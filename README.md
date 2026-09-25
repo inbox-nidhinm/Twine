@@ -60,7 +60,13 @@ Animation is being rebuilt around Jitter-style actions (see `docs/redesign.md`).
 Press M to switch between the two modes. They never share a control:
 
 - **Design** shows the layout as designed, with no animation, and its inspector edits the design.
-- **Animate** shows the moment at the playhead. Select a layer and use Add Action in the inspector to add an action at the playhead, half a second long. On the canvas you can select and drag layers, which moves their design position, and the animation moves with them. Editing an action's values arrives with redesign milestone 5.
+- **Animate** shows the moment at the playhead. Select a layer and use Add Action in the inspector to add an action at the playhead, half a second long. Select an action (on the timeline, or straight after adding it) and the inspector shows only its fields: start and length, easing (None, Smooth, Slow down, Accelerate, Overshoot, Spring, each with an intensity, or a Custom curve), To or By where it applies, the starting value (leave it empty to start from wherever the layer is; the greyed number is what it would start from), and the end value. Several actions of one kind edit together; mixed kinds share timing and easing.
+
+On the canvas in Animate:
+
+- With no action selected, dragging a layer moves its design position, and its animation moves with it (To moves included).
+- With a Move selected, its path shows: a hollow dot where it starts, a filled dot where it ends, and a curved path's two handles. Drag the layer, or the end dot, to set where it ends; the layer stays where it rests. Drag the handles to bend the path. Drag the start dot to set where it starts (over the layer, hold ⌘).
+- With a Resize, Scale or Rotate selected, the layer's outline and handles show it as it will be at the end of the action; drag a handle (or just outside a corner, for Rotate) to set the end, and the playhead goes to the action's end so the layer follows.
 
 The timeline runs the full width of the window in Animate, with the panels above it; drag its top edge to change its height, which every window remembers. Each layer with actions has a divider with its name, then one row per action.
 
@@ -79,7 +85,7 @@ The timeline runs the full width of the window in Animate, with the panels above
 | Click an eye | Switch an action off without deleting it |
 | Double-click a bar | Rename it |
 | ← and → | Move the selected actions a frame (Shift for ten) |
-| ⌫, ⌘C, ⌘V, ⌘D | Delete, copy, paste at the playhead (onto the selected layers), duplicate after the originals |
+| ⌫, ⌘C, ⌘V, ⌘D | Delete, copy, paste at the playhead (onto the selected layers), duplicate after the originals. After a click in the timeline, Delete only ever removes actions |
 | Stagger (timeline header, or Edit menu) | Start the selected actions a set gap apart, in row order |
 | Filter (timeline header) | Show only the selected layers' actions |
 | ⌘-scroll or pinch | Zoom the time axis |
@@ -90,4 +96,4 @@ Bars snap to the playhead, the scene's start and end, and other actions' starts 
 
 ## Status
 
-Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then redesign milestones 2 to 4 of 8: the action model and its evaluation, separate Design and Animate modes, and the action timeline. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.
+Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then redesign milestones 2 to 5 of 8: the action model and its evaluation, separate Design and Animate modes, the action timeline, and editing actions in the inspector and on the canvas. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.

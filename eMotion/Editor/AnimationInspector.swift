@@ -3,16 +3,21 @@ import MotionModel
 import MotionEditing
 import Theme
 
-/// Animate mode's inspector. It never shows design properties: with layers
-/// selected it offers the actions they can take, added at the playhead.
-/// With nothing selected it is empty.
+/// Animate mode's inspector. It never shows design properties: with actions
+/// selected it shows their fields; with only layers selected it offers the
+/// actions they can take, added at the playhead. With nothing selected it
+/// is empty.
 struct AnimationInspector: View {
     let controller: EditorController
     @Bindable var editor: EditorModel
 
     var body: some View {
         let layers = controller.selectedLayers
-        if !layers.isEmpty {
+        let actions = controller.selectedActions
+        if !actions.isEmpty {
+            ActionInspector(controller: controller, actions: actions)
+                .id(actions.map(\.id))
+        } else if !layers.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 HeaderRow(title: "Actions") {}
                 AddActionButton(kinds: controller.availableActions) { controller.addAction($0) }

@@ -261,6 +261,9 @@ struct UnitField: View {
         .frame(height: Theme.control)
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+        // A click anywhere in the box, its letter included, starts typing.
+        .contentShape(Rectangle())
+        .onTapGesture { focused = true }
     }
 
     private func format(_ v: Double) -> String {
@@ -270,7 +273,7 @@ struct UnitField: View {
 
     /// Up to `decimals` places, with trailing zeros dropped, so 5 reads `5`
     /// and 2.5 reads `2.5` rather than `2.50`.
-    private static func trimmed(_ v: Double, _ decimals: Int) -> String {
+    static func trimmed(_ v: Double, _ decimals: Int) -> String {
         var s = String(format: "%.\(decimals)f", v)
         if s.contains(".") {
             while s.hasSuffix("0") { s.removeLast() }
@@ -291,6 +294,72 @@ struct UnitField: View {
             text = format(v)
         } else {
             text = format(value)
+        }
+    }
+}
+
+/// A number that may be left empty. Empty shows `placeholder` greyed, the
+/// value the field falls back to; typing a number sets it, and deleting the
+/// number empties it again.
+struct OptionalField: View {
+    var unit: String = ""
+    let value: Double?
+    let placeholder: Double
+    var decimals: Int = 0
+    var suffix: String = ""
+    var accepts: (Double) -> Bool = { _ in true }
+    /// Nil when the field is emptied.
+    let commit: (Double?) -> Void
+
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 7) {
+            if !unit.isEmpty {
+                Text(unit)
+                    .font(ThemeFont.unit)
+                    .foregroundStyle(Theme.textTertiary)
+            }
+            TextField("", text: $text, prompt: Text(format(placeholder)).foregroundStyle(Theme.textTertiary))
+                .textFieldStyle(.plain)
+                .font(ThemeFont.label)
+                .monospacedDigit()
+                .foregroundStyle(Theme.textPrimary)
+                .focused($focused)
+                .onSubmit(apply)
+                .onChange(of: focused) { _, now in if !now { apply() } }
+                .onAppear { text = value.map(format) ?? "" }
+                .onChange(of: value) { old, now in
+                    if !focused || text == (old.map(format) ?? "") { text = now.map(format) ?? "" }
+                }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: Theme.control)
+        .frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+        // A click anywhere in the box, its letter included, starts typing.
+        .contentShape(Rectangle())
+        .onTapGesture { focused = true }
+    }
+
+    private func format(_ v: Double) -> String {
+        let number = decimals == 0 ? String(Int(v.rounded())) : UnitField.trimmed(v, decimals)
+        return suffix.isEmpty ? number : "\(number) \(suffix)"
+    }
+
+    private func apply() {
+        var typed = text.trimmingCharacters(in: .whitespaces)
+        if !suffix.isEmpty, typed.hasSuffix(suffix) { typed.removeLast(suffix.count) }
+        typed = typed.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        if typed.isEmpty {
+            if value != nil { commit(nil) }
+            text = ""
+        } else if let v = Double(typed), v.isFinite, accepts(v) {
+            if value.map({ abs($0 - v) > .ulpOfOne }) ?? true { commit(v) }
+            text = format(v)
+        } else {
+            text = value.map(format) ?? ""
         }
     }
 }

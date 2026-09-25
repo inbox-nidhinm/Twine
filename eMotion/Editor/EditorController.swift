@@ -70,6 +70,11 @@ final class EditorController {
         } else {
             editor.selection = Set(ids)
         }
+        // Actions on layers no longer selected are let go of, so they do not
+        // come back selected the next time their layer is picked.
+        let selectedLayers = editor.selection
+        let keep = project.actions.filter { editor.selectedActions.contains($0.id) && selectedLayers.contains($0.targetLayerID) }
+        editor.selectedActions = Set(keep.map(\.id))
     }
 
     func selectAll() {
@@ -78,6 +83,7 @@ final class EditorController {
 
     func deselectAll() {
         editor.selection = []
+        editor.selectedActions = []
     }
 
     /// Whether a layer or anything above it is locked, so it cannot be picked
@@ -106,7 +112,22 @@ final class EditorController {
     func edit(_ id: UUID, _ change: (inout Layer) -> Void) {
         guard var layer = project.layer(withID: id) else { return }
         change(&layer)
-        perform(.updateLayers([layer]))
+        perform(layerUpdate([layer]))
+    }
+
+    /// Layer edits as one command. A layer whose design position moved
+    /// takes its Move actions' absolute positions (To ends, initial values)
+    /// with it, so its whole animation travels with it in either mode.
+    func layerUpdate(_ layers: [Layer]) -> EditorCommand {
+        var carried: [Action] = []
+        for layer in layers {
+            guard let old = project.layer(withID: layer.id) else { continue }
+            let delta = layer.transform.position - old.transform.position
+            guard delta != .zero else { continue }
+            carried += project.actions(on: layer.id).filter { $0.spec.kind == .move }
+                .map { $0.remapped(point: { $0 + delta }, vector: { $0 }) }
+        }
+        return carried.isEmpty ? .updateLayers(layers) : .batch([.updateLayers(layers), .updateActions(carried)], name: "Edit Layer")
     }
 
     /// Changes every selected layer the same way, as one undo step.
@@ -117,7 +138,7 @@ final class EditorController {
             return l
         }
         guard !edited.isEmpty else { return }
-        perform(.updateLayers(edited))
+        perform(layerUpdate(edited))
     }
 
     // MARK: Continuous changes (drags and sliders)
@@ -125,7 +146,7 @@ final class EditorController {
     func begin(_ name: String) { store.beginContinuousChange(name) }
 
     func update(_ layers: [Layer]) {
-        try? store.updateContinuousChange(.updateLayers(layers))
+        try? store.updateContinuousChange(layerUpdate(layers))
     }
 
     func update(_ command: EditorCommand) {
@@ -236,6 +257,44 @@ final class EditorController {
 
     // MARK: Editing actions
 
+    /// What an action picks up from when it has no initial value: its layer
+    /// at the action's start, with the earlier actions on its channel.
+    func inheritedState(for action: Action) -> LayerState? {
+        guard let layer = project.layer(withID: action.targetLayerID) else { return nil }
+        return ActionTracks(project.actions).inheritedState(for: action, of: layer)
+    }
+
+    /// Changes every selected action the same way, as one undo step.
+    func editActions(_ name: String, _ change: (inout Action) -> Void) {
+        let edited = selectedActions.map { action -> Action in
+            var a = action
+            change(&a)
+            return a
+        }
+        guard !edited.isEmpty else { return }
+        perform(.batch([.updateActions(edited)], name: name))
+    }
+
+    /// The same, as one step of a drag or a slider, between `begin` and `end`.
+    func updateActions(_ change: (inout Action) -> Void) {
+        let edited = selectedActions.map { action -> Action in
+            var a = action
+            change(&a)
+            return a
+        }
+        guard !edited.isEmpty else { return }
+        update(.updateActions(edited))
+    }
+
+    /// The one action the canvas edits: a single selected action, in
+    /// Animate, whose layer is the only one selected.
+    var canvasAction: Action? {
+        let actions = selectedActions
+        guard editor.mode == .animate, actions.count == 1, let action = actions.first,
+              selection == [action.targetLayerID] else { return nil }
+        return action
+    }
+
     func deleteSelectedActions() {
         let ids = Set(selectedActions.map(\.id))
         guard !ids.isEmpty else { return }
@@ -333,7 +392,9 @@ final class EditorController {
     // MARK: Arranging
 
     func deleteSelection() {
-        if timelineHasFocus, !selectedActions.isEmpty { return deleteSelectedActions() }
+        // After a click in the timeline, Delete is for actions only; with
+        // none selected it does nothing rather than reaching for the layer.
+        if timelineHasFocus { return deleteSelectedActions() }
         let ids = selection
         guard !ids.isEmpty else { return }
         perform(.deleteLayers(Set(ids)))
@@ -407,7 +468,7 @@ final class EditorController {
             layer.translated(by: parentDelta(delta, for: layer.id, in: scene))
         }
         guard !moved.isEmpty else { return }
-        perform(.updateLayers(moved))
+        perform(layerUpdate(moved))
     }
 
     /// A composition-space movement expressed in a layer's parent's space,

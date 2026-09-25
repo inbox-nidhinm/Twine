@@ -37,12 +37,43 @@ enum CanvasDrag {
         var base: Set<UUID>
     }
 
+    /// Editing the selected action from the canvas, in Animate.
+    struct ActionEdit {
+        enum Part {
+            case pathStart, pathEnd, startHandle, endHandle
+            /// The layer itself, for a Move: where it is dropped is the end,
+            /// counted from where it shows at the playhead.
+            case body
+            /// A resize handle, for a Resize or a Scale.
+            case handle(Int)
+            /// Just outside a corner, for a Rotate.
+            case rotate
+        }
+
+        /// The action as it was when the drag began; every step works from it.
+        let action: Action
+        let part: Part
+        /// Where the drag began, in composition space.
+        let start: Vec2
+        /// What the action inherits at its start.
+        let from: LayerState
+        let parentInverse: Affine
+        /// The layer's position at the playhead when the drag began, in its
+        /// parent's space.
+        let shown: Vec2
+        /// The layer as it looks at the action's end, which is where the
+        /// playhead goes for drags that set an end value.
+        let atEnd: ResolvedLayer?
+        let worldAtEnd: Affine?
+    }
+
     case create(Create)
     case move(Move)
     case resize(Resize)
     case rotate(Edit)
     case anchor(Edit)
     case marquee(Marquee)
+    case action(ActionEdit)
 
     var marqueeRect: CGRect? {
         guard case .marquee(let m) = self else { return nil }

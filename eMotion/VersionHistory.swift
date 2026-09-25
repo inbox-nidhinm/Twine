@@ -23,6 +23,15 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Editing actions", changes: [
+            "Select an action and the inspector shows only its fields: start and length, easing, To or By, where it starts and where it ends. Several actions of one kind edit together.",
+            "Easing: None, Smooth, Slow down, Accelerate, Overshoot and Spring, each with an intensity, or a Custom curve with handles to drag.",
+            "A starting value can be left empty, and then it starts from wherever the layer is; the greyed number shows what that will be. Switching between To and By keeps the motion as it was.",
+            "A selected Move shows its path on the canvas. Drag the layer or the end dot to set where it ends, turn on Curved path and drag its handles to bend it, and drag the start dot (with Command, over the layer) to set where it starts.",
+            "A selected Resize, Scale or Rotate shows the layer as it will be at its end, with handles to drag.",
+            "Moving a layer's design position carries all of its moves along, To moves included.",
+            "Clicking anywhere in a number box starts typing, not just on the number. After a click in the timeline, Delete only removes actions.",
+        ]),
         .init(date: "26 September 2026", title: "The action timeline", changes: [
             "In Animate the timeline runs the full width of the window, with the panels above it. Drag its top edge to change its height; every window remembers it.",
             "One row per action, under a divider for its layer, in the layers panel's order. Each bar shows its action, name and layer; hide and show are small markers.",

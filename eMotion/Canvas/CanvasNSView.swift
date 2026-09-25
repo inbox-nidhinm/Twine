@@ -271,7 +271,12 @@ final class CanvasNSView: NSView {
     private func redrawOverlay() {
         guard let scene, let controller else { return }
         var outlines: [[CGPoint]] = []
+        let endBox = actionEndBox()
         for id in selection {
+            if let endBox, id == controller.canvasAction?.targetLayerID {
+                outlines.append(endBox.box)
+                continue
+            }
             guard let corners = scene.worldCorners(of: id) else { continue }
             outlines.append(corners.map(compositionToView))
         }
@@ -279,12 +284,16 @@ final class CanvasNSView: NSView {
         var handles: [CGPoint] = []
         var anchor: CGPoint?
         var union: [CGPoint]?
-        if selection.count == 1, let id = selection.first, !controller.isLocked(id), !animating,
+        // In Animate only a selected Resize or Scale brings the handles back,
+        // to set its end.
+        if let endBox, actionKindOnCanvas != .rotate {
+            handles = CanvasHandles.positions(for: endBox.box, isLine: endBox.isLine)
+        } else if selection.count == 1, let id = selection.first, !controller.isLocked(id), !animating,
            let corners = scene.worldCorners(of: id), let layer = scene.layer(id),
            let world = scene.worldTransform(of: id) {
             let view = corners.map(compositionToView)
             handles = CanvasHandles.positions(for: view, isLine: isLine(layer))
-            anchor = compositionToView(world.apply(layer.anchor))
+            if !animating { anchor = compositionToView(world.apply(layer.anchor)) }
         } else if selection.count > 1 {
             let points = outlines.flatMap { $0 }
             if let first = points.first {
@@ -300,7 +309,44 @@ final class CanvasNSView: NSView {
         }
 
         overlay.update(outlines: outlines, union: union, handles: handles, anchor: anchor,
-                       hover: hover, marquee: drag?.marqueeRect)
+                       hover: hover, marquee: drag?.marqueeRect, motion: motionOverlay())
+    }
+
+    /// The kind of the action the canvas is editing, in Animate.
+    private var actionKindOnCanvas: ActionKind? {
+        animating ? controller?.canvasAction?.spec.kind : nil
+    }
+
+    /// A selected Resize, Scale or Rotate edits the layer as it is at the
+    /// action's end, so its outline and handles are drawn there, in view
+    /// points: grabbing one takes the playhead to the end and the layer
+    /// lines up under the pointer.
+    private func actionEndBox() -> (box: [CGPoint], isLine: Bool)? {
+        guard animating, let controller, let action = controller.canvasAction,
+              [.resize, .scale, .rotate].contains(action.spec.kind) else { return nil }
+        let end = evaluate(controller.project, at: action.end)
+        guard let corners = end.worldCorners(of: action.targetLayerID), let layer = end.layer(action.targetLayerID) else { return nil }
+        return (corners.map(compositionToView), isLine(layer))
+    }
+
+    /// The selected Move's path in view points, when there is one to show.
+    private func motionOverlay() -> CanvasOverlay.Motion? {
+        guard animating, let controller, let action = controller.canvasAction, case .move(let m) = action.spec,
+              let from = controller.inheritedState(for: action), let toView = parentToView(action.targetLayerID) else { return nil }
+        let p = ActionGeometry.path(of: m, from: from.position)
+        return CanvasOverlay.Motion(start: toView(p.start), end: toView(p.end),
+                                    startHandle: p.startHandle.map(toView), endHandle: p.endHandle.map(toView))
+    }
+
+    /// From a layer's parent's space, where its position lives, to view points.
+    private func parentToView(_ id: UUID) -> ((Vec2) -> CGPoint)? {
+        guard let scene, let project else { return nil }
+        var world = Affine.identity
+        if let parent = project.location(of: id)?.parentID {
+            guard let w = scene.worldTransform(of: parent) else { return nil }
+            world = w
+        }
+        return { [weak self] p in self?.compositionToView(world.apply(p)) ?? .zero }
     }
 
     private func isLine(_ layer: ResolvedLayer) -> Bool {
@@ -355,6 +401,13 @@ final class CanvasNSView: NSView {
 
         if tool.isShape, !animating {
             drag = .create(CanvasDrag.Create(tool: tool, start: point, layerID: nil))
+            return
+        }
+
+        // The selected action's own handles come first in Animate.
+        if animating, let action = controller.canvasAction,
+           beginActionEdit(action, at: point, viewPoint: viewPoint, commandHeld: event.modifierFlags.contains(.command)) {
+            redrawOverlay()
             return
         }
 
@@ -474,6 +527,11 @@ final class CanvasNSView: NSView {
             marquee.current = viewPoint
             self.drag = .marquee(marquee)
             selectInMarquee(marquee)
+
+        case .action(let edit):
+            if let edited = editedAction(edit, pointer: point, shift: shift) {
+                controller.update(.updateActions([edited]))
+            }
         }
         redrawOverlay()
     }
@@ -500,12 +558,156 @@ final class CanvasNSView: NSView {
             }
             // Back to the arrow after drawing, as in Figma.
             controller.editor.tool = .select
-        case .move, .resize, .rotate, .anchor:
+        case .move, .resize, .rotate, .anchor, .action:
             controller.end()
         case .marquee:
             break
         }
         redrawOverlay()
+    }
+
+    // MARK: Editing the selected action
+
+    /// Starts a drag on the selected action's path, handles or layer, if the
+    /// click landed on one.
+    private func beginActionEdit(_ action: Action, at point: Vec2, viewPoint: CGPoint, commandHeld: Bool) -> Bool {
+        guard let controller, let scene, let from = controller.inheritedState(for: action),
+              let parentInverse = parentInverse(of: action.targetLayerID) else { return false }
+        let id = action.targetLayerID
+
+        func start(_ part: CanvasDrag.ActionEdit.Part, seekingToEnd: Bool) -> Bool {
+            let endScene = evaluate(controller.project, at: action.end)
+            drag = .action(CanvasDrag.ActionEdit(action: action, part: part, start: point, from: from,
+                                                 parentInverse: parentInverse, shown: scene.layer(id)?.position ?? from.position,
+                                                 atEnd: endScene.layer(id), worldAtEnd: endScene.worldTransform(of: id)))
+            // Handles set an end size, scale or angle against the layer as
+            // it looks at the end, so the playhead goes there and the box
+            // follows the pointer.
+            if seekingToEnd {
+                controller.stop()
+                controller.seek(to: action.end)
+            }
+            controller.begin("Edit \(action.name)")
+            return true
+        }
+
+        switch action.spec {
+        case .move:
+            let onLayer = layer(at: point, deep: false) == id || layer(at: point, deep: true) == id
+            if let route = motionOverlay() {
+                func near(_ p: CGPoint?) -> Bool {
+                    p.map { hypot($0.x - viewPoint.x, $0.y - viewPoint.y) <= CanvasOverlay.motionHit } ?? false
+                }
+                if near(route.startHandle) { return start(.startHandle, seekingToEnd: false) }
+                if near(route.endHandle) { return start(.endHandle, seekingToEnd: false) }
+                if near(route.end) { return start(.pathEnd, seekingToEnd: false) }
+                // The start usually sits right where the layer is grabbed to
+                // set the end, so over the layer it takes Command, as the
+                // anchor does in Design.
+                if near(route.start), commandHeld || !onLayer { return start(.pathStart, seekingToEnd: false) }
+            }
+            if onLayer { return start(.body, seekingToEnd: false) }
+        case .resize, .scale:
+            if let end = actionEndBox(), let handle = CanvasHandles.handle(at: viewPoint, box: end.box, isLine: end.isLine) {
+                return start(.handle(handle), seekingToEnd: true)
+            }
+        case .rotate:
+            if let end = actionEndBox(), CanvasHandles.isRotateZone(viewPoint, box: end.box) {
+                return start(.rotate, seekingToEnd: true)
+            }
+        case .opacity, .visibility:
+            break
+        }
+        return false
+    }
+
+    /// The action as the drag has it now, worked out from the action as it
+    /// was when the drag began.
+    private func editedAction(_ edit: CanvasDrag.ActionEdit, pointer: Vec2, shift: Bool) -> Action? {
+        var a = edit.action
+        let inParent = edit.parentInverse.apply(pointer)
+        switch (edit.part, edit.action.spec) {
+        case (.pathStart, .move(let m)):
+            a.spec = .move(ActionGeometry.settingStart(m, to: inParent, from: edit.from.position))
+        case (.pathEnd, .move(let m)):
+            a.spec = .move(ActionGeometry.settingEnd(m, to: inParent, from: edit.from.position))
+        case (.startHandle, .move(let m)):
+            a.spec = .move(ActionGeometry.settingHandle(m, first: true, to: inParent, from: edit.from.position))
+        case (.endHandle, .move(let m)):
+            a.spec = .move(ActionGeometry.settingHandle(m, first: false, to: inParent, from: edit.from.position))
+        case (.body, .move(let m)):
+            // The layer stays where it rests; its path's end follows the
+            // pointer, and where it is dropped is where the move ends.
+            let delta = edit.parentInverse.applyToVector(pointer - edit.start)
+            a.spec = .move(ActionGeometry.settingEnd(m, to: edit.shown + delta, from: edit.from.position))
+        case (.handle(let handle), .resize(var r)):
+            guard let size = resizedEnd(edit, handle: handle, pointer: pointer, keepAspect: r.isLinked || shift) else { return nil }
+            r.end = size
+            a.spec = .resize(r)
+        case (.handle(let handle), .scale(let s)):
+            guard let scale = scaledEnd(edit, handle: handle, pointer: pointer, linked: s.isLinked || shift) else { return nil }
+            a.spec = .scale(ActionGeometry.settingEnd(s, to: scale, from: edit.from.scale))
+        case (.rotate, .rotate(let r)):
+            guard let layer = edit.atEnd, let world = edit.worldAtEnd else { return nil }
+            let pivot = world.apply(layer.anchor)
+            let a0 = atan2(edit.start.y - pivot.y, edit.start.x - pivot.x)
+            let a1 = atan2(pointer.y - pivot.y, pointer.x - pivot.x)
+            // The turn since the drag began, the short way round, so crossing
+            // the left of the pivot does not jump a whole circle.
+            var turn = (a1 - a0) * 180 / .pi
+            turn -= 360 * (turn / 360).rounded()
+            var angle = layer.rotation + turn
+            if shift { angle = (angle / 15).rounded() * 15 }
+            a.spec = .rotate(ActionGeometry.settingEnd(r, to: angle, from: edit.from.rotation))
+        default:
+            return nil
+        }
+        return a
+    }
+
+    /// A Resize's end from a handle dragged to `pointer`. The box grows
+    /// around its anchor, as the action does, so the far side moves too.
+    private func resizedEnd(_ edit: CanvasDrag.ActionEdit, handle: Int, pointer: Vec2, keepAspect: Bool) -> Size2? {
+        guard let layer = edit.atEnd, let inverse = edit.worldAtEnd?.inverted else { return nil }
+        let local = inverse.apply(pointer)
+        let size = layer.size, anchor = layer.anchor
+        func span(_ p: Double, _ a: Double, _ length: Double, far: Bool) -> Double {
+            let f = length > 0 ? a / length : 0.5
+            if far { return f < 1 ? max((p - a) / (1 - f), 0) : max(2 * (p - a), 0) }
+            return f > 0 ? max((a - p) / f, 0) : max(2 * (a - p), 0)
+        }
+        var w = size.width, h = size.height
+        if [2, 3, 4].contains(handle) { w = span(local.x, anchor.x, size.width, far: true) }
+        if [0, 6, 7].contains(handle) { w = span(local.x, anchor.x, size.width, far: false) }
+        if [4, 5, 6].contains(handle) { h = span(local.y, anchor.y, size.height, far: true) }
+        if [0, 1, 2].contains(handle) { h = span(local.y, anchor.y, size.height, far: false) }
+        if keepAspect, size.width > 0, size.height > 0 {
+            let rw = w / size.width, rh = h / size.height
+            let r = [1, 5].contains(handle) ? rh : [3, 7].contains(handle) ? rw : max(rw, rh)
+            w = size.width * r
+            h = size.height * r
+        }
+        return Size2((w * 10).rounded() / 10, (h * 10).rounded() / 10)
+    }
+
+    /// A Scale's end from a handle dragged to `pointer`: how far the handle
+    /// is from the anchor now, against how far it was.
+    private func scaledEnd(_ edit: CanvasDrag.ActionEdit, handle: Int, pointer: Vec2, linked: Bool) -> Vec2? {
+        guard let layer = edit.atEnd, let inverse = edit.worldAtEnd?.inverted else { return nil }
+        let local = inverse.apply(pointer)
+        let size = layer.size, anchor = layer.anchor
+        let hx = [2, 3, 4].contains(handle) ? size.width : [0, 6, 7].contains(handle) ? 0 : anchor.x
+        let hy = [4, 5, 6].contains(handle) ? size.height : [0, 1, 2].contains(handle) ? 0 : anchor.y
+        var rx = abs(hx - anchor.x) > 0.5 ? (local.x - anchor.x) / (hx - anchor.x) : 1
+        var ry = abs(hy - anchor.y) > 0.5 ? (local.y - anchor.y) / (hy - anchor.y) : 1
+        if [1, 5].contains(handle) { rx = linked ? ry : 1 }
+        if [3, 7].contains(handle) { ry = linked ? rx : 1 }
+        if linked, [0, 2, 4, 6].contains(handle) {
+            let r = abs(rx) > abs(ry) ? rx : ry
+            rx = r
+            ry = r
+        }
+        return Vec2(layer.scale.x * rx, layer.scale.y * ry)
     }
 
     private func parentInverse(of id: UUID) -> Affine? {
@@ -567,12 +769,21 @@ final class CanvasNSView: NSView {
     }
 
     private func updateCursor(at viewPoint: CGPoint) {
-        guard let scene, let controller, selection.count == 1, let id = selection.first, !controller.isLocked(id),
-              !animating, let corners = scene.worldCorners(of: id), let resolved = scene.layer(id) else { return }
-        let view = corners.map(compositionToView)
-        if let handle = CanvasHandles.handle(at: viewPoint, box: view, isLine: isLine(resolved)) {
+        guard let scene, let controller, selection.count == 1, let id = selection.first, !controller.isLocked(id) else { return }
+        let view: [CGPoint]
+        let line: Bool
+        if animating {
+            guard let end = actionEndBox() else { return }
+            view = end.box
+            line = end.isLine
+        } else {
+            guard let corners = scene.worldCorners(of: id), let resolved = scene.layer(id) else { return }
+            view = corners.map(compositionToView)
+            line = isLine(resolved)
+        }
+        if actionKindOnCanvas != .rotate, let handle = CanvasHandles.handle(at: viewPoint, box: view, isLine: line) {
             CanvasHandles.cursor(for: handle).set()
-        } else if CanvasHandles.isRotateZone(viewPoint, box: view) {
+        } else if !animating || actionKindOnCanvas == .rotate, CanvasHandles.isRotateZone(viewPoint, box: view) {
             NSCursor.crosshair.set()
         } else {
             NSCursor.arrow.set()
