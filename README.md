@@ -60,18 +60,34 @@ Animation is being rebuilt around Jitter-style actions (see `docs/redesign.md`).
 Press M to switch between the two modes. They never share a control:
 
 - **Design** shows the layout as designed, with no animation, and its inspector edits the design.
-- **Animate** shows the moment at the playhead. Select a layer and use Add Action in the inspector to add an action at the playhead, half a second long. On the canvas you can select and drag layers, which moves their design position, and the animation moves with them. Editing actions and their timeline rows arrive with redesign milestones 4 and 5.
+- **Animate** shows the moment at the playhead. Select a layer and use Add Action in the inspector to add an action at the playhead, half a second long. On the canvas you can select and drag layers, which moves their design position, and the animation moves with them. Editing an action's values arrives with redesign milestone 5.
+
+The timeline runs the full width of the window in Animate, with the panels above it; drag its top edge to change its height, which every window remembers. Each layer with actions has a divider with its name, then one row per action.
 
 | | |
 |---|---|
 | M | Switch between Design and Animate |
 | Space | Play or pause (Animate) |
-| [ and ] | Previous and next frame |
+| , and . | Previous and next frame (Shift for ten frames) |
+| ⌥, and ⌥. | Previous and next start or end of an action |
 | Home, End | Go to the start or the end |
 | Click or drag the ruler | Scrub |
-| ⌘-scroll or pinch on the tracks | Zoom the time axis |
+| Drag the end marker on the ruler | Make the scene longer or shorter |
+| Click, Shift-click, ⌘-click, drag a box | Select actions (their layers are selected with them) |
+| Drag a bar | Move it in time; drop it on another of its layer's rows to reorder |
+| Drag a bar's end | Change its length; with ⌥, both ends move around the middle |
+| Click an eye | Switch an action off without deleting it |
+| Double-click a bar | Rename it |
+| ← and → | Move the selected actions a frame (Shift for ten) |
+| ⌫, ⌘C, ⌘V, ⌘D | Delete, copy, paste at the playhead (onto the selected layers), duplicate after the originals |
+| Stagger (timeline header, or Edit menu) | Start the selected actions a set gap apart, in row order |
+| Filter (timeline header) | Show only the selected layers' actions |
+| ⌘-scroll or pinch | Zoom the time axis |
+| Scroll sideways, or ⌥-drag empty space | Pan |
 | Click the time readout | Switch between seconds and frames |
+
+Bars snap to the playhead, the scene's start and end, and other actions' starts and ends, and always land on frames.
 
 ## Status
 
-Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then redesign milestones 2 and 3 of 8: the action model and its evaluation, and separate Design and Animate modes. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.
+Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then redesign milestones 2 to 4 of 8: the action model and its evaluation, separate Design and Animate modes, and the action timeline. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.

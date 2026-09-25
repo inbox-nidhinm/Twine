@@ -82,6 +82,8 @@ enum MainMenu {
         menu.addItem(item("Duplicate", #selector(EditorWindowController.duplicateLayers(_:)), "d"))
         menu.addItem(item("Rename Layer", #selector(EditorWindowController.renameLayer(_:)), "r"))
         menu.addItem(.separator())
+        menu.addItem(item("Stagger Actions…", #selector(EditorWindowController.staggerActions(_:))))
+        menu.addItem(.separator())
         menu.addItem(item("Group", #selector(EditorWindowController.groupLayers(_:)), "g"))
         menu.addItem(item("Ungroup", #selector(EditorWindowController.ungroupLayers(_:)), "g", [.command, .shift]))
         menu.addItem(.separator())
@@ -112,14 +114,16 @@ enum MainMenu {
         return menu
     }
 
-    /// Space, the brackets, Home and End work on the canvas and the timeline
+    /// Space, comma, full stop, Home and End work on the canvas and the timeline
     /// without being menu keys, so a space typed into a field stays a space.
     /// The menu names them so they can be found.
     private static func playbackMenu() -> NSMenu {
         let menu = NSMenu(title: "Playback")
         menu.addItem(item("Play or Pause    Space", #selector(EditorWindowController.togglePlayback(_:))))
-        menu.addItem(item("Previous Frame    [", #selector(EditorWindowController.previousFrame(_:))))
-        menu.addItem(item("Next Frame    ]", #selector(EditorWindowController.nextFrame(_:))))
+        menu.addItem(item("Previous Frame    ,", #selector(EditorWindowController.previousFrame(_:))))
+        menu.addItem(item("Next Frame    .", #selector(EditorWindowController.nextFrame(_:))))
+        menu.addItem(item("Previous Action Edge    ⌥,", #selector(EditorWindowController.previousEdge(_:))))
+        menu.addItem(item("Next Action Edge    ⌥.", #selector(EditorWindowController.nextEdge(_:))))
         menu.addItem(item("Go to Start    Home", #selector(EditorWindowController.goToStart(_:))))
         menu.addItem(item("Go to End    End", #selector(EditorWindowController.goToEnd(_:))))
         menu.addItem(.separator())

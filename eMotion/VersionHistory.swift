@@ -23,6 +23,15 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "The action timeline", changes: [
+            "In Animate the timeline runs the full width of the window, with the panels above it. Drag its top edge to change its height; every window remembers it.",
+            "One row per action, under a divider for its layer, in the layers panel's order. Each bar shows its action, name and layer; hide and show are small markers.",
+            "Drag a bar to move it in time, or onto another of its layer's rows to reorder. Drag an end to change its length, with Option for both ends. Bars snap to the playhead, the scene's ends and other actions, and land on frames.",
+            "Click, Shift-click, Command-click or drag a box to select; the actions' layers are selected with them. Click an eye to switch an action off. Double-click a bar to rename it.",
+            "Delete, copy, paste at the playhead onto the selected layers, and duplicate after the originals. Arrow keys move selected actions a frame, Shift ten. Stagger spaces selected actions by a gap you choose.",
+            "Comma and full stop step a frame (Shift for ten, Option for the previous or next action edge). Drag the end marker on the ruler to change the scene's length. Option-drag or scroll sideways to pan.",
+            "The filter in the timeline's header shows only the selected layers' actions. Copying and pasting a layer brings its actions with it.",
+        ]),
         .init(date: "26 September 2026", title: "Design and Animate, apart", changes: [
             "Press M to switch modes. Design shows the layout as designed, with no animation, and only design settings. Animate shows the moment at the playhead and never shows design settings.",
             "In Animate, select a layer and use Add Action to add a move, scale, rotate, opacity, resize or hide/show at the playhead, half a second long. The inspector lists the layer's actions.",

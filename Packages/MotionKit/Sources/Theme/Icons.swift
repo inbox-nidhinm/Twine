@@ -7,6 +7,13 @@ import SwiftUI
 ///
 /// Parsed once on first use and cached. See `IconShape` for the drawing.
 public enum Icon: String, CaseIterable, Sendable {
+    case filter
+    case move
+    case opacity
+    case resize
+    case rotate
+    case scale
+    case stagger
     case corners
     case link
     case unlink
@@ -51,6 +58,41 @@ public enum Icon: String, CaseIterable, Sendable {
     /// The subpaths, in the order they are drawn.
     public var data: [String] {
         switch self {
+        case .filter: return [   // Actions/filter.svg
+            "M4 5 H20 L14 12 V19 L10 17 V12 Z"
+        ]
+        case .move: return [   // Actions/move.svg
+            "M4 12 H19",
+            "M15 8 L19 12 L15 16",
+            "M4 9 V15"
+        ]
+        case .opacity: return [   // Actions/opacity.svg
+            "M12 4 C16.418 4 20 7.582 20 12 C20 16.418 16.418 20 12 20 C7.582 20 4 16.418 4 12 C4 7.582 7.582 4 12 4 Z",
+            "M12 4 V20",
+            "M12 8 L18.5 8",
+            "M12 12 L20 12",
+            "M12 16 L18.5 16"
+        ]
+        case .resize: return [   // Actions/resize.svg
+            "M4 10 V4 H10",
+            "M14 20 H20 V14",
+            "M4 4 L10 10",
+            "M20 20 L14 14"
+        ]
+        case .rotate: return [   // Actions/rotate.svg
+            "M19 12 C19 15.866 15.866 19 12 19 C8.134 19 5 15.866 5 12 C5 8.134 8.134 5 12 5 C14.3 5 16.3 6.1 17.6 7.8",
+            "M18 3.5 V8 H13.5"
+        ]
+        case .scale: return [   // Actions/scale.svg
+            "M5 19 L19 5",
+            "M13 5 H19 V11",
+            "M5 13 V19 H11"
+        ]
+        case .stagger: return [   // Actions/stagger.svg
+            "M4 7 H10",
+            "M8 12 H14",
+            "M12 17 H20"
+        ]
         case .corners: return [   // Inspector/corners.svg
             "M4 9 V6 C4 4.895 4.895 4 6 4 H9",
             "M15 4 H18 C19.105 4 20 4.895 20 6 V9",

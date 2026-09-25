@@ -39,11 +39,10 @@ struct EditorView: View {
                 }
             }
             .padding(Theme.floatInset)
+            // In Animate the panels stop above the timeline.
+            .padding(.bottom, editor.mode == .animate ? editor.timelineHeight + Theme.floatGap : 0)
 
             bottomSurface
-                .padding(.bottom, Theme.floatInset)
-                .padding(.leading, leftGutter)
-                .padding(.trailing, rightGutter)
 
             MenuLayer()
         }
@@ -55,13 +54,16 @@ struct EditorView: View {
         .tint(Theme.accent)
     }
 
-    /// Design mode floats the tools in a bar centred under the canvas;
-    /// Animate mode swaps it for the timeline, which runs the full width
-    /// between the panels.
+    /// Design mode floats the tools in a bar centred under the canvas,
+    /// between the panels; Animate mode swaps it for the timeline, which
+    /// runs the full width of the window with the panels above it.
     @ViewBuilder private var bottomSurface: some View {
         switch editor.mode {
         case .design:
             ToolBar(editor: editor)
+                .padding(.bottom, Theme.floatInset)
+                .padding(.leading, leftGutter)
+                .padding(.trailing, rightGutter)
                 .transition(.opacity)
         case .animate:
             TimelinePanel(controller: controller, editor: editor)
@@ -69,7 +71,7 @@ struct EditorView: View {
                 .frame(maxWidth: .infinity)
                 .floatingPanel()
                 .overlay(alignment: .top) { timelineGrip }
-                .padding(.horizontal, Theme.floatGap)
+                .padding(Theme.floatInset)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
@@ -83,9 +85,13 @@ struct EditorView: View {
             .gesture(DragGesture(coordinateSpace: .global)
                 .onChanged { g in
                     if gripStart == nil { gripStart = editor.timelineHeight }
-                    editor.timelineHeight = min(max((gripStart ?? 260) - g.translation.height, 140), 640)
+                    let range = EditorModel.timelineHeightRange
+                    editor.timelineHeight = min(max((gripStart ?? 260) - g.translation.height, range.lowerBound), range.upperBound)
                 }
-                .onEnded { _ in gripStart = nil })
+                .onEnded { _ in
+                    gripStart = nil
+                    editor.saveTimelineHeight()
+                })
             .offset(y: -3)
     }
 

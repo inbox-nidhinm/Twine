@@ -1,4 +1,5 @@
 import AppKit
+import Theme
 import SwiftUI
 import MotionEditing
 
@@ -78,6 +79,18 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     @objc func previousFrame(_ sender: Any?) { controller.step(-1) }
     @objc func nextFrame(_ sender: Any?) { controller.step(1) }
     @objc func goToStart(_ sender: Any?) { controller.jumpToStart() }
+    @objc func previousEdge(_ sender: Any?) { controller.jumpToEdge(forward: false) }
+    @objc func nextEdge(_ sender: Any?) { controller.jumpToEdge(forward: true) }
+
+    /// Raises the stagger card over the top of the timeline.
+    @objc func staggerActions(_ sender: Any?) {
+        guard let height = window?.contentView?.bounds.height else { return }
+        let origin = CGPoint(x: Theme.floatInset + Theme.floatGap,
+                             y: height - Theme.floatInset - editor.timelineHeight + Theme.barRow + 4)
+        menus.showPopup(at: origin) {
+            StaggerCard(controller: controller) { [menus] in menus.dismiss() }
+        }
+    }
     @objc func goToEnd(_ sender: Any?) { controller.jumpToEnd() }
     @objc func toggleLoop(_ sender: Any?) { editor.loops.toggle() }
 
@@ -104,8 +117,11 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         case #selector(togglePlayback(_:)):
             item.title = (editor.isPlaying ? "Pause" : "Play") + "    Space"
             return editor.mode == .animate
-        case #selector(previousFrame(_:)), #selector(nextFrame(_:)), #selector(goToStart(_:)), #selector(goToEnd(_:)):
+        case #selector(previousFrame(_:)), #selector(nextFrame(_:)), #selector(goToStart(_:)), #selector(goToEnd(_:)),
+             #selector(previousEdge(_:)), #selector(nextEdge(_:)):
             return editor.mode == .animate
+        case #selector(staggerActions(_:)):
+            return editor.mode == .animate && controller.selectedActions.count > 1
         case #selector(toggleLoop(_:)):
             item.state = editor.loops ? .on : .off
         case #selector(selectAll(_:)):

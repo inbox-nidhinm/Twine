@@ -38,11 +38,28 @@ final class EditorModel {
     /// Whether times read as frame numbers rather than seconds.
     var showsFrames = false
 
-    /// Where the last click landed, so Delete, Copy and Paste can act on
+    /// Where the last click landed, so Delete, Copy and Paste act on
     /// actions after a click in the timeline and on layers otherwise.
     var focus: Focus = .canvas
-    /// The timeline card's height, which its top edge drags.
-    var timelineHeight: CGFloat = 260
+    /// Actions picked in the timeline. Their layers are selected with them.
+    var selectedActions: Set<UUID> = []
+    /// The timeline lists only the selected layers' actions.
+    var timelineOnlySelected = false
+    /// The timeline card's height, which its top edge drags. Remembered for
+    /// every window and every launch.
+    var timelineHeight: CGFloat = EditorModel.savedTimelineHeight
+
+    static let timelineHeightRange: ClosedRange<CGFloat> = 160...640
+    private static let timelineHeightKey = "timelineHeight"
+
+    static var savedTimelineHeight: CGFloat {
+        let saved = UserDefaults.standard.double(forKey: timelineHeightKey)
+        return saved > 0 ? min(max(saved, timelineHeightRange.lowerBound), timelineHeightRange.upperBound) : 260
+    }
+
+    func saveTimelineHeight() {
+        UserDefaults.standard.set(Double(timelineHeight), forKey: Self.timelineHeightKey)
+    }
 
     enum Focus { case canvas, timeline }
 

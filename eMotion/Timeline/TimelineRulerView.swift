@@ -4,7 +4,8 @@ import MotionModel
 import Theme
 
 /// The ruler over the tracks: ticks and times, the end of the composition,
-/// and the playhead's head. Click or drag anywhere on it to scrub.
+/// and the playhead's head. Click or drag anywhere on it to scrub; drag the
+/// end marker to make the scene longer or shorter.
 struct TimelineRuler: NSViewRepresentable {
     let controller: EditorController
     let editor: EditorModel
@@ -19,6 +20,7 @@ struct TimelineRuler: NSViewRepresentable {
         _ = (editor.time, editor.showsFrames, editor.viewport.pointsPerSecond, editor.viewport.start,
              controller.project.composition)
         view.needsDisplay = true
+        view.window?.invalidateCursorRects(for: view)
     }
 }
 
@@ -62,6 +64,14 @@ final class TimelineRulerView: NSView {
             t += minor
         }
 
+        // The scene's end, a marker to drag.
+        let ex = endX.rounded() + 0.5
+        ctx.setFillColor(NSColor(Theme.textSecondary).cgColor)
+        ctx.fill(CGRect(x: ex - 0.5, y: 0, width: 1, height: bounds.height))
+        ctx.addPath(CGPath(roundedRect: CGRect(x: ex - 4, y: bounds.height - 10, width: 8, height: 10),
+                           cornerWidth: 2, cornerHeight: 2, transform: nil))
+        ctx.fillPath()
+
         // The playhead's head, a tab on the line through the tracks.
         let px = viewport.x(for: controller.editor.time).rounded() + 0.5
         let head = CGRect(x: px - 5, y: bounds.height - 12, width: 10, height: 12)
@@ -87,13 +97,41 @@ final class TimelineRulerView: NSView {
 
     // MARK: Scrubbing
 
+    private var draggingEnd = false
+
     override func mouseDown(with event: NSEvent) {
-        controller?.stop()
+        guard let controller else { return }
+        let x = convert(event.locationInWindow, from: nil).x
+        if abs(x - controller.editor.viewport.x(for: controller.duration)) <= 5 {
+            draggingEnd = true
+            controller.begin("Scene Length")
+            return
+        }
+        controller.stop()
         scrub(event)
     }
 
     override func mouseDragged(with event: NSEvent) {
-        scrub(event)
+        guard let controller else { return }
+        if draggingEnd {
+            let x = convert(event.locationInWindow, from: nil).x
+            controller.setDuration(controller.editor.viewport.time(at: x))
+        } else {
+            scrub(event)
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        if draggingEnd {
+            draggingEnd = false
+            controller?.end()
+        }
+    }
+
+    override func resetCursorRects() {
+        guard let controller else { return }
+        let x = controller.editor.viewport.x(for: controller.duration)
+        addCursorRect(CGRect(x: x - 5, y: 0, width: 10, height: bounds.height), cursor: .resizeLeftRight)
     }
 
     private func scrub(_ event: NSEvent) {
