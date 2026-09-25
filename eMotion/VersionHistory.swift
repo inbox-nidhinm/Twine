@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "25 September 2026", title: "Fixes to fields and easing", changes: [
+            "A number typed into a field and confirmed with Return no longer goes back to the old value when you click somewhere else. The same for hex colours.",
+            "The Easing menu is greyed out when only a property's last keyframe is selected, since easing shapes the move to the next keyframe and there is none.",
+            "Menus open on every click.",
+        ]),
         .init(date: "25 September 2026", title: "The timeline", changes: [
             "Animate mode's timeline: a row per layer, with its bar from in point to out point, and its animated properties underneath when opened. Drag a bar to move the layer in time, or an end to trim it. Drag the timeline's top edge to make it taller.",
             "Keyframes on the timeline: click, Shift-click or drag a box to select, drag to move them, landing on frames and snapping to the playhead, other keyframes and the ends of layers. Delete, copy, paste at the playhead and duplicate follow whichever you clicked last, the timeline or the canvas.",

@@ -170,6 +170,7 @@ struct MenuRow: View {
     /// What the control reads when shut: the choice in force.
     let value: String
     let entries: () -> [MenuEntry]
+    var isEnabled = true
 
     @Environment(MenuHost.self) private var menus
     @State private var frame: CGRect = .zero
@@ -181,27 +182,32 @@ struct MenuRow: View {
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
                 .lineLimit(1)
-            HStack(spacing: 6) {
-                Text(value)
-                    .font(ThemeFont.label)
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                IconView(.chevronDown, size: 13)
-                    .foregroundStyle(Theme.textTertiary)
-            }
-            .padding(.horizontal, 8)
-            .frame(height: Theme.panelRow + 4)
-            .frame(maxWidth: .infinity)
-            .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
-                .fill(hovering ? Theme.panelHover : Theme.panelRaised))
-            .contentShape(Rectangle())
-            .onHover { hovering = $0 }
-            .onTapGesture {
+            // A real button rather than a tap gesture, so a click always
+            // lands and accessibility can press it.
+            Button {
                 // Flush with the row's left edge and just under it, so the menu
                 // reads as having come out of the control.
                 menus.show(entries(), at: CGPoint(x: frame.minX, y: frame.maxY + 4))
+            } label: {
+                HStack(spacing: 6) {
+                    Text(value)
+                        .font(ThemeFont.label)
+                        .foregroundStyle(isEnabled ? Theme.textPrimary : Theme.textTertiary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    IconView(.chevronDown, size: 13)
+                        .foregroundStyle(Theme.textTertiary)
+                }
+                .padding(.horizontal, 8)
+                .frame(height: Theme.panelRow + 4)
+                .frame(maxWidth: .infinity)
+                .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
+                    .fill(hovering && isEnabled ? Theme.panelHover : Theme.panelRaised))
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .disabled(!isEnabled)
+            .onHover { hovering = $0 }
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
         }
         .padding(.vertical, 2)

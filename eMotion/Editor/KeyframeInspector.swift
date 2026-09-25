@@ -25,13 +25,28 @@ struct KeyframeInspector: View {
         return first
     }
 
+    /// Easing shapes the move from a keyframe to the next one, so a
+    /// property's last keyframe has nothing to ease.
+    private var anyEases: Bool {
+        refs.contains { ref in
+            guard let layer = controller.project.layer(withID: ref.layerID),
+                  let marks = LayerProperties.get(ref.property, of: layer)?.marks,
+                  let mark = marks.first(where: { $0.id == ref.keyframeID }) else { return false }
+            return marks.contains { $0.time > mark.time }
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HeaderRow(title: refs.count == 1 ? "Keyframe" : "Keyframes") {}
             VStack(alignment: .leading, spacing: 10) {
                 if refs.count == 1, let ref = refs.first { timeField(ref) }
-                MenuRow(label: "Easing", value: shared.map(Self.name) ?? "Mixed", entries: entries)
-                switch shared {
+                MenuRow(label: "Easing", value: anyEases ? shared.map(Self.name) ?? "Mixed" : "None",
+                        entries: entries, isEnabled: anyEases)
+                    .help(anyEases
+                          ? "How the move from this keyframe to the next one speeds up and slows down."
+                          : "Easing shapes the move from a keyframe to the next one, and nothing comes after the last keyframe. Select the keyframe before it.")
+                switch anyEases ? shared : nil {
                 case .bezier(let curve):
                     CurveEditor(curve: curve, controller: controller)
                         .frame(height: 150)

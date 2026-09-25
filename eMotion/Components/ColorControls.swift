@@ -83,7 +83,7 @@ struct HexField: View {
                 .onSubmit(apply)
                 .onChange(of: focused) { _, now in if !now { apply() } }
                 .onAppear { text = color.hex6 }
-                .onChange(of: color) { _, now in if !focused { text = now.hex6 } }
+                .onChange(of: color) { old, now in if !focused || text == old.hex6 { text = now.hex6 } }
         }
         .padding(.horizontal, 8)
         .frame(height: Theme.control)
@@ -92,10 +92,14 @@ struct HexField: View {
     }
 
     private func apply() {
+        // The parsed colour, not `color`: that is still the old one until the
+        // view updates, and it would come back when the field lost focus.
         if var parsed = RGBA(hex: text) {
             parsed.a = color.a
             if parsed != color { commit(parsed) }
+            text = parsed.hex6
+        } else {
+            text = color.hex6
         }
-        text = color.hex6
     }
 }

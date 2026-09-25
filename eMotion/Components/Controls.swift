@@ -276,7 +276,8 @@ struct UnitField: View {
                 .onSubmit(apply)
                 .onChange(of: focused) { _, now in if !now { apply() } }
                 .onAppear { text = format(value) }
-                .onChange(of: value) { _, now in if !focused { text = format(now) } }
+                // Follows the value unless the field holds typing of its own.
+                .onChange(of: value) { old, now in if !focused || text == format(old) { text = format(now) } }
         }
         .padding(.horizontal, 8)
         .frame(height: Theme.control)
@@ -306,8 +307,13 @@ struct UnitField: View {
         typed = typed.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
         if let v = Double(typed), v.isFinite, accepts(v), abs(v - value) > .ulpOfOne {
             commit(v)
+            // The new value, not `value`: that still holds the old one until
+            // the view updates, and showing it would put the old number back
+            // the moment the field lost focus.
+            text = format(v)
+        } else {
+            text = format(value)
         }
-        text = format(value)
     }
 }
 
