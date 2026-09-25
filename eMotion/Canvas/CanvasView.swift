@@ -27,6 +27,6 @@ struct CanvasView: NSViewRepresentable {
         // Read here rather than handed in, so a new playhead time updates the
         // canvas alone instead of the whole window's views.
         view.show(controller.project, time: editor.time, selection: controller.selection, tool: editor.tool,
-                  playing: editor.isPlaying)
+                  playing: editor.isPlaying, animating: editor.mode == .animate)
     }
 }

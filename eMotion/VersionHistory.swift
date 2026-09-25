@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Design and Animate, apart", changes: [
+            "Press M to switch modes. Design shows the layout as designed, with no animation, and only design settings. Animate shows the moment at the playhead and never shows design settings.",
+            "In Animate, select a layer and use Add Action to add a move, scale, rotate, opacity, resize or hide/show at the playhead, half a second long. The inspector lists the layer's actions.",
+            "In Animate, the canvas only selects and moves. Dragging a layer moves where it is designed, and its animation comes with it. Resizing, turning and drawing belong to Design.",
+            "Playback is for Animate; Space does nothing in Design.",
+        ]),
         .init(date: "26 September 2026", title: "Actions underneath", changes: [
             "Animation now works like Jitter underneath: a layer's properties are how it is designed, and actions (move, scale, rotate, opacity, resize, hide and show) change them over time. Adding and editing actions in the app comes with the next builds.",
             "Keyframes, stopwatches and layer in and out bars are gone. The inspector shows each layer as designed.",

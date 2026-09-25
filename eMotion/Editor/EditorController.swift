@@ -21,8 +21,27 @@ final class EditorController {
 
     var project: Project { store.project }
 
-    /// The scene at the playhead. Cheap enough to work out on demand.
-    var scene: ResolvedScene { evaluate(store.project, at: editor.time) }
+    /// What the canvas shows: the design in Design mode, the moment at the
+    /// playhead in Animate mode. Cheap enough to work out on demand.
+    var scene: ResolvedScene {
+        editor.mode == .animate ? evaluate(store.project, at: editor.time) : evaluateDesign(store.project)
+    }
+
+    // MARK: Modes
+
+    /// Design builds the layout and shows it with no animation; Animate adds
+    /// actions and shows the playhead's moment. Nothing carries across:
+    /// playback stops on the way into Design, and the drawing tools put
+    /// themselves away on the way into Animate.
+    func setMode(_ mode: EditorModel.Mode) {
+        guard editor.mode != mode else { return }
+        if mode == .design { stop() } else { editor.tool = .select }
+        editor.mode = mode
+    }
+
+    func toggleMode() {
+        setMode(editor.mode == .design ? .animate : .design)
+    }
 
     // MARK: Selection
 
@@ -153,6 +172,22 @@ final class EditorController {
             }
         }
         editor.time = next
+    }
+
+    // MARK: Actions
+
+    /// Kinds of action the selection can take together.
+    var availableActions: [ActionKind] { ActionFactory.kinds(for: selectedLayers) }
+
+    /// Adds an action of `kind` to every selected layer, at the playhead.
+    func addAction(_ kind: ActionKind) {
+        let tracks = ActionTracks(project.actions)
+        let actions = selectedLayers.filter { ActionFactory.kinds(for: $0).contains(kind) }.map { layer in
+            ActionFactory.make(kind, for: layer, at: editor.time, state: tracks.state(of: layer, at: editor.time),
+                               frameRate: frameRate, rowOrder: ActionFactory.nextRowOrder(on: layer.id, in: project))
+        }
+        guard !actions.isEmpty else { return NSSound.beep() }
+        perform(.batch([.insertActions(actions)], name: "Add \(actions[0].name)"))
     }
 
     // MARK: Making layers

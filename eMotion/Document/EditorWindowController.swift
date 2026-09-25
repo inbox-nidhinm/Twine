@@ -48,8 +48,9 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     @objc func toggleLayersPanel(_ sender: Any?) { editor.showLayers.toggle() }
     @objc func toggleInspectorPanel(_ sender: Any?) { editor.showInspector.toggle() }
-    @objc func switchToDesignMode(_ sender: Any?) { editor.mode = .design }
-    @objc func switchToAnimateMode(_ sender: Any?) { editor.mode = .animate }
+    @objc func switchToDesignMode(_ sender: Any?) { controller.setMode(.design) }
+    @objc func switchToAnimateMode(_ sender: Any?) { controller.setMode(.animate) }
+    @objc func toggleMode(_ sender: Any?) { controller.toggleMode() }
 
     // MARK: Edit menu
 
@@ -102,6 +103,9 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
             return controller.canPaste
         case #selector(togglePlayback(_:)):
             item.title = (editor.isPlaying ? "Pause" : "Play") + "    Space"
+            return editor.mode == .animate
+        case #selector(previousFrame(_:)), #selector(nextFrame(_:)), #selector(goToStart(_:)), #selector(goToEnd(_:)):
+            return editor.mode == .animate
         case #selector(toggleLoop(_:)):
             item.state = editor.loops ? .on : .off
         case #selector(selectAll(_:)):

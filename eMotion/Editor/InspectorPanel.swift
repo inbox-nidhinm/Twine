@@ -18,26 +18,36 @@ struct InspectorPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             SegmentRow(selection: editor.mode, options: EditorModel.Mode.allCases, title: \.title) {
-                editor.mode = $0
+                controller.setMode($0)
             }
             .padding(Theme.panelPad)
-            .help("Design builds the frame. Animate brings up the timeline. (⌥⌘1, ⌥⌘2)")
+            .help("Design builds the layout, with no animation. Animate adds actions and brings up the timeline. (M)")
 
             PanelDivider()
             ScrollView {
                 VStack(spacing: 0) {
-                    let selected = controller.selectedLayers
-                    if selected.count == 1, let layer = selected.first {
-                        LayerInspector(layer: layer, controller: controller)
-                            .id(layer.id)
-                    } else if selected.count > 1 {
-                        multipleSelection(selected)
-                    } else {
-                        compositionSection
-                        PanelDivider()
+                    // The two modes never share a control.
+                    switch editor.mode {
+                    case .design: designContent
+                    case .animate: AnimationInspector(controller: controller, editor: editor)
                     }
                 }
             }
+        }
+    }
+
+    /// Design mode: the selected layer as designed, what several layers
+    /// share, or with nothing selected, the composition.
+    @ViewBuilder private var designContent: some View {
+        let selected = controller.selectedLayers
+        if selected.count == 1, let layer = selected.first {
+            LayerInspector(layer: layer, controller: controller)
+                .id(layer.id)
+        } else if selected.count > 1 {
+            multipleSelection(selected)
+        } else {
+            compositionSection
+            PanelDivider()
         }
     }
 

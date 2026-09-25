@@ -98,19 +98,26 @@ final class TimelineTracksView: NSView {
         guard let controller else { return super.keyDown(with: event) }
         if event.keyCode == 51 || event.keyCode == 117 {
             controller.deleteSelection()
-        } else if !PlaybackKeys.handle(event, controller) {
+        } else if !EditorKeys.handle(event, controller) {
             super.keyDown(with: event)
         }
     }
 }
 
-/// The playback keys, shared by the canvas and the timeline.
-enum PlaybackKeys {
-    /// Space plays and pauses, `[` and `]` step a frame, and Home and End
-    /// (or Shift with the brackets) go to the ends.
+/// The bare keys the canvas and the timeline share. None of them are menu
+/// keys, so the same letter typed into a field stays a letter.
+enum EditorKeys {
+    /// M switches between Design and Animate. In Animate, Space plays and
+    /// pauses, `[` and `]` step a frame, and Home and End (or Shift with the
+    /// brackets) go to the ends.
     static func handle(_ event: NSEvent, _ controller: EditorController) -> Bool {
         let flags = event.modifierFlags.intersection([.command, .control, .option])
         guard flags.isEmpty else { return false }
+        if event.charactersIgnoringModifiers?.lowercased() == "m" {
+            controller.toggleMode()
+            return true
+        }
+        guard controller.editor.mode == .animate else { return false }
         switch event.keyCode {
         case 49: controller.togglePlay(); return true            // space
         case 115: controller.jumpToStart(); return true          // home

@@ -44,6 +44,9 @@ final class CanvasNSView: NSView {
     private var project: Project?
     private var selection: [UUID] = []
     private var tool: Tool = .select
+    /// Animate mode: the canvas shows the playhead's moment and only selects
+    /// and moves. Resizing, turning and the anchor are design edits.
+    private var animating = false
     private var hovered: UUID?
     private var drag: CanvasDrag?
 
@@ -106,17 +109,19 @@ final class CanvasNSView: NSView {
 
     // MARK: Showing a scene
 
-    /// Draws the project at `time`. Called by SwiftUI whenever anything the
-    /// canvas shows changes; it only renders and never writes to the model.
-    func show(_ project: Project, time: Double, selection: [UUID], tool: Tool, playing: Bool) {
+    /// Draws the project: as designed, or at `time` with its actions when
+    /// `animating`. Called by SwiftUI whenever anything the canvas shows
+    /// changes; it only renders and never writes to the model.
+    func show(_ project: Project, time: Double, selection: [UUID], tool: Tool, playing: Bool, animating: Bool) {
         setClockRunning(playing)
+        self.animating = animating
         self.project = project
         self.selection = selection
         if self.tool != tool {
             self.tool = tool
             window?.invalidateCursorRects(for: self)
         }
-        let scene = evaluate(project, at: time)
+        let scene = animating ? evaluate(project, at: time) : evaluateDesign(project)
         self.scene = scene
         if compositionSize != scene.size {
             // A new size means the old zoom no longer frames anything useful.
@@ -274,7 +279,7 @@ final class CanvasNSView: NSView {
         var handles: [CGPoint] = []
         var anchor: CGPoint?
         var union: [CGPoint]?
-        if selection.count == 1, let id = selection.first, !controller.isLocked(id),
+        if selection.count == 1, let id = selection.first, !controller.isLocked(id), !animating,
            let corners = scene.worldCorners(of: id), let layer = scene.layer(id),
            let world = scene.worldTransform(of: id) {
             let view = corners.map(compositionToView)
@@ -348,14 +353,14 @@ final class CanvasNSView: NSView {
         let point = viewToComposition(viewPoint)
         let shift = event.modifierFlags.contains(.shift)
 
-        if tool.isShape {
+        if tool.isShape, !animating {
             drag = .create(CanvasDrag.Create(tool: tool, start: point, layerID: nil))
             return
         }
 
         // A handle of the one selected layer comes first, before the layers
         // under it, so a handle over another shape still resizes.
-        if selection.count == 1, let id = selection.first, !controller.isLocked(id),
+        if selection.count == 1, let id = selection.first, !controller.isLocked(id), !animating,
            let layer = controller.project.layer(withID: id), let resolved = scene.layer(id),
            let corners = scene.worldCorners(of: id), let world = scene.worldTransform(of: id) {
             let view = corners.map(compositionToView)
@@ -563,7 +568,7 @@ final class CanvasNSView: NSView {
 
     private func updateCursor(at viewPoint: CGPoint) {
         guard let scene, let controller, selection.count == 1, let id = selection.first, !controller.isLocked(id),
-              let corners = scene.worldCorners(of: id), let resolved = scene.layer(id) else { return }
+              !animating, let corners = scene.worldCorners(of: id), let resolved = scene.layer(id) else { return }
         let view = corners.map(compositionToView)
         if let handle = CanvasHandles.handle(at: viewPoint, box: view, isLine: isLine(resolved)) {
             CanvasHandles.cursor(for: handle).set()
@@ -578,7 +583,7 @@ final class CanvasNSView: NSView {
 
     override func keyDown(with event: NSEvent) {
         guard let controller else { return super.keyDown(with: event) }
-        if PlaybackKeys.handle(event, controller) { return }
+        if EditorKeys.handle(event, controller) { return }
         let step = event.modifierFlags.contains(.shift) ? 10.0 : 1.0
         switch event.keyCode {
         case 51, 117: controller.deleteSelection()                   // delete, forward delete
@@ -596,7 +601,7 @@ final class CanvasNSView: NSView {
         case 126: controller.nudge(by: Vec2(0, -step))
         default:
             let flags = event.modifierFlags.intersection([.command, .control, .option])
-            if flags.isEmpty, let key = event.charactersIgnoringModifiers, let tool = Tool.forKey(key) {
+            if flags.isEmpty, !animating, let key = event.charactersIgnoringModifiers, let tool = Tool.forKey(key) {
                 controller.editor.tool = tool
                 if tool.isShape { controller.editor.lastShape = tool }
             } else {

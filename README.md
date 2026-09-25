@@ -55,13 +55,17 @@ Name.emotion/
 
 ## Animating
 
-Animation is being rebuilt around Jitter-style actions (see `docs/redesign.md`). A layer's own properties are its design state; an action is one timed instruction on top of it, such as "move by 200 px over 0.5 s, smoothly", with an optional starting value and an end value. Projects already store and play actions; adding and editing them in the app arrives with redesign milestones 4 and 5.
+Animation is being rebuilt around Jitter-style actions (see `docs/redesign.md`). A layer's own properties are its design state; an action is one timed instruction on top of it, such as "move by 200 px over 0.5 s, smoothly", with an optional starting value and an end value.
 
-For now, Animate (⌥⌘2) shows the timeline's transport and ruler:
+Press M to switch between the two modes. They never share a control:
+
+- **Design** shows the layout as designed, with no animation, and its inspector edits the design.
+- **Animate** shows the moment at the playhead. Select a layer and use Add Action in the inspector to add an action at the playhead, half a second long. On the canvas you can select and drag layers, which moves their design position, and the animation moves with them. Editing actions and their timeline rows arrive with redesign milestones 4 and 5.
 
 | | |
 |---|---|
-| Space | Play or pause |
+| M | Switch between Design and Animate |
+| Space | Play or pause (Animate) |
 | [ and ] | Previous and next frame |
 | Home, End | Go to the start or the end |
 | Click or drag the ruler | Scrub |
@@ -70,4 +74,4 @@ For now, Animate (⌥⌘2) shows the timeline's transport and ruler:
 
 ## Status
 
-Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then redesign milestone 2 of 8: the action model and its evaluation. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.
+Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then redesign milestones 2 and 3 of 8: the action model and its evaluation, and separate Design and Animate modes. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.
