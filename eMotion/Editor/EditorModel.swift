@@ -28,6 +28,10 @@ final class EditorModel {
     /// The shape that the shape slot shows, which is the one used last.
     var lastShape: Tool = .rectangle
     var selection: Set<UUID> = []
+    /// The layer whose name is being edited in the layers panel.
+    var renaming: UUID?
+    /// The playhead, in seconds. The timeline moves it from milestone 4.
+    var time: Double = 0
 }
 
 enum Tool: String, CaseIterable {
@@ -75,4 +79,13 @@ enum Tool: String, CaseIterable {
 
     static let shapes: [Tool] = [.rectangle, .ellipse, .line, .polygon, .star]
     var isShape: Bool { Self.shapes.contains(self) }
+
+    /// The pen arrives in milestone 8 and text in milestone 6. Until then
+    /// their buttons show as disabled rather than doing nothing when picked.
+    var isAvailable: Bool { self != .pen && self != .text }
+
+    /// The tool a letter picks, for the canvas's keyboard.
+    static func forKey(_ key: String) -> Tool? {
+        allCases.first { $0.key.lowercased() == key.lowercased() && $0.isAvailable }
+    }
 }

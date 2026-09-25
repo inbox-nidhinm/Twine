@@ -77,6 +77,17 @@ enum MainMenu {
         menu.addItem(item("Paste", #selector(NSText.paste(_:)), "v"))
         menu.addItem(item("Delete", #selector(NSText.delete(_:))))
         menu.addItem(item("Select All", #selector(NSText.selectAll(_:)), "a"))
+        menu.addItem(.separator())
+        menu.addItem(item("Duplicate", #selector(EditorWindowController.duplicateLayers(_:)), "d"))
+        menu.addItem(item("Rename Layer", #selector(EditorWindowController.renameLayer(_:)), "r"))
+        menu.addItem(.separator())
+        menu.addItem(item("Group", #selector(EditorWindowController.groupLayers(_:)), "g"))
+        menu.addItem(item("Ungroup", #selector(EditorWindowController.ungroupLayers(_:)), "g", [.command, .shift]))
+        menu.addItem(.separator())
+        menu.addItem(item("Bring Forward", #selector(EditorWindowController.bringForward(_:)), "]"))
+        menu.addItem(item("Send Backward", #selector(EditorWindowController.sendBackward(_:)), "["))
+        menu.addItem(item("Bring to Front", #selector(EditorWindowController.bringToFront(_:)), "]", [.command, .option]))
+        menu.addItem(item("Send to Back", #selector(EditorWindowController.sendToBack(_:)), "[", [.command, .option]))
         return menu
     }
 
@@ -87,6 +98,11 @@ enum MainMenu {
         menu.addItem(.separator())
         menu.addItem(item("Hide Layers", #selector(EditorWindowController.toggleLayersPanel(_:)), "1"))
         menu.addItem(item("Hide Inspector", #selector(EditorWindowController.toggleInspectorPanel(_:)), "2"))
+        menu.addItem(.separator())
+        menu.addItem(item("Zoom In", #selector(EditorWindowController.zoomIn(_:)), "="))
+        menu.addItem(item("Zoom Out", #selector(EditorWindowController.zoomOut(_:)), "-"))
+        menu.addItem(item("Zoom to Fit", #selector(EditorWindowController.zoomToFit(_:)), "0"))
+        menu.addItem(item("Actual Size", #selector(EditorWindowController.zoomToActualSize(_:)), "0", [.command, .option]))
         menu.addItem(.separator())
         menu.addItem(item("Enter Full Screen", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]))
         return menu

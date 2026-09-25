@@ -7,10 +7,18 @@ import SwiftUI
 ///
 /// Parsed once on first use and cached. See `IconShape` for the drawing.
 public enum Icon: String, CaseIterable, Sendable {
+    case corners
+    case link
+    case unlink
+    case audio
     case eyeSlash
     case eye
+    case group
+    case image
     case lock
+    case solo
     case unlock
+    case video
     case home
     case pause
     case play
@@ -33,6 +41,28 @@ public enum Icon: String, CaseIterable, Sendable {
     /// The subpaths, in the order they are drawn.
     public var data: [String] {
         switch self {
+        case .corners: return [   // Inspector/corners.svg
+            "M4 9 V6 C4 4.895 4.895 4 6 4 H9",
+            "M15 4 H18 C19.105 4 20 4.895 20 6 V9",
+            "M20 15 V18 C20 19.105 19.105 20 18 20 H15",
+            "M9 20 H6 C4.895 20 4 19.105 4 18 V15"
+        ]
+        case .link: return [   // Inspector/link.svg
+            "M10 14 L14 10",
+            "M8.5 11.5 L6.5 13.5 C5.1 14.9 5.1 17.1 6.5 18.5 C7.9 19.9 10.1 19.9 11.5 18.5 L13.5 16.5",
+            "M15.5 12.5 L17.5 10.5 C18.9 9.1 18.9 6.9 17.5 5.5 C16.1 4.1 13.9 4.1 12.5 5.5 L10.5 7.5"
+        ]
+        case .unlink: return [   // Inspector/unlink.svg
+            "M8.5 11.5 L6.5 13.5 C5.1 14.9 5.1 17.1 6.5 18.5 C7.9 19.9 10.1 19.9 11.5 18.5 L13.5 16.5",
+            "M15.5 12.5 L17.5 10.5 C18.9 9.1 18.9 6.9 17.5 5.5 C16.1 4.1 13.9 4.1 12.5 5.5 L10.5 7.5",
+            "M4 4 L7 7",
+            "M17 17 L20 20"
+        ]
+        case .audio: return [   // Layers/audio.svg
+            "M9 17 V6 L19 4 V15",
+            "M7 15 C8.105 15 9 15.895 9 17 C9 18.105 8.105 19 7 19 C5.895 19 5 18.105 5 17 C5 15.895 5.895 15 7 15 Z",
+            "M17 13 C18.105 13 19 13.895 19 15 C19 16.105 18.105 17 17 17 C15.895 17 15 16.105 15 15 C15 13.895 15.895 13 17 13 Z"
+        ]
         case .eyeSlash: return [   // Layers/eye-slash.svg
             "M2.5 12 C4.5 7.5 8 5.5 12 5.5 C16 5.5 19.5 7.5 21.5 12 C19.5 16.5 16 18.5 12 18.5 C8 18.5 4.5 16.5 2.5 12 Z",
             "M12 9 C13.657 9 15 10.343 15 12 C15 13.657 13.657 15 12 15 C10.343 15 9 13.657 9 12 C9 10.343 10.343 9 12 9 Z",
@@ -42,13 +72,33 @@ public enum Icon: String, CaseIterable, Sendable {
             "M2.5 12 C4.5 7.5 8 5.5 12 5.5 C16 5.5 19.5 7.5 21.5 12 C19.5 16.5 16 18.5 12 18.5 C8 18.5 4.5 16.5 2.5 12 Z",
             "M12 9 C13.657 9 15 10.343 15 12 C15 13.657 13.657 15 12 15 C10.343 15 9 13.657 9 12 C9 10.343 10.343 9 12 9 Z"
         ]
+        case .group: return [   // Layers/group.svg
+            "M4 8 V5 C4 4.448 4.448 4 5 4 H8",
+            "M16 4 H19 C19.552 4 20 4.448 20 5 V8",
+            "M20 16 V19 C20 19.552 19.552 20 19 20 H16",
+            "M8 20 H5 C4.448 20 4 19.552 4 19 V16",
+            "M8 9 H14 V15 H8 Z"
+        ]
+        case .image: return [   // Layers/image.svg
+            "M5 5 H19 V19 H5 Z",
+            "M5 16 L10 11 L14 15 L16 13 L19 16",
+            "M15 7.5 C15.828 7.5 16.5 8.172 16.5 9 C16.5 9.828 15.828 10.5 15 10.5 C14.172 10.5 13.5 9.828 13.5 9 C13.5 8.172 14.172 7.5 15 7.5 Z"
+        ]
         case .lock: return [   // Layers/lock.svg
             "M6 11 H18 C18.552 11 19 11.448 19 12 V19 C19 19.552 18.552 20 18 20 H6 C5.448 20 5 19.552 5 19 V12 C5 11.448 5.448 11 6 11 Z",
             "M8 11 V8 C8 5.791 9.791 4 12 4 C14.209 4 16 5.791 16 8 V11"
         ]
+        case .solo: return [   // Layers/solo.svg
+            "M12 4 C16.418 4 20 7.582 20 12 C20 16.418 16.418 20 12 20 C7.582 20 4 16.418 4 12 C4 7.582 7.582 4 12 4 Z",
+            "M12 9 C13.657 9 15 10.343 15 12 C15 13.657 13.657 15 12 15 C10.343 15 9 13.657 9 12 C9 10.343 10.343 9 12 9 Z"
+        ]
         case .unlock: return [   // Layers/unlock.svg
             "M6 11 H18 C18.552 11 19 11.448 19 12 V19 C19 19.552 18.552 20 18 20 H6 C5.448 20 5 19.552 5 19 V12 C5 11.448 5.448 11 6 11 Z",
             "M8 11 V8 C8 5.791 9.791 4 12 4 C13.8 4 15.3 5.2 15.8 6.8"
+        ]
+        case .video: return [   // Layers/video.svg
+            "M4 7 H15 V17 H4 Z",
+            "M15 10.5 L20 7.5 V16.5 L15 13.5"
         ]
         case .home: return [   // Panels/home.svg
             "M4 10.5 L12 4 L20 10.5 V19 C20 19.552 19.552 20 19 20 H15 V14 H9 V20 H5 C4.448 20 4 19.552 4 19 Z"

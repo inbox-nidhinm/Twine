@@ -1,0 +1,256 @@
+import AppKit
+import MotionModel
+import MotionEditing
+import MotionEvaluation
+import MotionRendering
+
+/// Everything the editor can do to a project, in one place: the canvas, the
+/// panels and the menus all call in here, and this is what turns their
+/// gestures into commands. It holds no state of its own beyond what it is
+/// handed; the project lives in the store and the view state in the model.
+@MainActor
+final class EditorController {
+    let store: ProjectStore
+    let editor: EditorModel
+    weak var canvas: CanvasNSView?
+
+    init(store: ProjectStore, editor: EditorModel) {
+        self.store = store
+        self.editor = editor
+    }
+
+    var project: Project { store.project }
+
+    /// The scene at the playhead. Cheap enough to work out on demand.
+    var scene: ResolvedScene { evaluate(store.project, at: editor.time) }
+
+    // MARK: Selection
+
+    /// The selection with anything that no longer exists left out, such as a
+    /// layer an undo just took away.
+    var selection: [UUID] {
+        let all = project.allLayers.map(\.id)
+        return all.filter(editor.selection.contains)
+    }
+
+    var selectedLayers: [Layer] { selection.compactMap(project.layer(withID:)) }
+
+    func select(_ ids: [UUID], extending: Bool = false) {
+        if extending {
+            var next = editor.selection
+            for id in ids {
+                if next.contains(id) { next.remove(id) } else { next.insert(id) }
+            }
+            editor.selection = next
+        } else {
+            editor.selection = Set(ids)
+        }
+    }
+
+    func selectAll() {
+        editor.selection = Set(project.layers.filter { !$0.isLocked }.map(\.id))
+    }
+
+    func deselectAll() {
+        editor.selection = []
+    }
+
+    /// Whether a layer or anything above it is locked, so it cannot be picked
+    /// on the canvas.
+    func isLocked(_ id: UUID) -> Bool {
+        let chain = project.ancestors(of: id) + [id]
+        return chain.contains { project.layer(withID: $0)?.isLocked == true }
+    }
+
+    // MARK: Running commands
+
+    /// Runs a command as one undo step. A command that cannot apply beeps
+    /// rather than failing silently.
+    @discardableResult
+    func perform(_ command: EditorCommand) -> Bool {
+        do {
+            try store.perform(command)
+            return true
+        } catch {
+            NSSound.beep()
+            return false
+        }
+    }
+
+    /// Changes one layer through a copy of it, as one undo step.
+    func edit(_ id: UUID, _ change: (inout Layer) -> Void) {
+        guard var layer = project.layer(withID: id) else { return }
+        change(&layer)
+        perform(.updateLayers([layer]))
+    }
+
+    /// Changes every selected layer the same way, as one undo step.
+    func editSelection(_ change: (inout Layer) -> Void) {
+        let edited = selectedLayers.map { layer -> Layer in
+            var l = layer
+            change(&l)
+            return l
+        }
+        guard !edited.isEmpty else { return }
+        perform(.updateLayers(edited))
+    }
+
+    // MARK: Continuous changes (drags and sliders)
+
+    func begin(_ name: String) { store.beginContinuousChange(name) }
+
+    func update(_ layers: [Layer]) {
+        try? store.updateContinuousChange(.updateLayers(layers))
+    }
+
+    func update(_ command: EditorCommand) {
+        try? store.updateContinuousChange(command)
+    }
+
+    func end() { store.endContinuousChange() }
+
+    func cancel() { store.cancelContinuousChange() }
+
+    // MARK: Making layers
+
+    func makeShape(_ tool: Tool, from start: Vec2, to end: Vec2) -> Layer? {
+        guard let kind = tool.shapeKind else { return nil }
+        let name = LayerFactory.nextName(kind.title, in: project)
+        let duration = project.composition.duration
+        if kind == .line { return LayerFactory.line(from: start, to: end, name: name, duration: duration) }
+        let box = Box(minX: min(start.x, end.x), minY: min(start.y, end.y),
+                      maxX: max(start.x, end.x), maxY: max(start.y, end.y))
+        return LayerFactory.shape(kind, in: box, name: name, duration: duration)
+    }
+
+    // MARK: Arranging
+
+    func deleteSelection() {
+        let ids = selection
+        guard !ids.isEmpty else { return }
+        perform(.deleteLayers(Set(ids)))
+        editor.selection = []
+    }
+
+    func duplicateSelection() {
+        let layers = topmost(selectedLayers)
+        guard !layers.isEmpty else { return }
+        // Duplicates land just in front of their originals, nudged so they
+        // can be seen, the way Figma and Flip do it.
+        var commands: [EditorCommand] = []
+        var copies: [UUID] = []
+        for layer in layers {
+            guard let location = project.location(of: layer.id) else { continue }
+            var copy = layer.duplicated().translated(by: Vec2(10, 10))
+            copy.name = layer.name
+            commands.append(.insertLayers([copy], parentID: location.parentID, index: location.index + 1))
+            copies.append(copy.id)
+        }
+        if perform(.batch(commands, name: layers.count == 1 ? "Duplicate Layer" : "Duplicate Layers")) {
+            editor.selection = Set(copies)
+        }
+    }
+
+    func groupSelection() {
+        let ids = topmost(selectedLayers).map(\.id)
+        guard !ids.isEmpty else { return }
+        do {
+            let (command, groupID) = try Arrangement.group(ids, in: project, at: editor.time,
+                                                           name: LayerFactory.nextName("Group", in: project))
+            if perform(command) { editor.selection = [groupID] }
+        } catch {
+            NSSound.beep()
+        }
+    }
+
+    func ungroupSelection() {
+        let groups = selectedLayers.filter(\.isGroup)
+        guard !groups.isEmpty else { return NSSound.beep() }
+        var commands: [EditorCommand] = []
+        var freed: [UUID] = []
+        // One at a time against the project as each ungroup leaves it, so two
+        // selected groups do not work from stale positions.
+        var working = project
+        for group in groups {
+            guard let (command, children) = try? Arrangement.ungroup(group.id, in: working, at: editor.time) else { continue }
+            try? command.apply(to: &working)
+            commands.append(command)
+            freed += children
+        }
+        if perform(.batch(commands, name: "Ungroup")) { editor.selection = Set(freed) }
+    }
+
+    func restack(_ direction: Arrangement.Direction) {
+        let ids = selection
+        guard let command = Arrangement.restack(ids, direction, in: project) else { return NSSound.beep() }
+        perform(command)
+    }
+
+    /// Nudges the selection by `delta` in composition space.
+    func nudge(by delta: Vec2) {
+        let scene = self.scene
+        let moved = topmost(selectedLayers).filter { !isLocked($0.id) }.map { layer in
+            layer.translated(by: parentDelta(delta, for: layer.id, in: scene))
+        }
+        guard !moved.isEmpty else { return }
+        perform(.updateLayers(moved))
+    }
+
+    /// A composition-space movement expressed in a layer's parent's space,
+    /// which is what its position is measured in.
+    func parentDelta(_ delta: Vec2, for id: UUID, in scene: ResolvedScene) -> Vec2 {
+        guard let parent = project.location(of: id)?.parentID,
+              let inverse = scene.worldTransform(of: parent)?.inverted else { return delta }
+        return inverse.applyToVector(delta)
+    }
+
+    /// Of a set of layers, the ones not inside another one of the set.
+    func topmost(_ layers: [Layer]) -> [Layer] {
+        let ids = Set(layers.map(\.id))
+        return layers.filter { Set(project.ancestors(of: $0.id)).isDisjoint(with: ids) }
+    }
+
+    // MARK: Clipboard
+
+    static let pasteboardType = NSPasteboard.PasteboardType("com.nidhin.emotion.layers")
+
+    func copySelection() {
+        let layers = topmost(selectedLayers)
+        guard !layers.isEmpty, let data = try? JSONEncoder().encode(layers) else { return }
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.setData(data, forType: Self.pasteboardType)
+    }
+
+    func cutSelection() {
+        copySelection()
+        deleteSelection()
+    }
+
+    var canPaste: Bool { NSPasteboard.general.data(forType: Self.pasteboardType) != nil }
+
+    /// Pastes in place, in front of everything at the top level. Every pasted
+    /// layer is a new layer with new ids, however many times it is pasted.
+    func paste() {
+        guard let data = NSPasteboard.general.data(forType: Self.pasteboardType),
+              let layers = try? JSONDecoder().decode([Layer].self, from: data) else { return }
+        let copies = layers.map { $0.duplicated() }
+        if perform(.batch([.insertLayers(copies, parentID: nil, index: nil)],
+                          name: copies.count == 1 ? "Paste Layer" : "Paste Layers")) {
+            editor.selection = Set(copies.map(\.id))
+        }
+    }
+}
+
+extension Tool {
+    var shapeKind: LayerFactory.ShapeKind? {
+        switch self {
+        case .rectangle: return .rectangle
+        case .ellipse: return .ellipse
+        case .line: return .line
+        case .polygon: return .polygon
+        case .star: return .star
+        default: return nil
+        }
+    }
+}

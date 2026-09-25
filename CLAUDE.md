@@ -10,7 +10,8 @@ The full brief is `docs/brief.md`. Read it before a milestone. This file is the 
 - The user is a designer, not an engineer. Explain in plain terms.
 - No help text in the UI. States are shown, not explained. Put explanations in `.help()` tooltips.
 - Views never write literals: every colour, size and radius comes from `Theme` (in `Packages/MotionKit/Sources/Theme`). Values come from the "Flip Design System" page of Figma file `2XErpBfGuIGNU0DkL58Ute` (node 171:2055), with a light blue accent (#4C9FEF) in place of Flip's green.
-- **Accessibility presses do not prove clicks work.** They skip hit testing. To test real clicks without touching the user's mouse, post `NSEvent` mouse events through `window.sendEvent` from a temporary in-app hook, and log `contentView.hitTest` for each point. Remove the hook before committing.
+- **Accessibility presses do not prove clicks work.** They skip hit testing. To test real clicks without touching the user's mouse, post `NSEvent` mouse and key events through `window.sendEvent` from a temporary in-app hook, and log state after each. After each step post an `.applicationDefined` event through `NSApp.postEvent`: events sent straight to a window skip the event loop, so the undo group never closes, the document never counts as edited, and nothing saves. Remove the hook before committing.
+- **Never drive the copy of the app the user is using.** For scripted tests make a copy of `build/eMotion.app` with its own bundle id (`com.nidhin.emotion.selftest`) and point it at a throwaway project in the scratchpad.
 - When driving the running app to verify, the user is often working in other apps. Launch with `open -g`, use accessibility presses (`click button N of ...`) rather than synthetic keys or clicks, and never type unless eMotion is frontmost. Setting a SwiftUI text field's value through accessibility does not reach its binding.
 
 ## Layers of the code
@@ -18,11 +19,13 @@ The full brief is `docs/brief.md`. Read it before a milestone. This file is the 
 | Where | What | May import |
 |---|---|---|
 | `Packages/MotionKit/Sources/MotionModel` | The document: plain `Codable`, `Sendable` value types. File format and migrations in `FileFormat.swift`. | Foundation |
-| `Packages/MotionKit/Sources/MotionEditing` | `EditorCommand` (every allowed change) and `ProjectStore` (applies commands, snapshot undo, continuous changes) | Foundation, MotionModel |
+| `Packages/MotionKit/Sources/MotionEditing` | `EditorCommand` (every allowed change), `ProjectStore` (applies commands, snapshot undo, continuous changes), `Arrangement` (group, ungroup, restack), `LayerFactory`, Design mode property edits | Foundation, MotionModel, MotionEvaluation |
+| `Packages/MotionKit/Sources/MotionEvaluation` | `evaluate(project, at:)` and `ResolvedScene`: sampling, easing, springs, OKLab blending, shape paths, `Affine` | Foundation, MotionModel |
+| `Packages/MotionKit/Sources/MotionRendering` | `SceneRenderer`, `CoreAnimationRenderer`, `OffscreenRenderer` (CARenderer into Metal, used for thumbnails and, from milestone 5, export) | QuartzCore, Metal |
 | `Packages/MotionKit/Sources/Theme` | Tokens, type, grain, icons (`Icons.swift` is generated) | SwiftUI |
 | `eMotion/` | The app: AppKit lifecycle, `NSDocument`, SwiftUI views | everything |
 
-Milestones 2, 4 and 5 add `MotionEvaluation`, `MotionRendering` and `MotionExport` as package targets.
+Milestone 5 adds `MotionExport`. In the app, `Editor/EditorController.swift` is where every canvas gesture, menu item and inspector edit becomes a command, and `Canvas/` holds the AppKit canvas, its drag maths and its overlay.
 
 ## Decisions worth knowing
 
@@ -36,6 +39,7 @@ Milestones 2, 4 and 5 add `MotionEvaluation`, `MotionRendering` and `MotionExpor
 - **Focus**: no field has the keyboard when a window opens, and `ChromelessWindow.sendEvent` ends a text edit when a click lands anywhere outside the field.
 - **Saving**: autosave in place, plus a save one second after changes stop (`ProjectDocument.scheduleSaveSoon`). `NSDocument`'s read and save overrides are `nonisolated` and step onto the main actor; the package `FileWrapper` is kept and reused so media is never rewritten.
 - **Menus** are the app's own (`Components/Menus.swift`), drawn on the panel card. One `MenuHost` per window.
+- **Canvas**: `CanvasNSView` owns a `CoreAnimationRenderer` whose root sits in a `world` layer scaled and moved for zoom and pan; the selection is drawn by `CanvasOverlay` in view points. It renders from `show(...)`, which `updateNSView` calls, and never writes to the model there. A plain drag on a layer always moves it; moving the anchor needs Command, because the anchor sits where moves start. Resizing a group changes its scale, not its size.
 - **Colour picking** uses the system colour panel for now, through `ColorPanelBridge`. Milestone 3 replaces it with Flip's own picker card.
 
 ## Icons

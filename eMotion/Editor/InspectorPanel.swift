@@ -10,6 +10,7 @@ import Theme
 struct InspectorPanel: View {
     let store: ProjectStore
     @Bindable var editor: EditorModel
+    let controller: EditorController
 
     @State private var compositionOpen = true
     @State private var customRate = false
@@ -25,11 +26,42 @@ struct InspectorPanel: View {
             PanelDivider()
             ScrollView {
                 VStack(spacing: 0) {
-                    compositionSection
-                    PanelDivider()
+                    let selected = controller.selectedLayers
+                    if selected.count == 1, let layer = selected.first {
+                        LayerInspector(layer: layer, controller: controller, time: editor.time)
+                            .id(layer.id)
+                    } else if selected.count > 1 {
+                        multipleSelection(selected)
+                    } else {
+                        compositionSection
+                        PanelDivider()
+                    }
                 }
             }
         }
+    }
+
+    // MARK: Several layers
+
+    /// What several layers have in common to change together.
+    private func multipleSelection(_ layers: [Layer]) -> some View {
+        let values = layers.map { $0.opacity.value(at: editor.time) }
+        let shared = values.allSatisfy { abs($0 - values[0]) < 1e-9 } ? values[0] : values.max() ?? 1
+        return VStack(alignment: .leading, spacing: 8) {
+            HeaderRow(title: "Layers") {}
+            SliderRow(label: "Opacity", value: shared * 100, range: 0...100, readout: { "\(Int($0.rounded()))%" },
+                      onChange: { v in
+                          controller.update(layers.map { l in
+                              var c = l
+                              c.opacity = c.opacity.designEdited(to: v / 100, at: editor.time)
+                              return c
+                          })
+                      },
+                      onBegin: { controller.begin("Opacity") },
+                      onEnd: { controller.end() })
+                .padding(.horizontal, Theme.panelPad)
+        }
+        .padding(.bottom, Theme.panelPad)
     }
 
     // MARK: Composition

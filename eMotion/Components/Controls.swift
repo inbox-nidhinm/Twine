@@ -354,3 +354,77 @@ struct SectionHeader: View {
         .contentShape(Rectangle())
     }
 }
+
+/// A whole number with minus and plus either side, for counts where a slider
+/// would be silly: a polygon's sides, a star's points.
+struct StepRow: View {
+    let label: String
+    let value: Int
+    let range: ClosedRange<Int>
+    let commit: (Int) -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(label)
+                .font(ThemeFont.label)
+                .foregroundStyle(Theme.textSecondary)
+                .frame(width: Theme.labelWidth, alignment: .leading)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            HStack(spacing: 0) {
+                StepButton(icon: .minus, disabled: value <= range.lowerBound) { commit(max(range.lowerBound, value - 1)) }
+                Text("\(value)")
+                    .font(ThemeFont.label)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.textPrimary)
+                    .frame(width: 28)
+                StepButton(icon: .plus, disabled: value >= range.upperBound) { commit(min(range.upperBound, value + 1)) }
+            }
+            .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+        }
+        .frame(height: Theme.panelRow)
+    }
+}
+
+private struct StepButton: View {
+    let icon: Icon
+    let disabled: Bool
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            IconView(icon, size: 15)
+                .foregroundStyle(disabled ? Theme.textTertiary.opacity(0.4)
+                                 : hovering ? Theme.textPrimary : Theme.textSecondary)
+                .frame(width: 22, height: Theme.control)
+                .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
+                    .fill(hovering && !disabled ? Theme.panelHover : .clear))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .onHover { hovering = $0 }
+    }
+}
+
+/// A section's title with actions at its end, such as adding a fill. For
+/// sections that do not fold.
+struct HeaderRow<Accessory: View>: View {
+    let title: String
+    @ViewBuilder var accessory: () -> Accessory
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Text(title)
+                .font(ThemeFont.labelStrong)
+                .foregroundStyle(Theme.textPrimary)
+            Spacer(minLength: 0)
+            accessory()
+        }
+        .padding(.leading, Theme.panelPad)
+        .padding(.trailing, Theme.panelPad - 4)
+        .frame(height: Theme.button)
+    }
+}

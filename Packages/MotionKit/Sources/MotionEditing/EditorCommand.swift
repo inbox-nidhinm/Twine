@@ -28,6 +28,9 @@ public enum EditorCommand: Sendable {
     /// id. This is how property edits arrive until the property commands do.
     case updateLayers([Layer])
     case addMedia(MediaAsset)
+    /// Several commands applied in order as one undo step, such as grouping,
+    /// which takes layers out and puts a group in. If any fails, none apply.
+    case batch([EditorCommand], name: String)
 
     /// What Edit > Undo calls it.
     public var actionName: String {
@@ -42,6 +45,7 @@ public enum EditorCommand: Sendable {
         case .setSoloed(_, let on): return on ? "Solo" : "Unsolo"
         case .updateLayers: return "Edit Layer"
         case .addMedia: return "Import"
+        case .batch(_, let name): return name
         }
     }
 
@@ -126,6 +130,9 @@ public enum EditorCommand: Sendable {
         case .addMedia(let asset):
             guard !p.media.contains(where: { $0.id == asset.id }) else { throw EditorError.duplicateID(asset.id) }
             p.media.append(asset)
+
+        case .batch(let commands, _):
+            for command in commands { try command.apply(into: &p) }
         }
     }
 

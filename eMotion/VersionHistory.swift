@@ -23,6 +23,16 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "25 September 2026", title: "Drawing on the canvas", changes: [
+            "The canvas draws the composition with the real renderer. Pinch or Command-scroll to zoom about the pointer, scroll with two fingers to pan, Command-0 to fit, Option-Command-0 for actual size.",
+            "Rectangle, ellipse, line, polygon and star: drag to draw, Shift for a square, a circle or a 45 degree line, Option to draw from the centre, or click for a standard size. The tool hands back to the arrow when you finish.",
+            "Select by clicking, Shift-click to add, or drag a marquee over empty canvas. A click inside a group picks the group; Command-click or a double-click reaches the shape inside.",
+            "Drag to move, Shift to keep to one axis. Eight handles resize from the opposite side, Shift keeps proportions, Option resizes from the centre. Just outside a corner turns the layer, Shift in 15 degree steps. Command-drag the anchor marker to move the anchor.",
+            "Arrow keys nudge by a pixel, Shift by ten. Delete removes. Duplicate, group, ungroup, copy, paste and restacking are in the Edit menu with their usual keys.",
+            "The layers panel lists the tree front to back, with groups that fold, hide, lock and solo on each row, a right-click menu, renaming, and drag to restack or drop into a group.",
+            "The inspector edits the selected layer: position, size, rotation, scale, anchor and opacity; corner radius, sides and points; a solid or gradient fill; a stroke with its width, alignment, caps, joins and dashes; drop shadows and blur.",
+            "The pen and text tools are shown but switched off until their milestones.",
+        ]),
         .init(date: "25 September 2026", title: "Everything worked out at any moment", changes: [
             "Every property can now be worked out at any moment of the animation, between frames included: keyframes, the easing presets, custom curves, holds and springs.",
             "Colours blend through a perceptual colour space, so red to blue passes through purple rather than grey.",

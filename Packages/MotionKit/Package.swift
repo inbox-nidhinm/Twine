@@ -20,8 +20,9 @@ let package = Package(
     targets: [
         // Pure value types. Foundation only: no UI, no rendering.
         .target(name: "MotionModel"),
-        // Commands and undo. Foundation and the model only.
-        .target(name: "MotionEditing", dependencies: ["MotionModel"]),
+        // Commands and undo, and the edits built from them. Reads evaluated
+        // values so an edit can land relative to what is on screen.
+        .target(name: "MotionEditing", dependencies: ["MotionModel", "MotionEvaluation"]),
         // `evaluate(project, at:)`: interpolation, easing, springs, and the
         // flat ResolvedScene every renderer draws from. Foundation only.
         .target(name: "MotionEvaluation", dependencies: ["MotionModel"]),

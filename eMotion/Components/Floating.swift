@@ -170,6 +170,11 @@ enum TrafficLights {
 /// field focused through clicks on anything that cannot itself take focus,
 /// which in a window of buttons and a canvas is almost everything.
 final class ChromelessWindow: NSWindow {
+    /// What gets the keyboard when nothing else wants it: the canvas, in a
+    /// project window, so tool letters and the delete key work after a click
+    /// on a panel button.
+    weak var preferredResponder: NSResponder?
+
     override func sendEvent(_ event: NSEvent) {
         if event.type == .leftMouseDown || event.type == .rightMouseDown,
            let fieldEditor = firstResponder as? NSText,
@@ -178,7 +183,7 @@ final class ChromelessWindow: NSWindow {
             let hit = content.hitTest(content.convert(event.locationInWindow, from: nil))
             if hit.map({ !$0.isDescendant(of: field) }) ?? true {
                 // Resigning commits the field, the same as pressing Return.
-                makeFirstResponder(nil)
+                makeFirstResponder(preferredResponder)
             }
         }
         super.sendEvent(event)
@@ -188,7 +193,7 @@ final class ChromelessWindow: NSWindow {
     /// keyboard to the first text field it finds, and typing then goes into
     /// the composition's width.
     func clearInitialFocus() {
-        DispatchQueue.main.async { [weak self] in self?.makeFirstResponder(nil) }
+        DispatchQueue.main.async { [weak self] in self?.makeFirstResponder(self?.preferredResponder) }
     }
 }
 

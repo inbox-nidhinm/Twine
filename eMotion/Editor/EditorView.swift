@@ -10,6 +10,7 @@ struct EditorView: View {
     let document: ProjectDocument
     let store: ProjectStore
     @Bindable var editor: EditorModel
+    let controller: EditorController
 
     @Environment(MenuHost.self) private var menus
 
@@ -18,11 +19,14 @@ struct EditorView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            CanvasView(composition: store.project.composition, insets: canvasInsets)
+            Theme.canvas.grained()
+                .ignoresSafeArea()
+            CanvasView(controller: controller, project: store.project, time: editor.time,
+                       selection: controller.selection, tool: editor.tool, insets: canvasInsets)
 
             HStack(alignment: .top, spacing: 0) {
                 if editor.showLayers {
-                    LayersPanel(document: document, store: store, editor: editor)
+                    LayersPanel(document: document, store: store, editor: editor, controller: controller)
                         .frame(width: Theme.panelWidth)
                         .frame(maxHeight: .infinity)
                         .floatingPanel()
@@ -30,7 +34,7 @@ struct EditorView: View {
                 }
                 Spacer(minLength: Theme.floatGap)
                 if editor.showInspector {
-                    InspectorPanel(store: store, editor: editor)
+                    InspectorPanel(store: store, editor: editor, controller: controller)
                         .frame(width: Theme.panelWidth)
                         .frame(maxHeight: .infinity)
                         .floatingPanel()
@@ -85,8 +89,8 @@ struct EditorView: View {
     private var canvasInsets: EdgeInsets {
         let bottom = editor.mode == .animate ? Self.timelineHeight : Theme.barHeight
         return EdgeInsets(top: Theme.floatInset,
-                          leading: leftGutter + Theme.floatGap,
+                          leading: leftGutter,
                           bottom: bottom + Theme.floatInset * 2,
-                          trailing: rightGutter + Theme.floatGap)
+                          trailing: rightGutter)
     }
 }
