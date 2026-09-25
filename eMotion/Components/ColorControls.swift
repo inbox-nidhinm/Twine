@@ -17,38 +17,46 @@ extension RGBA {
     }
 }
 
-/// A plain square of colour that opens the colour panel. SwiftUI's own
-/// `ColorPicker` draws a capsule that reads as a button rather than as the
-/// colour it shows.
-///
-/// For now this opens the system colour panel. Flip's own picker card
-/// replaces it when fills arrive in milestone 3.
+/// A plain square of colour that opens the app's colour picker beside it.
+/// SwiftUI's own `ColorPicker` draws a capsule that reads as a button rather
+/// than as the colour it shows.
 struct ColorWell: View {
     let color: RGBA
     var size: CGFloat = 48
-    /// Every change while the panel is being dragged in. The first arrives
-    /// after `onBegin`, and `onEnd` comes once the panel goes quiet.
+    /// What the picker's card is called.
+    var title: String = "Colour"
+    /// Every step of a drag in the picker. The first arrives after `onBegin`,
+    /// and `onEnd` comes when the drag lets go, so a drag is one undo step.
     let onChange: (RGBA) -> Void
     var onBegin: () -> Void = {}
     var onEnd: () -> Void = {}
 
+    @Environment(MenuHost.self) private var menus
     @State private var hovering = false
+    @State private var frame: CGRect = .zero
 
     var body: some View {
         Button {
-            ColorPanelBridge.shared.present(color, onBegin: onBegin, onChange: onChange, onEnd: onEnd)
+            // Beside the well, towards the canvas, level with it.
+            let x = frame.minX - Theme.cardWidth - Theme.floatGap * 2
+            menus.showPopup(at: CGPoint(x: x, y: frame.minY - 40)) {
+                PopupCard(title: title, width: Theme.cardWidth) {
+                    ColorPicker(color: color, onChange: onChange, onBegin: onBegin, onEnd: onEnd)
+                }
+            }
         } label: {
-            RoundedRectangle(cornerRadius: Theme.radiusWell)
+            RoundedRectangle(cornerRadius: size >= 40 ? Theme.radiusWell : Theme.radiusControl)
                 .fill(color.opaque)
                 .frame(width: size, height: size)
                 // The hairline answers the pointer, not the fill: a hover that
                 // tinted the square would be showing the wrong colour.
-                .overlay(RoundedRectangle(cornerRadius: Theme.radiusWell)
+                .overlay(RoundedRectangle(cornerRadius: size >= 40 ? Theme.radiusWell : Theme.radiusControl)
                     .strokeBorder(hovering ? Theme.edgeHover : Theme.edge, lineWidth: 1))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
     }
 }
 
@@ -89,62 +97,5 @@ struct HexField: View {
             if parsed != color { commit(parsed) }
         }
         text = color.hex6
-    }
-}
-
-/// Routes the shared `NSColorPanel` to whichever well opened it last.
-///
-/// The panel reports every step of a drag as a separate change and never says
-/// when a drag ends, so the bridge treats a quarter second of quiet as the end
-/// of one continuous edit. That makes a drag across the colour wheel one undo
-/// step rather than hundreds.
-@MainActor
-final class ColorPanelBridge: NSObject {
-    static let shared = ColorPanelBridge()
-
-    private var onBegin: () -> Void = {}
-    private var onChange: (RGBA) -> Void = { _ in }
-    private var onEnd: () -> Void = {}
-    private var editing = false
-    private var quiet: Timer?
-
-    func present(_ color: RGBA, onBegin: @escaping () -> Void, onChange: @escaping (RGBA) -> Void,
-                 onEnd: @escaping () -> Void) {
-        finish()
-        self.onBegin = onBegin
-        self.onChange = onChange
-        self.onEnd = onEnd
-
-        let panel = NSColorPanel.shared
-        panel.setTarget(nil)
-        panel.showsAlpha = true
-        panel.isContinuous = true
-        panel.color = color.nsColor
-        panel.setTarget(self)
-        panel.setAction(#selector(changed(_:)))
-        panel.orderFront(nil)
-    }
-
-    @objc private func changed(_ sender: NSColorPanel) {
-        if !editing {
-            editing = true
-            onBegin()
-        }
-        onChange(RGBA(sender.color))
-        quiet?.invalidate()
-        let timer = Timer(timeInterval: 0.25, repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated { self?.finish() }
-        }
-        // Both modes, so the timer still runs while the panel is being dragged in.
-        RunLoop.main.add(timer, forMode: .common)
-        quiet = timer
-    }
-
-    private func finish() {
-        quiet?.invalidate()
-        quiet = nil
-        guard editing else { return }
-        editing = false
-        onEnd()
     }
 }

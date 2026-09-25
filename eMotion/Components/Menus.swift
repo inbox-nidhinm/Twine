@@ -37,16 +37,28 @@ final class MenuHost {
     /// When true, `origin.y` is where the card's bottom edge goes, for menus
     /// raised from a bar along the bottom of the window.
     private(set) var growsUp = false
-    var isOpen: Bool { !entries.isEmpty }
+    /// A card raised by a control, such as the colour picker, drawn on the
+    /// same layer as menus and put away the same way.
+    private(set) var popup: AnyView?
+    var isOpen: Bool { !entries.isEmpty || popup != nil }
 
     func show(_ entries: [MenuEntry], at origin: CGPoint, growsUp: Bool = false) {
+        popup = nil
         self.entries = entries
         self.origin = origin
         self.growsUp = growsUp
     }
 
+    func showPopup<Content: View>(at origin: CGPoint, @ViewBuilder _ content: () -> Content) {
+        entries = []
+        popup = AnyView(content())
+        self.origin = origin
+        growsUp = false
+    }
+
     func dismiss() {
         entries = []
+        popup = nil
     }
 }
 
@@ -71,7 +83,13 @@ struct MenuLayer: View {
                         .contentShape(Rectangle())
                         .onTapGesture { menus.dismiss() }
 
-                    MenuCard(entries: menus.entries) { menus.dismiss() }
+                    Group {
+                        if let popup = menus.popup {
+                            popup
+                        } else {
+                            MenuCard(entries: menus.entries) { menus.dismiss() }
+                        }
+                    }
                         .fixedSize()
                         .alignmentGuide(.leading) { d in
                             -min(origin.x, max(bounds.width - d.width - inset, 0))

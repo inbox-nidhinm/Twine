@@ -111,6 +111,140 @@ final class EditorController {
 
     func cancel() { store.cancelContinuousChange() }
 
+    // MARK: How edits land
+
+    /// Design mode shifts an animation, Animate mode keys at the playhead.
+    var context: EditContext {
+        EditContext(time: editor.time, mode: editor.mode == .animate ? .animate : .design,
+                    frameDuration: project.composition.frameRate.frameDuration)
+    }
+
+    // MARK: Playback
+
+    var duration: Double { project.composition.duration }
+    var frameRate: FrameRate { project.composition.frameRate }
+    /// The start of the last frame: the latest moment the playhead can show.
+    var lastFrameTime: Double { frameRate.time(ofFrame: max(project.composition.frameCount - 1, 0)) }
+
+    func togglePlay() {
+        if !editor.isPlaying, editor.time >= lastFrameTime { editor.time = 0 }
+        editor.isPlaying.toggle()
+    }
+
+    func stop() { editor.isPlaying = false }
+
+    /// Moves the playhead, landing on a frame.
+    func seek(to time: Double) {
+        editor.time = min(max(frameRate.snapped(time), 0), lastFrameTime)
+    }
+
+    func step(_ frames: Int) {
+        stop()
+        seek(to: frameRate.time(ofFrame: frameRate.frame(at: editor.time) + frames))
+    }
+
+    func jumpToStart() { stop(); editor.time = 0 }
+    func jumpToEnd() { stop(); editor.time = lastFrameTime }
+
+    /// Called by the display's clock while playing. Plays in real time, and
+    /// either loops or stops on the last frame.
+    func advance(by seconds: Double) {
+        guard editor.isPlaying else { return }
+        var next = editor.time + seconds
+        if next > lastFrameTime {
+            if editor.loops && duration > 0 {
+                next = next.truncatingRemainder(dividingBy: duration)
+                if next > lastFrameTime { next = 0 }
+            } else {
+                next = lastFrameTime
+                editor.isPlaying = false
+            }
+        }
+        editor.time = next
+    }
+
+    // MARK: Keyframes
+
+    /// Keyframes that still exist, for after an undo.
+    var selectedKeyframes: Set<KeyframeRef> {
+        editor.selectedKeyframes.filter { ref in
+            guard let layer = project.layer(withID: ref.layerID),
+                  let property = LayerProperties.get(ref.property, of: layer) else { return false }
+            return property.marks.contains { $0.id == ref.keyframeID }
+        }
+    }
+
+    func toggleStopwatch(_ property: PropertyID, on id: UUID) {
+        guard let layer = project.layer(withID: id) else { return }
+        let edited = Keyframing.toggleStopwatch(property, on: layer, at: editor.time)
+        let on = LayerProperties.get(property, of: edited)?.isAnimated == true
+        if perform(.batch([.updateLayers([edited])], name: on ? "Animate \(LayerProperties.title(property))"
+                                                           : "Stop Animating \(LayerProperties.title(property))")), on {
+            editor.timelineExpanded.insert(id)
+        }
+    }
+
+    func toggleKeyframe(_ property: PropertyID, on id: UUID) {
+        guard let layer = project.layer(withID: id) else { return }
+        let edited = Keyframing.toggleKeyframe(property, on: layer, at: editor.time,
+                                               tolerance: frameRate.frameDuration / 2)
+        perform(.batch([.updateLayers([edited])], name: "Keyframe"))
+    }
+
+    func deleteSelectedKeyframes() {
+        let refs = selectedKeyframes
+        let layers = Set(refs.map(\.layerID)).compactMap(project.layer(withID:)).map { Keyframing.delete(refs, in: $0) }
+        guard !layers.isEmpty else { return }
+        if perform(.batch([.updateLayers(layers)], name: refs.count == 1 ? "Delete Keyframe" : "Delete Keyframes")) {
+            editor.selectedKeyframes = []
+        }
+    }
+
+    func setEasing(_ easing: Easing) {
+        let refs = selectedKeyframes
+        let layers = Set(refs.map(\.layerID)).compactMap(project.layer(withID:)).map { Keyframing.setEasing(easing, for: refs, in: $0) }
+        guard !layers.isEmpty else { return }
+        perform(.batch([.updateLayers(layers)], name: "Easing"))
+    }
+
+    /// For the easing editor's drags, which undo as one step.
+    func updateEasing(_ easing: Easing) {
+        let refs = selectedKeyframes
+        update(Set(refs.map(\.layerID)).compactMap(project.layer(withID:)).map { Keyframing.setEasing(easing, for: refs, in: $0) })
+    }
+
+    static let keyframePasteboardType = NSPasteboard.PasteboardType("com.nidhin.emotion.keyframes")
+
+    func copyKeyframes() {
+        guard let clipboard = KeyframeClipboard.copy(selectedKeyframes, from: project),
+              let data = try? JSONEncoder().encode(clipboard) else { return }
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.setData(data, forType: Self.keyframePasteboardType)
+    }
+
+    var canPasteKeyframes: Bool {
+        NSPasteboard.general.data(forType: Self.keyframePasteboardType) != nil && !selection.isEmpty
+    }
+
+    /// Pastes onto each selected layer, the earliest keyframe at the playhead.
+    func pasteKeyframes() {
+        guard let data = NSPasteboard.general.data(forType: Self.keyframePasteboardType),
+              let clipboard = try? JSONDecoder().decode(KeyframeClipboard.self, from: data) else { return }
+        let layers = selectedLayers.map { clipboard.paste(onto: $0, at: editor.time) }
+        guard !layers.isEmpty else { return }
+        perform(.batch([.updateLayers(layers)], name: "Paste Keyframes"))
+        for layer in layers { editor.timelineExpanded.insert(layer.id) }
+    }
+
+    /// Copies the chosen keyframes to the playhead.
+    func duplicateKeyframes() {
+        let refs = selectedKeyframes
+        guard let clipboard = KeyframeClipboard.copy(refs, from: project) else { return }
+        let layers = Set(refs.map(\.layerID)).compactMap(project.layer(withID:)).map { clipboard.paste(onto: $0, at: editor.time) }
+        perform(.batch([.updateLayers(layers)], name: "Duplicate Keyframes"))
+    }
+
     // MARK: Making layers
 
     func makeShape(_ tool: Tool, from start: Vec2, to end: Vec2) -> Layer? {
@@ -126,6 +260,7 @@ final class EditorController {
     // MARK: Arranging
 
     func deleteSelection() {
+        if editor.focus == .timeline, !selectedKeyframes.isEmpty { return deleteSelectedKeyframes() }
         let ids = selection
         guard !ids.isEmpty else { return }
         perform(.deleteLayers(Set(ids)))
@@ -133,6 +268,7 @@ final class EditorController {
     }
 
     func duplicateSelection() {
+        if editor.focus == .timeline, !selectedKeyframes.isEmpty { return duplicateKeyframes() }
         let layers = topmost(selectedLayers)
         guard !layers.isEmpty else { return }
         // Duplicates land just in front of their originals, nudged so they
@@ -189,8 +325,9 @@ final class EditorController {
     /// Nudges the selection by `delta` in composition space.
     func nudge(by delta: Vec2) {
         let scene = self.scene
+        let context = self.context
         let moved = topmost(selectedLayers).filter { !isLocked($0.id) }.map { layer in
-            layer.translated(by: parentDelta(delta, for: layer.id, in: scene))
+            layer.moved(by: parentDelta(delta, for: layer.id, in: scene), in: context)
         }
         guard !moved.isEmpty else { return }
         perform(.updateLayers(moved))
@@ -215,6 +352,7 @@ final class EditorController {
     static let pasteboardType = NSPasteboard.PasteboardType("com.nidhin.emotion.layers")
 
     func copySelection() {
+        if editor.focus == .timeline, !selectedKeyframes.isEmpty { return copyKeyframes() }
         let layers = topmost(selectedLayers)
         guard !layers.isEmpty, let data = try? JSONEncoder().encode(layers) else { return }
         let board = NSPasteboard.general
@@ -227,11 +365,15 @@ final class EditorController {
         deleteSelection()
     }
 
-    var canPaste: Bool { NSPasteboard.general.data(forType: Self.pasteboardType) != nil }
+    var canPaste: Bool {
+        if editor.focus == .timeline, canPasteKeyframes { return true }
+        return NSPasteboard.general.data(forType: Self.pasteboardType) != nil
+    }
 
     /// Pastes in place, in front of everything at the top level. Every pasted
     /// layer is a new layer with new ids, however many times it is pasted.
     func paste() {
+        if editor.focus == .timeline, canPasteKeyframes { return pasteKeyframes() }
         guard let data = NSPasteboard.general.data(forType: Self.pasteboardType),
               let layers = try? JSONDecoder().decode([Layer].self, from: data) else { return }
         let copies = layers.map { $0.duplicated() }

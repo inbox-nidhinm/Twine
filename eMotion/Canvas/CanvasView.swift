@@ -5,10 +5,7 @@ import Theme
 /// Puts the AppKit canvas into the SwiftUI window, and hands it what it draws.
 struct CanvasView: NSViewRepresentable {
     let controller: EditorController
-    let project: Project
-    let time: Double
-    let selection: [UUID]
-    let tool: Tool
+    let editor: EditorModel
     let insets: EdgeInsets
 
     @Environment(MenuHost.self) private var menus
@@ -27,6 +24,9 @@ struct CanvasView: NSViewRepresentable {
             return true
         }
         view.insets = NSEdgeInsets(top: insets.top, left: insets.leading, bottom: insets.bottom, right: insets.trailing)
-        view.show(project, time: time, selection: selection, tool: tool)
+        // Read here rather than handed in, so a new playhead time updates the
+        // canvas alone instead of the whole window's views.
+        view.show(controller.project, time: editor.time, selection: controller.selection, tool: editor.tool,
+                  playing: editor.isPlaying)
     }
 }

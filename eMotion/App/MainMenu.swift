@@ -10,6 +10,7 @@ enum MainMenu {
         bar.addItem(submenu(fileMenu()))
         bar.addItem(submenu(editMenu()))
         bar.addItem(submenu(viewMenu()))
+        bar.addItem(submenu(playbackMenu()))
         let window = windowMenu()
         bar.addItem(submenu(window))
         NSApp.windowsMenu = window
@@ -105,6 +106,21 @@ enum MainMenu {
         menu.addItem(item("Actual Size", #selector(EditorWindowController.zoomToActualSize(_:)), "0", [.command, .option]))
         menu.addItem(.separator())
         menu.addItem(item("Enter Full Screen", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]))
+        return menu
+    }
+
+    /// Space, the brackets, Home and End work on the canvas and the timeline
+    /// without being menu keys, so a space typed into a field stays a space.
+    /// The menu names them so they can be found.
+    private static func playbackMenu() -> NSMenu {
+        let menu = NSMenu(title: "Playback")
+        menu.addItem(item("Play or Pause    Space", #selector(EditorWindowController.togglePlayback(_:))))
+        menu.addItem(item("Previous Frame    [", #selector(EditorWindowController.previousFrame(_:))))
+        menu.addItem(item("Next Frame    ]", #selector(EditorWindowController.nextFrame(_:))))
+        menu.addItem(item("Go to Start    Home", #selector(EditorWindowController.goToStart(_:))))
+        menu.addItem(item("Go to End    End", #selector(EditorWindowController.goToEnd(_:))))
+        menu.addItem(.separator())
+        menu.addItem(item("Loop", #selector(EditorWindowController.toggleLoop(_:))))
         return menu
     }
 

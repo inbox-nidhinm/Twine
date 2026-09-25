@@ -7,7 +7,7 @@ import Theme
 ///
 /// `range` is only what the track spans. Typing a value outside it is allowed
 /// everywhere a slider has a field beside it; the pill simply pins at the end.
-struct SliderRow: View {
+struct SliderRow<Accessory: View>: View {
     let label: String
     let value: Double
     let range: ClosedRange<Double>
@@ -17,13 +17,19 @@ struct SliderRow: View {
     var onChange: (Double) -> Void
     var onBegin: () -> Void = {}
     var onEnd: () -> Void = {}
+    /// Sits at the end of the label's line, such as a stopwatch.
+    @ViewBuilder var accessory: () -> Accessory
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(ThemeFont.label)
-                .foregroundStyle(Theme.textSecondary)
-                .lineLimit(1)
+            HStack(spacing: 0) {
+                Text(label)
+                    .font(ThemeFont.label)
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                accessory()
+            }
             PillTrack(value: value, range: range, readout: readout(value),
                       onChange: onChange, onBegin: onBegin, onEnd: onEnd)
         }
@@ -109,6 +115,36 @@ private struct PillTrack: View {
             )
         }
         .frame(height: Theme.track)
+    }
+}
+
+extension SliderRow where Accessory == EmptyView {
+    init(label: String, value: Double, range: ClosedRange<Double>, readout: @escaping (Double) -> String = { "\(Int($0.rounded()))" },
+         onChange: @escaping (Double) -> Void, onBegin: @escaping () -> Void = {}, onEnd: @escaping () -> Void = {}) {
+        self.init(label: label, value: value, range: range, readout: readout, onChange: onChange,
+                  onBegin: onBegin, onEnd: onEnd, accessory: { EmptyView() })
+    }
+}
+
+/// The stopwatch beside an animatable property. Lit when the property has
+/// keyframes. Turning it on keys the current value at the playhead; turning
+/// it off takes every keyframe away and keeps the value at the playhead.
+struct Stopwatch: View {
+    let isOn: Bool
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            IconView(.stopwatch, size: 15)
+                .foregroundStyle(isOn ? Theme.accent : hovering ? Theme.textPrimary : Theme.textTertiary)
+                .frame(width: 20, height: Theme.control)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(isOn ? "Stop animating: removes its keyframes" : "Animate: adds a keyframe at the playhead")
     }
 }
 

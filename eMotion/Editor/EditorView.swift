@@ -14,15 +14,12 @@ struct EditorView: View {
 
     @Environment(MenuHost.self) private var menus
 
-    /// The height the timeline card takes in Animate mode.
-    static let timelineHeight: CGFloat = 240
 
     var body: some View {
         ZStack(alignment: .bottom) {
             Theme.canvas.grained()
                 .ignoresSafeArea()
-            CanvasView(controller: controller, project: store.project, time: editor.time,
-                       selection: controller.selection, tool: editor.tool, insets: canvasInsets)
+            CanvasView(controller: controller, editor: editor, insets: canvasInsets)
 
             HStack(alignment: .top, spacing: 0) {
                 if editor.showLayers {
@@ -67,14 +64,32 @@ struct EditorView: View {
             ToolBar(editor: editor)
                 .transition(.opacity)
         case .animate:
-            TimelinePanel(composition: store.project.composition)
-                .frame(height: Self.timelineHeight)
+            TimelinePanel(controller: controller, editor: editor)
+                .frame(height: editor.timelineHeight)
                 .frame(maxWidth: .infinity)
                 .floatingPanel()
+                .overlay(alignment: .top) { timelineGrip }
                 .padding(.horizontal, Theme.floatGap)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
+
+    /// The timeline's top edge, dragged to make it taller or shorter.
+    private var timelineGrip: some View {
+        Color.clear
+            .frame(height: 6)
+            .contentShape(Rectangle())
+            .background(CursorArea(cursor: .resizeUpDown))
+            .gesture(DragGesture(coordinateSpace: .global)
+                .onChanged { g in
+                    if gripStart == nil { gripStart = editor.timelineHeight }
+                    editor.timelineHeight = min(max((gripStart ?? 260) - g.translation.height, 140), 640)
+                }
+                .onEnded { _ in gripStart = nil })
+            .offset(y: -3)
+    }
+
+    @State private var gripStart: CGFloat?
 
     private var leftGutter: CGFloat {
         editor.showLayers ? Theme.floatInset + Theme.panelWidth : Theme.floatInset
@@ -87,7 +102,7 @@ struct EditorView: View {
     /// What the panels and the bottom surface cover, so a fitted composition
     /// lands in the space that is actually visible.
     private var canvasInsets: EdgeInsets {
-        let bottom = editor.mode == .animate ? Self.timelineHeight : Theme.barHeight
+        let bottom = editor.mode == .animate ? editor.timelineHeight : Theme.barHeight
         return EdgeInsets(top: Theme.floatInset,
                           leading: leftGutter,
                           bottom: bottom + Theme.floatInset * 2,

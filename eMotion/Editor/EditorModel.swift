@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import Theme
+import MotionEditing
 
 /// The editor's own state for one window: what is shown and what is in hand.
 /// None of this is saved in the project.
@@ -30,8 +31,41 @@ final class EditorModel {
     var selection: Set<UUID> = []
     /// The layer whose name is being edited in the layers panel.
     var renaming: UUID?
-    /// The playhead, in seconds. The timeline moves it from milestone 4.
+    /// The playhead, in seconds.
     var time: Double = 0
+    var isPlaying = false
+    var loops = true
+    /// Whether times read as frame numbers rather than seconds.
+    var showsFrames = false
+
+    /// Keyframes picked in the timeline.
+    var selectedKeyframes: Set<KeyframeRef> = []
+    /// Which layers the timeline has open to show their animated properties
+    /// and, for groups, their children.
+    var timelineExpanded: Set<UUID> = []
+    /// Where the last click landed, so Delete, Copy and Paste act on
+    /// keyframes after a click in the timeline and on layers otherwise.
+    var focus: Focus = .canvas
+    /// The timeline card's height, which its top edge drags.
+    var timelineHeight: CGFloat = 260
+
+    enum Focus { case canvas, timeline }
+
+    let viewport = TimelineViewport()
+}
+
+/// How the timeline maps time to points. Shared by the ruler and the tracks
+/// so they cannot disagree.
+@MainActor
+@Observable
+final class TimelineViewport {
+    var pointsPerSecond: Double = 100
+    /// The time at the left edge of the tracks.
+    var start: Double = 0
+    var hasFitted = false
+
+    func x(for time: Double) -> Double { (time - start) * pointsPerSecond }
+    func time(at x: Double) -> Double { x / pointsPerSecond + start }
 }
 
 enum Tool: String, CaseIterable {

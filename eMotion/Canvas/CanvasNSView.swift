@@ -47,6 +47,11 @@ final class CanvasNSView: NSView {
     private var hovered: UUID?
     private var drag: CanvasDrag?
 
+    /// Ticks with the display while playing, so playback advances in step
+    /// with what is shown.
+    private var clock: CADisplayLink?
+    private var lastTick: CFTimeInterval?
+
     static let minZoom = 0.02
     static let maxZoom = 64.0
 
@@ -103,7 +108,8 @@ final class CanvasNSView: NSView {
 
     /// Draws the project at `time`. Called by SwiftUI whenever anything the
     /// canvas shows changes; it only renders and never writes to the model.
-    func show(_ project: Project, time: Double, selection: [UUID], tool: Tool) {
+    func show(_ project: Project, time: Double, selection: [UUID], tool: Tool, playing: Bool) {
+        setClockRunning(playing)
         self.project = project
         self.selection = selection
         if self.tool != tool {
@@ -155,6 +161,27 @@ final class CanvasNSView: NSView {
         overlay.frame = bounds
         CATransaction.commit()
         redrawOverlay()
+    }
+
+    // MARK: Playback clock
+
+    private func setClockRunning(_ running: Bool) {
+        if running, clock == nil {
+            let link = displayLink(target: self, selector: #selector(tick(_:)))
+            link.add(to: .main, forMode: .common)
+            clock = link
+            lastTick = nil
+        } else if !running, let link = clock {
+            link.invalidate()
+            clock = nil
+            lastTick = nil
+        }
+    }
+
+    @objc private func tick(_ link: CADisplayLink) {
+        defer { lastTick = link.targetTimestamp }
+        guard let last = lastTick else { return }
+        controller?.advance(by: link.targetTimestamp - last)
     }
 
     // MARK: Zoom and pan
@@ -314,6 +341,7 @@ final class CanvasNSView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
+        controller?.editor.focus = .canvas
         if dismissTransients() { return }
         guard let controller, let scene else { return }
         let viewPoint = convert(event.locationInWindow, from: nil)
@@ -404,12 +432,13 @@ final class CanvasNSView: NSView {
             guard let scene else { return }
             var delta = point - move.start
             if shift { delta = abs(delta.x) >= abs(delta.y) ? Vec2(delta.x, 0) : Vec2(0, delta.y) }
-            controller.update(move.originals.map { $0.translated(by: controller.parentDelta(delta, for: $0.id, in: scene)) })
+            let context = controller.context
+            controller.update(move.originals.map { $0.moved(by: controller.parentDelta(delta, for: $0.id, in: scene), in: context) })
 
         case .resize(let resize):
             guard let parentInverse = parentInverse(of: resize.layer.id) else { return }
             let edited = CanvasGeometry.resized(resize.layer, handle: resize.handle,
-                                                pointer: parentInverse.apply(point), time: controller.editor.time,
+                                                pointer: parentInverse.apply(point), context: controller.context,
                                                 keepAspect: shift, fromCenter: option)
             controller.update([edited])
 
@@ -430,13 +459,13 @@ final class CanvasNSView: NSView {
             var angle = original + (a1 - a0) * 180 / .pi
             if shift { angle = (angle / 15).rounded() * 15 }
             var layer = rotate.layer
-            layer.transform.rotation = layer.transform.rotation.designEdited(to: angle, at: controller.editor.time)
+            layer.transform.rotation = layer.transform.rotation.edited(to: angle, in: controller.context)
             controller.update([layer])
 
         case .anchor(let edit):
             guard let parentInverse = parentInverse(of: edit.layer.id) else { return }
             controller.update([CanvasGeometry.movedAnchor(edit.layer, to: parentInverse.apply(point),
-                                                          time: controller.editor.time)])
+                                                          context: controller.context)])
 
         case .marquee(var marquee):
             marquee.current = viewPoint
@@ -551,6 +580,7 @@ final class CanvasNSView: NSView {
 
     override func keyDown(with event: NSEvent) {
         guard let controller else { return super.keyDown(with: event) }
+        if PlaybackKeys.handle(event, controller) { return }
         let step = event.modifierFlags.contains(.shift) ? 10.0 : 1.0
         switch event.keyCode {
         case 51, 117: controller.deleteSelection()                   // delete, forward delete

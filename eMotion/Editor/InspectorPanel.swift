@@ -26,6 +26,11 @@ struct InspectorPanel: View {
             PanelDivider()
             ScrollView {
                 VStack(spacing: 0) {
+                    let keys = controller.selectedKeyframes
+                    if !keys.isEmpty {
+                        KeyframeInspector(controller: controller, refs: keys)
+                        PanelDivider()
+                    }
                     let selected = controller.selectedLayers
                     if selected.count == 1, let layer = selected.first {
                         LayerInspector(layer: layer, controller: controller, time: editor.time)
@@ -53,7 +58,7 @@ struct InspectorPanel: View {
                       onChange: { v in
                           controller.update(layers.map { l in
                               var c = l
-                              c.opacity = c.opacity.designEdited(to: v / 100, at: editor.time)
+                              c.opacity = c.opacity.edited(to: v / 100, in: controller.context)
                               return c
                           })
                       },
@@ -117,7 +122,7 @@ struct InspectorPanel: View {
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
             HStack(spacing: 8) {
-                ColorWell(color: composition.background.color,
+                ColorWell(color: composition.background.color, title: "Background",
                           onChange: { color in
                               var c = composition
                               c.background.color = color

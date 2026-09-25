@@ -71,6 +71,15 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     @objc func bringToFront(_ sender: Any?) { controller.restack(.front) }
     @objc func sendToBack(_ sender: Any?) { controller.restack(.back) }
 
+    // MARK: Playback menu
+
+    @objc func togglePlayback(_ sender: Any?) { controller.togglePlay() }
+    @objc func previousFrame(_ sender: Any?) { controller.step(-1) }
+    @objc func nextFrame(_ sender: Any?) { controller.step(1) }
+    @objc func goToStart(_ sender: Any?) { controller.jumpToStart() }
+    @objc func goToEnd(_ sender: Any?) { controller.jumpToEnd() }
+    @objc func toggleLoop(_ sender: Any?) { editor.loops.toggle() }
+
     // MARK: Zoom
 
     @objc func zoomIn(_ sender: Any?) { controller.canvas?.zoom(by: 2) }
@@ -91,6 +100,10 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
             return controller.selectedLayers.contains(where: \.isGroup)
         case #selector(paste(_:)):
             return controller.canPaste
+        case #selector(togglePlayback(_:)):
+            item.title = (editor.isPlaying ? "Pause" : "Play") + "    Space"
+        case #selector(toggleLoop(_:)):
+            item.state = editor.loops ? .on : .off
         case #selector(selectAll(_:)):
             return !controller.project.layers.isEmpty
         case #selector(toggleLayersPanel(_:)):

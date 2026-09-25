@@ -53,6 +53,25 @@ Name.emotion/
 | Two-finger scroll | Pan |
 | ⌘0, ⌥⌘0, ⌘=, ⌘- | Fit, actual size, zoom in, zoom out |
 
+## Animating
+
+Switch to Animate (⌥⌘2) to bring up the timeline. Turn on a property's stopwatch in the inspector to key its value at the playhead; after that, changing it in Animate mode, on the canvas or in the inspector, keys it at the playhead. In Design mode a change moves the whole animation instead.
+
+| | |
+|---|---|
+| Space | Play or pause |
+| [ and ] | Previous and next frame |
+| Home, End | Go to the start or the end |
+| Click or drag the ruler | Scrub |
+| Click, Shift-click, drag a box | Select keyframes |
+| Drag keyframes | Move them in time; they land on frames and snap to the playhead, other keyframes and layer ends |
+| Drag a layer's bar, or an end of it | Move the layer in time, or trim it |
+| ⌫, ⌘C, ⌘V, ⌘D | Delete, copy, paste at the playhead, duplicate at the playhead |
+| ⌘-scroll or pinch on the tracks | Zoom the time axis |
+| Click the time readout | Switch between seconds and frames |
+
+With keyframes selected, the inspector shows their easing: linear, hold, presets, a custom curve, or a spring.
+
 ## Status
 
-Milestones 1 to 3 of 8: the foundation, evaluation and rendering, and the canvas with basic shapes. See `docs/brief.md` for the whole plan, and Version History on the home screen for what each build changed.
+Milestones 1 to 4 of 8: the foundation, evaluation and rendering, the canvas with basic shapes, and the timeline with playback. See `docs/brief.md` for the whole plan, and Version History on the home screen for what each build changed.

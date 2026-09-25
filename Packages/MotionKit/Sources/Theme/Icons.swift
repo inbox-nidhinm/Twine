@@ -20,15 +20,25 @@ public enum Icon: String, CaseIterable, Sendable {
     case unlock
     case video
     case home
+    case jumpEnd
+    case jumpStart
+    case loop
     case pause
     case play
+    case stepBack
+    case stepForward
     case check
     case chevronDown
     case chevronRight
     case close
+    case eyedropper
     case minus
     case plus
     case trash
+    case keyframeNext
+    case keyframePrev
+    case keyframe
+    case stopwatch
     case ellipse
     case line
     case pen
@@ -103,12 +113,36 @@ public enum Icon: String, CaseIterable, Sendable {
         case .home: return [   // Panels/home.svg
             "M4 10.5 L12 4 L20 10.5 V19 C20 19.552 19.552 20 19 20 H15 V14 H9 V20 H5 C4.448 20 4 19.552 4 19 Z"
         ]
+        case .jumpEnd: return [   // Playback/jump-end.svg
+            "M19 6 V18",
+            "M12 6 L17 12 L12 18",
+            "M5 6 L10 12 L5 18"
+        ]
+        case .jumpStart: return [   // Playback/jump-start.svg
+            "M5 6 V18",
+            "M12 6 L7 12 L12 18",
+            "M19 6 L14 12 L19 18"
+        ]
+        case .loop: return [   // Playback/loop.svg
+            "M17 4 L20 7 L17 10",
+            "M20 7 H8 C5.791 7 4 8.791 4 11",
+            "M7 20 L4 17 L7 14",
+            "M4 17 H16 C18.209 17 20 15.209 20 13"
+        ]
         case .pause: return [   // Playback/pause.svg
             "M9 5 V19",
             "M15 5 V19"
         ]
         case .play: return [   // Playback/play.svg
             "M8 5.5 V18.5 C8 19.2 8.8 19.6 9.4 19.2 L18.4 13 C18.9 12.6 18.9 11.4 18.4 11 L9.4 4.8 C8.8 4.4 8 4.8 8 5.5 Z"
+        ]
+        case .stepBack: return [   // Playback/step-back.svg
+            "M7 6 V18",
+            "M18 6 L10 12 L18 18 Z"
+        ]
+        case .stepForward: return [   // Playback/step-forward.svg
+            "M17 6 V18",
+            "M6 6 L14 12 L6 18 Z"
         ]
         case .check: return [   // Shared/check.svg
             "M5 12.5 L10 17.5 L19 7"
@@ -123,6 +157,11 @@ public enum Icon: String, CaseIterable, Sendable {
             "M6 6 L18 18",
             "M18 6 L6 18"
         ]
+        case .eyedropper: return [   // Shared/eyedropper.svg
+            "M14.5 6.5 L17.5 9.5",
+            "M16 5 C17 4 18.5 4 19.5 5 C20.5 6 20.5 7.5 19.5 8.5 L17 11 L13 7 Z",
+            "M15.5 9.5 L7 18 L4 20 L6 17 L14.5 8.5"
+        ]
         case .minus: return [   // Shared/minus.svg
             "M5 12 H19"
         ]
@@ -136,6 +175,21 @@ public enum Icon: String, CaseIterable, Sendable {
             "M7 7 L8 20 H16 L17 7",
             "M10 11 V16",
             "M14 11 V16"
+        ]
+        case .keyframeNext: return [   // Timeline/keyframe-next.svg
+            "M9 6 L15 12 L9 18"
+        ]
+        case .keyframePrev: return [   // Timeline/keyframe-prev.svg
+            "M15 6 L9 12 L15 18"
+        ]
+        case .keyframe: return [   // Timeline/keyframe.svg
+            "M12 4 L20 12 L12 20 L4 12 Z"
+        ]
+        case .stopwatch: return [   // Timeline/stopwatch.svg
+            "M12 21 C16.418 21 20 17.418 20 13 C20 8.582 16.418 5 12 5 C7.582 5 4 8.582 4 13 C4 17.418 7.582 21 12 21 Z",
+            "M12 9 V13 L14.5 15",
+            "M10 2.5 H14",
+            "M12 2.5 V5"
         ]
         case .ellipse: return [   // Tools/ellipse.svg
             "M12 4 C16.418 4 20 7.582 20 12 C20 16.418 16.418 20 12 20 C7.582 20 4 16.418 4 12 C4 7.582 7.582 4 12 4 Z"

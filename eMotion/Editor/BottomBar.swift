@@ -66,34 +66,3 @@ struct ToolBar: View {
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { chevronFrame = $0 }
     }
 }
-
-/// Animate mode's surface. Milestone 4 fills it with layer rows, bars and
-/// keyframes; for now it carries the transport and the clock.
-struct TimelinePanel: View {
-    let composition: Composition
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: Theme.barGap) {
-                BarButton(icon: .play, help: "Play (Space)", disabled: true) {}
-                Text(TimeFormat.clock(0))
-                    .font(ThemeFont.label)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.textPrimary)
-                    .padding(.leading, 6)
-                Text("/ \(TimeFormat.clock(composition.duration))")
-                    .font(ThemeFont.label)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.textTertiary)
-                Spacer(minLength: 0)
-                Text("\(composition.frameRate.label) fps")
-                    .font(ThemeFont.caption)
-                    .foregroundStyle(Theme.textTertiary)
-            }
-            .padding(.horizontal, Theme.barPad + 2)
-            .frame(height: Theme.barRow)
-            PanelDivider()
-            Spacer(minLength: 0)
-        }
-    }
-}

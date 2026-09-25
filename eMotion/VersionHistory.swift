@@ -23,6 +23,15 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "25 September 2026", title: "The timeline", changes: [
+            "Animate mode's timeline: a row per layer, with its bar from in point to out point, and its animated properties underneath when opened. Drag a bar to move the layer in time, or an end to trim it. Drag the timeline's top edge to make it taller.",
+            "Keyframes on the timeline: click, Shift-click or drag a box to select, drag to move them, landing on frames and snapping to the playhead, other keyframes and the ends of layers. Delete, copy, paste at the playhead and duplicate follow whichever you clicked last, the timeline or the canvas.",
+            "A stopwatch beside every property in the inspector. On, it keys the value at the playhead; after that, any change in Animate mode keys it at the playhead, from the canvas or the inspector. In Design mode a change moves the whole animation instead. Off, the keyframes go and the value at the playhead stays.",
+            "Easing for the selected keyframes: linear, hold, twelve presets, a custom curve with handles to drag, or a spring with its stiffness, damping and mass, and how long it takes to settle. A spring moves the next keyframe to where it settles.",
+            "Playback in real time. Space plays and pauses, [ and ] step a frame, Home and End go to the ends, and it loops unless you switch that off. Click or drag the ruler to scrub. Click the time to read it in frames.",
+            "Trim start and end on strokes, so a line can draw itself on.",
+            "The app's own colour picker, drawn on the panel card like Flip's, in place of the system colour panel.",
+        ]),
         .init(date: "25 September 2026", title: "Drawing on the canvas", changes: [
             "The canvas draws the composition with the real renderer. Pinch or Command-scroll to zoom about the pointer, scroll with two fingers to pan, Command-0 to fit, Option-Command-0 for actual size.",
             "Rectangle, ellipse, line, polygon and star: drag to draw, Shift for a square, a circle or a 45 degree line, Option to draw from the centre, or click for a standard size. The tool hands back to the arrow when you finish.",
