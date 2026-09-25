@@ -23,6 +23,13 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "25 September 2026", title: "Clicks land where they should", changes: [
+            "The Design and Animate switch, the Composition header and the tools answer clicks again. The inspector's list had been stretching up under the title bar and catching clicks meant for the controls above it, and even sent some to the width field.",
+            "Nothing takes the keyboard when a window opens, so typing no longer goes into the composition's width.",
+            "Clicking anywhere outside a text field ends the edit and keeps what was typed.",
+            "The traffic lights stay in the left panel's corner without the loop that crashed the app when a project opened in the background.",
+            "Section headers are real buttons, so a click anywhere on the row folds them.",
+        ]),
         .init(date: "25 September 2026", title: "The foundation", changes: [
             "A home screen of every project in eMotion Creations, newest first, with open, rename, duplicate, show in Finder and move to Trash.",
             "New projects are written to disk the moment they are made and save themselves from then on. Closing a window never asks a question, and File > Revert To browses older versions.",

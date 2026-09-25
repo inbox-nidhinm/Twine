@@ -322,12 +322,22 @@ struct PanelDivider: View {
 }
 
 /// A section's name, and when it folds, a chevron that says which way it is.
+/// The whole row is the button when it folds, so a click anywhere on it works.
 struct SectionHeader: View {
     let title: String
     var isOpen: Bool? = nil
     var toggle: () -> Void = {}
 
     var body: some View {
+        if isOpen != nil {
+            Button { withAnimation(.easeOut(duration: 0.14)) { toggle() } } label: { row }
+                .buttonStyle(.plain)
+        } else {
+            row
+        }
+    }
+
+    private var row: some View {
         HStack(spacing: 6) {
             Text(title)
                 .font(ThemeFont.labelStrong)
@@ -342,6 +352,5 @@ struct SectionHeader: View {
         .padding(.horizontal, Theme.panelPad)
         .frame(height: Theme.button)
         .contentShape(Rectangle())
-        .onTapGesture { if isOpen != nil { withAnimation(.easeOut(duration: 0.14)) { toggle() } } }
     }
 }

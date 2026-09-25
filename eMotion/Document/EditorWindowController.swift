@@ -25,6 +25,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     override func showWindow(_ sender: Any?) {
         super.showWindow(sender)
+        (window as? ChromelessWindow)?.clearInitialFocus()
+        if let window { TrafficLights.retry(in: window) }
         // The home screen gives way to the project, as it does in Flip.
         HomeWindowController.shared.close()
     }

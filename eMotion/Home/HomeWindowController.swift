@@ -24,6 +24,8 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
     override func showWindow(_ sender: Any?) {
         library.refresh()
         super.showWindow(sender)
+        (window as? ChromelessWindow)?.clearInitialFocus()
+        if let window { TrafficLights.retry(in: window) }
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
