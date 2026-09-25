@@ -17,7 +17,12 @@ public enum ProjectFormat {
     /// Bump this, and add a migration from the previous version, whenever a
     /// change to the model would make an older file fail to decode or mean
     /// something different.
-    public static let currentVersion = 1
+    ///
+    /// 2 replaced keyframes with actions (September 2026).
+    public static let currentVersion = 2
+    /// Files older than this are refused with a plain message rather than
+    /// migrated: nothing made before actions carries over meaningfully.
+    public static let oldestReadableVersion = 2
 
     public static let documentFileName = "document.json"
     public static let mediaFolderName = "media"
@@ -41,6 +46,9 @@ public enum ProjectFormat {
         }
         if probe.formatVersion > currentVersion {
             throw ProjectFileError.newerVersion(probe.formatVersion)
+        }
+        if probe.formatVersion < oldestReadableVersion {
+            throw ProjectFileError.olderVersion(probe.formatVersion)
         }
 
         var body = data
@@ -67,6 +75,7 @@ public enum ProjectFormat {
 public enum ProjectFileError: Error, Equatable, LocalizedError {
     case unreadable(String)
     case newerVersion(Int)
+    case olderVersion(Int)
     case missingMigration(from: Int)
     case missingDocument
 
@@ -74,10 +83,15 @@ public enum ProjectFileError: Error, Equatable, LocalizedError {
         switch self {
         case .unreadable(let why): return "The project could not be read. \(why)"
         case .newerVersion: return "This project was saved by a newer version of eMotion."
+        case .olderVersion: return "This project was made with an earlier version of eMotion, before animation moved to actions, and can no longer be opened."
         case .missingMigration(let v): return "Projects saved in format \(v) cannot be opened by this version."
         case .missingDocument: return "The project is missing its document.json."
         }
     }
+
+    /// The open panel's alert heads itself "could not be opened" and shows
+    /// this underneath, so the reason goes here too.
+    public var failureReason: String? { errorDescription }
 }
 
 /// Upgrades the JSON of an older file one version at a time.
@@ -97,7 +111,7 @@ public struct FormatMigrator: Sendable {
         self.steps = steps
     }
 
-    /// No migrations yet: version 1 is the first format.
+    /// No migrations yet: version 2 is the oldest format still read.
     public static let standard = FormatMigrator(steps: [:])
 
     public func migrate(_ data: Data, from old: Int, to new: Int) throws -> Data {

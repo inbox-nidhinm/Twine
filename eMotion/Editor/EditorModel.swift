@@ -38,13 +38,8 @@ final class EditorModel {
     /// Whether times read as frame numbers rather than seconds.
     var showsFrames = false
 
-    /// Keyframes picked in the timeline.
-    var selectedKeyframes: Set<KeyframeRef> = []
-    /// Which layers the timeline has open to show their animated properties
-    /// and, for groups, their children.
-    var timelineExpanded: Set<UUID> = []
-    /// Where the last click landed, so Delete, Copy and Paste act on
-    /// keyframes after a click in the timeline and on layers otherwise.
+    /// Where the last click landed, so Delete, Copy and Paste can act on
+    /// actions after a click in the timeline and on layers otherwise.
     var focus: Focus = .canvas
     /// The timeline card's height, which its top edge drags.
     var timelineHeight: CGFloat = 260

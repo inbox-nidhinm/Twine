@@ -1,6 +1,8 @@
 import Foundation
 
-/// One item in the layer tree.
+/// One item in the layer tree. Its properties are its design state: how it
+/// looks when no action is changing it. Layers last the whole composition;
+/// they come and go through actions, such as Opacity and Hide/Show.
 ///
 /// `id` is assigned once and never changes, including across duplication of the
 /// file. Masks, selections, and a future Figma importer all refer to layers by
@@ -11,34 +13,28 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
     public var isVisible: Bool
     public var isLocked: Bool
     public var isSoloed: Bool
-    /// When the layer appears and disappears, in composition seconds.
-    public var inPoint: Double
-    public var outPoint: Double
     public var transform: Transform
     /// The box the layer is laid out in. Shapes draw to fill it, text wraps to
     /// its width when fixed, images and video are scaled into it, and a group
     /// clips to it when `clipsContent` is on.
-    public var size: AnimatableProperty<Size2>
+    public var size: Size2
     /// 0 to 1. The inspector shows it as a percentage.
-    public var opacity: AnimatableProperty<Double>
+    public var opacity: Double
     /// Drop shadows and blurs, in the order they apply. A list, like fills, so
     /// that Figma's effect stack can be carried over whole.
     public var effects: [Effect]
     public var mask: MaskReference?
     public var content: LayerContent
 
-    public init(id: UUID = UUID(), name: String, content: LayerContent, size: Size2,
-                position: Vec2, inPoint: Double = 0, outPoint: Double) {
+    public init(id: UUID = UUID(), name: String, content: LayerContent, size: Size2, position: Vec2) {
         self.id = id
         self.name = name
         self.isVisible = true
         self.isLocked = false
         self.isSoloed = false
-        self.inPoint = inPoint
-        self.outPoint = outPoint
         self.transform = Transform(position: position, anchor: size.center)
-        self.size = AnimatableProperty(size)
-        self.opacity = AnimatableProperty(1)
+        self.size = size
+        self.opacity = 1
         self.effects = []
         self.mask = nil
         self.content = content
@@ -67,24 +63,24 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
 /// Where a layer sits and how it is turned and scaled, around its anchor point.
 public struct Transform: Codable, Sendable, Equatable {
     /// Where the anchor point sits, in the parent's space.
-    public var position: AnimatableProperty<Vec2>
+    public var position: Vec2
     /// Measured in pixels from the layer's own top-left corner. New layers put
     /// it at their centre.
-    public var anchor: AnimatableProperty<Vec2>
+    public var anchor: Vec2
     /// 1 is 100%.
-    public var scale: AnimatableProperty<Vec2>
+    public var scale: Vec2
     /// Whether editing one scale axis moves the other with it. A property of
     /// the editor rather than of the motion, but it belongs to the layer.
     public var isScaleLinked: Bool
     /// Degrees, clockwise.
-    public var rotation: AnimatableProperty<Double>
+    public var rotation: Double
 
     public init(position: Vec2, anchor: Vec2) {
-        self.position = AnimatableProperty(position)
-        self.anchor = AnimatableProperty(anchor)
-        self.scale = AnimatableProperty(.one)
+        self.position = position
+        self.anchor = anchor
+        self.scale = .one
         self.isScaleLinked = true
-        self.rotation = AnimatableProperty(0)
+        self.rotation = 0
     }
 }
 
@@ -132,7 +128,7 @@ public struct TextContent: Codable, Sendable, Equatable {
     /// 100 to 900, the CSS scale. The family's nearest face is used.
     public var fontWeight: Int
     public var fontSize: Double
-    public var color: AnimatableProperty<RGBA>
+    public var color: RGBA
     public var alignment: TextAlignment
     /// Extra space between letters, in pixels.
     public var letterSpacing: Double
@@ -147,7 +143,7 @@ public struct TextContent: Codable, Sendable, Equatable {
         self.fontFamily = fontFamily
         self.fontWeight = fontWeight
         self.fontSize = fontSize
-        self.color = AnimatableProperty(color)
+        self.color = color
         self.alignment = alignment
         self.letterSpacing = letterSpacing
         self.lineHeight = lineHeight
@@ -173,19 +169,19 @@ public struct ImageContent: Codable, Sendable, Equatable {
     }
 }
 
-/// A video clip. The frame shown at composition time `t` is the one at
-/// `trimStart + (t - inPoint)` in the source.
+/// A video clip. Until its Play bar arrives (redesign milestone 8), the frame
+/// shown at composition time `t` is the one at `trimStart + t` in the source.
 public struct VideoContent: Codable, Sendable, Equatable {
     public var mediaID: UUID
     public var trimStart: Double
     /// 1 is the clip's own level.
-    public var volume: AnimatableProperty<Double>
+    public var volume: Double
     public var isMuted: Bool
 
     public init(mediaID: UUID, trimStart: Double = 0) {
         self.mediaID = mediaID
         self.trimStart = trimStart
-        self.volume = AnimatableProperty(1)
+        self.volume = 1
         self.isMuted = false
     }
 }
@@ -193,13 +189,13 @@ public struct VideoContent: Codable, Sendable, Equatable {
 public struct AudioContent: Codable, Sendable, Equatable {
     public var mediaID: UUID
     public var trimStart: Double
-    public var volume: AnimatableProperty<Double>
+    public var volume: Double
     public var isMuted: Bool
 
     public init(mediaID: UUID, trimStart: Double = 0) {
         self.mediaID = mediaID
         self.trimStart = trimStart
-        self.volume = AnimatableProperty(1)
+        self.volume = 1
         self.isMuted = false
     }
 }
@@ -269,26 +265,26 @@ extension EffectKind: Codable {
 }
 
 public struct DropShadow: Codable, Sendable, Equatable {
-    public var color: AnimatableProperty<RGBA>
-    public var offset: AnimatableProperty<Vec2>
+    public var color: RGBA
+    public var offset: Vec2
     /// Blur radius in pixels.
-    public var blur: AnimatableProperty<Double>
+    public var blur: Double
     /// 0 to 1, on top of the colour's own alpha.
-    public var opacity: AnimatableProperty<Double>
+    public var opacity: Double
 
     public init(color: RGBA = .black, offset: Vec2 = Vec2(0, 4), blur: Double = 8, opacity: Double = 0.25) {
-        self.color = AnimatableProperty(color)
-        self.offset = AnimatableProperty(offset)
-        self.blur = AnimatableProperty(blur)
-        self.opacity = AnimatableProperty(opacity)
+        self.color = color
+        self.offset = offset
+        self.blur = blur
+        self.opacity = opacity
     }
 }
 
 public struct LayerBlur: Codable, Sendable, Equatable {
     /// Gaussian radius in pixels.
-    public var radius: AnimatableProperty<Double>
+    public var radius: Double
 
     public init(radius: Double = 4) {
-        self.radius = AnimatableProperty(radius)
+        self.radius = radius
     }
 }

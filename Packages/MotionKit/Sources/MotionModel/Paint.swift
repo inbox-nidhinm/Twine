@@ -16,11 +16,11 @@ public struct Fill: Codable, Sendable, Equatable, Identifiable {
 }
 
 public enum Paint: Sendable, Equatable {
-    case solid(AnimatableProperty<RGBA>)
+    case solid(RGBA)
     case linearGradient(Gradient)
     case radialGradient(Gradient)
 
-    public static func color(_ color: RGBA) -> Paint { .solid(AnimatableProperty(color)) }
+    public static func color(_ color: RGBA) -> Paint { .solid(color) }
 }
 
 extension Paint: Codable {
@@ -30,7 +30,7 @@ extension Paint: Codable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         switch try c.decode(Kind.self, forKey: .type) {
-        case .solid: self = .solid(try c.decode(AnimatableProperty<RGBA>.self, forKey: .color))
+        case .solid: self = .solid(try c.decode(RGBA.self, forKey: .color))
         case .linearGradient: self = .linearGradient(try c.decode(Gradient.self, forKey: .gradient))
         case .radialGradient: self = .radialGradient(try c.decode(Gradient.self, forKey: .gradient))
         }
@@ -57,12 +57,12 @@ extension Paint: Codable {
 /// it is resized. For a radial gradient `start` is the centre and `end` a point
 /// on its edge.
 public struct Gradient: Codable, Sendable, Equatable {
-    public var stops: AnimatableProperty<[GradientStop]>
+    public var stops: [GradientStop]
     public var start: Vec2
     public var end: Vec2
 
     public init(stops: [GradientStop], start: Vec2 = Vec2(0, 0.5), end: Vec2 = Vec2(1, 0.5)) {
-        self.stops = AnimatableProperty(stops)
+        self.stops = stops
         self.start = start
         self.end = end
     }
@@ -83,7 +83,7 @@ public struct Stroke: Codable, Sendable, Equatable, Identifiable {
     public let id: UUID
     public var isEnabled: Bool
     public var paint: Paint
-    public var width: AnimatableProperty<Double>
+    public var width: Double
     public var alignment: StrokeAlignment
     public var cap: LineCap
     public var join: LineJoin
@@ -91,8 +91,8 @@ public struct Stroke: Codable, Sendable, Equatable, Identifiable {
     public var dashPattern: [Double]
     public var dashOffset: Double
     /// How much of the path is drawn, as fractions of its length.
-    public var trimStart: AnimatableProperty<Double>
-    public var trimEnd: AnimatableProperty<Double>
+    public var trimStart: Double
+    public var trimEnd: Double
 
     public init(id: UUID = UUID(), isEnabled: Bool = true, paint: Paint, width: Double = 1,
                 alignment: StrokeAlignment = .center, cap: LineCap = .butt, join: LineJoin = .miter,
@@ -100,14 +100,14 @@ public struct Stroke: Codable, Sendable, Equatable, Identifiable {
         self.id = id
         self.isEnabled = isEnabled
         self.paint = paint
-        self.width = AnimatableProperty(width)
+        self.width = width
         self.alignment = alignment
         self.cap = cap
         self.join = join
         self.dashPattern = dashPattern
         self.dashOffset = dashOffset
-        self.trimStart = AnimatableProperty(0)
-        self.trimEnd = AnimatableProperty(1)
+        self.trimStart = 0
+        self.trimEnd = 1
     }
 }
 

@@ -2,18 +2,57 @@ import Foundation
 import MotionModel
 
 extension Easing {
-    /// Eased progress through a segment, for linear progress `u` from 0 to 1.
+    /// Eased progress through an action, for linear progress `u` from 0 to 1.
     /// The result is 0 at the start and exactly 1 at the end, and may overshoot
     /// in between.
     public func progress(_ u: Double) -> Double {
         if u <= 0 { return 0 }
         if u >= 1 { return 1 }
         switch self {
-        case .linear: return u
-        case .hold: return 0
-        case .bezier(let curve): return curve.value(at: u)
-        case .spring(let spring): return spring.normalizedProgress(u)
+        case .custom(let curve): return curve.value(at: u)
+        case .preset(let preset, let intensity): return preset.progress(u, intensity: intensity)
         }
+    }
+}
+
+extension EasingPreset {
+    /// Each preset's shape at an intensity from 0 to 1. The curves run from
+    /// gentle at 0 to strong at 1, and 0.5 is a sensible middle.
+    public func progress(_ u: Double, intensity: Double) -> Double {
+        let i = min(max(intensity, 0), 1)
+        switch self {
+        case .none: return u
+        case .smooth, .slowDown, .accelerate, .overshoot: return curve(intensity: i).value(at: u)
+        case .spring: return Self.spring(intensity: i).normalizedProgress(u)
+        }
+    }
+
+    /// The bezier a curve preset makes. Smooth, Slow down and Accelerate
+    /// blend from a straight line at intensity 0 to a strong exponential
+    /// curve at 1. Overshoot raises its first handle above the end value,
+    /// further the higher the intensity.
+    public func curve(intensity i: Double) -> CubicBezier {
+        func blend(_ strong: CubicBezier) -> CubicBezier {
+            let a = CubicBezier.linear
+            return CubicBezier(a.x1 + (strong.x1 - a.x1) * i, a.y1 + (strong.y1 - a.y1) * i,
+                               a.x2 + (strong.x2 - a.x2) * i, a.y2 + (strong.y2 - a.y2) * i)
+        }
+        switch self {
+        case .none, .spring: return .linear
+        case .smooth: return blend(CubicBezier(0.87, 0, 0.13, 1))
+        case .slowDown: return blend(CubicBezier(0.16, 1, 0.3, 1))
+        case .accelerate: return blend(CubicBezier(0.7, 0, 0.84, 0))
+        case .overshoot: return CubicBezier(0.34, 1 + 1.2 * i, 0.64, 1)
+        }
+    }
+
+    /// Critically damped (no bounce) at intensity 0, down to very little
+    /// damping at 1. Stiffness only sets the natural speed, which fitting the
+    /// motion to the action's duration cancels out.
+    static func spring(intensity i: Double) -> Spring {
+        let zeta = 1 - 0.92 * i
+        let stiffness = 100.0
+        return Spring(stiffness: stiffness, damping: 2 * zeta * stiffness.squareRoot(), mass: 1)
     }
 }
 
@@ -76,8 +115,8 @@ extension Spring {
     }
 
     /// The time after which the spring stays within a thousandth of its
-    /// target for good. This is the spring's natural length: applying a spring
-    /// to a segment makes the segment this long.
+    /// target for good: the spring's natural length, which the spring preset
+    /// stretches or squeezes to the action's duration.
     ///
     /// Worked out from the motion's envelope rather than by stepping through
     /// it, because evaluation asks for this on every frame. An underdamped
@@ -107,9 +146,9 @@ extension Spring {
         return max(hi, 1e-3)
     }
 
-    /// Progress for linear progress `u` through a segment of any length. The
+    /// Progress for linear progress `u` through an action of any length. The
     /// spring's natural motion is stretched or squeezed to fit, and nudged by
-    /// the small amount left at the settle point so the segment ends exactly
+    /// the small amount left at the settle point so the action ends exactly
     /// on its end value rather than a thousandth short of it.
     func normalizedProgress(_ u: Double) -> Double {
         let settle = settleDuration

@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Actions underneath", changes: [
+            "Animation now works like Jitter underneath: a layer's properties are how it is designed, and actions (move, scale, rotate, opacity, resize, hide and show) change them over time. Adding and editing actions in the app comes with the next builds.",
+            "Keyframes, stopwatches and layer in and out bars are gone. The inspector shows each layer as designed.",
+            "Duplicating, pasting, grouping and ungrouping keep each layer's actions with it.",
+            "Projects from earlier builds show a plain message and no longer open.",
+        ]),
         .init(date: "25 September 2026", title: "Fixes to fields and easing", changes: [
             "A number typed into a field and confirmed with Return no longer goes back to the old value when you click somewhere else. The same for hex colours.",
             "The Easing menu is greyed out when only a property's last keyframe is selected, since easing shapes the move to the next keyframe and there is none.",

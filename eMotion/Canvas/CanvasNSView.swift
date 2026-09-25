@@ -432,13 +432,12 @@ final class CanvasNSView: NSView {
             guard let scene else { return }
             var delta = point - move.start
             if shift { delta = abs(delta.x) >= abs(delta.y) ? Vec2(delta.x, 0) : Vec2(0, delta.y) }
-            let context = controller.context
-            controller.update(move.originals.map { $0.moved(by: controller.parentDelta(delta, for: $0.id, in: scene), in: context) })
+            controller.update(move.originals.map { $0.translated(by: controller.parentDelta(delta, for: $0.id, in: scene)) })
 
         case .resize(let resize):
             guard let parentInverse = parentInverse(of: resize.layer.id) else { return }
             let edited = CanvasGeometry.resized(resize.layer, handle: resize.handle,
-                                                pointer: parentInverse.apply(point), context: controller.context,
+                                                pointer: parentInverse.apply(point),
                                                 keepAspect: shift, fromCenter: option)
             controller.update([edited])
 
@@ -455,17 +454,16 @@ final class CanvasNSView: NSView {
             }
             let a0 = atan2(rotate.start.y - pivot.y, rotate.start.x - pivot.x)
             let a1 = atan2(point.y - pivot.y, point.x - pivot.x)
-            let original = rotate.layer.transform.rotation.value(at: controller.editor.time)
+            let original = rotate.layer.transform.rotation
             var angle = original + (a1 - a0) * 180 / .pi
             if shift { angle = (angle / 15).rounded() * 15 }
             var layer = rotate.layer
-            layer.transform.rotation = layer.transform.rotation.edited(to: angle, in: controller.context)
+            layer.transform.rotation = angle
             controller.update([layer])
 
         case .anchor(let edit):
             guard let parentInverse = parentInverse(of: edit.layer.id) else { return }
-            controller.update([CanvasGeometry.movedAnchor(edit.layer, to: parentInverse.apply(point),
-                                                          context: controller.context)])
+            controller.update([CanvasGeometry.movedAnchor(edit.layer, to: parentInverse.apply(point))])
 
         case .marquee(var marquee):
             marquee.current = viewPoint

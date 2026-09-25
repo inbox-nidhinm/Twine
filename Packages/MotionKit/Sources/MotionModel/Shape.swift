@@ -15,7 +15,7 @@ public struct ShapeContent: Codable, Sendable, Equatable {
 /// What a shape is. Every kind except `path` is drawn to fill the layer's
 /// `size`, so resizing a rectangle is just changing its size.
 public enum ShapeGeometry: Sendable, Equatable {
-    case rectangle(cornerRadii: AnimatableProperty<CornerRadii>)
+    case rectangle(cornerRadii: CornerRadii)
     case ellipse
     /// A straight line across the middle of the box, left to right. Rotation
     /// points it anywhere, which is how Figma represents lines too.
@@ -23,17 +23,14 @@ public enum ShapeGeometry: Sendable, Equatable {
     case polygon(sides: Int)
     /// `innerRadius` is the inner points' distance from the centre as a fraction
     /// of the outer radius.
-    case star(points: Int, innerRadius: AnimatableProperty<Double>)
+    case star(points: Int, innerRadius: Double)
     /// Drawn with the pen tool, in the layer's own pixel space.
-    ///
-    /// Animatable so that shape morphing can arrive later without a format
-    /// change. Until then a keyframed path holds each shape until the next.
-    case path(AnimatableProperty<BezierPath>)
+    case path(BezierPath)
 
     public var isClosed: Bool {
         switch self {
         case .line: return false
-        case .path(let path): return path.value.subpaths.allSatisfy(\.isClosed)
+        case .path(let path): return path.subpaths.allSatisfy(\.isClosed)
         default: return true
         }
     }
@@ -47,14 +44,14 @@ extension ShapeGeometry: Codable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         switch try c.decode(Kind.self, forKey: .type) {
         case .rectangle:
-            self = .rectangle(cornerRadii: try c.decode(AnimatableProperty<CornerRadii>.self, forKey: .cornerRadii))
+            self = .rectangle(cornerRadii: try c.decode(CornerRadii.self, forKey: .cornerRadii))
         case .ellipse: self = .ellipse
         case .line: self = .line
         case .polygon: self = .polygon(sides: try c.decode(Int.self, forKey: .sides))
         case .star:
             self = .star(points: try c.decode(Int.self, forKey: .points),
-                         innerRadius: try c.decode(AnimatableProperty<Double>.self, forKey: .innerRadius))
-        case .path: self = .path(try c.decode(AnimatableProperty<BezierPath>.self, forKey: .path))
+                         innerRadius: try c.decode(Double.self, forKey: .innerRadius))
+        case .path: self = .path(try c.decode(BezierPath.self, forKey: .path))
         }
     }
 

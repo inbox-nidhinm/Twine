@@ -44,24 +44,16 @@ import Testing
         #expect(RGBA(hex: "nope") == nil)
     }
 
-    @Test func keyframesStaySorted() {
-        var property = AnimatableProperty(0.0, keyframes: [
-            Keyframe(time: 2, value: 2), Keyframe(time: 1, value: 1),
-        ])
-        #expect(property.keyframes.map(\.time) == [1, 2])
-        property.setKeyframes([Keyframe(time: 5, value: 0), Keyframe(time: 0, value: 0)])
-        #expect(property.keyframes.map(\.time) == [0, 5])
-    }
 }
 
 @Suite struct LayerTreeTests {
     private func project() -> (Project, group: UUID, child: UUID, top: UUID) {
         let child = Layer(name: "Child", content: .shape(ShapeContent(geometry: .ellipse)),
-                          size: Size2(10, 10), position: .zero, outPoint: 1)
+                          size: Size2(10, 10), position: .zero)
         let group = Layer(name: "Group", content: .group(GroupContent(children: [child])),
-                          size: Size2(10, 10), position: .zero, outPoint: 1)
+                          size: Size2(10, 10), position: .zero)
         let top = Layer(name: "Top", content: .shape(ShapeContent(geometry: .line)),
-                        size: Size2(10, 0), position: .zero, outPoint: 1)
+                        size: Size2(10, 0), position: .zero)
         return (Project(layers: [group, top]), group.id, child.id, top.id)
     }
 
@@ -85,7 +77,7 @@ import Testing
     @Test func insertsIntoGroupsOnly() {
         var (p, group, _, top) = project()
         let new = Layer(name: "New", content: .shape(ShapeContent(geometry: .ellipse)),
-                        size: Size2(1, 1), position: .zero, outPoint: 1)
+                        size: Size2(1, 1), position: .zero)
         let intoShape = p.insertLayer(new, parentID: top, at: nil)
         let intoGroup = p.insertLayer(new, parentID: group, at: 0)
         #expect(!intoShape && intoGroup)

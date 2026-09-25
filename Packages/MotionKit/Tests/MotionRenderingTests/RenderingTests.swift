@@ -18,12 +18,12 @@ private func pixel(_ image: CGImage, _ x: Int, _ y: Int) -> (r: Int, g: Int, b: 
     return (unpremultiply(bytes[0]), unpremultiply(bytes[1]), unpremultiply(bytes[2]), a)
 }
 
-private func shape(_ geometry: ShapeGeometry = .rectangle(cornerRadii: AnimatableProperty(.zero)),
+private func shape(_ geometry: ShapeGeometry = .rectangle(cornerRadii: .zero),
                    fill: RGBA? = RGBA(1, 0, 0), at origin: Vec2, size: Size2) -> Layer {
     var layer = Layer(name: "S", content: .shape(ShapeContent(geometry: geometry,
                                                              fills: fill.map { [Fill(paint: .color($0))] } ?? [])),
-                      size: size, position: origin, outPoint: 5)
-    layer.transform.anchor = AnimatableProperty(.zero)
+                      size: size, position: origin)
+    layer.transform.anchor = .zero
     return layer
 }
 
@@ -72,19 +72,18 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
         let a = shape(fill: RGBA(1, 1, 1), at: Vec2(0, 0), size: Size2(40, 40))
         let b = shape(fill: RGBA(1, 1, 1), at: Vec2(20, 20), size: Size2(40, 40))
         var group = Layer(name: "G", content: .group(GroupContent(children: [a, b])), size: Size2(64, 64),
-                          position: .zero, outPoint: 5)
-        group.transform.anchor = AnimatableProperty(.zero)
-        group.opacity = AnimatableProperty(0.5)
+                          position: .zero)
+        group.transform.anchor = .zero
+        group.opacity = 0.5
         let overlap = pixel(try render(Project(composition: transparentComposition(), layers: [group])), 30, 30)
         #expect(abs(overlap.a - 128) <= 3)
     }
 
     @Test func rendersTheMomentAskedFor() throws {
-        var square = shape(at: .zero, size: Size2(16, 16))
-        square.transform.position = AnimatableProperty(.zero, keyframes: [
-            Keyframe(time: 0, value: Vec2(0, 0), easing: .linear), Keyframe(time: 1, value: Vec2(48, 0)),
-        ])
-        let project = Project(composition: transparentComposition(), layers: [square])
+        let square = shape(at: .zero, size: Size2(16, 16))
+        let slide = Action(target: square.id, start: 0, duration: 1, easing: .linear,
+                           spec: .move(MoveAction(mode: .to, end: Vec2(48, 0))))
+        let project = Project(composition: transparentComposition(), layers: [square], actions: [slide])
         let early = try render(project, at: 0), late = try render(project, at: 1)
         #expect(pixel(early, 4, 8).a > 250 && pixel(early, 56, 8).a == 0)
         #expect(pixel(late, 4, 8).a == 0 && pixel(late, 56, 8).a > 250)
@@ -92,7 +91,7 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
 
     @Test func insideStrokesStayInsideTheShape() throws {
         var layer = shape(fill: nil, at: Vec2(16, 16), size: Size2(32, 32))
-        layer.content = .shape(ShapeContent(geometry: .rectangle(cornerRadii: AnimatableProperty(.zero)),
+        layer.content = .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
                                             strokes: [Stroke(paint: .color(RGBA(0, 1, 0)), width: 4, alignment: .inside)]))
         let image = try render(Project(composition: transparentComposition(), layers: [layer]))
         #expect(pixel(image, 18, 32).a > 250)   // just inside the left edge
@@ -102,7 +101,7 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
 
     @Test func outsideStrokesStayOutsideTheShape() throws {
         var layer = shape(fill: nil, at: Vec2(16, 16), size: Size2(32, 32))
-        layer.content = .shape(ShapeContent(geometry: .rectangle(cornerRadii: AnimatableProperty(.zero)),
+        layer.content = .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
                                             strokes: [Stroke(paint: .color(RGBA(0, 1, 0)), width: 4, alignment: .outside)]))
         let image = try render(Project(composition: transparentComposition(), layers: [layer]))
         #expect(pixel(image, 14, 32).a > 250)
@@ -111,7 +110,7 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
 
     @Test func linearGradientsRunStartToEnd() throws {
         var layer = shape(fill: nil, at: .zero, size: Size2(64, 64))
-        layer.content = .shape(ShapeContent(geometry: .rectangle(cornerRadii: AnimatableProperty(.zero)),
+        layer.content = .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
                                             fills: [Fill(paint: .linearGradient(Gradient(stops: [
                                                 GradientStop(position: 0, color: RGBA(1, 0, 0)),
                                                 GradientStop(position: 1, color: RGBA(0, 0, 1)),

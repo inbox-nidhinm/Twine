@@ -26,14 +26,9 @@ struct InspectorPanel: View {
             PanelDivider()
             ScrollView {
                 VStack(spacing: 0) {
-                    let keys = controller.selectedKeyframes
-                    if !keys.isEmpty {
-                        KeyframeInspector(controller: controller, refs: keys)
-                        PanelDivider()
-                    }
                     let selected = controller.selectedLayers
                     if selected.count == 1, let layer = selected.first {
-                        LayerInspector(layer: layer, controller: controller, time: editor.time)
+                        LayerInspector(layer: layer, controller: controller)
                             .id(layer.id)
                     } else if selected.count > 1 {
                         multipleSelection(selected)
@@ -50,7 +45,7 @@ struct InspectorPanel: View {
 
     /// What several layers have in common to change together.
     private func multipleSelection(_ layers: [Layer]) -> some View {
-        let values = layers.map { $0.opacity.value(at: editor.time) }
+        let values = layers.map(\.opacity)
         let shared = values.allSatisfy { abs($0 - values[0]) < 1e-9 } ? values[0] : values.max() ?? 1
         return VStack(alignment: .leading, spacing: 8) {
             HeaderRow(title: "Layers") {}
@@ -58,7 +53,7 @@ struct InspectorPanel: View {
                       onChange: { v in
                           controller.update(layers.map { l in
                               var c = l
-                              c.opacity = c.opacity.edited(to: v / 100, in: controller.context)
+                              c.opacity = v / 100
                               return c
                           })
                       },

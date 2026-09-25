@@ -5,12 +5,11 @@ import MotionEvaluation
 import Theme
 
 /// The inspector for one selected layer: where it is, what shape it is, and
-/// how it is painted. Every value is the one at the playhead, and every edit
-/// goes through the controller as one undo step.
+/// how it is painted, as designed. Every edit goes through the controller as
+/// one undo step.
 struct LayerInspector: View {
     let layer: Layer
     let controller: EditorController
-    let time: Double
 
     @State private var perCorner = false
 
@@ -51,37 +50,32 @@ struct LayerInspector: View {
             HeaderRow(title: "Layer") {}
             Group {
                 HStack(spacing: 8) {
-                    number("X", t.position.value(at: time).x) { l, v in
-                        l.transform.position = l.transform.position.edited(to: Vec2(v, l.transform.position.value(at: time).y), in: controller.context)
+                    number("X", t.position.x) { l, v in
+                        l.transform.position = Vec2(v, l.transform.position.y)
                     }
-                    number("Y", t.position.value(at: time).y) { l, v in
-                        l.transform.position = l.transform.position.edited(to: Vec2(l.transform.position.value(at: time).x, v), in: controller.context)
+                    number("Y", t.position.y) { l, v in
+                        l.transform.position = Vec2(l.transform.position.x, v)
                     }
-                    watch(.position)
                 }
                 .help("Where the anchor point sits, in pixels")
                 if !layer.isGroup {
                     HStack(spacing: 8) {
-                        number("W", layer.size.value(at: time).width, accepts: { $0 >= 0 }) { l, v in resize(&l, width: v) }
-                        number("H", layer.size.value(at: time).height, accepts: { $0 >= 0 }) { l, v in resize(&l, height: v) }
-                        watch(.size)
+                        number("W", layer.size.width, accepts: { $0 >= 0 }) { l, v in resize(&l, width: v) }
+                        number("H", layer.size.height, accepts: { $0 >= 0 }) { l, v in resize(&l, height: v) }
                     }
                 }
                 HStack(spacing: 8) {
-                    UnitField(unit: "R", value: t.rotation.value(at: time), decimals: 1, suffix: "°") { v in
-                        controller.edit(layer.id) { l in l.transform.rotation = l.transform.rotation.edited(to: v, in: controller.context) }
+                    UnitField(unit: "R", value: t.rotation, decimals: 1, suffix: "°") { v in
+                        controller.edit(layer.id) { l in l.transform.rotation = v }
                     }
                     .help("Rotation in degrees, clockwise")
-                    watch(.rotation)
                 }
                 HStack(spacing: 8) {
                     scaleFields
-                    watch(.scale)
                 }
                 HStack(spacing: 8) {
-                    number("AX", t.anchor.value(at: time).x) { l, v in moveAnchor(&l, x: v) }
-                    number("AY", t.anchor.value(at: time).y) { l, v in moveAnchor(&l, y: v) }
-                    watch(.anchor)
+                    number("AX", t.anchor.x) { l, v in moveAnchor(&l, x: v) }
+                    number("AY", t.anchor.y) { l, v in moveAnchor(&l, y: v) }
                 }
                 .help("The point the layer turns and scales about, in pixels from its top-left")
                 opacity
@@ -92,25 +86,25 @@ struct LayerInspector: View {
     }
 
     @ViewBuilder private var scaleFields: some View {
-        let scale = t.scale.value(at: time)
+        let scale = t.scale
         if t.isScaleLinked {
             UnitField(unit: "S", value: scale.x * 100, decimals: 1, suffix: "%") { v in
                 controller.edit(layer.id) { l in
-                    let s = l.transform.scale.value(at: time)
+                    let s = l.transform.scale
                     let ratio = s.x != 0 ? s.y / s.x : 1
-                    l.transform.scale = l.transform.scale.edited(to: Vec2(v / 100, v / 100 * ratio), in: controller.context)
+                    l.transform.scale = Vec2(v / 100, v / 100 * ratio)
                 }
             }
             .help("Scale")
         } else {
             UnitField(unit: "SX", value: scale.x * 100, decimals: 1, suffix: "%") { v in
                 controller.edit(layer.id) { l in
-                    l.transform.scale = l.transform.scale.edited(to: Vec2(v / 100, l.transform.scale.value(at: time).y), in: controller.context)
+                    l.transform.scale = Vec2(v / 100, l.transform.scale.y)
                 }
             }
             UnitField(unit: "SY", value: scale.y * 100, decimals: 1, suffix: "%") { v in
                 controller.edit(layer.id) { l in
-                    l.transform.scale = l.transform.scale.edited(to: Vec2(l.transform.scale.value(at: time).x, v / 100), in: controller.context)
+                    l.transform.scale = Vec2(l.transform.scale.x, v / 100)
                 }
             }
         }
@@ -121,50 +115,44 @@ struct LayerInspector: View {
     }
 
     private var opacity: some View {
-        SliderRow(label: "Opacity", value: layer.opacity.value(at: time) * 100, range: 0...100,
+        SliderRow(label: "Opacity", value: layer.opacity * 100, range: 0...100,
                   readout: { "\(Int($0.rounded()))%" },
                   onChange: { v in
                       var l = layer
-                      l.opacity = l.opacity.edited(to: v / 100, in: controller.context)
+                      l.opacity = v / 100
                       controller.update([l])
                   },
                   onBegin: { controller.begin("Opacity") },
-                  onEnd: { controller.end() },
-                  accessory: { watch(.opacity) })
+                  onEnd: { controller.end() })
     }
 
-    private func watch(_ property: PropertyID) -> some View {
-        Stopwatch(isOn: LayerProperties.get(property, of: layer)?.isAnimated == true) {
-            controller.toggleStopwatch(property, on: layer.id)
-        }
-    }
 
     /// Resizing from the inspector keeps the layer's top-left where it is and
     /// the anchor in the same place relative to the box, as dragging the
     /// bottom-right handle would.
     private func resize(_ l: inout Layer, width: Double? = nil, height: Double? = nil) {
-        let size = l.size.value(at: time)
+        let size = l.size
         let target = Size2(width ?? size.width, height ?? size.height)
-        let anchor = l.transform.anchor.value(at: time)
+        let anchor = l.transform.anchor
         let newAnchor = Vec2(size.width > 0 ? anchor.x / size.width * target.width : anchor.x,
                              size.height > 0 ? anchor.y / size.height * target.height : anchor.y)
-        let old = Affine.layer(position: l.transform.position.value(at: time), anchor: anchor,
-                               scale: l.transform.scale.value(at: time), rotation: l.transform.rotation.value(at: time))
+        let old = Affine.layer(position: l.transform.position, anchor: anchor,
+                               scale: l.transform.scale, rotation: l.transform.rotation)
         let topLeft = old.apply(.zero)
         let offset = old.applyToVector(Vec2(-newAnchor.x, -newAnchor.y))
-        l.size = l.size.edited(to: target, in: controller.context)
-        l.transform.anchor = l.transform.anchor.edited(to: newAnchor, in: controller.context)
-        l.transform.position = l.transform.position.edited(to: Vec2(topLeft.x - offset.x, topLeft.y - offset.y), in: controller.context)
+        l.size = target
+        l.transform.anchor = newAnchor
+        l.transform.position = Vec2(topLeft.x - offset.x, topLeft.y - offset.y)
     }
 
     /// Typing an anchor moves the anchor, not the layer.
     private func moveAnchor(_ l: inout Layer, x: Double? = nil, y: Double? = nil) {
-        let anchor = l.transform.anchor.value(at: time)
+        let anchor = l.transform.anchor
         let target = Vec2(x ?? anchor.x, y ?? anchor.y)
-        let old = Affine.layer(position: l.transform.position.value(at: time), anchor: anchor,
-                               scale: l.transform.scale.value(at: time), rotation: l.transform.rotation.value(at: time))
-        l.transform.anchor = l.transform.anchor.edited(to: target, in: controller.context)
-        l.transform.position = l.transform.position.edited(to: old.apply(target), in: controller.context)
+        let old = Affine.layer(position: l.transform.position, anchor: anchor,
+                               scale: l.transform.scale, rotation: l.transform.rotation)
+        l.transform.anchor = target
+        l.transform.position = old.apply(target)
     }
 
     // MARK: Shape
@@ -172,7 +160,7 @@ struct LayerInspector: View {
     @ViewBuilder private func shapeSection(_ geometry: ShapeGeometry) -> some View {
         switch geometry {
         case .rectangle(let radii):
-            let r = radii.value(at: time)
+            let r = radii
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     UnitField(unit: "Radius", value: r.topLeft, decimals: 1, accepts: { $0 >= 0 }) { v in
@@ -182,7 +170,6 @@ struct LayerInspector: View {
                     IconButton(icon: .corners, help: perCorner ? "One radius for every corner" : "A radius for each corner") {
                         perCorner.toggle()
                     }
-                    watch(PropertyID(.cornerRadii))
                 }
                 if perCorner || !r.isUniform {
                     HStack(spacing: 8) {
@@ -209,10 +196,9 @@ struct LayerInspector: View {
                     setGeometry(.star(points: n, innerRadius: inner))
                 }
                 LabeledRow(label: "Inner") {
-                    UnitField(value: inner.value(at: time) * 100, decimals: 1, suffix: "%", accepts: { $0 >= 0 }) { v in
-                        setGeometry(.star(points: points, innerRadius: inner.edited(to: v / 100, in: controller.context)))
+                    UnitField(value: inner * 100, decimals: 1, suffix: "%", accepts: { $0 >= 0 }) { v in
+                        setGeometry(.star(points: points, innerRadius: v / 100))
                     }
-                    watch(PropertyID(.starInnerRadius))
                 }
                 .help("How far in the inner points sit, as a share of the outer ones")
             }
@@ -226,15 +212,15 @@ struct LayerInspector: View {
     private func corner(_ unit: String, _ value: Double, _ set: @escaping (inout CornerRadii, Double) -> Void) -> some View {
         UnitField(unit: unit, value: value, decimals: 1, accepts: { $0 >= 0 }) { v in
             guard case .rectangle(let radii) = layer.shapeGeometry else { return }
-            var r = radii.value(at: time)
+            var r = radii
             set(&r, v)
             setRadii(r)
         }
     }
 
     private func setRadii(_ r: CornerRadii) {
-        guard case .rectangle(let radii) = layer.shapeGeometry else { return }
-        setGeometry(.rectangle(cornerRadii: radii.edited(to: r, in: controller.context)))
+        guard case .rectangle = layer.shapeGeometry else { return }
+        setGeometry(.rectangle(cornerRadii: r))
     }
 
     private func setGeometry(_ geometry: ShapeGeometry) {
@@ -285,7 +271,6 @@ private struct FillSection: View {
                         editShape { $0.fills[0].paint = fill.paint.converted(to: kind) }
                     }
                     PaintEditor(paint: fill.paint, isEnabled: fill.isEnabled, controller: controller, layer: layer,
-                                property: PropertyID(fill.paint.isSolid ? .fillColor : .fillStops, target: fill.id),
                                 title: "Fill",
                                 change: { paint in editedShape { $0.fills[0].paint = paint } },
                                 toggle: { editShape { $0.fills[0].isEnabled.toggle() } })
@@ -321,13 +306,7 @@ private struct StrokeSection: View {
     let shape: ShapeContent
     let controller: EditorController
 
-    private var time: Double { controller.editor.time }
 
-    private func watch(_ property: PropertyID) -> some View {
-        Stopwatch(isOn: LayerProperties.get(property, of: layer)?.isAnimated == true) {
-            controller.toggleStopwatch(property, on: layer.id)
-        }
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -348,7 +327,6 @@ private struct StrokeSection: View {
             if let stroke = shape.strokes.first {
                 VStack(alignment: .leading, spacing: 8) {
                     PaintEditor(paint: stroke.paint, isEnabled: stroke.isEnabled, controller: controller, layer: layer,
-                                property: PropertyID(stroke.paint.isSolid ? .strokeColor : .strokeStops, target: stroke.id),
                                 title: "Stroke",
                                 change: { paint in
                                     var l = layer
@@ -359,25 +337,22 @@ private struct StrokeSection: View {
                                 },
                                 toggle: { editShape { $0.strokes[0].isEnabled.toggle() } })
                     LabeledRow(label: "Width") {
-                        UnitField(value: stroke.width.value(at: time), decimals: 1, suffix: "px", accepts: { $0 >= 0 }) { v in
-                            editShape { $0.strokes[0].width = $0.strokes[0].width.edited(to: v, in: controller.context) }
+                        UnitField(value: stroke.width, decimals: 1, suffix: "px", accepts: { $0 >= 0 }) { v in
+                            editShape { $0.strokes[0].width = v }
                         }
-                        watch(PropertyID(.strokeWidth, target: stroke.id))
                     }
                     LabeledRow(label: "Trim start") {
-                        UnitField(value: stroke.trimStart.value(at: time) * 100, decimals: 1, suffix: "%",
+                        UnitField(value: stroke.trimStart * 100, decimals: 1, suffix: "%",
                                   accepts: { $0 >= 0 && $0 <= 100 }) { v in
-                            editShape { $0.strokes[0].trimStart = $0.strokes[0].trimStart.edited(to: v / 100, in: controller.context) }
+                            editShape { $0.strokes[0].trimStart = v / 100 }
                         }
-                        watch(PropertyID(.trimStart, target: stroke.id))
                     }
                     .help("How much of the path is left undrawn at its start. Animate it to draw a line on.")
                     LabeledRow(label: "Trim end") {
-                        UnitField(value: stroke.trimEnd.value(at: time) * 100, decimals: 1, suffix: "%",
+                        UnitField(value: stroke.trimEnd * 100, decimals: 1, suffix: "%",
                                   accepts: { $0 >= 0 && $0 <= 100 }) { v in
-                            editShape { $0.strokes[0].trimEnd = $0.strokes[0].trimEnd.edited(to: v / 100, in: controller.context) }
+                            editShape { $0.strokes[0].trimEnd = v / 100 }
                         }
-                        watch(PropertyID(.trimEnd, target: stroke.id))
                     }
                     .help("Where along the path the stroke stops")
                     if shape.geometry.isClosed {
@@ -434,28 +409,25 @@ private struct PaintEditor: View {
     let isEnabled: Bool
     let controller: EditorController
     let layer: Layer
-    /// The colour or gradient property this paint's stopwatch animates.
-    let property: PropertyID
     let title: String
     /// Builds the whole edited layer for a new paint.
     let change: (Paint) -> Layer
     let toggle: () -> Void
 
-    private var time: Double { controller.editor.time }
 
     var body: some View {
         switch paint {
         case .solid(let color):
-            colorRow(color.value(at: time), eye: true) { c in .solid(color.set(c, in: controller.context)) }
+            colorRow(color) { c in .solid(c) }
         case .linearGradient(let g), .radialGradient(let g):
-            let stops = g.stops.value(at: time)
+            let stops = g.stops
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(stops.enumerated()), id: \.offset) { index, stop in
-                    colorRow(stop.color, eye: index == 0) { c in
+                    colorRow(stop.color) { c in
                         var s = stops
                         s[index].color = c
                         var gradient = g
-                        gradient.stops = g.stops.set(s, in: controller.context)
+                        gradient.stops = s
                         return paint.withGradient(gradient)
                     }
                 }
@@ -463,7 +435,7 @@ private struct PaintEditor: View {
         }
     }
 
-    private func colorRow(_ color: RGBA, eye: Bool, _ make: @escaping (RGBA) -> Paint) -> some View {
+    private func colorRow(_ color: RGBA, _ make: @escaping (RGBA) -> Paint) -> some View {
         HStack(spacing: 6) {
             ColorWell(color: color, size: Theme.control, title: title,
                       onChange: { controller.update([change(make($0))]) },
@@ -477,11 +449,6 @@ private struct PaintEditor: View {
             }
             .frame(width: 58)
             .help("Opacity of this colour")
-            if eye {
-                Stopwatch(isOn: LayerProperties.get(property, of: layer)?.isAnimated == true) {
-                    controller.toggleStopwatch(property, on: layer.id)
-                }
-            }
         }
     }
 }
@@ -506,14 +473,14 @@ extension Paint {
     func converted(to kind: String) -> Paint {
         switch (self, kind) {
         case (.solid(let c), "Linear"), (.solid(let c), "Radial"):
-            var clear = c.value
+            var clear = c
             clear.a = 0
-            let g = MotionModel.Gradient(stops: [GradientStop(position: 0, color: c.value), GradientStop(position: 1, color: clear)],
+            let g = MotionModel.Gradient(stops: [GradientStop(position: 0, color: c), GradientStop(position: 1, color: clear)],
                              start: kind == "Radial" ? Vec2(0.5, 0.5) : Vec2(0, 0.5),
                              end: kind == "Radial" ? Vec2(1, 0.5) : Vec2(1, 0.5))
             return kind == "Radial" ? .radialGradient(g) : .linearGradient(g)
         case (.linearGradient(let g), "Solid"), (.radialGradient(let g), "Solid"):
-            return .color(g.stops.value.first?.color ?? .white)
+            return .color(g.stops.first?.color ?? .white)
         case (.linearGradient(var g), "Radial"):
             g.start = Vec2(0.5, 0.5)
             g.end = Vec2(1, 0.5)
@@ -544,7 +511,6 @@ private struct EffectsSection: View {
     @Environment(MenuHost.self) private var menus
     @State private var addFrame: CGRect = .zero
 
-    private var time: Double { controller.editor.time }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -582,45 +548,40 @@ private struct EffectsSection: View {
             switch effect.kind {
             case .dropShadow(let s):
                 HStack(spacing: 8) {
-                    ColorWell(color: s.color.value(at: time), size: Theme.control, title: "Shadow",
-                              onChange: { c in controller.update([withShadow(index) { $0.color = $0.color.set(c, in: controller.context) }]) },
+                    ColorWell(color: s.color, size: Theme.control, title: "Shadow",
+                              onChange: { c in controller.update([withShadow(index) { $0.color = c }]) },
                               onBegin: { controller.begin("Shadow Colour") },
                               onEnd: { controller.end() })
-                    HexField(color: s.color.value(at: time)) { c in
-                        controller.perform(.updateLayers([withShadow(index) { $0.color = $0.color.set(c, in: controller.context) }]))
+                    HexField(color: s.color) { c in
+                        controller.perform(.updateLayers([withShadow(index) { $0.color = c }]))
                     }
-                    watch(PropertyID(.shadowColor, target: effect.id))
                 }
                 HStack(spacing: 8) {
-                    field(index, "X", s.offset.value(at: time).x) { sh, v in
-                        sh.offset = sh.offset.edited(to: Vec2(v, sh.offset.value(at: time).y), in: controller.context)
+                    field(index, "X", s.offset.x) { sh, v in
+                        sh.offset = Vec2(v, sh.offset.y)
                     }
-                    field(index, "Y", s.offset.value(at: time).y) { sh, v in
-                        sh.offset = sh.offset.edited(to: Vec2(sh.offset.value(at: time).x, v), in: controller.context)
+                    field(index, "Y", s.offset.y) { sh, v in
+                        sh.offset = Vec2(sh.offset.x, v)
                     }
-                    watch(PropertyID(.shadowOffset, target: effect.id))
                 }
                 HStack(spacing: 8) {
-                    field(index, "Blur", s.blur.value(at: time), min: 0) { sh, v in sh.blur = sh.blur.edited(to: v, in: controller.context) }
-                    watch(PropertyID(.shadowBlur, target: effect.id))
-                    UnitField(value: s.opacity.value(at: time) * 100, decimals: 0, suffix: "%",
+                    field(index, "Blur", s.blur, min: 0) { sh, v in sh.blur = v }
+                    UnitField(value: s.opacity * 100, decimals: 0, suffix: "%",
                               accepts: { $0 >= 0 && $0 <= 100 }) { v in
-                        controller.perform(.updateLayers([withShadow(index) { $0.opacity = $0.opacity.edited(to: v / 100, in: controller.context) }]))
+                        controller.perform(.updateLayers([withShadow(index) { $0.opacity = v / 100 }]))
                     }
                     .help("Shadow opacity")
-                    watch(PropertyID(.shadowOpacity, target: effect.id))
                 }
             case .layerBlur(let b):
                 LabeledRow(label: "Radius") {
-                    UnitField(value: b.radius.value(at: time), decimals: 1, suffix: "px", accepts: { $0 >= 0 }) { v in
+                    UnitField(value: b.radius, decimals: 1, suffix: "px", accepts: { $0 >= 0 }) { v in
                         edit(index) { e in
                             if case .layerBlur(var blur) = e.kind {
-                                blur.radius = blur.radius.edited(to: v, in: controller.context)
+                                blur.radius = v
                                 e.kind = .layerBlur(blur)
                             }
                         }
                     }
-                    watch(PropertyID(.blurRadius, target: effect.id))
                 }
             }
         }
@@ -633,11 +594,6 @@ private struct EffectsSection: View {
         }
     }
 
-    private func watch(_ property: PropertyID) -> some View {
-        Stopwatch(isOn: LayerProperties.get(property, of: layer)?.isAnimated == true) {
-            controller.toggleStopwatch(property, on: layer.id)
-        }
-    }
 
     private func add(_ kind: EffectKind) {
         controller.edit(layer.id) { l in l.effects.append(Effect(kind: kind)) }

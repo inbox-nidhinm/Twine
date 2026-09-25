@@ -138,13 +138,12 @@ enum CanvasGeometry {
     /// with Option the centre does, and with Shift the proportions are kept.
     /// The anchor keeps its place relative to the box. A shape changes size;
     /// a group changes scale, so the layers inside it resize with it.
-    static func resized(_ layer: Layer, handle: Int, pointer: Vec2, context: EditContext,
+    static func resized(_ layer: Layer, handle: Int, pointer: Vec2,
                         keepAspect: Bool, fromCenter: Bool) -> Layer {
-        let time = context.time
         let t = layer.transform
-        let size = layer.size.value(at: time)
-        let anchor = t.anchor.value(at: time), scale = t.scale.value(at: time)
-        let rotation = t.rotation.value(at: time), position = t.position.value(at: time)
+        let size = layer.size
+        let anchor = t.anchor, scale = t.scale
+        let rotation = t.rotation, position = t.position
         let old = Affine.layer(position: position, anchor: anchor, scale: scale, rotation: rotation)
         guard let inverse = old.inverted else { return layer }
         let local = inverse.apply(pointer)
@@ -180,31 +179,30 @@ enum CanvasGeometry {
             let newScale = Vec2(w > 0 ? scale.x * nw / w : scale.x, h > 0 ? scale.y * nh / h : scale.y)
             let turned = Affine.layer(position: .zero, anchor: .zero, scale: newScale, rotation: rotation)
             let offset = turned.applyToVector(Vec2(fixedOld.x - anchor.x, fixedOld.y - anchor.y))
-            edited.transform.scale = t.scale.edited(to: newScale, in: context)
-            edited.transform.position = t.position.edited(to: Vec2(pinned.x - offset.x, pinned.y - offset.y), in: context)
+            edited.transform.scale = newScale
+            edited.transform.position = Vec2(pinned.x - offset.x, pinned.y - offset.y)
         } else {
             let fixedNew = Vec2(fixed(left, nw), fixed(top, nh))
             let newAnchor = Vec2(w > 0 ? anchor.x / w * nw : anchor.x, h > 0 ? anchor.y / h * nh : anchor.y)
             let offset = old.applyToVector(Vec2(fixedNew.x - newAnchor.x, fixedNew.y - newAnchor.y))
-            edited.size = layer.size.edited(to: Size2(nw, nh), in: context)
-            edited.transform.anchor = t.anchor.edited(to: newAnchor, in: context)
-            edited.transform.position = t.position.edited(to: Vec2(pinned.x - offset.x, pinned.y - offset.y), in: context)
+            edited.size = Size2(nw, nh)
+            edited.transform.anchor = newAnchor
+            edited.transform.position = Vec2(pinned.x - offset.x, pinned.y - offset.y)
         }
         return edited
     }
 
     /// The anchor moved to `pointer`, with the position moved to match so the
     /// layer itself does not move.
-    static func movedAnchor(_ layer: Layer, to pointer: Vec2, context: EditContext) -> Layer {
-        let time = context.time
+    static func movedAnchor(_ layer: Layer, to pointer: Vec2) -> Layer {
         let t = layer.transform
-        let old = Affine.layer(position: t.position.value(at: time), anchor: t.anchor.value(at: time),
-                               scale: t.scale.value(at: time), rotation: t.rotation.value(at: time))
+        let old = Affine.layer(position: t.position, anchor: t.anchor,
+                               scale: t.scale, rotation: t.rotation)
         guard let inverse = old.inverted else { return layer }
         let anchor = inverse.apply(pointer)
         var edited = layer
-        edited.transform.anchor = t.anchor.edited(to: anchor, in: context)
-        edited.transform.position = t.position.edited(to: old.apply(anchor), in: context)
+        edited.transform.anchor = anchor
+        edited.transform.position = old.apply(anchor)
         return edited
     }
 }

@@ -111,14 +111,6 @@ final class EditorController {
 
     func cancel() { store.cancelContinuousChange() }
 
-    // MARK: How edits land
-
-    /// Design mode shifts an animation, Animate mode keys at the playhead.
-    var context: EditContext {
-        EditContext(time: editor.time, mode: editor.mode == .animate ? .animate : .design,
-                    frameDuration: project.composition.frameRate.frameDuration)
-    }
-
     // MARK: Playback
 
     var duration: Double { project.composition.duration }
@@ -163,104 +155,20 @@ final class EditorController {
         editor.time = next
     }
 
-    // MARK: Keyframes
-
-    /// Keyframes that still exist, for after an undo.
-    var selectedKeyframes: Set<KeyframeRef> {
-        editor.selectedKeyframes.filter { ref in
-            guard let layer = project.layer(withID: ref.layerID),
-                  let property = LayerProperties.get(ref.property, of: layer) else { return false }
-            return property.marks.contains { $0.id == ref.keyframeID }
-        }
-    }
-
-    func toggleStopwatch(_ property: PropertyID, on id: UUID) {
-        guard let layer = project.layer(withID: id) else { return }
-        let edited = Keyframing.toggleStopwatch(property, on: layer, at: editor.time)
-        let on = LayerProperties.get(property, of: edited)?.isAnimated == true
-        if perform(.batch([.updateLayers([edited])], name: on ? "Animate \(LayerProperties.title(property))"
-                                                           : "Stop Animating \(LayerProperties.title(property))")), on {
-            editor.timelineExpanded.insert(id)
-        }
-    }
-
-    func toggleKeyframe(_ property: PropertyID, on id: UUID) {
-        guard let layer = project.layer(withID: id) else { return }
-        let edited = Keyframing.toggleKeyframe(property, on: layer, at: editor.time,
-                                               tolerance: frameRate.frameDuration / 2)
-        perform(.batch([.updateLayers([edited])], name: "Keyframe"))
-    }
-
-    func deleteSelectedKeyframes() {
-        let refs = selectedKeyframes
-        let layers = Set(refs.map(\.layerID)).compactMap(project.layer(withID:)).map { Keyframing.delete(refs, in: $0) }
-        guard !layers.isEmpty else { return }
-        if perform(.batch([.updateLayers(layers)], name: refs.count == 1 ? "Delete Keyframe" : "Delete Keyframes")) {
-            editor.selectedKeyframes = []
-        }
-    }
-
-    func setEasing(_ easing: Easing) {
-        let refs = selectedKeyframes
-        let layers = Set(refs.map(\.layerID)).compactMap(project.layer(withID:)).map { Keyframing.setEasing(easing, for: refs, in: $0) }
-        guard !layers.isEmpty else { return }
-        perform(.batch([.updateLayers(layers)], name: "Easing"))
-    }
-
-    /// For the easing editor's drags, which undo as one step.
-    func updateEasing(_ easing: Easing) {
-        let refs = selectedKeyframes
-        update(Set(refs.map(\.layerID)).compactMap(project.layer(withID:)).map { Keyframing.setEasing(easing, for: refs, in: $0) })
-    }
-
-    static let keyframePasteboardType = NSPasteboard.PasteboardType("com.nidhin.emotion.keyframes")
-
-    func copyKeyframes() {
-        guard let clipboard = KeyframeClipboard.copy(selectedKeyframes, from: project),
-              let data = try? JSONEncoder().encode(clipboard) else { return }
-        let board = NSPasteboard.general
-        board.clearContents()
-        board.setData(data, forType: Self.keyframePasteboardType)
-    }
-
-    var canPasteKeyframes: Bool {
-        NSPasteboard.general.data(forType: Self.keyframePasteboardType) != nil && !selection.isEmpty
-    }
-
-    /// Pastes onto each selected layer, the earliest keyframe at the playhead.
-    func pasteKeyframes() {
-        guard let data = NSPasteboard.general.data(forType: Self.keyframePasteboardType),
-              let clipboard = try? JSONDecoder().decode(KeyframeClipboard.self, from: data) else { return }
-        let layers = selectedLayers.map { clipboard.paste(onto: $0, at: editor.time) }
-        guard !layers.isEmpty else { return }
-        perform(.batch([.updateLayers(layers)], name: "Paste Keyframes"))
-        for layer in layers { editor.timelineExpanded.insert(layer.id) }
-    }
-
-    /// Copies the chosen keyframes to the playhead.
-    func duplicateKeyframes() {
-        let refs = selectedKeyframes
-        guard let clipboard = KeyframeClipboard.copy(refs, from: project) else { return }
-        let layers = Set(refs.map(\.layerID)).compactMap(project.layer(withID:)).map { clipboard.paste(onto: $0, at: editor.time) }
-        perform(.batch([.updateLayers(layers)], name: "Duplicate Keyframes"))
-    }
-
     // MARK: Making layers
 
     func makeShape(_ tool: Tool, from start: Vec2, to end: Vec2) -> Layer? {
         guard let kind = tool.shapeKind else { return nil }
         let name = LayerFactory.nextName(kind.title, in: project)
-        let duration = project.composition.duration
-        if kind == .line { return LayerFactory.line(from: start, to: end, name: name, duration: duration) }
+        if kind == .line { return LayerFactory.line(from: start, to: end, name: name) }
         let box = Box(minX: min(start.x, end.x), minY: min(start.y, end.y),
                       maxX: max(start.x, end.x), maxY: max(start.y, end.y))
-        return LayerFactory.shape(kind, in: box, name: name, duration: duration)
+        return LayerFactory.shape(kind, in: box, name: name)
     }
 
     // MARK: Arranging
 
     func deleteSelection() {
-        if editor.focus == .timeline, !selectedKeyframes.isEmpty { return deleteSelectedKeyframes() }
         let ids = selection
         guard !ids.isEmpty else { return }
         perform(.deleteLayers(Set(ids)))
@@ -268,20 +176,23 @@ final class EditorController {
     }
 
     func duplicateSelection() {
-        if editor.focus == .timeline, !selectedKeyframes.isEmpty { return duplicateKeyframes() }
         let layers = topmost(selectedLayers)
         guard !layers.isEmpty else { return }
         // Duplicates land just in front of their originals, nudged so they
         // can be seen, the way Figma and Flip do it.
         var commands: [EditorCommand] = []
         var copies: [UUID] = []
+        var map: [UUID: UUID] = [:]
         for layer in layers {
             guard let location = project.location(of: layer.id) else { continue }
-            var copy = layer.duplicated().translated(by: Vec2(10, 10))
+            var copy = layer.duplicated(recordingIDs: &map).translated(by: Vec2(10, 10))
             copy.name = layer.name
             commands.append(.insertLayers([copy], parentID: location.parentID, index: location.index + 1))
             copies.append(copy.id)
         }
+        // Their animation comes too, nudged with them where it is absolute.
+        let actions = project.actionCopies(for: map).map { $0.remapped(point: { $0 + Vec2(10, 10) }, vector: { $0 }) }
+        if !actions.isEmpty { commands.append(.insertActions(actions)) }
         if perform(.batch(commands, name: layers.count == 1 ? "Duplicate Layer" : "Duplicate Layers")) {
             editor.selection = Set(copies)
         }
@@ -291,7 +202,7 @@ final class EditorController {
         let ids = topmost(selectedLayers).map(\.id)
         guard !ids.isEmpty else { return }
         do {
-            let (command, groupID) = try Arrangement.group(ids, in: project, at: editor.time,
+            let (command, groupID) = try Arrangement.group(ids, in: project,
                                                            name: LayerFactory.nextName("Group", in: project))
             if perform(command) { editor.selection = [groupID] }
         } catch {
@@ -308,7 +219,7 @@ final class EditorController {
         // selected groups do not work from stale positions.
         var working = project
         for group in groups {
-            guard let (command, children) = try? Arrangement.ungroup(group.id, in: working, at: editor.time) else { continue }
+            guard let (command, children) = try? Arrangement.ungroup(group.id, in: working) else { continue }
             try? command.apply(to: &working)
             commands.append(command)
             freed += children
@@ -322,12 +233,12 @@ final class EditorController {
         perform(command)
     }
 
-    /// Nudges the selection by `delta` in composition space.
+    /// Nudges the selection's design position by `delta` in composition
+    /// space.
     func nudge(by delta: Vec2) {
         let scene = self.scene
-        let context = self.context
         let moved = topmost(selectedLayers).filter { !isLocked($0.id) }.map { layer in
-            layer.moved(by: parentDelta(delta, for: layer.id, in: scene), in: context)
+            layer.translated(by: parentDelta(delta, for: layer.id, in: scene))
         }
         guard !moved.isEmpty else { return }
         perform(.updateLayers(moved))
@@ -351,10 +262,18 @@ final class EditorController {
 
     static let pasteboardType = NSPasteboard.PasteboardType("com.nidhin.emotion.layers")
 
+    /// What goes on the pasteboard: the layers and the actions on them and
+    /// on everything inside them.
+    private struct LayerClipboard: Codable {
+        var layers: [Layer]
+        var actions: [Action]
+    }
+
     func copySelection() {
-        if editor.focus == .timeline, !selectedKeyframes.isEmpty { return copyKeyframes() }
         let layers = topmost(selectedLayers)
-        guard !layers.isEmpty, let data = try? JSONEncoder().encode(layers) else { return }
+        let ids = Set(layers.flatMap { [$0] + Project(layers: [$0]).allLayers }.map(\.id))
+        let clipboard = LayerClipboard(layers: layers, actions: project.actions.filter { ids.contains($0.targetLayerID) })
+        guard !layers.isEmpty, let data = try? JSONEncoder().encode(clipboard) else { return }
         let board = NSPasteboard.general
         board.clearContents()
         board.setData(data, forType: Self.pasteboardType)
@@ -366,18 +285,18 @@ final class EditorController {
     }
 
     var canPaste: Bool {
-        if editor.focus == .timeline, canPasteKeyframes { return true }
-        return NSPasteboard.general.data(forType: Self.pasteboardType) != nil
+        NSPasteboard.general.data(forType: Self.pasteboardType) != nil
     }
 
     /// Pastes in place, in front of everything at the top level. Every pasted
     /// layer is a new layer with new ids, however many times it is pasted.
     func paste() {
-        if editor.focus == .timeline, canPasteKeyframes { return pasteKeyframes() }
         guard let data = NSPasteboard.general.data(forType: Self.pasteboardType),
-              let layers = try? JSONDecoder().decode([Layer].self, from: data) else { return }
-        let copies = layers.map { $0.duplicated() }
-        if perform(.batch([.insertLayers(copies, parentID: nil, index: nil)],
+              let clipboard = try? JSONDecoder().decode(LayerClipboard.self, from: data) else { return }
+        var map: [UUID: UUID] = [:]
+        let copies = clipboard.layers.map { $0.duplicated(recordingIDs: &map) }
+        let actions = Project(actions: clipboard.actions).actionCopies(for: map)
+        if perform(.batch([.insertLayers(copies, parentID: nil, index: nil), .insertActions(actions)],
                           name: copies.count == 1 ? "Paste Layer" : "Paste Layers")) {
             editor.selection = Set(copies.map(\.id))
         }

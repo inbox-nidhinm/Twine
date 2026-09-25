@@ -1,9 +1,9 @@
 import Foundation
 import MotionModel
 
-/// A value that can be blended between two keyframes.
+/// A value that can be blended from an action's starting value to its end.
 ///
-/// `t` is the eased progress through a segment. It usually runs 0 to 1 but
+/// `t` is the eased progress through the action. It usually runs 0 to 1 but
 /// may leave that range: overshooting curves and springs go past the end
 /// value and come back, so conformances extrapolate rather than clamp, except
 /// where a value outside its range means nothing (a colour channel, a radius).
@@ -54,8 +54,9 @@ extension RGBA: Interpolatable {
 }
 
 /// Stops blend pairwise when both sides have the same number of them. When
-/// the counts differ there is no honest pairing, so the segment holds its
-/// start value until the next keyframe.
+/// the counts differ there is no honest pairing, so the value holds its
+/// start until the action ends. (Resampling to match counts arrives with the
+/// Color action.)
 extension GradientStop: Interpolatable {
     public static func interpolate(_ a: GradientStop, _ b: GradientStop, _ t: Double) -> GradientStop {
         GradientStop(position: lerp(a.position, b.position, t), color: .interpolate(a.color, b.color, t))

@@ -1,101 +1,65 @@
 import Foundation
 
-/// A property that can hold one value, or change over time through keyframes.
+/// How an action moves from its starting value to its end value over its
+/// duration.
 ///
-/// With no keyframes, `value` is the property. With keyframes, the keyframes
-/// are the property and `value` is kept only as what the property returns to if
-/// the stopwatch is switched off. Keyframes are kept sorted by time.
-public struct AnimatableProperty<Value: AnimatableValue>: Sendable, Equatable {
-    public var value: Value
-    public private(set) var keyframes: [Keyframe<Value>]
-
-    public init(_ value: Value, keyframes: [Keyframe<Value>] = []) {
-        self.value = value
-        self.keyframes = keyframes.sorted { $0.time < $1.time }
-    }
-
-    public var isAnimated: Bool { !keyframes.isEmpty }
-
-    /// Replaces every keyframe, keeping them in time order.
-    public mutating func setKeyframes(_ new: [Keyframe<Value>]) {
-        keyframes = new.sorted { $0.time < $1.time }
-    }
-}
-
-extension AnimatableProperty: Codable {
-    private enum CodingKeys: String, CodingKey { case value, keyframes }
-
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(try c.decode(Value.self, forKey: .value),
-                  keyframes: try c.decodeIfPresent([Keyframe<Value>].self, forKey: .keyframes) ?? [])
-    }
-
-    /// A property that is not animated writes only its value, which keeps a
-    /// document of mostly static layers small and readable.
-    public func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(value, forKey: .value)
-        if !keyframes.isEmpty { try c.encode(keyframes, forKey: .keyframes) }
-    }
-}
-
-/// A value at a moment. `easing` shapes the segment that runs from this
-/// keyframe to the next one; the last keyframe's easing is kept but unused.
-public struct Keyframe<Value: AnimatableValue>: Codable, Sendable, Equatable, Identifiable {
-    public let id: UUID
-    /// Composition time in seconds.
-    public var time: Double
-    public var value: Value
-    public var easing: Easing
-
-    public init(id: UUID = UUID(), time: Double, value: Value, easing: Easing = .default) {
-        self.id = id
-        self.time = time
-        self.value = value
-        self.easing = easing
-    }
-}
-
-/// How one keyframe segment moves from its start value to its end value.
+/// A preset is a named feel with an intensity from 0 to 1; the curve it makes
+/// is worked out when the scene is evaluated, so improving a preset later
+/// improves every action that uses it. A custom easing stores its curve.
 public enum Easing: Sendable, Equatable {
-    case linear
-    /// Stays at the start value, then jumps at the next keyframe.
-    case hold
-    case bezier(CubicBezier)
-    case spring(Spring)
+    case preset(EasingPreset, intensity: Double)
+    case custom(CubicBezier)
 
-    /// What a new keyframe gets.
-    public static let `default` = Easing.bezier(.easeInOut)
+    /// What a new action gets.
+    public static let `default` = Easing.preset(.smooth, intensity: 0.5)
+    /// Constant speed.
+    public static let linear = Easing.preset(.none, intensity: 0)
 }
 
 extension Easing: Codable {
-    private enum Kind: String, Codable { case linear, hold, bezier, spring }
-    private enum CodingKeys: String, CodingKey { case type, curve, spring }
+    private enum Kind: String, Codable { case preset, custom }
+    private enum CodingKeys: String, CodingKey { case type, preset, intensity, curve }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         switch try c.decode(Kind.self, forKey: .type) {
-        case .linear: self = .linear
-        case .hold: self = .hold
-        case .bezier: self = .bezier(try c.decode(CubicBezier.self, forKey: .curve))
-        case .spring: self = .spring(try c.decode(Spring.self, forKey: .spring))
+        case .preset:
+            self = .preset(try c.decode(EasingPreset.self, forKey: .preset),
+                           intensity: try c.decode(Double.self, forKey: .intensity))
+        case .custom:
+            self = .custom(try c.decode(CubicBezier.self, forKey: .curve))
         }
     }
 
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .linear: try c.encode(Kind.linear, forKey: .type)
-        case .hold: try c.encode(Kind.hold, forKey: .type)
-        case .bezier(let curve):
-            try c.encode(Kind.bezier, forKey: .type)
+        case .preset(let preset, let intensity):
+            try c.encode(Kind.preset, forKey: .type)
+            try c.encode(preset, forKey: .preset)
+            try c.encode(intensity, forKey: .intensity)
+        case .custom(let curve):
+            try c.encode(Kind.custom, forKey: .type)
             try c.encode(curve, forKey: .curve)
-        case .spring(let spring):
-            try c.encode(Kind.spring, forKey: .type)
-            try c.encode(spring, forKey: .spring)
         }
     }
+}
+
+/// The named feels offered for an action. A short list for now; more can be
+/// added without changing the file format, since presets are stored by name.
+public enum EasingPreset: String, Codable, Sendable, CaseIterable {
+    /// Constant speed. Intensity does nothing.
+    case none
+    /// Eases in and out.
+    case smooth
+    /// Starts fast and eases into the end value.
+    case slowDown
+    /// Starts slowly and speeds up into the end value.
+    case accelerate
+    /// Passes the end value and settles back onto it.
+    case overshoot
+    /// Springs into place, bouncing more as intensity rises.
+    case spring
 }
 
 /// A CSS-style timing curve from (0, 0) to (1, 1) through two control points.
@@ -113,46 +77,13 @@ public struct CubicBezier: Codable, Sendable, Hashable {
         self.y2 = y2
     }
 
-    public static let easeIn = CubicBezier(0.42, 0, 1, 1)
-    public static let easeOut = CubicBezier(0, 0, 0.58, 1)
+    /// Control points on the diagonal: a straight line.
+    public static let linear = CubicBezier(1.0 / 3, 1.0 / 3, 2.0 / 3, 2.0 / 3)
     public static let easeInOut = CubicBezier(0.42, 0, 0.58, 1)
 }
 
-/// A named curve offered in the easing menu. The document stores the curve,
-/// not the name, so a preset edited by hand is simply a custom curve.
-public struct EasingPreset: Sendable, Identifiable {
-    public let name: String
-    public let curve: CubicBezier
-    public var id: String { name }
-
-    public static let all: [EasingPreset] = [
-        .init(name: "Ease In", curve: .easeIn),
-        .init(name: "Ease Out", curve: .easeOut),
-        .init(name: "Ease In Out", curve: .easeInOut),
-        .init(name: "Strong In", curve: CubicBezier(0.5, 0, 0.75, 0)),
-        .init(name: "Strong Out", curve: CubicBezier(0.25, 1, 0.5, 1)),
-        .init(name: "Strong In Out", curve: CubicBezier(0.76, 0, 0.24, 1)),
-        .init(name: "Expo In", curve: CubicBezier(0.7, 0, 0.84, 0)),
-        .init(name: "Expo Out", curve: CubicBezier(0.16, 1, 0.3, 1)),
-        .init(name: "Expo In Out", curve: CubicBezier(0.87, 0, 0.13, 1)),
-        .init(name: "Back In", curve: CubicBezier(0.36, 0, 0.66, -0.56)),
-        .init(name: "Back Out", curve: CubicBezier(0.34, 1.56, 0.64, 1)),
-        .init(name: "Back In Out", curve: CubicBezier(0.68, -0.6, 0.32, 1.6)),
-    ]
-
-    /// The preset this curve is, if it is one.
-    public static func named(_ curve: CubicBezier) -> EasingPreset? {
-        all.first { $0.curve == curve }
-    }
-}
-
-/// A damped spring from the segment's start value to its end value.
-///
-/// A spring has its own natural settling time. When one is applied, the next
-/// keyframe is moved to where the spring settles (its duration is derived).
-/// If that keyframe is then dragged, the spring's motion is stretched or
-/// squeezed to fit the new gap (its duration is overridden), so the motion
-/// never jumps. Neither needs storing: the segment's length says which it is.
+/// A damped spring released from 0 towards 1. The spring preset uses it for
+/// its shape, fitted to the action's duration.
 public struct Spring: Codable, Sendable, Hashable {
     public var stiffness: Double
     public var damping: Double

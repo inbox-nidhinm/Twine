@@ -5,7 +5,7 @@ import Theme
 
 /// The left panel: the project's name in the strip beside the traffic lights,
 /// then the layer tree. The tree is for groupings and stacking order; the
-/// timeline, a separate surface, is for keyframes.
+/// timeline, a separate surface, is for actions.
 struct LayersPanel: View {
     let document: ProjectDocument
     let store: ProjectStore

@@ -7,12 +7,17 @@ public struct Project: Codable, Sendable, Equatable {
     /// layers panel shows them reversed, front at the top, as every design
     /// tool does.
     public var layers: [Layer]
+    /// Every action, in no particular order. Each names the layer it acts on;
+    /// the timeline sorts them for display.
+    public var actions: [Action]
     /// Every file copied into the package's `media` folder.
     public var media: [MediaAsset]
 
-    public init(composition: Composition = Composition(), layers: [Layer] = [], media: [MediaAsset] = []) {
+    public init(composition: Composition = Composition(), layers: [Layer] = [], actions: [Action] = [],
+                media: [MediaAsset] = []) {
         self.composition = composition
         self.layers = layers
+        self.actions = actions
         self.media = media
     }
 }

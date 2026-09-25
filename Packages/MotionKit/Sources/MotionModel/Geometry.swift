@@ -1,6 +1,6 @@
 import Foundation
 
-/// Every value a keyframe can hold. The model only promises that values can be
+/// Every value an action can hold. The model only promises that values can be
 /// stored and compared; how two of them blend is the evaluation layer's job, so
 /// interpolation lives there and not here.
 public protocol AnimatableValue: Codable, Sendable, Equatable {}
@@ -22,6 +22,9 @@ public struct Vec2: AnimatableValue, Hashable {
 
     public static let zero = Vec2(0, 0)
     public static let one = Vec2(1, 1)
+
+    public static func + (a: Vec2, b: Vec2) -> Vec2 { Vec2(a.x + b.x, a.y + b.y) }
+    public static func - (a: Vec2, b: Vec2) -> Vec2 { Vec2(a.x - b.x, a.y - b.y) }
 }
 
 /// A width and height in pixels.

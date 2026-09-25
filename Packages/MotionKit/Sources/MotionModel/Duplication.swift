@@ -9,16 +9,23 @@ extension Layer {
     /// changes, so copying is always making a new layer.
     public func duplicated() -> Layer {
         var map: [UUID: UUID] = [:]
-        var copy = copied(into: &map)
-        copy.remapMasks(map)
+        return duplicated(recordingIDs: &map)
+    }
+
+    /// The same, adding each old id and its copy's id to `map`, so whatever
+    /// refers to the originals (their actions) can be copied across too.
+    public func duplicated(recordingIDs map: inout [UUID: UUID]) -> Layer {
+        var local: [UUID: UUID] = [:]
+        var copy = copied(into: &local)
+        copy.remapMasks(local)
+        map.merge(local) { $1 }
         return copy
     }
 
     private func copied(into map: inout [UUID: UUID]) -> Layer {
         let newID = UUID()
         map[id] = newID
-        var copy = Layer(id: newID, name: name, content: content, size: size.value, position: .zero,
-                         inPoint: inPoint, outPoint: outPoint)
+        var copy = Layer(id: newID, name: name, content: content, size: size, position: .zero)
         copy.isVisible = isVisible
         copy.isLocked = isLocked
         copy.isSoloed = isSoloed

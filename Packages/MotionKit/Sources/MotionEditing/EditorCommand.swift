@@ -8,8 +8,6 @@ import MotionModel
 /// state before it for undo. Keeping the list short and explicit is what makes
 /// "every change is undoable" something the compiler can check rather than a
 /// habit: a view has no other route to the document.
-///
-/// Later milestones add keyframe, timing and property commands here.
 public enum EditorCommand: Sendable {
     case setComposition(Composition)
     /// Inserts layers as siblings, in order, starting at `index` inside
@@ -28,6 +26,11 @@ public enum EditorCommand: Sendable {
     /// id. This is how property edits arrive until the property commands do.
     case updateLayers([Layer])
     case addMedia(MediaAsset)
+    /// Adds actions. Each must aim at a layer that exists.
+    case insertActions([Action])
+    /// Replaces actions wholesale with edited copies, matched by id.
+    case updateActions([Action])
+    case deleteActions(Set<UUID>)
     /// Several commands applied in order as one undo step, such as grouping,
     /// which takes layers out and puts a group in. If any fails, none apply.
     case batch([EditorCommand], name: String)
@@ -45,6 +48,9 @@ public enum EditorCommand: Sendable {
         case .setSoloed(_, let on): return on ? "Solo" : "Unsolo"
         case .updateLayers: return "Edit Layer"
         case .addMedia: return "Import"
+        case .insertActions(let actions): return actions.count == 1 ? "Add Action" : "Add Actions"
+        case .updateActions: return "Edit Action"
+        case .deleteActions(let ids): return ids.count == 1 ? "Delete Action" : "Delete Actions"
         case .batch(_, let name): return name
         }
     }
@@ -55,6 +61,10 @@ public enum EditorCommand: Sendable {
     public func apply(to project: inout Project) throws {
         var draft = project
         try apply(into: &draft)
+        // An action on a layer that no longer exists does nothing, so it
+        // goes with its layer, whichever command took the layer away.
+        let remaining = Set(draft.allLayers.map(\.id))
+        draft.actions.removeAll { !remaining.contains($0.targetLayerID) }
         project = draft
     }
 
@@ -130,6 +140,25 @@ public enum EditorCommand: Sendable {
         case .addMedia(let asset):
             guard !p.media.contains(where: { $0.id == asset.id }) else { throw EditorError.duplicateID(asset.id) }
             p.media.append(asset)
+
+        case .insertActions(let actions):
+            for action in actions {
+                guard !p.actions.contains(where: { $0.id == action.id }) else { throw EditorError.duplicateID(action.id) }
+                guard p.layer(withID: action.targetLayerID) != nil else { throw EditorError.notFound(action.targetLayerID) }
+                guard action.duration >= 0, action.start.isFinite, action.duration.isFinite else { throw EditorError.invalidValue }
+                p.actions.append(action)
+            }
+
+        case .updateActions(let actions):
+            for action in actions {
+                guard let i = p.actions.firstIndex(where: { $0.id == action.id }) else { throw EditorError.notFound(action.id) }
+                guard p.layer(withID: action.targetLayerID) != nil else { throw EditorError.notFound(action.targetLayerID) }
+                guard action.duration >= 0, action.start.isFinite, action.duration.isFinite else { throw EditorError.invalidValue }
+                p.actions[i] = action
+            }
+
+        case .deleteActions(let ids):
+            p.actions.removeAll { ids.contains($0.id) }
 
         case .batch(let commands, _):
             for command in commands { try command.apply(into: &p) }

@@ -126,28 +126,6 @@ extension SliderRow where Accessory == EmptyView {
     }
 }
 
-/// The stopwatch beside an animatable property. Lit when the property has
-/// keyframes. Turning it on keys the current value at the playhead; turning
-/// it off takes every keyframe away and keeps the value at the playhead.
-struct Stopwatch: View {
-    let isOn: Bool
-    let action: () -> Void
-
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            IconView(.stopwatch, size: 15)
-                .foregroundStyle(isOn ? Theme.accent : hovering ? Theme.textPrimary : Theme.textTertiary)
-                .frame(width: 20, height: Theme.control)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .help(isOn ? "Stop animating: removes its keyframes" : "Animate: adds a keyframe at the playhead")
-    }
-}
-
 /// The switch, built from the slider's parts: the same track and the same
 /// white pill, moved to one end or the other. Off sits in the canvas's dark,
 /// on sits in the accent.

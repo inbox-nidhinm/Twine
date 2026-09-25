@@ -3,56 +3,10 @@ import Testing
 import MotionModel
 @testable import MotionEvaluation
 
-private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), size: Size2 = Size2(50, 50),
-                  in inPoint: Double = 0, out outPoint: Double = 5) -> Layer {
-    Layer(name: name, content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: AnimatableProperty(.zero)),
+private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), size: Size2 = Size2(50, 50)) -> Layer {
+    Layer(name: name, content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
                                                    fills: [Fill(paint: .color(.white))])),
-          size: size, position: position, inPoint: inPoint, outPoint: outPoint)
-}
-
-@Suite struct SamplingTests {
-    private let property = AnimatableProperty(0.0, keyframes: [
-        Keyframe(time: 1, value: 10, easing: .linear),
-        Keyframe(time: 3, value: 30, easing: .hold),
-        Keyframe(time: 4, value: 40),
-    ])
-
-    @Test func holdsBeforeTheFirstAndAfterTheLastKeyframe() {
-        #expect(property.value(at: -5) == 10)
-        #expect(property.value(at: 0) == 10)
-        #expect(property.value(at: 4) == 40)
-        #expect(property.value(at: 100) == 40)
-    }
-
-    @Test func landsExactlyOnKeyframes() {
-        #expect(property.value(at: 1) == 10)
-        #expect(property.value(at: 3) == 30)
-    }
-
-    @Test func worksAtAnyFractionalTime() {
-        #expect(abs(property.value(at: 2) - 20) < 1e-12)
-        #expect(abs(property.value(at: 1.001) - 10.01) < 1e-9)
-        // Subframes between 60 fps frames, as motion blur will ask for.
-        let a = property.value(at: 1.5), b = property.value(at: 1.5 + 1.0 / 240), c = property.value(at: 1.5 + 2.0 / 240)
-        #expect(a < b && b < c)
-    }
-
-    @Test func holdSegmentsJumpAtTheNextKeyframe() {
-        #expect(property.value(at: 3.999) == 30)
-        #expect(property.value(at: 4) == 40)
-    }
-
-    @Test func staticPropertiesIgnoreTime() {
-        let still = AnimatableProperty(Vec2(3, 4))
-        #expect(still.value(at: 0) == Vec2(3, 4))
-        #expect(still.value(at: 123.456) == Vec2(3, 4))
-    }
-
-    @Test func manyKeyframesStillFindTheRightSegment() {
-        let keys = (0..<1000).map { Keyframe(time: Double($0), value: Double($0) * 2, easing: .linear) }
-        let long = AnimatableProperty(0.0, keyframes: keys)
-        #expect(abs(long.value(at: 567.25) - 1134.5) < 1e-9)
-    }
+          size: size, position: position)
 }
 
 @Suite struct InterpolationTests {
@@ -98,14 +52,13 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
 
 @Suite struct EvaluateTests {
     @Test func resolvesPropertiesAtTheTimeAsked() {
-        var layer = rect()
-        layer.transform.position = AnimatableProperty(.zero, keyframes: [
-            Keyframe(time: 0, value: Vec2(0, 0), easing: .linear), Keyframe(time: 2, value: Vec2(200, 100)),
+        let layer = rect()
+        let project = Project(layers: [layer], actions: [
+            Action(target: layer.id, start: 0, duration: 2, easing: .linear,
+                   spec: .move(MoveAction(mode: .to, initial: .zero, end: Vec2(200, 100)))),
+            Action(target: layer.id, start: 0, duration: 1, easing: .linear,
+                   spec: .opacity(OpacityAction(initial: 0, end: 1))),
         ])
-        layer.opacity = AnimatableProperty(1, keyframes: [
-            Keyframe(time: 0, value: 0, easing: .linear), Keyframe(time: 1, value: 1),
-        ])
-        let project = Project(layers: [layer])
         let scene = evaluate(project, at: 0.5)
         #expect(scene.layers.count == 1)
         #expect(scene.layers[0].position == Vec2(50, 25))
@@ -118,17 +71,15 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
         #expect(evaluate(project, at: 1.2345) == evaluate(project, at: 1.2345))
     }
 
-    @Test func layersShowOnlyBetweenTheirInAndOutPoints() {
-        let project = Project(layers: [rect(in: 1, out: 2)])
-        #expect(evaluate(project, at: 0.999).layers.isEmpty)
-        #expect(evaluate(project, at: 1).layers.count == 1)
-        #expect(evaluate(project, at: 1.999).layers.count == 1)
-        #expect(evaluate(project, at: 2).layers.isEmpty)
+    @Test func layersLastTheWholeComposition() {
+        let project = Project(layers: [rect()])
+        #expect(evaluate(project, at: 0).layers.count == 1)
+        #expect(evaluate(project, at: 1000).layers.count == 1)
     }
 
     @Test func hiddenLayersAndTheirChildrenAreLeftOut() {
         var group = Layer(name: "G", content: .group(GroupContent(children: [rect()])), size: Size2(10, 10),
-                          position: .zero, outPoint: 5)
+                          position: .zero)
         group.isVisible = false
         #expect(evaluate(Project(layers: [group, rect("Top")]), at: 0).layers.count == 1)
     }
@@ -138,7 +89,7 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
         soloed.isSoloed = true
         let sibling = rect("Sibling")
         let group = Layer(name: "G", content: .group(GroupContent(children: [soloed, sibling])),
-                          size: Size2(10, 10), position: .zero, outPoint: 5)
+                          size: Size2(10, 10), position: .zero)
         let outside = rect("Outside")
         let ids = evaluate(Project(layers: [group, outside]), at: 0).layers.map(\.id)
         #expect(ids == [group.id, soloed.id])
@@ -146,7 +97,7 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
 
     @Test func soloingAGroupShowsEverythingInside() {
         var group = Layer(name: "G", content: .group(GroupContent(children: [rect("A"), rect("B")])),
-                          size: Size2(10, 10), position: .zero, outPoint: 5)
+                          size: Size2(10, 10), position: .zero)
         group.isSoloed = true
         #expect(evaluate(Project(layers: [group, rect("Outside")]), at: 0).layers.count == 3)
     }
@@ -154,7 +105,7 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
     @Test func childrenFollowTheirGroupInDrawingOrder() {
         let a = rect("A"), b = rect("B")
         let group = Layer(name: "G", content: .group(GroupContent(children: [a, b], clipsContent: true)),
-                          size: Size2(10, 10), position: .zero, outPoint: 5)
+                          size: Size2(10, 10), position: .zero)
         let scene = evaluate(Project(layers: [group]), at: 0)
         #expect(scene.layers.map(\.id) == [group.id, a.id, b.id])
         #expect(scene.layers[1].parentID == group.id)
@@ -181,25 +132,25 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
         // A 10x10 child at (5,5) in its group, the group moved by (100, 0)
         // and turned 90 degrees clockwise about its own origin.
         var child = rect("Child", at: Vec2(5, 5), size: Size2(10, 10))
-        child.transform.anchor = AnimatableProperty(.zero)
+        child.transform.anchor = .zero
         var group = Layer(name: "G", content: .group(GroupContent(children: [child])), size: Size2(100, 100),
-                          position: Vec2(100, 0), outPoint: 5)
-        group.transform.anchor = AnimatableProperty(.zero)
-        group.transform.rotation = AnimatableProperty(90)
+                          position: Vec2(100, 0))
+        group.transform.anchor = .zero
+        group.transform.rotation = 90
         let scene = evaluate(Project(layers: [group]), at: 0)
         let corner = scene.worldTransform(of: child.id)!.apply(.zero)
         // (5,5) turned clockwise in y-down space lands at (-5, 5), then moved.
         #expect(abs(corner.x - 95) < 1e-9 && abs(corner.y - 5) < 1e-9)
     }
 
-    @Test func videoSourceTimeFollowsTrimAndInPoint() {
+    @Test func videoSourceTimeFollowsTrim() {
         let clip = Layer(name: "Clip", content: .video(VideoContent(mediaID: UUID(), trimStart: 2)),
-                         size: Size2(10, 10), position: .zero, inPoint: 1, outPoint: 5)
+                         size: Size2(10, 10), position: .zero)
         guard case .video(_, let sourceTime) = evaluate(Project(layers: [clip]), at: 1.5).layers[0].content else {
             Issue.record("expected video")
             return
         }
-        #expect(sourceTime == 2.5)
+        #expect(sourceTime == 3.5)
     }
 }
 
@@ -238,7 +189,7 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
     @Test func openPathsStrokeCentred() {
         var line = Layer(name: "L", content: .shape(ShapeContent(geometry: .line,
             strokes: [Stroke(paint: .color(.black), width: 4, alignment: .inside)])),
-            size: Size2(80, 0), position: .zero, outPoint: 5)
+            size: Size2(80, 0), position: .zero)
         line.name = "Line"
         guard case .shape(let shape) = evaluate(Project(layers: [line]), at: 0).layers[0].content else { return }
         #expect(shape.strokes[0].alignment == .center)

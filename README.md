@@ -1,6 +1,6 @@
 # eMotion
 
-A native macOS app for keyframe motion design, in the spirit of Jitter, in Flip's design language.
+A native macOS app for motion design, in the spirit of Jitter, in Flip's design language.
 
 ## Running it
 
@@ -55,7 +55,9 @@ Name.emotion/
 
 ## Animating
 
-Switch to Animate (⌥⌘2) to bring up the timeline. Turn on a property's stopwatch in the inspector to key its value at the playhead; after that, changing it in Animate mode, on the canvas or in the inspector, keys it at the playhead. In Design mode a change moves the whole animation instead.
+Animation is being rebuilt around Jitter-style actions (see `docs/redesign.md`). A layer's own properties are its design state; an action is one timed instruction on top of it, such as "move by 200 px over 0.5 s, smoothly", with an optional starting value and an end value. Projects already store and play actions; adding and editing them in the app arrives with redesign milestones 4 and 5.
+
+For now, Animate (⌥⌘2) shows the timeline's transport and ruler:
 
 | | |
 |---|---|
@@ -63,15 +65,9 @@ Switch to Animate (⌥⌘2) to bring up the timeline. Turn on a property's stopw
 | [ and ] | Previous and next frame |
 | Home, End | Go to the start or the end |
 | Click or drag the ruler | Scrub |
-| Click, Shift-click, drag a box | Select keyframes |
-| Drag keyframes | Move them in time; they land on frames and snap to the playhead, other keyframes and layer ends |
-| Drag a layer's bar, or an end of it | Move the layer in time, or trim it |
-| ⌫, ⌘C, ⌘V, ⌘D | Delete, copy, paste at the playhead, duplicate at the playhead |
 | ⌘-scroll or pinch on the tracks | Zoom the time axis |
 | Click the time readout | Switch between seconds and frames |
 
-With keyframes selected, the inspector shows their easing: linear, hold, presets, a custom curve, or a spring.
-
 ## Status
 
-Milestones 1 to 4 of 8: the foundation, evaluation and rendering, the canvas with basic shapes, and the timeline with playback. See `docs/brief.md` for the whole plan, and Version History on the home screen for what each build changed.
+Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then redesign milestone 2 of 8: the action model and its evaluation. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.

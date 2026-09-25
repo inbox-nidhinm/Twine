@@ -24,16 +24,16 @@ public enum LayerFactory {
     public static let defaultStroke = RGBA(hex: "1E1E1E")!
 
     /// A shape filling `box` in its parent's space, with its anchor at the
-    /// centre, visible for the whole composition.
-    public static func shape(_ kind: ShapeKind, in box: Box, name: String, duration: Double) -> Layer {
+    /// centre.
+    public static func shape(_ kind: ShapeKind, in box: Box, name: String) -> Layer {
         let size = Size2(max(box.width, 0), max(box.height, 0))
         let geometry: ShapeGeometry
         switch kind {
-        case .rectangle: geometry = .rectangle(cornerRadii: AnimatableProperty(.zero))
+        case .rectangle: geometry = .rectangle(cornerRadii: .zero)
         case .ellipse: geometry = .ellipse
         case .line: geometry = .line
         case .polygon: geometry = .polygon(sides: 6)
-        case .star: geometry = .star(points: 5, innerRadius: AnimatableProperty(0.4))
+        case .star: geometry = .star(points: 5, innerRadius: 0.4)
         }
         let content: ShapeContent
         if kind == .line {
@@ -41,24 +41,24 @@ public enum LayerFactory {
         } else {
             content = ShapeContent(geometry: geometry, fills: [Fill(paint: .color(defaultFill))])
         }
-        return Layer(name: name, content: .shape(content), size: size, position: box.center, outPoint: duration)
+        return Layer(name: name, content: .shape(content), size: size, position: box.center)
     }
 
     /// A line from `start` to `end`: a box as long as the line and no taller,
     /// turned to point the right way, with its anchor in the middle.
-    public static func line(from start: Vec2, to end: Vec2, name: String, duration: Double) -> Layer {
+    public static func line(from start: Vec2, to end: Vec2, name: String) -> Layer {
         let dx = end.x - start.x, dy = end.y - start.y
         let length = hypot(dx, dy)
-        var layer = shape(.line, in: Box(origin: .zero, size: Size2(length, 0)), name: name, duration: duration)
-        layer.transform.position = AnimatableProperty(Vec2((start.x + end.x) / 2, (start.y + end.y) / 2))
-        layer.transform.rotation = AnimatableProperty(atan2(dy, dx) * 180 / .pi)
+        var layer = shape(.line, in: Box(origin: .zero, size: Size2(length, 0)), name: name)
+        layer.transform.position = Vec2((start.x + end.x) / 2, (start.y + end.y) / 2)
+        layer.transform.rotation = atan2(dy, dx) * 180 / .pi
         return layer
     }
 
     /// An empty group whose box is `box`, in its parent's space.
-    public static func group(in box: Box, children: [Layer], name: String, duration: Double) -> Layer {
+    public static func group(in box: Box, children: [Layer], name: String) -> Layer {
         Layer(name: name, content: .group(GroupContent(children: children)), size: Size2(box.width, box.height),
-              position: box.center, outPoint: duration)
+              position: box.center)
     }
 
     /// `Rectangle 3` when the project already has two rectangles, and so on.

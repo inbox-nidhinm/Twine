@@ -7,7 +7,7 @@ import MotionModel
 @Suite struct ProjectStoreTests {
     private func shape(_ name: String) -> Layer {
         Layer(name: name, content: .shape(ShapeContent(geometry: .ellipse)),
-              size: Size2(10, 10), position: .zero, outPoint: 5)
+              size: Size2(10, 10), position: .zero)
     }
 
     /// Grouping by event needs a running event loop, which tests do not have.
@@ -58,14 +58,14 @@ import MotionModel
         let store = makeStore(Project(layers: [a]))
         store.beginContinuousChange("Move")
         for x in stride(from: 0.0, through: 100, by: 10) {
-            a.transform.position = AnimatableProperty(Vec2(x, 0))
+            a.transform.position = Vec2(x, 0)
             try store.updateContinuousChange(.updateLayers([a]))
         }
         store.endContinuousChange()
-        #expect(store.project.layers[0].transform.position.value == Vec2(100, 0))
+        #expect(store.project.layers[0].transform.position == Vec2(100, 0))
 
         store.undoManager.undo()
-        #expect(store.project.layers[0].transform.position.value == .zero)
+        #expect(store.project.layers[0].transform.position == .zero)
         #expect(!store.undoManager.canUndo)
     }
 
@@ -92,7 +92,7 @@ import MotionModel
 
     @Test func movingKeepsRelativeOrderAndRefusesCycles() throws {
         let a = shape("A"), b = shape("B"), c = shape("C")
-        let group = Layer(name: "G", content: .group(GroupContent()), size: Size2(1, 1), position: .zero, outPoint: 5)
+        let group = Layer(name: "G", content: .group(GroupContent()), size: Size2(1, 1), position: .zero)
         let store = makeStore(Project(layers: [a, b, c, group]))
 
         // Asked for in reverse, moved in their existing order.
