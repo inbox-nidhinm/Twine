@@ -1,6 +1,10 @@
 import AppKit
 import MotionModel
 import MotionEditing
+import MotionEvaluation
+import MotionRendering
+import ImageIO
+import UniformTypeIdentifiers
 
 /// One open `.emotion` project.
 ///
@@ -49,11 +53,18 @@ final class ProjectDocument: NSDocument {
     }
 
     nonisolated override func fileWrapper(ofType typeName: String) throws -> FileWrapper {
-        let json = try MainActor.assumeIsolated { () throws -> Data in
+        let (json, thumbnail) = try MainActor.assumeIsolated { () throws -> (Data, Data?) in
             guard let store else { throw ProjectFileError.missingDocument }
-            return try ProjectFormat.encode(store.project)
+            return (try ProjectFormat.encode(store.project), Thumbnail.png(of: store.project))
         }
         let root = package ?? FileWrapper(directoryWithFileWrappers: [:])
+
+        if let thumbnail {
+            if let old = root.fileWrappers?[ProjectFormat.thumbnailFileName] { root.removeFileWrapper(old) }
+            let file = FileWrapper(regularFileWithContents: thumbnail)
+            file.preferredFilename = ProjectFormat.thumbnailFileName
+            root.addFileWrapper(file)
+        }
 
         if let old = root.fileWrappers?[ProjectFormat.documentFileName] { root.removeFileWrapper(old) }
         let document = FileWrapper(regularFileWithContents: json)
@@ -123,5 +134,30 @@ final class ProjectDocument: NSDocument {
         move(to: target) { error in
             if let error { NSApp.presentError(error) }
         }
+    }
+}
+
+/// The home screen's picture of a project: its first frame, through the same
+/// renderer as the canvas and export.
+enum Thumbnail {
+    /// The longer side, in pixels. Cards are 148pt wide, so this is sharp at 2x.
+    static let longSide = 320.0
+
+    private static var renderer: OffscreenRenderer?
+
+    static func png(of project: Project) -> Data? {
+        let size = project.composition.size
+        guard size.width > 0, size.height > 0 else { return nil }
+        let scale = longSide / max(size.width, size.height)
+        let width = max(Int((size.width * scale).rounded()), 1), height = max(Int((size.height * scale).rounded()), 1)
+        if renderer?.pixelWidth != width || renderer?.pixelHeight != height {
+            renderer = OffscreenRenderer(pixelWidth: width, pixelHeight: height)
+        }
+        guard let image = renderer?.image(of: evaluate(project, at: 0)) else { return nil }
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)
+        else { return nil }
+        CGImageDestinationAddImage(destination, image, nil)
+        return CGImageDestinationFinalize(destination) ? data as Data : nil
     }
 }

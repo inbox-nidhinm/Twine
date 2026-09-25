@@ -6,13 +6,15 @@ import PackageDescription
 // knows nothing, editing knows the model, and nothing here knows about views
 // except Theme, which is only tokens and drawing primitives.
 //
-// Later milestones add MotionEvaluation, MotionRendering and MotionExport here.
+// Milestone 5 adds MotionExport here.
 let package = Package(
     name: "MotionKit",
     platforms: [.macOS(.v26)],
     products: [
         .library(name: "MotionModel", targets: ["MotionModel"]),
         .library(name: "MotionEditing", targets: ["MotionEditing"]),
+        .library(name: "MotionEvaluation", targets: ["MotionEvaluation"]),
+        .library(name: "MotionRendering", targets: ["MotionRendering"]),
         .library(name: "Theme", targets: ["Theme"]),
     ],
     targets: [
@@ -20,6 +22,12 @@ let package = Package(
         .target(name: "MotionModel"),
         // Commands and undo. Foundation and the model only.
         .target(name: "MotionEditing", dependencies: ["MotionModel"]),
+        // `evaluate(project, at:)`: interpolation, easing, springs, and the
+        // flat ResolvedScene every renderer draws from. Foundation only.
+        .target(name: "MotionEvaluation", dependencies: ["MotionModel"]),
+        // The SceneRenderer protocol and its Core Animation implementation,
+        // shared by the canvas and offscreen rendering.
+        .target(name: "MotionRendering", dependencies: ["MotionModel", "MotionEvaluation"]),
         // Tokens from the Flip Design System in Figma, the grain, the fonts,
         // and the icon set. Copied rather than processed, because any
         // re-encoding of the grain would undo how it was packed.
@@ -27,5 +35,7 @@ let package = Package(
 
         .testTarget(name: "MotionModelTests", dependencies: ["MotionModel"]),
         .testTarget(name: "MotionEditingTests", dependencies: ["MotionEditing"]),
+        .testTarget(name: "MotionEvaluationTests", dependencies: ["MotionEvaluation"]),
+        .testTarget(name: "MotionRenderingTests", dependencies: ["MotionRendering"]),
     ]
 )

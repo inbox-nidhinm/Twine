@@ -10,6 +10,8 @@
 		E00000000000000000000001 /* MotionModel in Frameworks */ = {isa = PBXBuildFile; productRef = E00000000000000000000002 /* MotionModel */; };
 		E00000000000000000000003 /* MotionEditing in Frameworks */ = {isa = PBXBuildFile; productRef = E00000000000000000000004 /* MotionEditing */; };
 		E00000000000000000000005 /* Theme in Frameworks */ = {isa = PBXBuildFile; productRef = E00000000000000000000006 /* Theme */; };
+		E0000000000000000000001A /* MotionEvaluation in Frameworks */ = {isa = PBXBuildFile; productRef = E0000000000000000000001B /* MotionEvaluation */; };
+		E0000000000000000000001C /* MotionRendering in Frameworks */ = {isa = PBXBuildFile; productRef = E0000000000000000000001D /* MotionRendering */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +33,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E0000000000000000000001C /* MotionRendering in Frameworks */,
+				E0000000000000000000001A /* MotionEvaluation in Frameworks */,
 				E00000000000000000000001 /* MotionModel in Frameworks */,
 				E00000000000000000000003 /* MotionEditing in Frameworks */,
 				E00000000000000000000005 /* Theme in Frameworks */,
@@ -86,6 +90,8 @@
 			);
 			name = eMotion;
 			packageProductDependencies = (
+				E0000000000000000000001D /* MotionRendering */,
+				E0000000000000000000001B /* MotionEvaluation */,
 				E00000000000000000000002 /* MotionModel */,
 				E00000000000000000000004 /* MotionEditing */,
 				E00000000000000000000006 /* Theme */,
@@ -318,6 +324,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E00000000000000000000007 /* XCLocalSwiftPackageReference "Packages/MotionKit" */;
 			productName = Theme;
+		};
+		E0000000000000000000001B /* MotionEvaluation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E00000000000000000000007 /* XCLocalSwiftPackageReference "Packages/MotionKit" */;
+			productName = MotionEvaluation;
+		};
+		E0000000000000000000001D /* MotionRendering */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E00000000000000000000007 /* XCLocalSwiftPackageReference "Packages/MotionKit" */;
+			productName = MotionRendering;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

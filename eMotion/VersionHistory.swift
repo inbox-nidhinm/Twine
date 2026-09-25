@@ -23,6 +23,13 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "25 September 2026", title: "Everything worked out at any moment", changes: [
+            "Every property can now be worked out at any moment of the animation, between frames included: keyframes, the easing presets, custom curves, holds and springs.",
+            "Colours blend through a perceptual colour space, so red to blue passes through purple rather than grey.",
+            "A spring keeps its own natural length; stretch the segment and the bounce stretches with it rather than jumping.",
+            "The renderer that draws the canvas also draws off screen, which is how the export will draw, so what you see is what you get.",
+            "Home screen cards show each project's first frame.",
+        ]),
         .init(date: "25 September 2026", title: "Clicks land where they should", changes: [
             "The Design and Animate switch, the Composition header and the tools answer clicks again. The inspector's list had been stretching up under the title bar and catching clicks meant for the controls above it, and even sent some to the width field.",
             "Nothing takes the keyboard when a window opens, so typing no longer goes into the composition's width.",
