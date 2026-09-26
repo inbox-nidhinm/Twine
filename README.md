@@ -57,6 +57,10 @@ Name.emotion/
 
 Pick the Text tool (T) and click the canvas: a text layer appears with its word selected, ready to type over, right on the canvas. Double-click a text layer to type where you clicked, or press Return with it selected to edit all of it; Escape or a click away finishes. All the usual Mac typing keys, Copy and Paste, held-key accents and input methods work, and Undo steps back through your typing while you type. The words can also be typed in the inspector's text box. The Text section sets the font (from a searchable list of the fonts on this Mac), weight, size, colour, alignment, letter spacing, line height and auto or fixed width. A font that is not installed shows crossed out and the text draws in SF Pro. The box always fits the words; dragging its side makes it fixed width.
 
+## Masks
+
+Select a layer and press + under Mask in the inspector to pick another layer as its mask: the layer then shows only where the mask draws, and the mask itself stops drawing. Invert shows it everywhere the mask does not draw. Any shape, text, picture or video can be a mask, and a group can be masked by a layer inside it. The mask's opacity, blur and actions all carry through, so a moving mask reveals as it goes. A mask shows its own icon in the layers panel; select it there to move it on the canvas. Switching a mask off shows the layer whole.
+
 ## Pictures, video and sound
 
 File > Import… (⌘I), or drop files on the canvas. Pictures and video come in at their own size (shrunk to fit the composition if larger); sound has no picture and only shows in the layers panel and the timeline. The file is copied into the project package.
@@ -134,4 +138,4 @@ Export Current Frame… (Shift-⌘E) saves a PNG of what the canvas shows: the f
 
 ## Status
 
-Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then all 8 redesign milestones and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, MP4, MOV and PNG export, Style and Blur actions, text layers with Text and Shape actions, and pictures, video and sound with Play bars. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.
+Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then all 8 redesign milestones and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, MP4, MOV and PNG export, Style and Blur actions, text layers with Text and Shape actions, and pictures, video and sound with Play bars. After those, masks. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.

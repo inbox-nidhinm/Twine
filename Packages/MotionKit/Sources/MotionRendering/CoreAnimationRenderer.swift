@@ -23,13 +23,20 @@ public final class CoreAnimationRenderer: SceneRenderer {
     private let backgroundLayer = CALayer()
     private let contentLayer = CALayer()
     private var nodes: [UUID: Node] = [:]
+    /// Each masked layer's mask, by the masked layer's id. Kept per masked
+    /// layer rather than per mask, since a Core Animation layer can be the
+    /// mask of only one other.
+    private var masks: [UUID: MaskNode] = [:]
 
     /// Whether pictures (text now; images and video later) are drawn upside
     /// down and must be turned over. Off screen the layer tree runs y up and
     /// the texture's rows turn it the right way, which shapes never notice
     /// but a picture does. The offscreen renderer turns this on.
     public var flipsContents = false {
-        didSet { for node in nodes.values { node.flipsContents = flipsContents } }
+        didSet {
+            for node in nodes.values { node.flipsContents = flipsContents }
+            for mask in masks.values { mask.node.flipsContents = flipsContents }
+        }
     }
 
     /// Where image and video layers get their pictures. Without one they draw
@@ -39,7 +46,10 @@ public final class CoreAnimationRenderer: SceneRenderer {
     /// How many device pixels to rasterise per point. Raise it for Retina
     /// screens and high-resolution exports.
     public var contentsScale: CGFloat = 2 {
-        didSet { for node in nodes.values { node.setContentsScale(contentsScale) } }
+        didSet {
+            for node in nodes.values { node.setContentsScale(contentsScale) }
+            for mask in masks.values { mask.node.setContentsScale(contentsScale) }
+        }
     }
 
     public init() {
@@ -88,6 +98,31 @@ public final class CoreAnimationRenderer: SceneRenderer {
         for resolved in scene.layers where resolved.content == .group {
             if let node = nodes[resolved.id] { Self.setSublayers(node.container, children[resolved.id] ?? []) }
         }
+        updateMasks(scene)
+    }
+
+    /// Gives every masked layer its mask, drawn by a node of its own and
+    /// placed in the masked layer's space, and takes masks away that have
+    /// gone.
+    private func updateMasks(_ scene: ResolvedScene) {
+        var masked = Set<UUID>()
+        for resolved in scene.layers {
+            guard let node = nodes[resolved.id] else { continue }
+            guard let mask = resolved.mask, let source = scene.mask(mask.layerID) else {
+                if node.container.mask != nil { node.container.mask = nil }
+                continue
+            }
+            let made = masks[resolved.id] ?? {
+                let m = MaskNode(scale: contentsScale)
+                m.node.flipsContents = flipsContents
+                masks[resolved.id] = m
+                return m
+            }()
+            made.update(source, mask: mask, bounds: node.container.bounds, media: media)
+            if node.container.mask !== made.root { node.container.mask = made.root }
+            masked.insert(resolved.id)
+        }
+        for id in masks.keys where !masked.contains(id) { masks[id] = nil }
     }
 
     /// Only touches the tree when the order actually changed.
@@ -95,6 +130,48 @@ public final class CoreAnimationRenderer: SceneRenderer {
         let current = parent.sublayers ?? []
         if current.count == layers.count && zip(current, layers).allSatisfy({ $0 === $1 }) { return }
         parent.sublayers = layers
+    }
+}
+
+// MARK: - A mask
+
+/// The layer a mask is set to: the mask layer, drawn as it would be on its
+/// own and moved into the masked layer's space. Core Animation keeps the
+/// masked layer where this is opaque. Inverted, it is an opaque sheet with
+/// the mask layer punched out of it, so the masked layer shows everywhere
+/// the mask does not draw.
+private final class MaskNode {
+    let root = CALayer()
+    let node: Node
+    private var sheet: CALayer?
+
+    init(scale: CGFloat) {
+        node = Node(scale: scale)
+        root.anchorPoint = .zero
+        root.actions = Node.noActions
+        root.addSublayer(node.container)
+    }
+
+    func update(_ source: ResolvedLayer, mask: ResolvedMask, bounds: CGRect, media: MediaProvider?) {
+        root.frame = bounds
+        node.update(source, media: media)
+        node.container.transform = mask.transform.caTransform
+        if mask.isInverted, let punch = Compositing.destinationOut() {
+            if sheet == nil {
+                let made = CALayer()
+                made.actions = Node.noActions
+                made.backgroundColor = CGColor(gray: 0, alpha: 1)
+                root.insertSublayer(made, at: 0)
+                sheet = made
+                node.container.compositingFilter = punch
+            }
+            // Wide enough to cover a shadow or a blur spilling past the box.
+            sheet?.frame = bounds.insetBy(dx: -4096, dy: -4096)
+        } else if let sheet {
+            sheet.removeFromSuperlayer()
+            self.sheet = nil
+            node.container.compositingFilter = nil
+        }
     }
 }
 

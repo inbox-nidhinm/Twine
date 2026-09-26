@@ -52,6 +52,11 @@ struct LayerInspector: View {
             }
             PanelDivider()
             EffectsSection(layer: layer, controller: controller)
+            // A mask draws alone, so a mask of its own would do nothing.
+            if case .audio = layer.content {} else if layer.mask != nil || !controller.project.maskSourceIDs.contains(layer.id) {
+                PanelDivider()
+                MaskSection(layer: layer, controller: controller)
+            }
         }
     }
 
@@ -592,6 +597,60 @@ extension Paint {
 }
 
 // MARK: - Effects
+
+/// Another layer that shows this one only where it draws, or with Invert,
+/// only where it does not. The mask stops drawing by itself.
+private struct MaskSection: View {
+    let layer: Layer
+    let controller: EditorController
+
+    @Environment(MenuHost.self) private var menus
+    @State private var addFrame: CGRect = .zero
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HeaderRow(title: "Mask") {
+                if layer.mask == nil {
+                    IconButton(icon: .plus, help: "Show this layer only where another layer draws") {
+                        menus.show(entries(), at: CGPoint(x: addFrame.maxX - Theme.menuMinWidth, y: addFrame.maxY + 4))
+                    }
+                    .disabled(candidates.isEmpty)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { addFrame = $0 }
+                } else {
+                    IconButton(icon: .minus, help: "Remove the mask") { set(nil) }
+                }
+            }
+            if let mask = layer.mask {
+                VStack(alignment: .leading, spacing: 8) {
+                    MenuRow(label: "Layer", value: controller.project.layer(withID: mask.layerID)?.name ?? "None",
+                            entries: entries)
+                        .help("The layer whose shape shows this one. It stops drawing by itself.")
+                    ToggleRow(label: "Invert", isOn: mask.isInverted) {
+                        set(MaskReference(layerID: mask.layerID, isInverted: !mask.isInverted))
+                    }
+                    .help("Show this layer where the mask does not draw, rather than where it does")
+                }
+                .padding(.horizontal, Theme.panelPad)
+            }
+        }
+        .padding(.bottom, Theme.panelPad)
+    }
+
+    /// Front first, as the layers panel lists them.
+    private var candidates: [Layer] { controller.project.maskCandidates(for: layer.id).reversed() }
+
+    private func entries() -> [MenuEntry] {
+        candidates.map { candidate in
+            .item(candidate.name, checked: layer.mask?.layerID == candidate.id) {
+                set(MaskReference(layerID: candidate.id, isInverted: layer.mask?.isInverted ?? false))
+            }
+        }
+    }
+
+    private func set(_ mask: MaskReference?) {
+        controller.edit(layer.id) { l in l.mask = mask }
+    }
+}
 
 private struct EffectsSection: View {
     let layer: Layer

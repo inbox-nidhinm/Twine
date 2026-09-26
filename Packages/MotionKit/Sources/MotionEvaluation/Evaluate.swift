@@ -11,7 +11,8 @@ import MotionModel
 /// A layer is in the scene when it is switched on and no action has hidden
 /// it. If any layer is soloed, only soloed layers show, with everything inside
 /// a soloed group and the groups that contain a soloed layer. Audio layers draw
-/// nothing and are left out, as are layers used as another layer's mask.
+/// nothing and are left out. Layers used as another layer's mask go in the
+/// scene's `masks` instead, whatever is soloed, so a mask keeps working.
 public func evaluate(_ project: Project, at time: Double) -> ResolvedScene {
     scene(of: project, at: time, tracks: ActionTracks(project.actions))
 }
@@ -25,10 +26,9 @@ public func evaluateDesign(_ project: Project) -> ResolvedScene {
 private func scene(of project: Project, at time: Double, tracks: ActionTracks) -> ResolvedScene {
     let all = project.allLayers
     let soloing = all.contains { $0.isSoloed }
-    // A layer used as another's mask stops drawing on its own. A later
-    // milestone hands mask layers to the renderer separately, to draw as
-    // masks only.
-    let maskSources = Set(all.compactMap { $0.mask?.layerID })
+    // A layer used as another's mask stops drawing on its own, and draws
+    // only through the layers it masks.
+    let maskSources = project.maskSourceIDs
     var out: [ResolvedLayer] = []
 
     func hasSoloedDescendant(_ layer: Layer) -> Bool {
@@ -50,10 +50,79 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks) -
     }
     walk(project.layers, parent: nil, soloedAbove: false)
 
+    if !maskSources.isEmpty {
+        var world = WorldTransforms(project: project, tracks: tracks, time: time, known: out)
+        var masks: [ResolvedLayer] = []
+        for id in maskSources {
+            guard let layer = world.resolved(id) else { continue }
+            var source = layer
+            // A mask draws alone; its own mask is not followed.
+            source.mask = nil
+            masks.append(source)
+        }
+        let shown = Set(masks.map(\.id))
+        for i in out.indices {
+            guard let reference = project.layer(withID: out[i].id)?.mask else { continue }
+            if shown.contains(reference.layerID), let from = world.transform(of: reference.layerID),
+               let into = world.transform(of: out[i].id)?.inverted {
+                out[i].mask = ResolvedMask(layerID: reference.layerID, isInverted: reference.isInverted,
+                                           transform: from.then(into))
+            } else {
+                out[i].mask = nil
+            }
+        }
+        // In drawing order, so the scene is the same whatever order the set
+        // gives.
+        let order = Dictionary(uniqueKeysWithValues: all.enumerated().map { ($1.id, $0) })
+        masks.sort { order[$0.id, default: 0] < order[$1.id, default: 0] }
+        let background = project.composition.background
+        return ResolvedScene(time: time, size: project.composition.size,
+                             background: background.isTransparent ? nil : background.color,
+                             layers: out, masks: masks)
+    }
+
     let background = project.composition.background
     return ResolvedScene(time: time, size: project.composition.size,
                          background: background.isTransparent ? nil : background.color,
                          layers: out)
+}
+
+/// Layers resolved on demand, with the transform from each one's space into
+/// the composition's, for placing a mask over the layer it masks. Starts
+/// from the layers already in the scene, and resolves others (a mask, the
+/// groups a mask sits in) as they are asked for.
+private struct WorldTransforms {
+    let project: Project
+    let tracks: ActionTracks
+    let time: Double
+    private var cache: [UUID: ResolvedLayer?] = [:]
+
+    init(project: Project, tracks: ActionTracks, time: Double, known: [ResolvedLayer]) {
+        self.project = project
+        self.tracks = tracks
+        self.time = time
+        for layer in known { cache[layer.id] = layer }
+    }
+
+    /// The layer as it stands at `time`, or nil if it, or a group it sits
+    /// in, is switched off or hidden.
+    mutating func resolved(_ id: UUID) -> ResolvedLayer? {
+        if let known = cache[id] { return known }
+        var result: ResolvedLayer?
+        let parent = project.location(of: id)?.parentID
+        if let layer = project.layer(withID: id), layer.isVisible, parent.map({ resolved($0) != nil }) ?? true {
+            let state = tracks.state(of: layer, at: time)
+            if state.isShown { result = resolve(layer, state: state, parent: parent, at: time) }
+        }
+        cache[id] = result
+        return result
+    }
+
+    mutating func transform(of id: UUID) -> Affine? {
+        guard let layer = resolved(id) else { return nil }
+        guard let parent = layer.parentID else { return layer.transform }
+        return transform(of: parent).map { layer.transform.then($0) }
+    }
 }
 
 private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, at t: Double) -> ResolvedLayer? {
@@ -128,7 +197,9 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, at t: Dou
                          opacity: min(max(state.opacity, 0), 1),
                          content: content, shadow: shadow, blur: blur, backgroundBlur: backgroundBlur,
                          clipsContent: clips,
-                         mask: layer.mask.map { ResolvedMask(layerID: $0.layerID, isInverted: $0.isInverted) })
+                         // Filled in once every layer is resolved, since a
+                         // mask can sit anywhere in the tree.
+                         mask: nil)
 }
 
 /// The shape with its actions applied: the first fill's paint, the first

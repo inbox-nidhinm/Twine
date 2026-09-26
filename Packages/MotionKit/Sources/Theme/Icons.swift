@@ -34,6 +34,7 @@ public enum Icon: String, CaseIterable, Sendable {
     case group
     case image
     case lock
+    case mask
     case solo
     case unlock
     case video
@@ -223,6 +224,10 @@ public enum Icon: String, CaseIterable, Sendable {
         case .lock: return [   // Layers/lock.svg
             "M6 11 H18 C18.552 11 19 11.448 19 12 V19 C19 19.552 18.552 20 18 20 H6 C5.448 20 5 19.552 5 19 V12 C5 11.448 5.448 11 6 11 Z",
             "M8 11 V8 C8 5.791 9.791 4 12 4 C14.209 4 16 5.791 16 8 V11"
+        ]
+        case .mask: return [   // Layers/mask.svg
+            "M6 4.5 H18 C18.828 4.5 19.5 5.172 19.5 6 V18 C19.5 18.828 18.828 19.5 18 19.5 H6 C5.172 19.5 4.5 18.828 4.5 18 V6 C4.5 5.172 5.172 4.5 6 4.5 Z",
+            "M12 7.5 C14.485 7.5 16.5 9.515 16.5 12 C16.5 14.485 14.485 16.5 12 16.5 C9.515 16.5 7.5 14.485 7.5 12 C7.5 9.515 9.515 7.5 12 7.5 Z"
         ]
         case .solo: return [   // Layers/solo.svg
             "M12 4 C16.418 4 20 7.582 20 12 C20 16.418 16.418 20 12 20 C7.582 20 4 16.418 4 12 C4 7.582 7.582 4 12 4 Z",

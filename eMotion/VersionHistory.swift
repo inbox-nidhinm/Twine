@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Masks", changes: [
+            "Any layer can be masked by another: press + under Mask in the inspector and pick the mask. The layer shows only where the mask draws, and the mask itself stops drawing. Invert shows it everywhere else.",
+            "Shapes, text, pictures and video can all be masks, and a group can be masked by a layer inside it.",
+            "Masks animate: move, scale, fade or blur the mask and the reveal follows. It all carries through to export.",
+            "A mask shows its own icon in the layers panel. Select it there to move it on the canvas. Clicks on the canvas only pick what a mask lets show.",
+        ]),
         .init(date: "26 September 2026", title: "Timeline touches", changes: [
             "The timeline's label column is as wide as the layers panel, so its divider lines up with the panel's right edge.",
             "The timeline stops at 0s: it no longer scrolls back into time before the start.",

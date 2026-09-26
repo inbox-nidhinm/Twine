@@ -375,10 +375,19 @@ final class CanvasNSView: NSView {
 
     /// The layer under a composition point, frontmost first. Locked layers
     /// cannot be picked. Unless `deep`, a click inside a group picks the group,
-    /// as in Figma; Command reaches the layer itself.
+    /// as in Figma; Command reaches the layer itself. A masked layer is only
+    /// picked where the mask lets it show. A mask draws nothing of its own, so
+    /// it is picked only once selected (from the layers panel), to be moved.
     func layer(at point: Vec2, deep: Bool) -> UUID? {
         guard let scene, let controller else { return nil }
         let tolerance = 5 / zoom
+        for id in selection {
+            guard let mask = scene.mask(id), !controller.isLocked(id),
+                  let world = scene.worldTransform(of: id), let inverse = world.inverted else { continue }
+            if hits(mask, at: inverse.apply(point).cg, tolerance: tolerance / max(sqrt(abs(world.determinant)), 1e-6)) {
+                return id
+            }
+        }
         for resolved in scene.layers.reversed() {
             guard resolved.content != .group, !controller.isLocked(resolved.id),
                   let world = scene.worldTransform(of: resolved.id), let inverse = world.inverted else { continue }
@@ -386,21 +395,38 @@ final class CanvasNSView: NSView {
             // Scale the tolerance into the layer's space, so it is the same
             // few screen points whatever the layer's own scale.
             let localTolerance = tolerance / max(sqrt(abs(world.determinant)), 1e-6)
-            var hit = false
-            if case .shape(let shape) = resolved.content {
-                let path = shape.path.cgPath
-                if shape.isClosed && (!shape.fills.isEmpty || shape.strokes.isEmpty) && path.contains(local) { hit = true }
-                if !hit {
-                    let width = (shape.strokes.map(\.width).max() ?? 0) + localTolerance * 2
-                    hit = path.copy(strokingWithWidth: width, lineCap: .round, lineJoin: .round, miterLimit: 10).contains(local)
-                }
-            } else {
-                // Text, images and video: anywhere in their box.
-                hit = CGRect(origin: .zero, size: resolved.size.cg).insetBy(dx: -localTolerance, dy: -localTolerance).contains(local)
-            }
-            if hit { return deep ? resolved.id : topLevel(of: resolved.id) }
+            guard hits(resolved, at: local, tolerance: localTolerance), shows(resolved, at: local, in: scene) else { continue }
+            return deep ? resolved.id : topLevel(of: resolved.id)
         }
         return nil
+    }
+
+    /// Whether a point in the layer's own space lands on what it draws: a
+    /// shape's fill or stroke, or anywhere in a text's or picture's box.
+    private func hits(_ resolved: ResolvedLayer, at local: CGPoint, tolerance: Double) -> Bool {
+        if case .shape(let shape) = resolved.content {
+            let path = shape.path.cgPath
+            if shape.isClosed && (!shape.fills.isEmpty || shape.strokes.isEmpty) && path.contains(local) { return true }
+            let width = (shape.strokes.map(\.width).max() ?? 0) + tolerance * 2
+            return path.copy(strokingWithWidth: width, lineCap: .round, lineJoin: .round, miterLimit: 10).contains(local)
+        }
+        return CGRect(origin: .zero, size: resolved.size.cg).insetBy(dx: -tolerance, dy: -tolerance).contains(local)
+    }
+
+    /// Whether the layer's mask, if it has one, lets it show at a point in
+    /// its own space. A group's mask is honoured by its children too.
+    private func shows(_ resolved: ResolvedLayer, at local: CGPoint, in scene: ResolvedScene) -> Bool {
+        var layer: ResolvedLayer? = resolved
+        var point = Vec2(Double(local.x), Double(local.y))
+        while let current = layer {
+            if let mask = current.mask, let source = scene.mask(mask.layerID), let inverse = mask.transform.inverted {
+                let inside = hits(source, at: inverse.apply(point).cg, tolerance: 0)
+                if inside == mask.isInverted { return false }
+            }
+            point = current.transform.apply(point)
+            layer = current.parentID.flatMap { scene.layer($0) }
+        }
+        return true
     }
 
     private func topLevel(of id: UUID) -> UUID {

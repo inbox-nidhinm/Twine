@@ -40,3 +40,14 @@ enum Blur {
         return type.init()
     }
 }
+
+/// Blend modes Core Animation has but does not publish.
+enum Compositing {
+    /// For a layer's `compositingFilter`: clears whatever is underneath
+    /// where the layer draws, by as much as it draws. Nil if the system
+    /// does not have it, in which case an inverted mask draws as a plain one.
+    static func destinationOut() -> Any? {
+        guard let type = NSClassFromString("CAFilter") as? NSObject.Type else { return nil }
+        return type.perform(NSSelectorFromString("filterWithType:"), with: "destOut")?.takeUnretainedValue()
+    }
+}

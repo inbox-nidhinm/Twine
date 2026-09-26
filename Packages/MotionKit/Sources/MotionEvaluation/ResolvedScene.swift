@@ -16,15 +16,24 @@ public struct ResolvedScene: Sendable, Equatable {
     /// Nil when the composition's background is transparent.
     public var background: RGBA?
     public var layers: [ResolvedLayer]
+    /// Layers used as masks, which draw only through the layers they mask.
+    /// Kept apart from `layers` so nothing draws them by accident, but found
+    /// by `layer(_:)`, so a selected mask still shows its box and handles.
+    public var masks: [ResolvedLayer]
 
-    public init(time: Double, size: Size2, background: RGBA?, layers: [ResolvedLayer]) {
+    public init(time: Double, size: Size2, background: RGBA?, layers: [ResolvedLayer], masks: [ResolvedLayer] = []) {
         self.time = time
         self.size = size
         self.background = background
         self.layers = layers
+        self.masks = masks
     }
 
-    public func layer(_ id: UUID) -> ResolvedLayer? { layers.first { $0.id == id } }
+    public func layer(_ id: UUID) -> ResolvedLayer? {
+        layers.first { $0.id == id } ?? masks.first { $0.id == id }
+    }
+
+    public func mask(_ id: UUID) -> ResolvedLayer? { masks.first { $0.id == id } }
 
     /// From a layer's own space into composition space, through every group
     /// it sits inside.
@@ -66,8 +75,9 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
     public var backgroundBlur: BackgroundBlur?
     /// Groups only.
     public var clipsContent: Bool
-    /// Masks arrive with milestone 6. The field is here so the scene's shape
-    /// does not change when they do.
+    /// Another layer whose alpha shows or hides this one. Nil when the layer
+    /// has no mask, or its mask is switched off or hidden, which (as in
+    /// Figma) shows the layer whole.
     public var mask: ResolvedMask?
 
     /// From the layer's own space into its parent's.
@@ -148,6 +158,17 @@ public struct ResolvedShadow: Sendable, Equatable {
 }
 
 public struct ResolvedMask: Sendable, Equatable {
+    /// The mask, in `ResolvedScene.masks`.
     public var layerID: UUID
+    /// Shows the layer where the mask is empty rather than where it draws.
     public var isInverted: Bool
+    /// From the mask's own space into the masked layer's, through whatever
+    /// groups either sits in.
+    public var transform: Affine
+
+    public init(layerID: UUID, isInverted: Bool, transform: Affine) {
+        self.layerID = layerID
+        self.isInverted = isInverted
+        self.transform = transform
+    }
 }

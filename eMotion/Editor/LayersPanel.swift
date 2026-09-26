@@ -168,6 +168,7 @@ private struct LayerRow: View {
 
     private var layer: Layer { row.layer }
     private var selected: Bool { editor.selection.contains(layer.id) }
+    private var isMask: Bool { controller.project.allLayers.contains { $0.mask?.layerID == layer.id } }
 
     enum DropEdge { case above, into, below }
 
@@ -186,8 +187,9 @@ private struct LayerRow: View {
             } else {
                 Color.clear.frame(width: 14, height: 1)
             }
-            IconView(layer.icon, size: 15)
+            IconView(isMask ? .mask : layer.icon, size: 15)
                 .foregroundStyle(selected ? Theme.textPrimary : Theme.textTertiary)
+                .help(isMask ? "Masking another layer: it shows only through that layer" : "")
             name
             Spacer(minLength: 0)
             if layer.isSoloed || hovering {

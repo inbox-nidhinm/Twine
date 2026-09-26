@@ -119,6 +119,45 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
         let scene = evaluate(Project(layers: [mask, masked]), at: 0)
         #expect(scene.layers.map(\.id) == [masked.id])
         #expect(scene.layers[0].mask?.layerID == mask.id)
+        // Kept apart, for drawing through the masked layer, and still found
+        // by id so a selected mask shows its box.
+        #expect(scene.masks.map(\.id) == [mask.id])
+        #expect(scene.layer(mask.id) != nil)
+    }
+
+    @Test func aMaskFollowsItsOwnActions() {
+        let mask = rect("Mask")
+        var masked = rect("Masked")
+        masked.mask = MaskReference(layerID: mask.id, isInverted: true)
+        let slide = Action(target: mask.id, start: 0, duration: 1, easing: .linear,
+                           spec: .move(MoveAction(mode: .by, end: Vec2(30, 0))))
+        let project = Project(layers: [mask, masked], actions: [slide])
+        // Same place, same size: the mask's space is the masked layer's.
+        #expect(evaluate(project, at: 0).layers[0].mask?.transform == .identity)
+        let later = evaluate(project, at: 1).layers[0].mask
+        #expect(later?.transform.tx == 30 && later?.transform.ty == 0)
+        #expect(later?.isInverted == true)
+    }
+
+    @Test func aHiddenMaskLeavesTheLayerUnmasked() {
+        var mask = rect("Mask")
+        mask.isVisible = false
+        var masked = rect("Masked")
+        masked.mask = MaskReference(layerID: mask.id)
+        let scene = evaluate(Project(layers: [mask, masked]), at: 0)
+        #expect(scene.layers.map(\.id) == [masked.id])
+        #expect(scene.layers[0].mask == nil)
+        #expect(scene.masks.isEmpty)
+    }
+
+    @Test func masksKeepWorkingWhileSoloed() {
+        let mask = rect("Mask")
+        var masked = rect("Masked")
+        masked.mask = MaskReference(layerID: mask.id)
+        masked.isSoloed = true
+        let scene = evaluate(Project(layers: [mask, masked, rect("Other")]), at: 0)
+        #expect(scene.layers.map(\.id) == [masked.id])
+        #expect(scene.layers[0].mask != nil)
     }
 
     @Test func transparentBackgroundIsNil() {
