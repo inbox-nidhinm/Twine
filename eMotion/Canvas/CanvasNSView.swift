@@ -325,8 +325,10 @@ final class CanvasNSView: NSView {
             }
         }
 
+        // A selected layer under the pointer gets the wash too, inside its
+        // selection outline, so every layer answers the pointer.
         var hover: [CGPoint]?
-        if let hovered, !selection.contains(hovered), drag == nil, let corners = scene.worldCorners(of: hovered) {
+        if let hovered, drag == nil, let corners = scene.worldCorners(of: hovered) {
             hover = corners.map(compositionToView)
         }
 
@@ -337,7 +339,8 @@ final class CanvasNSView: NSView {
             anchor = nil
         }
         overlay.update(outlines: outlines, union: union, handles: handles, anchor: anchor,
-                       hover: textSession == nil ? hover : nil, marquee: drag?.marqueeRect, motion: motionOverlay())
+                       hover: textSession == nil ? hover : nil, hoverIsSelected: hovered.map(selection.contains) ?? false,
+                       marquee: drag?.marqueeRect, motion: motionOverlay())
         let marks = snapMarks()
         overlay.updateSnap(lines: marks.lines, gaps: marks.gaps)
         updateTextOverlay()

@@ -24,7 +24,8 @@ enum VersionHistory {
 
     static let builds: [Build] = [
         .init(date: "26 September 2026", title: "Clearer hover", changes: [
-            "Hovering a layer on the canvas now gives it a faint grey wash inside a thin grey outline, which never reads as a selection.",
+            "Hovering a layer on the canvas now gives it a faint wash inside a thin white outline with a dark edge, which shows on artwork of any colour (a grey layer hid the first grey version) and never reads as a selection.",
+            "A selected layer answers the pointer too: it takes the wash inside its blue outline.",
             "Its row in the layers panel shows the full hover state, solo, lock and eye switches included, just as when the pointer is on the row itself.",
         ]),
         .init(date: "26 September 2026", title: "New rows come into view", changes: [

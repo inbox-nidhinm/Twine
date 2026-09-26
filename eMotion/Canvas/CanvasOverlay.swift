@@ -10,6 +10,8 @@ import Theme
 /// touches it from the main thread.
 nonisolated final class CanvasOverlay: CALayer {
     private let hover = CAShapeLayer()
+    /// The dark edge under the hover line.
+    private let hoverEdge = CAShapeLayer()
     private let outlines = CAShapeLayer()
     private let union = CAShapeLayer()
     private let handles = CAShapeLayer()
@@ -48,7 +50,7 @@ nonisolated final class CanvasOverlay: CALayer {
     private func commonInit() {
         anchorPoint = .zero
         actions = Self.none
-        for l in [textSelection, hover, outlines, union, marquee, motion, motionArms, anchor, handles, motionStart, motionEnd,
+        for l in [textSelection, hoverEdge, hover, outlines, union, marquee, motion, motionArms, anchor, handles, motionStart, motionEnd,
                   motionHandles, textMarked, caret, guides, gapLines] {
             l.anchorPoint = .zero
             l.actions = Self.none
@@ -60,11 +62,14 @@ nonisolated final class CanvasOverlay: CALayer {
             l.strokeColor = Self.accent
             l.lineWidth = 1
         }
-        // Monochrome, so it never reads as a selection: a faint grey wash
-        // over the layer's box inside a thin grey outline.
+        // Monochrome, so it never reads as a selection: a faint wash over
+        // the layer's box inside a one-point white line with a dark edge.
         hover.lineWidth = 1
-        hover.strokeColor = NSColor(Theme.canvasHover).cgColor
-        hover.fillColor = NSColor(Theme.canvasHover).withAlphaComponent(0.16).cgColor
+        hover.strokeColor = NSColor(Theme.canvasHover).withAlphaComponent(0.9).cgColor
+        hover.fillColor = NSColor(Theme.canvasHover).withAlphaComponent(0.12).cgColor
+        hoverEdge.fillColor = nil
+        hoverEdge.lineWidth = 3
+        hoverEdge.strokeColor = NSColor(Theme.canvasHoverEdge).withAlphaComponent(0.45).cgColor
         marquee.fillColor = NSColor(Theme.accent).withAlphaComponent(0.08).cgColor
         marquee.strokeColor = Self.accent
         marquee.lineWidth = 1
@@ -205,7 +210,7 @@ nonisolated final class CanvasOverlay: CALayer {
     }
 
     func update(outlines boxes: [[CGPoint]], union unionBox: [CGPoint]?, handles points: [CGPoint],
-                anchor anchorPoint: CGPoint?, hover hoverBox: [CGPoint]?, marquee rect: CGRect?,
+                anchor anchorPoint: CGPoint?, hover hoverBox: [CGPoint]?, hoverIsSelected: Bool = false, marquee rect: CGRect?,
                 motion route: Motion? = nil) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -242,6 +247,9 @@ nonisolated final class CanvasOverlay: CALayer {
         outlines.path = polygons(boxes)
         union.path = unionBox.map { polygons([$0]) } ?? nil
         hover.path = hoverBox.map { polygons([$0]) } ?? nil
+        // A selected layer keeps its blue outline; it only takes the wash.
+        hover.strokeColor = hoverIsSelected ? nil : NSColor(Theme.canvasHover).withAlphaComponent(0.9).cgColor
+        hoverEdge.path = hoverIsSelected ? nil : hover.path
         marquee.path = rect.map { CGPath(rect: $0.integral.insetBy(dx: 0.5, dy: 0.5), transform: nil) }
 
         let squares = CGMutablePath()

@@ -52,9 +52,11 @@ public enum Theme {
     /// The playhead: its line down the timeline and the pill in the ruler
     /// that carries the time. Teal, so it never reads as a selection.
     public static let playhead = Color(red: 0x2B / 255, green: 0x88 / 255, blue: 0x85 / 255)
-    /// A layer under the pointer on the canvas: a neutral grey, so it reads
-    /// on light and dark artwork alike and never as a selection.
-    public static let canvasHover = Color(red: 0x8E / 255, green: 0x8E / 255, blue: 0x93 / 255)
+    /// A layer under the pointer on the canvas: a white line on a dark edge
+    /// over a faint white wash. Black and white together show on artwork of
+    /// any colour, grey included, and never read as a selection.
+    public static let canvasHover = Color.white
+    public static let canvasHoverEdge = Color.black
     /// Smart guides and equal-spacing marks while something snaps.
     public static let guide = Color(red: 0xF2 / 255, green: 0x4E / 255, blue: 0x6B / 255)
 
