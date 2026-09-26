@@ -56,6 +56,7 @@ Name.emotion/
 | Pinch, ⌘-scroll | Zoom about the pointer |
 | Two-finger scroll, Space-drag, middle-button drag | Pan |
 | ⌘0, ⌥⌘0, ⌘=, ⌘- | Fit, actual size, zoom in, zoom out |
+| ⌘/ | Every shortcut, on one card |
 
 One layer aligns with the composition; several align with each other. The same commands are in the Arrange menu and in a row of buttons at the top of the inspector.
 

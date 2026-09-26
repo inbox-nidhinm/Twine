@@ -19,7 +19,6 @@ struct ToolBar: View {
                 tool(editor.lastShape)
                 shapeChevron
             }
-            tool(.pen)
             tool(.text)
         }
         .padding(Theme.trayPad)

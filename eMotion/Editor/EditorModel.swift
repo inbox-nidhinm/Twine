@@ -32,6 +32,8 @@ final class EditorModel {
     /// The layer under the pointer, on the canvas or in the layers panel,
     /// which both light up.
     var hoveredLayer: UUID?
+    /// The keyboard shortcuts card is up (⌘/).
+    var showShortcuts = false
     /// The layer whose name is being edited in the layers panel.
     var renaming: UUID?
     /// Set to a text layer to put the keyboard in its text box in the

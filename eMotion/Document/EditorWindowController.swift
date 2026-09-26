@@ -133,6 +133,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     @objc func goToEnd(_ sender: Any?) { controller.jumpToEnd() }
     @objc func toggleLoop(_ sender: Any?) { editor.loops.toggle() }
     @objc func toggleSnapping(_ sender: Any?) { editor.snaps.toggle() }
+    @objc func toggleShortcuts(_ sender: Any?) { editor.showShortcuts.toggle() }
 
     // MARK: Arrange
 
@@ -182,6 +183,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
             item.state = editor.loops ? .on : .off
         case #selector(toggleSnapping(_:)):
             item.state = editor.snaps ? .on : .off
+        case #selector(toggleShortcuts(_:)):
+            item.state = editor.showShortcuts ? .on : .off
         case #selector(alignLayers(_:)):
             return controller.canAlign
         case #selector(distributeHorizontally(_:)), #selector(distributeVertically(_:)):

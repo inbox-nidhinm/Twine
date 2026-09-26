@@ -1119,7 +1119,9 @@ final class CanvasNSView: NSView {
         switch event.keyCode {
         case 51, 117: controller.deleteSelection()                   // delete, forward delete
         case 53:                                                     // escape
-            if drag != nil {
+            if controller.editor.showShortcuts {
+                controller.editor.showShortcuts = false
+            } else if drag != nil {
                 controller.cancel()
                 drag = nil
                 snap = nil

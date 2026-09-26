@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Keyboard shortcuts card", changes: [
+            "Help > Keyboard Shortcuts (⌘/) shows every eMotion shortcut on one card, grouped by where it works: modes and tools, view, the canvas, arranging, playback, the timeline and the project. Escape, ⌘/ or a click outside closes it.",
+            "The Pen tool's greyed-out button is gone from the toolbar, since the pen tool is no longer planned.",
+        ]),
         .init(date: "26 September 2026", title: "Export part of the scene", changes: [
             "Export > Range exports the whole scene or only part of it: choose Part of the scene and type where it starts and ends. The movie starts at the From time, and its sound comes with it, in step.",
         ]),

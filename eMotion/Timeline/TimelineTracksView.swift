@@ -683,7 +683,9 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         case 51, 117:                                                // delete, forward delete
             controller.deleteSelection()
         case 53:                                                     // escape
-            if drag != nil {
+            if controller.editor.showShortcuts {
+                controller.editor.showShortcuts = false
+            } else if drag != nil {
                 controller.cancel()
                 drag = nil
             } else {
