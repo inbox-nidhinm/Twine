@@ -23,10 +23,16 @@ import MotionEvaluation
     }
 
     @Test func everyKindVisiblyDoesSomething() {
-        let project = Project(layers: [square])
+        var stroked = square
+        if case .shape(var shape) = stroked.content {
+            shape.strokes = [Stroke(paint: .solid(.black), width: 2)]
+            stroked.content = .shape(shape)
+        }
+        #expect(ActionFactory.kinds(for: stroked) == ActionKind.allCases)
         for kind in ActionKind.allCases {
-            let a = make(kind)
-            let p = Project(layers: project.layers, actions: [a])
+            let a = ActionFactory.make(kind, for: stroked, at: 1, state: LayerState(design: stroked),
+                                       frameRate: .fps60, rowOrder: 0)
+            let p = Project(layers: [stroked], actions: [a])
             let before = evaluate(p, at: 0.5), after = evaluate(p, at: 5)
             #expect(before != after, "\(kind) changes nothing")
         }
@@ -53,7 +59,8 @@ import MotionEvaluation
     @Test func kindsFollowTheLayer() {
         let group = LayerFactory.group(in: Box(minX: 0, minY: 0, maxX: 1, maxY: 1), children: [], name: "G")
         let audio = Layer(name: "A", content: .audio(AudioContent(mediaID: UUID())), size: Size2(0, 0), position: .zero)
-        #expect(ActionFactory.kinds(for: square) == ActionKind.allCases)
+        // A filled rectangle with no stroke: everything but Stroke and Trim.
+        #expect(ActionFactory.kinds(for: square) == ActionKind.allCases.filter { $0 != .stroke && $0 != .trim })
         #expect(!ActionFactory.kinds(for: group).contains(.resize))
         #expect(ActionFactory.kinds(for: audio).isEmpty)
         #expect(ActionFactory.kinds(for: [square, group]) == ActionFactory.kinds(for: group))

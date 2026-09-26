@@ -59,8 +59,11 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
     public var opacity: Double
     public var content: ResolvedContent
     public var shadow: ResolvedShadow?
-    /// Gaussian radius in pixels; 0 is none.
+    /// Pixels, as Figma measures blur (twice the Gaussian's standard
+    /// deviation); 0 is none.
     public var blur: Double
+    /// Shapes only: blurs what is behind the layer, inside its outline.
+    public var backgroundBlur: BackgroundBlur?
     /// Groups only.
     public var clipsContent: Bool
     /// Masks arrive with milestone 6. The field is here so the scene's shape
@@ -129,8 +132,11 @@ public struct ResolvedText: Sendable, Equatable {
 public struct ResolvedShadow: Sendable, Equatable {
     public var color: RGBA
     public var offset: Vec2
+    /// As Figma measures it: twice the Gaussian's standard deviation.
     public var blur: Double
     public var opacity: Double
+    /// Pixels the shadow's shape grows by before blurring; shapes only.
+    public var spread: Double
 }
 
 public struct ResolvedMask: Sendable, Equatable {

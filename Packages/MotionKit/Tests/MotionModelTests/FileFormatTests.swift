@@ -18,7 +18,8 @@ func kitchenSinkProject() -> Project {
         strokes: [Stroke(paint: .color(.black), width: 3, alignment: .inside, cap: .round, join: .bevel,
                          dashPattern: [4, 2], dashOffset: 1)])),
         size: Size2(200, 100), position: Vec2(300, 200))
-    rect.effects = [Effect(kind: .dropShadow(DropShadow())), Effect(isEnabled: false, kind: .layerBlur(LayerBlur(radius: 12)))]
+    rect.effects = [Effect(kind: .dropShadow(DropShadow(spread: 3))), Effect(isEnabled: false, kind: .layerBlur(LayerBlur(radius: 12))),
+                    Effect(kind: .backgroundBlur(BackgroundBlur(radius: 20, blend: 0.6)))]
 
     let ellipse = Layer(name: "Ellipse", content: .shape(ShapeContent(
         geometry: .ellipse,
@@ -72,6 +73,16 @@ func kitchenSinkProject() -> Project {
         Action(target: picture.id, start: 2, duration: 1, easing: .preset(.overshoot, intensity: 0.3),
                spec: .resize(ResizeAction(end: Size2(320, 240), isLinked: true))),
         Action(target: group.id, start: 3, duration: 0, spec: .visibility(VisibilityAction(isVisible: false))),
+        Action(target: rect.id, start: 1, duration: 1, spec: .color(ColorAction(
+            initial: .solid(.white), end: .radialGradient(Gradient(stops: [GradientStop(position: 0.2, color: .black)]))))),
+        Action(target: rect.id, start: 1, duration: 1, spec: .stroke(StrokeAction(
+            end: StrokeLook(width: 8, paint: .linearGradient(Gradient(stops: [])))))),
+        Action(target: rect.id, start: 1, duration: 1, spec: .trim(TrimAction(initial: TrimRange(start: 0, end: 0), end: .whole))),
+        Action(target: rect.id, start: 1, duration: 1, spec: .cornerRadius(CornerRadiusAction(
+            end: CornerRadii(topLeft: 1, topRight: 2, bottomRight: 3, bottomLeft: 4), isLinked: false))),
+        Action(target: rect.id, start: 1, duration: 1, spec: .shadow(ShadowAction(initial: .noShadow, end: DropShadow(spread: -2)))),
+        Action(target: group.id, start: 1, duration: 1, spec: .layerBlur(LayerBlurAction(initial: 2, end: 10))),
+        Action(target: rect.id, start: 1, duration: 1, spec: .backgroundBlur(BackgroundBlurAction(end: BackgroundBlur(radius: 4, blend: 0.5)))),
     ]
 
     return Project(
@@ -112,6 +123,12 @@ func kitchenSinkProject() -> Project {
         for key in ["\"actions\"", "\"targetLayerID\"", "\"rowOrder\"", "\"intensity\"", "\"curve\"", "\"isEnabled\""] {
             #expect(text.contains(key))
         }
+    }
+
+    @Test func shadowsSavedBeforeSpreadStillOpen() throws {
+        let json = #"{"color": {"r": 0, "g": 0, "b": 0, "a": 1}, "offset": {"x": 0, "y": 4}, "blur": 8, "opacity": 0.25}"#
+        let shadow = try JSONDecoder().decode(DropShadow.self, from: Data(json.utf8))
+        #expect(shadow == DropShadow())
     }
 
     @Test func fileFromBeforeActionsIsRefusedPlainly() throws {

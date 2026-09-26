@@ -63,7 +63,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, at t: Dou
 
     switch layer.content {
     case .shape(let shape):
-        content = .shape(resolve(shape, size: size))
+        content = .shape(resolve(shape, size: size, state: state))
     case .text(let text):
         content = .text(ResolvedText(text: text.text, fontFamily: text.fontFamily, fontWeight: text.fontWeight,
                                      fontSize: text.fontSize, color: text.color,
@@ -80,20 +80,25 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, at t: Dou
         clips = group.clipsContent
     }
 
+    // One shadow per layer is what Core Animation draws. Figma allows
+    // several; the first one switched on wins until a renderer can do more,
+    // and that is the one the Shadow action drives. The same goes for the
+    // background blur. Layer blurs add up, the first carrying its action.
     var shadow: ResolvedShadow?
-    var blur = 0.0
-    for effect in layer.effects where effect.isEnabled {
-        switch effect.kind {
-        case .dropShadow(let s):
-            // One shadow per layer is what Core Animation draws. Figma allows
-            // several; the first one wins until a renderer can do more.
-            if shadow == nil {
-                shadow = ResolvedShadow(color: s.color, offset: s.offset, blur: max(s.blur, 0),
-                                        opacity: min(max(s.opacity, 0), 1))
-            }
-        case .layerBlur(let b):
-            blur += max(b.radius, 0)
-        }
+    let s = state.shadow
+    if s.opacity > 0 && s.color.a > 0 {
+        shadow = ResolvedShadow(color: s.color, offset: s.offset, blur: max(s.blur, 0),
+                                opacity: min(max(s.opacity, 0), 1), spread: s.spread)
+    }
+    var blur = max(state.layerBlur, 0)
+    let blurs = layer.effects.filter(\.isEnabled).compactMap { effect -> Double? in
+        if case .layerBlur(let b) = effect.kind { return b.radius }
+        return nil
+    }
+    blur += blurs.dropFirst().reduce(0) { $0 + max($1, 0) }
+    var backgroundBlur: BackgroundBlur?
+    if case .shape = layer.content, state.backgroundBlur.radius > 0, state.backgroundBlur.blend > 0 {
+        backgroundBlur = state.backgroundBlur
     }
 
     // A resized layer grows around its anchor: the anchor keeps its place as
@@ -106,11 +111,28 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, at t: Dou
                          position: state.position, anchor: anchor,
                          scale: state.scale, rotation: state.rotation,
                          opacity: min(max(state.opacity, 0), 1),
-                         content: content, shadow: shadow, blur: blur, clipsContent: clips,
+                         content: content, shadow: shadow, blur: blur, backgroundBlur: backgroundBlur,
+                         clipsContent: clips,
                          mask: layer.mask.map { ResolvedMask(layerID: $0.layerID, isInverted: $0.isInverted) })
 }
 
-private func resolve(_ shape: ShapeContent, size: Size2) -> ResolvedShape {
+/// The shape with its actions applied: the first fill's paint, the first
+/// stroke's width, paint and trim, and a rectangle's corners.
+private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState) -> ResolvedShape {
+    var shape = shape
+    if let fill = state.fill, !shape.fills.isEmpty { shape.fills[0].paint = fill }
+    if !shape.strokes.isEmpty {
+        if let look = state.stroke {
+            shape.strokes[0].width = look.width
+            shape.strokes[0].paint = look.paint
+        }
+        if let trim = state.trim {
+            shape.strokes[0].trimStart = trim.start
+            shape.strokes[0].trimEnd = trim.end
+        }
+    }
+    if let radii = state.cornerRadii, case .rectangle = shape.geometry { shape.geometry = .rectangle(cornerRadii: radii) }
+
     let path: BezierPath
     switch shape.geometry {
     case .rectangle(let radii): path = ShapePaths.rectangle(size, radii: radii)

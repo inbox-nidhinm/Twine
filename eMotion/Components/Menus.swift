@@ -8,6 +8,8 @@ struct MenuEntry: Identifiable {
     enum Kind {
         case item(title: String, checked: Bool, disabled: Bool, action: () -> Void)
         case separator
+        /// A small label naming the group of items under it.
+        case header(String)
     }
 
     let id = UUID()
@@ -19,6 +21,8 @@ struct MenuEntry: Identifiable {
     }
 
     static let separator = MenuEntry(kind: .separator)
+
+    static func header(_ title: String) -> MenuEntry { MenuEntry(kind: .header(title)) }
 }
 
 /// The menu that is up in a window, if any.
@@ -117,6 +121,12 @@ private struct MenuCard: View {
                 switch entry.kind {
                 case .separator:
                     Rectangle().fill(Theme.border).frame(height: 1).padding(.vertical, 4)
+                case .header(let title):
+                    Text(title)
+                        .font(ThemeFont.caption)
+                        .foregroundStyle(Theme.textTertiary)
+                        .padding(.horizontal, 6)
+                        .frame(height: Theme.control, alignment: .bottomLeading)
                 case let .item(title, checked, disabled, action):
                     MenuItemRow(title: title, checked: checked, disabled: disabled) {
                         close()

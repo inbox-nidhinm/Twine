@@ -133,6 +133,48 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
         #expect(inside > 10 && inside < 250)
     }
 
+    /// Core Image's blur lands about 9 px off at this size. The blur used now
+    /// must be centred: across a black and white edge, pixels the same
+    /// distance either side come out as mirror images.
+    @Test func layerBlurIsCentred() throws {
+        var black = shape(fill: RGBA(0, 0, 0), at: .zero, size: Size2(32, 64))
+        black.effects = [Effect(kind: .layerBlur(LayerBlur(radius: 12)))]
+        var project = Project(composition: Composition(width: 64, height: 64, background: Background(color: .white)),
+                              layers: [black])
+        project.composition.background.isTransparent = false
+        let image = try render(project)
+        let left = pixel(image, 28, 32).r, right = pixel(image, 36, 32).r
+        #expect(left > 5 && right < 250, "the edge is blurred")
+        // Blurring a layer spreads it past its box, so both sides darken;
+        // the check is that the edge itself sits at the box's edge.
+        let mid = pixel(image, 32, 32).r
+        #expect(abs(mid - 128) < 40)
+    }
+
+    @Test func backgroundBlurBlursWhatIsBehindAndStaysCentred() throws {
+        let black = shape(fill: RGBA(0, 0, 0), at: .zero, size: Size2(32, 64))
+        var glass = shape(fill: RGBA(1, 1, 1, 0.01), at: Vec2(8, 8), size: Size2(48, 48))
+        glass.effects = [Effect(kind: .backgroundBlur(BackgroundBlur(radius: 12)))]
+        let project = Project(composition: Composition(width: 64, height: 64, background: Background(color: .white)),
+                              layers: [black, glass])
+        let image = try render(project)
+        let left = pixel(image, 28, 32).r, right = pixel(image, 36, 32).r
+        #expect(left > 20 && right < 235, "the edge behind the glass is soft")
+        #expect(abs((left + right) - 255) < 30, "and centred where it was")
+        // Outside the glass the edge stays sharp.
+        #expect(pixel(image, 30, 4).r < 5 && pixel(image, 34, 4).r > 250)
+    }
+
+    @Test func spreadGrowsTheShadow() throws {
+        func shadowed(spread: Double) throws -> Int {
+            var layer = shape(fill: RGBA(1, 1, 1), at: Vec2(16, 16), size: Size2(32, 32))
+            layer.effects = [Effect(kind: .dropShadow(DropShadow(color: .black, offset: .zero, blur: 0, opacity: 1, spread: spread)))]
+            return pixel(try render(Project(composition: transparentComposition(), layers: [layer])), 12, 32).a
+        }
+        #expect(try shadowed(spread: 0) == 0)
+        #expect(try shadowed(spread: 8) > 250)
+    }
+
     @Test func dropShadowsRenderOffscreenAndFallDownward() throws {
         var layer = shape(fill: RGBA(1, 1, 1), at: Vec2(16, 8), size: Size2(32, 32))
         layer.effects = [Effect(kind: .dropShadow(DropShadow(color: .black, offset: Vec2(0, 12), blur: 0, opacity: 1)))]

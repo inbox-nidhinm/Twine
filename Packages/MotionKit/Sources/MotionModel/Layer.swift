@@ -241,10 +241,11 @@ public struct Effect: Codable, Sendable, Equatable, Identifiable {
 public enum EffectKind: Sendable, Equatable {
     case dropShadow(DropShadow)
     case layerBlur(LayerBlur)
+    case backgroundBlur(BackgroundBlur)
 }
 
 extension EffectKind: Codable {
-    private enum Kind: String, Codable { case dropShadow, layerBlur }
+    private enum Kind: String, Codable { case dropShadow, layerBlur, backgroundBlur }
     private enum CodingKeys: String, CodingKey { case type, shadow, blur }
 
     public init(from decoder: Decoder) throws {
@@ -252,6 +253,7 @@ extension EffectKind: Codable {
         switch try c.decode(Kind.self, forKey: .type) {
         case .dropShadow: self = .dropShadow(try c.decode(DropShadow.self, forKey: .shadow))
         case .layerBlur: self = .layerBlur(try c.decode(LayerBlur.self, forKey: .blur))
+        case .backgroundBlur: self = .backgroundBlur(try c.decode(BackgroundBlur.self, forKey: .blur))
         }
     }
 
@@ -260,31 +262,75 @@ extension EffectKind: Codable {
         switch self {
         case .dropShadow(let v): try c.encode(Kind.dropShadow, forKey: .type); try c.encode(v, forKey: .shadow)
         case .layerBlur(let v): try c.encode(Kind.layerBlur, forKey: .type); try c.encode(v, forKey: .blur)
+        case .backgroundBlur(let v): try c.encode(Kind.backgroundBlur, forKey: .type); try c.encode(v, forKey: .blur)
         }
     }
 }
 
-public struct DropShadow: Codable, Sendable, Equatable {
+/// Blur amounts are Figma's: twice the standard deviation of the Gaussian,
+/// the same number CSS takes for a shadow's blur. A layer blur of 8 in Figma
+/// looks the same here.
+public struct DropShadow: AnimatableValue {
     public var color: RGBA
     public var offset: Vec2
-    /// Blur radius in pixels.
+    /// Blur in pixels, as Figma measures it.
     public var blur: Double
     /// 0 to 1, on top of the colour's own alpha.
     public var opacity: Double
+    /// How far the shadow's shape grows past the layer's (or, negative,
+    /// shrinks inside it) before it is blurred. Shapes only.
+    public var spread: Double
 
-    public init(color: RGBA = .black, offset: Vec2 = Vec2(0, 4), blur: Double = 8, opacity: Double = 0.25) {
+    public init(color: RGBA = .black, offset: Vec2 = Vec2(0, 4), blur: Double = 8, opacity: Double = 0.25,
+                spread: Double = 0) {
         self.color = color
         self.offset = offset
         self.blur = blur
         self.opacity = opacity
+        self.spread = spread
+    }
+
+    /// No shadow at all, which is what a Shadow action on a layer designed
+    /// without one starts from. Its opacity is what makes it none; the colour
+    /// stays solid so that raising the opacity alone brings a shadow back.
+    public static let noShadow = DropShadow(color: .black, offset: .zero, blur: 0, opacity: 0)
+
+    private enum CodingKeys: String, CodingKey { case color, offset, blur, opacity, spread }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        color = try c.decode(RGBA.self, forKey: .color)
+        offset = try c.decode(Vec2.self, forKey: .offset)
+        blur = try c.decode(Double.self, forKey: .blur)
+        opacity = try c.decode(Double.self, forKey: .opacity)
+        // Added after the first files with shadows were written.
+        spread = try c.decodeIfPresent(Double.self, forKey: .spread) ?? 0
     }
 }
 
 public struct LayerBlur: Codable, Sendable, Equatable {
-    /// Gaussian radius in pixels.
+    /// Pixels, as Figma measures blur.
     public var radius: Double
 
     public init(radius: Double = 4) {
         self.radius = radius
     }
+}
+
+/// Blurs whatever is behind the layer, seen through its fills: frosted
+/// glass. Shapes only, since it follows the shape's outline.
+public struct BackgroundBlur: AnimatableValue {
+    /// Pixels, as Figma measures blur.
+    public var radius: Double
+    /// 0 to 1: how much of the blurred background shows over the sharp one.
+    public var blend: Double
+
+    public init(radius: Double = 16, blend: Double = 1) {
+        self.radius = radius
+        self.blend = blend
+    }
+
+    /// No blur, which is what a Background Blur action on a layer designed
+    /// without one starts from.
+    public static let noBlur = BackgroundBlur(radius: 0, blend: 1)
 }

@@ -57,6 +57,13 @@ public enum ActionSpec: Sendable, Equatable {
     case opacity(OpacityAction)
     case resize(ResizeAction)
     case visibility(VisibilityAction)
+    case color(ColorAction)
+    case stroke(StrokeAction)
+    case trim(TrimAction)
+    case cornerRadius(CornerRadiusAction)
+    case shadow(ShadowAction)
+    case layerBlur(LayerBlurAction)
+    case backgroundBlur(BackgroundBlurAction)
 
     public var kind: ActionKind {
         switch self {
@@ -66,12 +73,21 @@ public enum ActionSpec: Sendable, Equatable {
         case .opacity: return .opacity
         case .resize: return .resize
         case .visibility: return .visibility
+        case .color: return .color
+        case .stroke: return .stroke
+        case .trim: return .trim
+        case .cornerRadius: return .cornerRadius
+        case .shadow: return .shadow
+        case .layerBlur: return .layerBlur
+        case .backgroundBlur: return .backgroundBlur
         }
     }
 }
 
 public enum ActionKind: String, Codable, Sendable, CaseIterable {
     case move, scale, rotate, opacity, resize, visibility
+    case color, stroke, trim, cornerRadius, shadow
+    case layerBlur, backgroundBlur
 
     public var defaultName: String {
         switch self {
@@ -81,6 +97,34 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .opacity: return "Opacity"
         case .resize: return "Resize"
         case .visibility: return "Hide/Show"
+        case .color: return "Colour"
+        case .stroke: return "Stroke"
+        case .trim: return "Trim"
+        case .cornerRadius: return "Corner Radius"
+        case .shadow: return "Shadow"
+        case .layerBlur: return "Layer Blur"
+        case .backgroundBlur: return "Background Blur"
+        }
+    }
+
+    /// The group it is listed under when adding an action.
+    public var category: ActionCategory {
+        switch self {
+        case .move, .scale, .rotate, .opacity, .resize, .visibility: return .transform
+        case .color, .stroke, .trim, .cornerRadius, .shadow: return .style
+        case .layerBlur, .backgroundBlur: return .blur
+        }
+    }
+}
+
+public enum ActionCategory: String, Sendable, CaseIterable {
+    case transform, style, blur
+
+    public var title: String {
+        switch self {
+        case .transform: return "Transform"
+        case .style: return "Style"
+        case .blur: return "Blur"
         }
     }
 }
@@ -186,8 +230,119 @@ public struct VisibilityAction: Codable, Sendable, Equatable {
     }
 }
 
+/// The first fill's paint: a colour, or a gradient whose stops, positions and
+/// geometry all travel. A layer with no fill has nothing to act on.
+public struct ColorAction: Codable, Sendable, Equatable {
+    public var initial: Paint?
+    public var end: Paint
+
+    public init(initial: Paint? = nil, end: Paint) {
+        self.initial = initial
+        self.end = end
+    }
+}
+
+/// The two parts of a stroke that animate together: how thick it is and what
+/// it is painted with.
+public struct StrokeLook: AnimatableValue {
+    public var width: Double
+    public var paint: Paint
+
+    public init(width: Double, paint: Paint) {
+        self.width = width
+        self.paint = paint
+    }
+}
+
+/// The first stroke's width and paint.
+public struct StrokeAction: Codable, Sendable, Equatable {
+    public var initial: StrokeLook?
+    public var end: StrokeLook
+
+    public init(initial: StrokeLook? = nil, end: StrokeLook) {
+        self.initial = initial
+        self.end = end
+    }
+}
+
+/// How much of a stroke is drawn, as fractions of the path's length from its
+/// start. 0 to 1 draws all of it; 0 to 0 draws none.
+public struct TrimRange: AnimatableValue {
+    public var start: Double
+    public var end: Double
+
+    public init(start: Double, end: Double) {
+        self.start = start
+        self.end = end
+    }
+
+    public static let whole = TrimRange(start: 0, end: 1)
+}
+
+/// The first stroke's trim, for lines that draw themselves on.
+public struct TrimAction: Codable, Sendable, Equatable {
+    public var initial: TrimRange?
+    public var end: TrimRange
+
+    public init(initial: TrimRange? = nil, end: TrimRange) {
+        self.initial = initial
+        self.end = end
+    }
+}
+
+/// A rectangle's corners, in pixels.
+public struct CornerRadiusAction: Codable, Sendable, Equatable {
+    public var initial: CornerRadii?
+    public var end: CornerRadii
+    /// Whether one number sets all four corners.
+    public var isLinked: Bool
+
+    public init(initial: CornerRadii? = nil, end: CornerRadii, isLinked: Bool = true) {
+        self.initial = initial
+        self.end = end
+        self.isLinked = isLinked
+    }
+}
+
+/// The first drop shadow. A layer designed without one starts from no shadow
+/// at all: transparent, with no offset, blur or spread.
+public struct ShadowAction: Codable, Sendable, Equatable {
+    public var initial: DropShadow?
+    public var end: DropShadow
+
+    public init(initial: DropShadow? = nil, end: DropShadow) {
+        self.initial = initial
+        self.end = end
+    }
+}
+
+/// The first layer blur's radius. A layer designed without one starts from 0.
+public struct LayerBlurAction: Codable, Sendable, Equatable {
+    public var initial: Double?
+    public var end: Double
+
+    public init(initial: Double? = nil, end: Double) {
+        self.initial = initial
+        self.end = end
+    }
+}
+
+/// The first background blur. A layer designed without one starts from none.
+public struct BackgroundBlurAction: Codable, Sendable, Equatable {
+    public var initial: BackgroundBlur?
+    public var end: BackgroundBlur
+
+    public init(initial: BackgroundBlur? = nil, end: BackgroundBlur) {
+        self.initial = initial
+        self.end = end
+    }
+}
+
 extension ActionSpec: Codable {
-    private enum CodingKeys: String, CodingKey { case type, move, scale, rotate, opacity, resize, visibility }
+    private enum CodingKeys: String, CodingKey {
+        case type, move, scale, rotate, opacity, resize, visibility
+        case color, stroke, trim, cornerRadius, shadow, layerBlur, backgroundBlur
+    }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -198,6 +353,13 @@ extension ActionSpec: Codable {
         case .opacity: self = .opacity(try c.decode(OpacityAction.self, forKey: .opacity))
         case .resize: self = .resize(try c.decode(ResizeAction.self, forKey: .resize))
         case .visibility: self = .visibility(try c.decode(VisibilityAction.self, forKey: .visibility))
+        case .color: self = .color(try c.decode(ColorAction.self, forKey: .color))
+        case .stroke: self = .stroke(try c.decode(StrokeAction.self, forKey: .stroke))
+        case .trim: self = .trim(try c.decode(TrimAction.self, forKey: .trim))
+        case .cornerRadius: self = .cornerRadius(try c.decode(CornerRadiusAction.self, forKey: .cornerRadius))
+        case .shadow: self = .shadow(try c.decode(ShadowAction.self, forKey: .shadow))
+        case .layerBlur: self = .layerBlur(try c.decode(LayerBlurAction.self, forKey: .layerBlur))
+        case .backgroundBlur: self = .backgroundBlur(try c.decode(BackgroundBlurAction.self, forKey: .backgroundBlur))
         }
     }
 
@@ -211,6 +373,13 @@ extension ActionSpec: Codable {
         case .opacity(let v): try c.encode(v, forKey: .opacity)
         case .resize(let v): try c.encode(v, forKey: .resize)
         case .visibility(let v): try c.encode(v, forKey: .visibility)
+        case .color(let v): try c.encode(v, forKey: .color)
+        case .stroke(let v): try c.encode(v, forKey: .stroke)
+        case .trim(let v): try c.encode(v, forKey: .trim)
+        case .cornerRadius(let v): try c.encode(v, forKey: .cornerRadius)
+        case .shadow(let v): try c.encode(v, forKey: .shadow)
+        case .layerBlur(let v): try c.encode(v, forKey: .layerBlur)
+        case .backgroundBlur(let v): try c.encode(v, forKey: .backgroundBlur)
         }
     }
 }

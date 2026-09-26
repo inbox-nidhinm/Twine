@@ -23,6 +23,15 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Style and blur actions", changes: [
+            "Seven new actions, listed under Style and Blur in Add Action: Colour, Stroke, Trim, Corner Radius, Shadow, Layer Blur and Background Blur. Each is offered only where it applies: Stroke and Trim for shapes with a stroke, Corner Radius for rectangles, Background Blur for shapes.",
+            "Colour changes the first fill, to a colour or a linear or radial gradient. Gradients blend their colours, stops and direction, even between different numbers of stops.",
+            "Trim draws a stroke on; a new one starts from nothing and draws the whole line. Stroke changes its width and colour together.",
+            "Shadow and Background Blur on a layer designed without one fade in from nothing. A shadow set to start from nothing keeps its colour, so only its opacity needs raising.",
+            "Design mode gains Background Blur (frosted glass, with a blend) under Effects, and Spread for drop shadows.",
+            "Blurs are now centred where they belong. They used to sit about 9 px off, down and to the left, on the canvas and in exports alike. Blur amounts follow Figma's measure, so existing blurs and shadows look about half as soft as before.",
+            "Add Action's menu is grouped under Transform, Style and Blur.",
+        ]),
         .init(date: "26 September 2026", title: "Export", changes: [
             "Export movies: MP4 in H.264 or HEVC, or MOV in HEVC with transparency, ProRes 422 or ProRes 4444. Or save the current frame as a PNG.",
             "With nothing selected in Design, the Export section under Composition picks the format, the size (50%, 100% or 200%) and, for H.264 and HEVC, the quality. It remembers them for next time.",

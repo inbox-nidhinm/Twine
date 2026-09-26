@@ -40,8 +40,7 @@ private struct AddActionButton: View {
 
     var body: some View {
         Button {
-            menus.show(kinds.map { kind in .item(kind.defaultName) { add(kind) } },
-                       at: CGPoint(x: frame.minX, y: frame.maxY + 4))
+            menus.show(entries, at: CGPoint(x: frame.minX, y: frame.maxY + 4))
         } label: {
             HStack(spacing: 6) {
                 IconView(.plus, size: 13)
@@ -64,6 +63,15 @@ private struct AddActionButton: View {
         .onHover { hovering = $0 }
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
         .help("Adds an action at the playhead, half a second long.")
+    }
+
+    /// Grouped under Transform, Style and Blur, leaving out empty groups.
+    private var entries: [MenuEntry] {
+        ActionCategory.allCases.flatMap { category -> [MenuEntry] in
+            let items = kinds.filter { $0.category == category }
+            guard !items.isEmpty else { return [] }
+            return [.header(category.title)] + items.map { kind in .item(kind.defaultName) { add(kind) } }
+        }
     }
 }
 

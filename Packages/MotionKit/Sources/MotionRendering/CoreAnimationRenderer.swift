@@ -98,7 +98,7 @@ private final class Node {
         "shadowColor": NSNull(), "shadowOffset": NSNull(), "shadowRadius": NSNull(), "shadowOpacity": NSNull(),
         "filters": NSNull(), "colors": NSNull(), "locations": NSNull(), "startPoint": NSNull(),
         "endPoint": NSNull(), "frame": NSNull(), "mask": NSNull(), "backgroundColor": NSNull(),
-        "lineDashPattern": NSNull(), "lineDashPhase": NSNull(), "masksToBounds": NSNull(), "hidden": NSNull(),
+        "lineDashPattern": NSNull(), "lineDashPhase": NSNull(), "masksToBounds": NSNull(), "hidden": NSNull(), "shadowPath": NSNull(),
     ]
 
     let container = CALayer()
@@ -108,6 +108,11 @@ private final class Node {
     private var signature: [String] = []
     private var paintLayers: [PaintLayers] = []
     private var blurRadius = 0.0
+    /// Frosted glass: the blurred background, under the fills and clipped
+    /// to the shape. Made when a layer first needs one.
+    private var backdrop: CALayer?
+    private let backdropMask = CAShapeLayer()
+    private var backdropRadius = 0.0
 
     init(scale: CGFloat) {
         self.scale = scale
@@ -132,31 +137,72 @@ private final class Node {
         container.opacity = Float(layer.opacity)
         container.masksToBounds = layer.clipsContent
 
+        // Blur amounts arrive as Figma measures them, twice the Gaussian's
+        // standard deviation. Core Animation's shadow radius is the standard
+        // deviation, as is the blur filter's radius.
         if let shadow = layer.shadow {
             container.shadowColor = shadow.color.cgColor
             container.shadowOffset = CGSize(width: shadow.offset.x, height: shadow.offset.y)
-            container.shadowRadius = shadow.blur
+            container.shadowRadius = shadow.blur / 2
             container.shadowOpacity = Float(shadow.opacity)
+            container.shadowPath = spreadPath(layer, by: shadow.spread)
         } else {
             container.shadowOpacity = 0
+            container.shadowPath = nil
         }
 
         if layer.blur != blurRadius {
             blurRadius = layer.blur
-            container.filters = layer.blur > 0
-                ? [CIFilter(name: "CIGaussianBlur", parameters: [kCIInputRadiusKey: layer.blur])!]
-                : nil
+            container.filters = layer.blur > 0 ? [Blur.filter(amount: layer.blur)] : nil
         }
 
         switch layer.content {
         case .shape(let shape):
             updateShape(shape, size: layer.size)
+            updateBackdrop(layer.backgroundBlur, path: shape.path.cgPath, size: layer.size)
         case .group:
             // A group's sublayers are its children, set by the renderer.
             if !signature.isEmpty { clearPaint() }
         case .text, .image, .video:
             // Drawn from milestones 6 and 7.
             if !signature.isEmpty { clearPaint() }
+        }
+    }
+
+    /// The shadow's outline grown by `spread`, or shrunk for a negative one.
+    /// Nil leaves Core Animation to shadow whatever the layer draws, which
+    /// is what a spread of 0 and every non-shape layer want.
+    private func spreadPath(_ layer: ResolvedLayer, by spread: Double) -> CGPath? {
+        guard spread != 0, case .shape(let shape) = layer.content, shape.isClosed else { return nil }
+        let path = shape.path.cgPath
+        let band = path.copy(strokingWithWidth: abs(spread) * 2, lineCap: .round, lineJoin: .round, miterLimit: 10)
+        return spread > 0 ? path.union(band) : path.subtracting(band)
+    }
+
+    private func updateBackdrop(_ blur: BackgroundBlur?, path: CGPath, size: Size2) {
+        guard let blur else {
+            backdrop?.removeFromSuperlayer()
+            return
+        }
+        if backdrop == nil {
+            guard let made = Blur.makeBackdrop() else { return }
+            made.anchorPoint = .zero
+            made.actions = Self.noActions
+            backdropMask.anchorPoint = .zero
+            backdropMask.actions = Self.noActions
+            backdropMask.fillColor = CGColor(gray: 0, alpha: 1)
+            made.mask = backdropMask
+            backdrop = made
+        }
+        guard let backdrop else { return }
+        if container.sublayers?.first !== backdrop { container.insertSublayer(backdrop, at: 0) }
+        backdrop.frame = CGRect(origin: .zero, size: size.cg)
+        backdropMask.frame = backdrop.bounds
+        backdropMask.path = path
+        backdrop.opacity = Float(blur.blend)
+        if blur.radius != backdropRadius {
+            backdropRadius = blur.radius
+            backdrop.filters = [Blur.filter(amount: blur.radius)]
         }
     }
 
@@ -172,6 +218,7 @@ private final class Node {
             clearPaint()
             paintLayers = shape.fills.map { PaintLayers(paint: $0, stroke: nil, scale: scale) }
                 + shape.strokes.map { PaintLayers(paint: $0.paint, stroke: $0, scale: scale) }
+            // The backdrop, if any, goes back underneath in `updateBackdrop`.
             container.sublayers = paintLayers.map(\.root)
             signature = wanted
         }

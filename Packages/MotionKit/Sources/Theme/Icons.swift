@@ -7,13 +7,19 @@ import SwiftUI
 ///
 /// Parsed once on first use and cached. See `IconShape` for the drawing.
 public enum Icon: String, CaseIterable, Sendable {
+    case backgroundBlur
+    case color
     case filter
+    case layerBlur
     case move
     case opacity
     case resize
     case rotate
     case scale
+    case shadow
     case stagger
+    case stroke
+    case trim
     case corners
     case link
     case unlink
@@ -59,8 +65,33 @@ public enum Icon: String, CaseIterable, Sendable {
     /// The subpaths, in the order they are drawn.
     public var data: [String] {
         switch self {
+        case .backgroundBlur: return [   // Actions/background-blur.svg
+            "M7 4.5 H17 C17.8 4.5 18.5 5.2 18.5 6 V18 C18.5 18.8 17.8 19.5 17 19.5 H7 C6.2 19.5 5.5 18.8 5.5 18 V6 C5.5 5.2 6.2 4.5 7 4.5 Z",
+            "M2.5 9 H5.5",
+            "M18.5 9 H21.5",
+            "M2.5 15 H5.5",
+            "M18.5 15 H21.5",
+            "M9 9 H10",
+            "M13 9 H15",
+            "M9 15 H11",
+            "M14 15 H15"
+        ]
+        case .color: return [   // Actions/color.svg
+            "M12 4 C12 4 6 10.5 6 14.5 C6 17.8 8.7 20.5 12 20.5 C15.3 20.5 18 17.8 18 14.5 C18 10.5 12 4 12 4 Z"
+        ]
         case .filter: return [   // Actions/filter.svg
             "M4 5 H20 L14 12 V19 L10 17 V12 Z"
+        ]
+        case .layerBlur: return [   // Actions/layer-blur.svg
+            "M12 7.5 C14.5 7.5 16.5 9.5 16.5 12 C16.5 14.5 14.5 16.5 12 16.5 C9.5 16.5 7.5 14.5 7.5 12 C7.5 9.5 9.5 7.5 12 7.5 Z",
+            "M12 3.5 V4.5",
+            "M12 19.5 V20.5",
+            "M3.5 12 H4.5",
+            "M19.5 12 H20.5",
+            "M6 6 L6.7 6.7",
+            "M17.3 17.3 L18 18",
+            "M6 18 L6.7 17.3",
+            "M17.3 6.7 L18 6"
         ]
         case .move: return [   // Actions/move.svg
             "M4 12 H19",
@@ -89,10 +120,22 @@ public enum Icon: String, CaseIterable, Sendable {
             "M13 5 H19 V11",
             "M5 13 V19 H11"
         ]
+        case .shadow: return [   // Actions/shadow.svg
+            "M4.5 4.5 H15 V15 H4.5 Z",
+            "M18.5 8 V18.5 H8"
+        ]
         case .stagger: return [   // Actions/stagger.svg
             "M4 7 H10",
             "M8 12 H14",
             "M12 17 H20"
+        ]
+        case .stroke: return [   // Actions/stroke.svg
+            "M4.5 7 C4.5 5.6 5.6 4.5 7 4.5 H17 C18.4 4.5 19.5 5.6 19.5 7 V17 C19.5 18.4 18.4 19.5 17 19.5 H7 C5.6 19.5 4.5 18.4 4.5 17 Z",
+            "M8.5 8.5 H15.5 V15.5 H8.5 Z"
+        ]
+        case .trim: return [   // Actions/trim.svg
+            "M12 5 C15.9 5 19 8.1 19 12 C19 15.9 15.9 19 12 19 C8.1 19 5 15.9 5 12",
+            "M3.5 12 H6.5"
         ]
         case .corners: return [   // Inspector/corners.svg
             "M4 9 V6 C4 4.895 4.895 4 6 4 H9",

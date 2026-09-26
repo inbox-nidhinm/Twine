@@ -486,6 +486,13 @@ extension ActionKind {
         case .opacity: return .opacity
         case .resize: return .resize
         case .visibility: return .eye
+        case .color: return .color
+        case .stroke: return .stroke
+        case .trim: return .trim
+        case .cornerRadius: return .corners
+        case .shadow: return .shadow
+        case .layerBlur: return .layerBlur
+        case .backgroundBlur: return .backgroundBlur
         }
     }
 }

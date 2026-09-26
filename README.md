@@ -62,6 +62,14 @@ Press M to switch between the two modes. They never share a control:
 - **Design** shows the layout as designed, with no animation, and its inspector edits the design.
 - **Animate** shows the moment at the playhead. Select a layer and use Add Action in the inspector to add an action at the playhead, half a second long. Select an action (on the timeline, or straight after adding it) and the inspector shows only its fields: start and length, easing (None, Smooth, Slow down, Accelerate, Overshoot, Spring, each with an intensity, or a Custom curve), To or By where it applies, the starting value (leave it empty to start from wherever the layer is; the greyed number is what it would start from), and the end value. Several actions of one kind edit together; mixed kinds share timing and easing.
 
+Add Action lists what the selected layers can take, grouped:
+
+- **Transform**: Move, Scale, Rotate, Opacity, Resize, Hide/Show.
+- **Style**: Colour (the first fill: a colour or a gradient), Stroke (width and colour), Trim (draws a stroke on), Corner Radius (rectangles), Shadow.
+- **Blur**: Layer Blur, Background Blur (frosted glass, for shapes; it shows through a see-through fill).
+
+Shadows and blurs on a layer designed without them fade in from nothing. Blur amounts use Figma's measure.
+
 On the canvas in Animate:
 
 - With no action selected, dragging a layer moves its design position, and its animation moves with it (To moves included).
@@ -111,4 +119,4 @@ Export Current Frame… (Shift-⌘E) saves a PNG of what the canvas shows: the f
 
 ## Status
 
-Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then redesign milestones 2 to 5 of 8 and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, and MP4, MOV and PNG export. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.
+Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then redesign milestones 2 to 6 of 8 and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, MP4, MOV and PNG export, and Style and Blur actions. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.

@@ -516,10 +516,15 @@ private struct EffectsSection: View {
         VStack(alignment: .leading, spacing: 8) {
             HeaderRow(title: "Effects") {
                 IconButton(icon: .plus, help: "Add a shadow or a blur") {
-                    menus.show([
+                    var entries: [MenuEntry] = [
                         .item("Drop Shadow") { add(.dropShadow(DropShadow())) },
                         .item("Layer Blur") { add(.layerBlur(LayerBlur())) },
-                    ], at: CGPoint(x: addFrame.maxX - Theme.menuMinWidth, y: addFrame.maxY + 4))
+                    ]
+                    // It follows a shape's outline, so only shapes have one.
+                    if case .shape = layer.content {
+                        entries.append(.item("Background Blur") { add(.backgroundBlur(BackgroundBlur())) })
+                    }
+                    menus.show(entries, at: CGPoint(x: addFrame.maxX - Theme.menuMinWidth, y: addFrame.maxY + 4))
                 }
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { addFrame = $0 }
             }
@@ -555,6 +560,12 @@ private struct EffectsSection: View {
                     HexField(color: s.color) { c in
                         controller.perform(.updateLayers([withShadow(index) { $0.color = c }]))
                     }
+                    UnitField(value: s.opacity * 100, decimals: 0, suffix: "%",
+                              accepts: { $0 >= 0 && $0 <= 100 }) { v in
+                        controller.perform(.updateLayers([withShadow(index) { $0.opacity = v / 100 }]))
+                    }
+                    .frame(width: Theme.labelWidth)
+                    .help("Shadow opacity")
                 }
                 HStack(spacing: 8) {
                     field(index, "X", s.offset.x) { sh, v in
@@ -566,11 +577,8 @@ private struct EffectsSection: View {
                 }
                 HStack(spacing: 8) {
                     field(index, "Blur", s.blur, min: 0) { sh, v in sh.blur = v }
-                    UnitField(value: s.opacity * 100, decimals: 0, suffix: "%",
-                              accepts: { $0 >= 0 && $0 <= 100 }) { v in
-                        controller.perform(.updateLayers([withShadow(index) { $0.opacity = v / 100 }]))
-                    }
-                    .help("Shadow opacity")
+                    field(index, "Spread", s.spread) { sh, v in sh.spread = v }
+                        .help("Grows the shadow past the shape before it is blurred, or shrinks it with a negative number. Shapes only.")
                 }
             case .layerBlur(let b):
                 LabeledRow(label: "Radius") {
@@ -583,6 +591,17 @@ private struct EffectsSection: View {
                         }
                     }
                 }
+            case .backgroundBlur(let b):
+                HStack(spacing: 8) {
+                    UnitField(unit: "Blur", value: b.radius, decimals: 1, accepts: { $0 >= 0 }) { v in
+                        editBackgroundBlur(index) { $0.radius = v }
+                    }
+                    .help("How much the background behind the layer is blurred. It shows through where the fill is see-through.")
+                    UnitField(value: b.blend * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
+                        editBackgroundBlur(index) { $0.blend = v / 100 }
+                    }
+                    .help("Blend: how much of the blurred background shows over the sharp one.")
+                }
             }
         }
     }
@@ -594,6 +613,15 @@ private struct EffectsSection: View {
         }
     }
 
+
+    private func editBackgroundBlur(_ index: Int, _ change: @escaping (inout BackgroundBlur) -> Void) {
+        edit(index) { e in
+            if case .backgroundBlur(var blur) = e.kind {
+                change(&blur)
+                e.kind = .backgroundBlur(blur)
+            }
+        }
+    }
 
     private func add(_ kind: EffectKind) {
         controller.edit(layer.id) { l in l.effects.append(Effect(kind: kind)) }
@@ -621,6 +649,7 @@ extension Effect {
         switch kind {
         case .dropShadow: return "Drop Shadow"
         case .layerBlur: return "Layer Blur"
+        case .backgroundBlur: return "Background Blur"
         }
     }
 }

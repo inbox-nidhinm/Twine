@@ -15,12 +15,17 @@ public struct Fill: Codable, Sendable, Equatable, Identifiable {
     }
 }
 
-public enum Paint: Sendable, Equatable {
+public enum Paint: AnimatableValue {
     case solid(RGBA)
     case linearGradient(Gradient)
     case radialGradient(Gradient)
 
     public static func color(_ color: RGBA) -> Paint { .solid(color) }
+
+    public var isRadialGradient: Bool {
+        if case .radialGradient = self { return true }
+        return false
+    }
 }
 
 extension Paint: Codable {
@@ -56,7 +61,7 @@ extension Paint: Codable {
 /// box (0,0 top-left, 1,1 bottom-right) so the gradient follows the shape when
 /// it is resized. For a radial gradient `start` is the centre and `end` a point
 /// on its edge.
-public struct Gradient: Codable, Sendable, Equatable {
+public struct Gradient: AnimatableValue {
     public var stops: [GradientStop]
     public var start: Vec2
     public var end: Vec2

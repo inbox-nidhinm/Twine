@@ -235,6 +235,7 @@ private struct ValueFields: View {
             case .opacity(let o): opacity(o)
             case .resize(let r): resize(r)
             case .visibility(let v): visibility(v)
+            default: StyleValueFields(controller: controller, action: action, inherited: inherited)
             }
         }
     }

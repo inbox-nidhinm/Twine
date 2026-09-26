@@ -51,7 +51,9 @@ extension Action {
             o.end *= opacity
             o.initial = o.initial.map { $0 * opacity }
             copy.spec = .opacity(o)
-        case .resize, .visibility:
+        default:
+            // Sizes, visibility and every style and blur live in the
+            // layer's own space, which a new parent does not change.
             break
         }
         return copy

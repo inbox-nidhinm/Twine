@@ -615,7 +615,9 @@ final class CanvasNSView: NSView {
             if let end = actionEndBox(), CanvasHandles.isRotateZone(viewPoint, box: end.box) {
                 return start(.rotate, seekingToEnd: true)
             }
-        case .opacity, .visibility:
+        default:
+            // Opacity, visibility, styles and blurs have nothing to drag on
+            // the canvas; a drag moves the layer as usual.
             break
         }
         return false
