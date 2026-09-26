@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Hover everywhere on the canvas", changes: [
+            "Fixed: hover failed over the upper part of the canvas, worst in Animate, where a layer near the top did not respond and a tall one only answered over its lower half. The check for whether the pointer was over a panel looked at the spot mirrored top to bottom, which in Animate landed on the timeline.",
+            "The same mix-up could end typing in a text field when clicking inside it; that is fixed too.",
+        ]),
         .init(date: "26 September 2026", title: "Clearer hover", changes: [
             "Hovering a layer on the canvas now gives it a faint wash inside a thin white outline with a dark edge, which shows on artwork of any colour (a grey layer hid the first grey version) and never reads as a selection.",
             "A selected layer answers the pointer too: it takes the wash inside its blue outline.",

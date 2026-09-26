@@ -178,15 +178,25 @@ final class ChromelessWindow: NSWindow {
     override func sendEvent(_ event: NSEvent) {
         if event.type == .leftMouseDown || event.type == .rightMouseDown,
            let fieldEditor = firstResponder as? NSText,
-           let field = fieldEditor.delegate as? NSView,
-           let content = contentView {
-            let hit = content.hitTest(content.convert(event.locationInWindow, from: nil))
+           let field = fieldEditor.delegate as? NSView {
+            let hit = viewUnder(event.locationInWindow)
             if hit.map({ !$0.isDescendant(of: field) }) ?? true {
                 // Resigning commits the field, the same as pressing Return.
                 makeFirstResponder(preferredResponder)
             }
         }
         super.sendEvent(event)
+    }
+
+    /// The frontmost view at a point in window coordinates, as a click there
+    /// would find it. `hitTest` takes its point in the view's superview's
+    /// coordinates: for the content view that is the window's frame view,
+    /// which runs upward, whereas the content view itself runs downward.
+    /// Converting into the content view instead mirrors the point top to
+    /// bottom, which once made hover fail over the top of the canvas.
+    func viewUnder(_ locationInWindow: NSPoint) -> NSView? {
+        guard let content = contentView else { return nil }
+        return content.hitTest(content.superview?.convert(locationInWindow, from: nil) ?? locationInWindow)
     }
 
     /// Nothing is focused when a window opens. Left alone, AppKit hands the

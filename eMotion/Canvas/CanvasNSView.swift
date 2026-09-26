@@ -972,8 +972,7 @@ final class CanvasNSView: NSView {
         let viewPoint = convert(event.locationInWindow, from: nil)
         // Only while the canvas is really the view under the pointer, not a
         // panel floating over it.
-        guard let content = window?.contentView,
-              let top = content.hitTest(content.convert(event.locationInWindow, from: nil)),
+        guard let top = (window as? ChromelessWindow)?.viewUnder(event.locationInWindow),
               top === self || top.isDescendant(of: self) else {
             setHover(nil)
             return
