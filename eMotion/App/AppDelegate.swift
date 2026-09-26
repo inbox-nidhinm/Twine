@@ -3,6 +3,7 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.appearance = NSAppearance(named: .darkAqua)
+        Cursors.useAppArrowEverywhere()
         NSApp.mainMenu = MainMenu.build()
         try? Creations.ensureFolder()
     }

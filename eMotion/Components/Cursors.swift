@@ -1,4 +1,5 @@
 import AppKit
+import ObjectiveC
 
 /// The app's own pointers, drawn as 32 by 32 point SVGs in
 /// `Resources/Cursors`. Each falls back to the nearest system cursor if its
@@ -9,6 +10,22 @@ import AppKit
 /// Text fields keep the I-beam. The resize, turn and hand pointers are used
 /// wherever those things happen.
 enum Cursors {
+    /// Makes the app's arrow the one every part of the app gets when it asks
+    /// for the arrow, SwiftUI and AppKit included, by swapping what
+    /// `NSCursor.arrow` returns. SwiftUI sets the arrow over its views on
+    /// every move, which no cursor rect can overrule, so this is the only
+    /// way the pointer keeps one style. Call once, at launch, before any
+    /// window.
+    static func useAppArrowEverywhere() {
+        // Built first, while `.arrow` is still the system's, for its fallback.
+        let mine = arrow
+        guard mine !== NSCursor.arrow,
+              let original = class_getClassMethod(NSCursor.self, #selector(getter: NSCursor.arrow)),
+              let replacement = class_getClassMethod(NSCursor.self, #selector(NSCursor.emotionArrow)) else { return }
+        NSCursor.appArrow = mine
+        method_exchangeImplementations(original, replacement)
+    }
+
     static let arrow = make("cursor-arrow", hotSpot: CGPoint(x: 11.5, y: 11.5), fallback: .arrow)
     static let crosshair = make("cursor-shape", fallback: .crosshair)
     static let hand = make("cursor-hand", fallback: .openHand)
@@ -54,5 +71,17 @@ enum Cursors {
         guard let url, let image = NSImage(contentsOf: url) else { return fallback }
         image.size = NSSize(width: 32, height: 32)
         return NSCursor(image: image, hotSpot: hotSpot)
+    }
+}
+
+extension NSCursor {
+    /// The cursor `NSCursor.arrow` hands out once `Cursors.useAppArrowEverywhere`
+    /// has run. Set once at launch, on the main thread, before anything reads it.
+    nonisolated(unsafe) fileprivate static var appArrow: NSCursor?
+
+    @objc nonisolated fileprivate class func emotionArrow() -> NSCursor {
+        // After the swap this runs as `NSCursor.arrow`, and the name
+        // `emotionArrow` runs the system's original.
+        appArrow ?? emotionArrow()
     }
 }
