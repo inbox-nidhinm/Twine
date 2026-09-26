@@ -49,6 +49,9 @@ public enum Theme {
     public static let rowCurrent = accent.opacity(0.22)
     /// A row under the pointer. Translucent so the grain shows through.
     public static let rowHover = Color.white.opacity(0.057)
+    /// The playhead: its line down the timeline and the pill in the ruler
+    /// that carries the time. Teal, so it never reads as a selection.
+    public static let playhead = Color(red: 0x2B / 255, green: 0x88 / 255, blue: 0x85 / 255)
 
     // MARK: Text (text/*)
 

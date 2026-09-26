@@ -2,64 +2,38 @@ import Foundation
 import MotionModel
 import MotionEditing
 
-/// The timeline's rows, top to bottom: for each layer with actions, in the
-/// layers panel's order (front first), a thin divider with its name, then
-/// one row per action in the layer's row order.
+/// The timeline's rows, top to bottom: one per action, in the order the
+/// actions were added (or rows were dragged to), whatever their layer. Each
+/// row's label names the layer and the action.
 struct TimelineRow {
-    enum Kind {
-        case layer(Layer)
-        case action(Action, layerName: String)
-    }
-
-    let kind: Kind
+    let action: Action
+    let layerName: String
     let y: CGFloat
-    let height: CGFloat
 
-    static let actionHeight: CGFloat = 24
-    static let dividerHeight: CGFloat = 20
-    /// The column down the left of the rows, where each action's eye sits.
-    static let gutter: CGFloat = 28
+    /// A row, a little taller than a panel row so a bar is easy to grab.
+    static let height: CGFloat = 34
+    /// The bar inside it.
+    static let barHeight: CGFloat = 24
+    /// The column of labels down the left, which the transport sits over.
+    static let labelWidth: CGFloat = 240
 
-    var action: Action? {
-        if case .action(let a, _) = kind { return a }
-        return nil
-    }
+    var layerID: UUID { action.targetLayerID }
 
-    var layerID: UUID {
-        switch kind {
-        case .layer(let l): return l.id
-        case .action(let a, _): return a.targetLayerID
-        }
-    }
-
-    /// Every row for `project`, or only those of `only` when it is given.
+    /// Every row for `project`, or only those on the layers in `only`.
     static func rows(of project: Project, only: Set<UUID>? = nil) -> [TimelineRow] {
-        var out: [TimelineRow] = []
+        let names = Dictionary(project.allLayers.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
         var y: CGFloat = 0
-        let byLayer = ActionEditing.rowsByLayer(in: project)
-        for layer in panelOrder(project.layers) {
-            if let only, !only.contains(layer.id) { continue }
-            let actions = byLayer[layer.id] ?? []
-            guard !actions.isEmpty else { continue }
-            out.append(TimelineRow(kind: .layer(layer), y: y, height: dividerHeight))
-            y += dividerHeight
-            for action in actions {
-                out.append(TimelineRow(kind: .action(action, layerName: layer.name), y: y, height: actionHeight))
-                y += actionHeight
-            }
+        return ActionEditing.timeline(in: project).compactMap { action in
+            guard let name = names[action.targetLayerID] else { return nil }
+            if let only, !only.contains(action.targetLayerID) { return nil }
+            defer { y += height }
+            return TimelineRow(action: action, layerName: name, y: y)
         }
-        return out
     }
 
     /// Actions in the order their rows run down the timeline.
     static func order(of actions: [Action], in project: Project) -> [Action] {
         let ids = Set(actions.map(\.id))
-        return rows(of: project).compactMap(\.action).filter { ids.contains($0.id) }
-    }
-
-    /// The layer tree flattened as the layers panel lists it: front first,
-    /// each group followed by its children.
-    static func panelOrder(_ layers: [Layer]) -> [Layer] {
-        layers.reversed().flatMap { [$0] + panelOrder($0.children) }
+        return ActionEditing.timeline(in: project).filter { ids.contains($0.id) }
     }
 }

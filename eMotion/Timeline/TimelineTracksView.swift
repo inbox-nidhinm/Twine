@@ -10,6 +10,8 @@ struct ActionTimeline: NSViewRepresentable {
     let controller: EditorController
     let editor: EditorModel
 
+    @Environment(MenuHost.self) private var menus
+
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView()
         scroll.drawsBackground = false
@@ -19,6 +21,7 @@ struct ActionTimeline: NSViewRepresentable {
         scroll.horizontalScrollElasticity = .none
         let tracks = TimelineTracksView(frame: .zero)
         tracks.controller = controller
+        tracks.menus = menus
         tracks.autoresizingMask = [.width]
         scroll.documentView = tracks
         return scroll
@@ -29,36 +32,45 @@ struct ActionTimeline: NSViewRepresentable {
         // Read here so SwiftUI calls this whenever any of them change.
         _ = (editor.time, editor.selection, editor.selectedActions, editor.timelineOnlySelected,
              editor.viewport.pointsPerSecond, editor.viewport.start, controller.project)
+        tracks.menus = menus
         tracks.reload()
     }
 }
 
-/// Every action as a bar on its own row, with its layer's name on a divider
-/// above its group, drawn and handled in AppKit for exact positions.
+/// Every action on a row of its own, in the order actions were added: a
+/// label naming its layer and itself down the left, and its bar on the
+/// right, drawn and handled in AppKit for exact positions.
 ///
-/// Drag a bar to move it in time, and onto another of its layer's rows to
+/// Drag a bar to move it in time, or up and down (or drag its label) to
 /// reorder. Drag an end to change its length (Option for both ends). Click,
-/// Shift- or Command-click, or drag a box to select. Click an eye to switch
-/// an action off. Double-click a bar to rename it. Option-drag empty space,
-/// or scroll sideways, to pan; Command-scroll or pinch to zoom.
+/// Shift- or Command-click, or drag a box to select. The eye that shows on a
+/// hovered label switches an action off. Double-click a label to rename its
+/// action. Right-click for Stagger and what to show. Option-drag empty
+/// space, or scroll sideways, to pan; Command-scroll or pinch to zoom.
 final class TimelineTracksView: NSView, NSTextFieldDelegate {
     var controller: EditorController? {
         didSet { controller?.waveforms.onChange = { [weak self] in self?.needsDisplay = true } }
     }
+    /// For the right-click menu and the stagger card.
+    var menus: MenuHost?
     private(set) var rows: [TimelineRow] = []
 
     private var drag: Drag?
     private var lastSelection: Set<UUID> = []
     private var renaming: (id: UUID, field: NSTextField)?
+    private var hoveredRow: Int?
 
     /// How near, in points, a dragged time jumps to something worth lining up with.
     static let snapDistance = 6.0
     static let edgeHit = 5.0
     static let instantWidth = 12.0
+    /// The eye's square at the right of a label.
+    static let eyeBox = 22.0
 
     private enum Drag {
         case move(originals: [Action], anchor: Action, startX: Double)
         case trim(original: Action, startEdge: Bool, startX: Double)
+        case reorder(action: Action, began: Bool)
         case marquee(start: CGPoint, current: CGPoint, base: Set<UUID>)
         case pan(startX: Double, startTime: Double)
     }
@@ -68,7 +80,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     private var viewport: TimelineViewport? { controller?.editor.viewport }
-    private let gutter = TimelineRow.gutter
+    private let gutter = TimelineRow.labelWidth
 
     private func x(for time: Double) -> Double { gutter + (viewport?.x(for: time) ?? 0) }
     private func time(at x: Double) -> Double { viewport?.time(at: x - gutter) ?? 0 }
@@ -91,7 +103,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
 
     private func sizeToRows() {
         guard let clip = enclosingScrollView?.contentView else { return }
-        let height = max(rows.last.map { $0.y + $0.height } ?? 0, clip.bounds.height)
+        let height = max(CGFloat(rows.count) * TimelineRow.height, clip.bounds.height)
         let size = NSSize(width: clip.bounds.width, height: height)
         if frame.size != size { setFrameSize(size) }
     }
@@ -104,19 +116,27 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
     private func scrollToRows(of layers: Set<UUID>) {
         let mine = rows.filter { layers.contains($0.layerID) }
         guard let first = mine.first, let last = mine.last else { return }
-        scrollToVisible(CGRect(x: 0, y: first.y, width: 1, height: last.y + last.height - first.y))
+        scrollToVisible(CGRect(x: 0, y: first.y, width: 1, height: last.y + TimelineRow.height - first.y))
     }
 
-    private func row(at y: CGFloat) -> TimelineRow? {
-        rows.first { y >= $0.y && y < $0.y + $0.height }
+    private func rowIndex(at y: CGFloat) -> Int? {
+        let i = Int((y / TimelineRow.height).rounded(.down))
+        return i >= 0 && i < rows.count ? i : nil
     }
 
     private func barRect(_ action: Action, in row: TimelineRow) -> CGRect {
         let x0 = x(for: action.start)
+        let h = TimelineRow.barHeight, top = row.y + (TimelineRow.height - h) / 2
         if action.isInstant {
-            return CGRect(x: x0 - Self.instantWidth / 2, y: row.y + 6, width: Self.instantWidth, height: row.height - 12)
+            return CGRect(x: x0 - Self.instantWidth / 2, y: row.y + (TimelineRow.height - Self.instantWidth) / 2,
+                          width: Self.instantWidth, height: Self.instantWidth)
         }
-        return CGRect(x: x0, y: row.y + 3, width: max(x(for: action.end) - x0, 4), height: row.height - 6)
+        return CGRect(x: x0, y: top, width: max(x(for: action.end) - x0, 4), height: h)
+    }
+
+    private func eyeRect(_ row: TimelineRow) -> CGRect {
+        CGRect(x: gutter - Self.eyeBox - 8, y: row.y + (TimelineRow.height - Self.eyeBox) / 2,
+               width: Self.eyeBox, height: Self.eyeBox)
     }
 
     override func layout() {
@@ -127,9 +147,29 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
     /// The whole composition across the tracks at first sight.
     private func fitIfNeeded() {
         guard let viewport, let controller, !viewport.hasFitted, bounds.width - gutter > 40 else { return }
-        viewport.pointsPerSecond = max((bounds.width - gutter - 24) / max(controller.duration, 0.1), 1)
-        viewport.start = -8 / viewport.pointsPerSecond
+        viewport.pointsPerSecond = max((bounds.width - gutter - 48) / max(controller.duration, 0.1), 1)
+        viewport.start = -24 / viewport.pointsPerSecond
         viewport.hasFitted = true
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        for area in trackingAreas { removeTrackingArea(area) }
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseMoved, .mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+                                       owner: self, userInfo: nil))
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        let now = rowIndex(at: convert(event.locationInWindow, from: nil).y)
+        if now != hoveredRow {
+            hoveredRow = now
+            needsDisplay = true
+        }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        hoveredRow = nil
+        needsDisplay = true
     }
 
     // MARK: Drawing
@@ -139,14 +179,9 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         let selectedLayers = controller.editor.selection
         let selectedActions = Set(controller.selectedActions.map(\.id))
 
-        for row in rows where row.y + row.height >= dirtyRect.minY && row.y <= dirtyRect.maxY {
-            switch row.kind {
-            case .layer(let layer):
-                drawDivider(layer, row, selected: selectedLayers.contains(layer.id), in: ctx)
-            case .action(let action, let layerName):
-                drawAction(action, layerName: layerName, row: row, layerSelected: selectedLayers.contains(action.targetLayerID),
-                           selected: selectedActions.contains(action.id), in: ctx)
-            }
+        for (index, row) in rows.enumerated() where row.y + TimelineRow.height >= dirtyRect.minY && row.y <= dirtyRect.maxY {
+            drawRow(row, index: index, layerSelected: selectedLayers.contains(row.layerID),
+                    selected: selectedActions.contains(row.action.id), in: ctx)
         }
 
         // After the composition ends, dimmed.
@@ -155,12 +190,13 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
             ctx.setFillColor(CGColor(gray: 0, alpha: 0.22))
             ctx.fill(CGRect(x: max(endX, gutter), y: 0, width: bounds.width - max(endX, gutter), height: bounds.height))
         }
+        // The line between the labels and the bars.
         ctx.setFillColor(NSColor(Theme.border).cgColor)
         ctx.fill(CGRect(x: gutter - 1, y: 0, width: 1, height: bounds.height))
 
         let px = x(for: controller.editor.time).rounded() + 0.5
         if px >= gutter {
-            ctx.setFillColor(NSColor(Theme.accent).cgColor)
+            ctx.setFillColor(NSColor(Theme.playhead).cgColor)
             ctx.fill(CGRect(x: px - 0.5, y: 0, width: 1, height: bounds.height))
         }
 
@@ -173,78 +209,75 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         }
     }
 
-    private func drawDivider(_ layer: Layer, _ row: TimelineRow, selected: Bool, in ctx: CGContext) {
-        let rect = CGRect(x: 0, y: row.y, width: bounds.width, height: row.height)
-        ctx.setFillColor(NSColor(Theme.canvas).withAlphaComponent(0.6).cgColor)
-        ctx.fill(rect)
-        ctx.setFillColor(NSColor(Theme.border).cgColor)
-        ctx.fill(CGRect(x: 0, y: row.y, width: bounds.width, height: 1))
-        drawIcon(layer.icon, in: CGRect(x: gutter + 6, y: row.y + 4, width: 12, height: 12),
-                 color: NSColor(selected ? Theme.textPrimary : Theme.textTertiary), in: ctx)
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 10, weight: .semibold),
-            .foregroundColor: NSColor(selected ? Theme.textPrimary : Theme.textSecondary),
-        ]
-        (layer.name as NSString).draw(at: CGPoint(x: gutter + 24, y: row.y + 4), withAttributes: attributes)
-    }
+    private func drawRow(_ row: TimelineRow, index: Int, layerSelected: Bool, selected: Bool, in ctx: CGContext) {
+        let action = row.action
+        let full = CGRect(x: 0, y: row.y, width: bounds.width, height: TimelineRow.height)
+        let label = CGRect(x: 0, y: row.y, width: gutter, height: TimelineRow.height)
 
-    private func drawAction(_ action: Action, layerName: String, row: TimelineRow, layerSelected: Bool,
-                            selected: Bool, in ctx: CGContext) {
-        if layerSelected {
+        // The row: the accent across it when its action is selected, a tint
+        // when only its layer is.
+        if selected {
+            ctx.setFillColor(NSColor(Theme.accent).withAlphaComponent(0.35).cgColor)
+            ctx.fill(full)
+            ctx.setFillColor(NSColor(Theme.accent).cgColor)
+            ctx.fill(label)
+        } else if layerSelected {
             ctx.setFillColor(NSColor(Theme.rowHover).cgColor)
-            ctx.fill(CGRect(x: 0, y: row.y, width: bounds.width, height: row.height))
+            ctx.fill(full)
         }
-        ctx.setFillColor(NSColor(Theme.border).withAlphaComponent(0.4).cgColor)
-        ctx.fill(CGRect(x: 0, y: row.y + row.height - 1, width: bounds.width, height: 1))
+        // The faint line under every row.
+        ctx.setFillColor(NSColor(Theme.border).withAlphaComponent(0.45).cgColor)
+        ctx.fill(CGRect(x: 0, y: row.y + TimelineRow.height - 1, width: bounds.width, height: 1))
 
-        // The eye in the gutter.
-        drawIcon(action.isEnabled ? .eye : .eyeSlash,
-                 in: CGRect(x: (gutter - 14) / 2, y: row.y + (row.height - 14) / 2, width: 14, height: 14),
-                 color: NSColor(action.isEnabled ? Theme.textSecondary : Theme.textTertiary), in: ctx)
+        // The label: layer, then action.
+        let dimmed = !action.isEnabled
+        let primary = NSColor(selected ? Theme.textPrimary : dimmed ? Theme.textTertiary : Theme.textPrimary)
+        let secondary = NSColor(selected ? Theme.textPrimary : Theme.textTertiary).withAlphaComponent(selected ? 0.75 : 1)
+        let showsEye = hoveredRow == index || dimmed
+        let room = gutter - 16 - (showsEye ? Self.eyeBox + 12 : 12)
+        ctx.saveGState()
+        ctx.clip(to: CGRect(x: 16, y: row.y, width: max(room, 0), height: TimelineRow.height))
+        let layerAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12, weight: .medium),
+                                                              .foregroundColor: primary]
+        let actionAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: secondary]
+        let layerName = row.layerName as NSString
+        let textY = row.y + (TimelineRow.height - 15) / 2
+        layerName.draw(at: CGPoint(x: 16, y: textY), withAttributes: layerAttributes)
+        var cursor = 16 + layerName.size(withAttributes: layerAttributes).width + 7
+        ctx.setFillColor(secondary.cgColor)
+        ctx.fillEllipse(in: CGRect(x: cursor, y: row.y + TimelineRow.height / 2 - 1.5, width: 3, height: 3))
+        cursor += 10
+        (action.name as NSString).draw(at: CGPoint(x: cursor, y: textY), withAttributes: actionAttributes)
+        ctx.restoreGState()
+        if showsEye {
+            let eye = eyeRect(row).insetBy(dx: 4, dy: 4)
+            drawIcon(action.isEnabled ? .eye : .eyeSlash, in: eye,
+                     color: NSColor(selected ? Theme.textPrimary : Theme.textSecondary), in: ctx)
+        }
 
+        // The bar.
         let rect = barRect(action, in: row)
         ctx.saveGState()
-        ctx.setAlpha(action.isEnabled ? 1 : 0.4)
-        let path = CGPath(roundedRect: rect, cornerWidth: Theme.radiusRow, cornerHeight: Theme.radiusRow, transform: nil)
+        ctx.clip(to: CGRect(x: gutter, y: row.y, width: bounds.width - gutter, height: TimelineRow.height))
+        ctx.setAlpha(dimmed ? 0.4 : 1)
+        let radius = action.isInstant ? 3 : 6.0
+        let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
         ctx.addPath(path)
-        ctx.setFillColor(NSColor(selected ? Theme.rowSelected : Theme.panelRaised).cgColor)
+        ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.panelHover).cgColor)
         ctx.fillPath()
-        ctx.addPath(path)
-        ctx.setStrokeColor(NSColor(selected ? Theme.accent : Theme.edge).cgColor)
-        ctx.setLineWidth(1)
-        ctx.strokePath()
-
         if case .play(let play) = action.spec { drawWaveform(action, play: play, in: rect, selected: selected, ctx: ctx) }
-
-        // Icon, name and layer: inside a bar, or beside an instant marker.
-        let label = action.isInstant
-            ? CGRect(x: rect.maxX + 4, y: row.y, width: 400, height: row.height)
-            : CGRect(x: rect.minX, y: row.y, width: rect.width, height: row.height)
-        ctx.clip(to: label.intersection(CGRect(x: gutter, y: row.y, width: bounds.width - gutter, height: row.height)))
-        var cursor = label.minX + (action.isInstant ? 0 : 5)
-        drawIcon(action.spec.kind.icon, in: CGRect(x: cursor, y: row.y + (row.height - 12) / 2, width: 12, height: 12),
-                 color: NSColor(selected ? Theme.textPrimary : Theme.textSecondary), in: ctx)
-        cursor += 16
-        let nameAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor(Theme.textPrimary),
-        ]
-        let name = action.name as NSString
-        name.draw(at: CGPoint(x: cursor, y: row.y + 5), withAttributes: nameAttributes)
-        cursor += name.size(withAttributes: nameAttributes).width + 6
-        (layerName as NSString).draw(at: CGPoint(x: cursor, y: row.y + 5), withAttributes: [
-            .font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor(Theme.textTertiary),
-        ])
         ctx.restoreGState()
     }
 
     /// A sound's loudness along its Play bar, for the part of the file it
-    /// plays, drawn faintly behind the label.
+    /// plays, drawn faintly inside it.
     private func drawWaveform(_ action: Action, play: PlayAction, in rect: CGRect, selected: Bool, ctx: CGContext) {
         guard let controller, let asset = controller.asset(ofLayer: action.targetLayerID), asset.hasAudio,
               let peaks = controller.waveforms.peaks(for: asset.id, at: controller.document?.mediaURL(for: asset.id)),
               !peaks.isEmpty, action.duration > 0 else { return }
         ctx.saveGState()
-        ctx.clip(to: rect.insetBy(dx: 1, dy: 2))
+        ctx.addPath(CGPath(roundedRect: rect.insetBy(dx: 1, dy: 2), cornerWidth: 5, cornerHeight: 5, transform: nil))
+        ctx.clip()
         let visible = rect.intersection(CGRect(x: gutter, y: rect.minY, width: bounds.width - gutter, height: rect.height))
         let path = CGMutablePath()
         let mid = rect.midY, half = rect.height / 2 - 3
@@ -259,7 +292,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
             x += 2
         }
         ctx.addPath(path)
-        ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.textTertiary).withAlphaComponent(0.35).cgColor)
+        ctx.setFillColor(NSColor(Theme.textPrimary).withAlphaComponent(selected ? 0.45 : 0.22).cgColor)
         ctx.fillPath()
         ctx.restoreGState()
     }
@@ -281,40 +314,53 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         let flags = event.modifierFlags
         let extending = flags.contains(.shift) || flags.contains(.command)
 
-        guard let row = row(at: p.y) else { return startEmptyDrag(at: p, event: event) }
-        switch row.kind {
-        case .layer(let layer):
-            controller.deselectActions()
-            controller.select([layer.id])
-        case .action(let action, _):
-            if p.x < gutter { return controller.toggleEnabled(action) }
-            let rect = barRect(action, in: row)
-            guard rect.insetBy(dx: -Self.edgeHit, dy: 0).contains(p) else { return startEmptyDrag(at: p, event: event) }
-            if event.clickCount == 2 { return beginRename(action, in: row) }
+        guard let index = rowIndex(at: p.y) else { return startEmptyDrag(at: p, event: event) }
+        let row = rows[index]
+        let action = row.action
 
-            var selected = Set(controller.selectedActions.map(\.id))
-            if extending {
-                if selected.contains(action.id) { selected.remove(action.id) } else { selected.insert(action.id) }
-                controller.selectActions(selected)
-                if selected.isEmpty { controller.deselectActions() }
-                guard selected.contains(action.id) else { return }
-            } else if !selected.contains(action.id) {
-                controller.selectActions([action.id])
-            }
+        // The label: the eye switches the action off; a double-click
+        // renames it; a drag reorders.
+        if p.x < gutter {
+            if eyeRect(row).contains(p), hoveredRow == index || !action.isEnabled { return controller.toggleEnabled(action) }
+            if event.clickCount == 2 { return beginRename(row) }
+            pick(action, extending: extending)
+            if !extending { drag = .reorder(action: action, began: false) }
+            needsDisplay = true
+            return
+        }
 
-            if !action.isInstant, !extending, abs(p.x - rect.minX) <= Self.edgeHit {
-                drag = .trim(original: action, startEdge: true, startX: p.x)
-                controller.begin("Change Timing")
-            } else if !action.isInstant, !extending, abs(p.x - rect.maxX) <= Self.edgeHit {
-                drag = .trim(original: action, startEdge: false, startX: p.x)
-                controller.begin("Change Timing")
-            } else {
-                let originals = controller.selectedActions
-                drag = .move(originals: originals, anchor: action, startX: p.x)
-                controller.begin(originals.count == 1 ? "Move Action" : "Move Actions")
-            }
+        let rect = barRect(action, in: row)
+        guard rect.insetBy(dx: -Self.edgeHit, dy: 0).contains(p) else { return startEmptyDrag(at: p, event: event) }
+        if event.clickCount == 2 { return beginRename(row) }
+        guard pick(action, extending: extending) else { return }
+
+        if !action.isInstant, !extending, abs(p.x - rect.minX) <= Self.edgeHit {
+            drag = .trim(original: action, startEdge: true, startX: p.x)
+            controller.begin("Change Timing")
+        } else if !action.isInstant, !extending, abs(p.x - rect.maxX) <= Self.edgeHit {
+            drag = .trim(original: action, startEdge: false, startX: p.x)
+            controller.begin("Change Timing")
+        } else {
+            let originals = controller.selectedActions
+            drag = .move(originals: originals, anchor: action, startX: p.x)
+            controller.begin(originals.count == 1 ? "Move Action" : "Move Actions")
         }
         needsDisplay = true
+    }
+
+    /// Selects an action as a click does: on its own, or with Shift or
+    /// Command, added or taken away. Returns whether it ends up selected.
+    @discardableResult
+    private func pick(_ action: Action, extending: Bool) -> Bool {
+        guard let controller else { return false }
+        var selected = Set(controller.selectedActions.map(\.id))
+        if extending {
+            if selected.contains(action.id) { selected.remove(action.id) } else { selected.insert(action.id) }
+            if selected.isEmpty { controller.deselectActions() } else { controller.selectActions(selected) }
+            return selected.contains(action.id)
+        }
+        if !selected.contains(action.id) { controller.selectActions([action.id]) }
+        return true
     }
 
     /// Empty space: a box to select with, or with Option, a pan.
@@ -338,6 +384,23 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
     override func otherMouseDragged(with event: NSEvent) { mouseDragged(with: event) }
     override func otherMouseUp(with event: NSEvent) { mouseUp(with: event) }
 
+    /// The actions whose row changes when `action` moves to the row under
+    /// `y`, against the project as it is now. Empty when it is on that row
+    /// already. A drag's steps each build on the last, so each sends every
+    /// row that differs from now.
+    private func reordered(_ action: Action, toRowAt y: CGFloat) -> [Action] {
+        guard let controller else { return [] }
+        // The rows as they are this moment, not as last drawn: a quick drag
+        // can outrun the drawing.
+        let editor = controller.editor
+        let current = TimelineRow.rows(of: controller.project, only: editor.timelineOnlySelected ? editor.selection : nil)
+        let index = min(max(Int((y / TimelineRow.height).rounded(.down)), 0), current.count - 1)
+        guard index >= 0, current[index].action.id != action.id,
+              let target = ActionEditing.timeline(in: controller.project).firstIndex(where: { $0.id == current[index].action.id })
+        else { return [] }
+        return ActionEditing.moving(action.id, toRow: target, in: controller.project)
+    }
+
     override func mouseDragged(with event: NSEvent) {
         guard let controller, let viewport, let drag else { return }
         let p = convert(event.locationInWindow, from: nil)
@@ -347,12 +410,16 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
             let ids = Set(originals.map(\.id))
             let edges = anchor.isInstant ? [anchor.start] : [anchor.start, anchor.end]
             let delta = snapped((p.x - startX) / viewport.pointsPerSecond, edges: edges, ignoring: ids)
-            var edited = Dictionary(uniqueKeysWithValues: ActionEditing.moved(originals, by: delta, rate: rate).map { ($0.id, $0) })
-            // One action dragged onto another of its layer's rows moves there.
-            if originals.count == 1, let over = row(at: p.y)?.action, over.targetLayerID == anchor.targetLayerID,
-               over.id != anchor.id,
-               let index = ActionEditing.rows(on: anchor.targetLayerID, in: controller.project).firstIndex(where: { $0.id == over.id }) {
-                for changed in ActionEditing.moving(anchor.id, toRow: index, in: controller.project) {
+            // Times from where the drag began; rows as they are now.
+            let rowsNow = Dictionary(controller.project.actions.map { ($0.id, $0.rowOrder) }, uniquingKeysWith: { a, _ in a })
+            var edited = Dictionary(uniqueKeysWithValues: ActionEditing.moved(originals, by: delta, rate: rate).map { moved -> (UUID, Action) in
+                var a = moved
+                a.rowOrder = rowsNow[a.id] ?? a.rowOrder
+                return (a.id, a)
+            })
+            // One action dragged onto another row moves there.
+            if originals.count == 1 {
+                for changed in reordered(anchor, toRowAt: p.y) {
                     if var existing = edited[changed.id] {
                         existing.rowOrder = changed.rowOrder
                         edited[changed.id] = existing
@@ -362,6 +429,15 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
                 }
             }
             controller.update(.updateActions(Array(edited.values)))
+
+        case .reorder(let action, let began):
+            let changed = reordered(action, toRowAt: p.y)
+            guard !changed.isEmpty else { break }
+            if !began {
+                controller.begin("Reorder")
+                self.drag = .reorder(action: action, began: true)
+            }
+            controller.update(.updateActions(changed))
 
         case .trim(let original, let startEdge, let startX):
             let edge = startEdge ? original.start : original.end
@@ -375,9 +451,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
             self.drag = .marquee(start: start, current: p, base: base)
             let box = CGRect(x: min(start.x, p.x), y: min(start.y, p.y), width: abs(p.x - start.x), height: abs(p.y - start.y))
             var picked = base
-            for row in rows {
-                if let action = row.action, barRect(action, in: row).intersects(box) { picked.insert(action.id) }
-            }
+            for row in rows where barRect(row.action, in: row).intersects(box) { picked.insert(row.action.id) }
             if picked.isEmpty { controller.deselectActions() } else { controller.selectActions(picked) }
 
         case .pan(let startX, let startTime):
@@ -390,6 +464,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         guard let drag else { return }
         switch drag {
         case .move, .trim: controller?.end()
+        case .reorder(_, let began): if began { controller?.end() }
         case .marquee, .pan: break
         }
         self.drag = nil
@@ -414,14 +489,34 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         return best
     }
 
+    // MARK: Right-click
+
+    override func rightMouseDown(with event: NSEvent) {
+        guard let controller, let menus, let window, let content = window.contentView else { return }
+        let p = convert(event.locationInWindow, from: nil)
+        // A right-click on an unselected row picks it first, as Finder does.
+        if let index = rowIndex(at: p.y), !controller.selectedActions.contains(where: { $0.id == rows[index].action.id }) {
+            controller.selectActions([rows[index].action.id])
+        }
+        let inWindow = convert(p, to: nil)
+        let origin = CGPoint(x: inWindow.x, y: content.bounds.height - inWindow.y)
+        let editor = controller.editor
+        menus.show([
+            .item("Stagger…", disabled: controller.selectedActions.count < 2) {
+                menus.showPopup(at: origin) { StaggerCard(controller: controller) { menus.dismiss() } }
+            },
+            .separator,
+            .item("Show Only Selected Layers", checked: editor.timelineOnlySelected) { editor.timelineOnlySelected.toggle() },
+            .item("Show Times as Frames", checked: editor.showsFrames) { editor.showsFrames.toggle() },
+        ], at: origin)
+    }
+
     // MARK: Renaming
 
-    private func beginRename(_ action: Action, in row: TimelineRow) {
-        let rect = barRect(action, in: row)
-        let field = NSTextField(frame: CGRect(x: max(rect.minX, gutter), y: row.y + 2,
-                                              width: max(rect.width, 160), height: row.height - 4))
-        field.stringValue = action.name
-        field.font = NSFont.systemFont(ofSize: 11)
+    private func beginRename(_ row: TimelineRow) {
+        let field = NSTextField(frame: CGRect(x: 12, y: row.y + 5, width: gutter - 24, height: TimelineRow.height - 10))
+        field.stringValue = row.action.name
+        field.font = NSFont.systemFont(ofSize: 12)
         field.isBordered = false
         field.focusRingType = .none
         field.drawsBackground = true
@@ -429,7 +524,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         field.textColor = NSColor(Theme.textPrimary)
         field.delegate = self
         addSubview(field)
-        renaming = (action.id, field)
+        renaming = (row.action.id, field)
         window?.makeFirstResponder(field)
         field.currentEditor()?.selectAll(nil)
     }
@@ -480,7 +575,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         guard let viewport else { return }
         let t = time(at: x)
         viewport.pointsPerSecond = min(max(viewport.pointsPerSecond * factor, 5), 20_000)
-        viewport.start = t - (x - gutter) / viewport.pointsPerSecond
+        viewport.start = t - (max(x, gutter) - gutter) / viewport.pointsPerSecond
         needsDisplay = true
     }
 

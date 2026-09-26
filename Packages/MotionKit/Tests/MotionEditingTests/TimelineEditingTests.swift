@@ -13,21 +13,25 @@ import MotionEvaluation
                spec: .opacity(OpacityAction(end: 0)))
     }
 
-    @Test func newActionsSlotInByStartTime() {
-        let a = action(0, row: 0), b = action(2, row: 1)
-        let project = Project(layers: [square], actions: [a, b])
-        let (new, changed) = ActionEditing.slotting(action(1), into: project)
-        #expect(new.rowOrder == 1)
-        #expect(changed.map(\.id) == [b.id])
-        #expect(changed[0].rowOrder == 2)
+    @Test func newActionsGoToTheBottomWhateverTheirLayer() {
+        let other = LayerFactory.shape(.ellipse, in: Box(minX: 0, minY: 0, maxX: 5, maxY: 5), name: "O")
+        let a = action(3, row: 0), b = action(0, row: 1, on: other)
+        let project = Project(layers: [square, other], actions: [a, b])
+        let added = ActionEditing.appendingRows([action(1)], in: project)
+        #expect(added[0].rowOrder == 2)
+        // The timeline is the order they were added, not their start times.
+        var p = project
+        p.actions += added
+        #expect(ActionEditing.timeline(in: p).map(\.id) == [a.id, b.id, added[0].id])
     }
 
-    @Test func rowsCanBeRearranged() {
-        let a = action(0, row: 0), b = action(1, row: 1), c = action(2, row: 2)
-        var project = Project(layers: [square], actions: [a, b, c])
+    @Test func rowsCanBeRearrangedAcrossLayers() {
+        let other = LayerFactory.shape(.ellipse, in: Box(minX: 0, minY: 0, maxX: 5, maxY: 5), name: "O")
+        let a = action(0, row: 0), b = action(1, row: 1, on: other), c = action(2, row: 2)
+        var project = Project(layers: [square, other], actions: [a, b, c])
         let changed = ActionEditing.moving(c.id, toRow: 0, in: project)
         for x in changed { project.actions[project.actions.firstIndex { $0.id == x.id }!] = x }
-        #expect(ActionEditing.rows(on: square.id, in: project).map(\.id) == [c.id, a.id, b.id])
+        #expect(ActionEditing.timeline(in: project).map(\.id) == [c.id, a.id, b.id])
     }
 
     @Test func movingKeepsSpacingLandsOnFramesAndStopsAtZero() {
@@ -88,7 +92,7 @@ import MotionEvaluation
         #expect(ActionEditing.pasted([resize], onto: [group], at: 0, in: project, rate: rate).isEmpty)
     }
 
-    @Test func pastedRowsGoAfterTheLayersOwn() {
+    @Test func pastedRowsGoToTheBottom() {
         let project = Project(layers: [square], actions: [action(0, row: 4)])
         let rows = ActionEditing.appendingRows([action(1), action(2)], in: project)
         #expect(rows.map(\.rowOrder) == [5, 6])

@@ -23,6 +23,13 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "A new timeline", changes: [
+            "Labels down the left name each row's layer and action, with the play controls above them. Rows are taller and the bars simpler, with a faint line between rows.",
+            "Rows run in the order actions were added, whatever their layer: a new action goes to the bottom. Drag a row's label, or its bar, up or down to put it anywhere.",
+            "The playhead is teal, with the time in a pill on the ruler. The ruler shows seconds with dots between.",
+            "A selected action lights up its whole row. Hover a label to find its eye, which switches the action off; the eye stays while it is off. Double-click a label to rename.",
+            "Right-click the timeline for Stagger, Show Only Selected Layers and Show Times as Frames.",
+        ]),
         .init(date: "26 September 2026", title: "Typing on the canvas", changes: [
             "Type straight onto the canvas. The Text tool places a text layer ready to type over; double-click a text layer to type where you clicked; press Return with a text layer selected to edit all of it. Escape, or a click away, finishes.",
             "The caret and selection sit exactly on the letters, at any zoom and on turned text. Click to move the caret, drag or Shift-click to select, double-click for a word, triple-click for everything.",

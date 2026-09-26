@@ -76,10 +76,10 @@ import MotionEvaluation
         #expect(ActionFactory.kinds(for: []).isEmpty)
     }
 
-    @Test func rowOrderGoesAfterTheLayersOthers() {
+    @Test func newRowsGoAfterEveryOther() {
         var project = Project(layers: [square])
-        #expect(ActionFactory.nextRowOrder(on: square.id, in: project) == 0)
+        #expect(ActionFactory.nextRowOrder(in: project) == 0)
         project.actions = [make(.move), make(.scale)]
-        #expect(ActionFactory.nextRowOrder(on: square.id, in: project) == 4)
+        #expect(ActionFactory.nextRowOrder(in: project) == 4)
     }
 }

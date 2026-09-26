@@ -13,41 +13,26 @@ public enum ActionEditing {
         project.actions(on: layerID).sorted(by: rowOrder)
     }
 
-    /// Every layer's actions in their rows at once, for the whole timeline:
-    /// one pass over the actions rather than one per layer.
-    public static func rowsByLayer(in project: Project) -> [UUID: [Action]] {
-        Dictionary(grouping: project.actions, by: \.targetLayerID).mapValues { $0.sorted(by: rowOrder) }
+    /// Every action in its timeline row, top to bottom: one list for the
+    /// whole project, in the order the actions were added unless rows have
+    /// been dragged. A new action takes the next row at the bottom.
+    public static func timeline(in project: Project) -> [Action] {
+        project.actions.sorted(by: rowOrder)
     }
 
-    /// The order of rows within a layer.
+    /// The order of rows.
     public static func rowOrder(_ a: Action, _ b: Action) -> Bool {
         if a.rowOrder != b.rowOrder { return a.rowOrder < b.rowOrder }
         if a.start != b.start { return a.start < b.start }
         return a.id.uuidString < b.id.uuidString
     }
 
-    /// Where a new action goes among its layer's rows: after every row that
-    /// starts no later than it. Returns the new action and every existing one
-    /// whose row order had to change, renumbered from 0.
-    public static func slotting(_ action: Action, into project: Project) -> (new: Action, changed: [Action]) {
-        var rows = rows(on: action.targetLayerID, in: project)
-        let index = rows.firstIndex { $0.start > action.start } ?? rows.count
-        rows.insert(action, at: index)
-        let renumbered = renumber(rows)
-        let new = renumbered.first { $0.id == action.id }!
-        let changed = renumbered.filter { a in
-            a.id != action.id && project.actions.first { $0.id == a.id }?.rowOrder != a.rowOrder
-        }
-        return (new, changed)
-    }
-
-    /// The layer's rows with `actionID` moved to row `index` (counted among
-    /// that layer's rows), renumbered. Only rows whose order changed come back.
+    /// The timeline with `actionID` moved to row `index`, renumbered from 0.
+    /// Only rows whose order changed come back.
     public static func moving(_ actionID: UUID, toRow index: Int, in project: Project) -> [Action] {
-        guard let action = project.actions.first(where: { $0.id == actionID }) else { return [] }
-        var rows = rows(on: action.targetLayerID, in: project)
+        var rows = timeline(in: project)
         guard let from = rows.firstIndex(where: { $0.id == actionID }) else { return [] }
-        rows.remove(at: from)
+        let action = rows.remove(at: from)
         rows.insert(action, at: min(max(index, 0), rows.count))
         return renumber(rows).filter { a in project.actions.first { $0.id == a.id }?.rowOrder != a.rowOrder }
     }
@@ -157,15 +142,13 @@ public enum ActionEditing {
                isEnabled: a.isEnabled, rowOrder: a.rowOrder, spec: a.spec)
     }
 
-    /// New actions given row orders after their layers' existing rows, in
-    /// the order they come.
+    /// New actions given the rows at the bottom of the timeline, in the
+    /// order they come.
     public static func appendingRows(_ actions: [Action], in project: Project) -> [Action] {
-        var next: [UUID: Int] = [:]
-        return actions.map { action in
+        let first = ActionFactory.nextRowOrder(in: project)
+        return actions.enumerated().map { index, action in
             var a = action
-            let order = next[a.targetLayerID] ?? ActionFactory.nextRowOrder(on: a.targetLayerID, in: project)
-            a.rowOrder = order
-            next[a.targetLayerID] = order + 1
+            a.rowOrder = first + index
             return a
         }
     }

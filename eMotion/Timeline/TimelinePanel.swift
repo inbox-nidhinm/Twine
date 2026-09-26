@@ -3,23 +3,24 @@ import MotionModel
 import MotionEditing
 import Theme
 
-/// Animate mode's surface: the transport, the ruler, and a row per action
-/// under it, running the full width of the window.
+/// Animate mode's surface, running the full width of the window: the play
+/// controls over a column of labels, the ruler beside them, and a row per
+/// action underneath, in the order the actions were added.
 struct TimelinePanel: View {
     let controller: EditorController
     @Bindable var editor: EditorModel
 
-    static let rulerHeight: CGFloat = 24
+    static let headerHeight: CGFloat = 44
 
     var body: some View {
         VStack(spacing: 0) {
-            TransportBar(controller: controller, editor: editor)
-            PanelDivider()
             HStack(spacing: 0) {
-                Color.clear.frame(width: TimelineRow.gutter)
+                TransportBar(controller: controller, editor: editor)
+                    .frame(width: TimelineRow.labelWidth - 1)
+                Rectangle().fill(Theme.border).frame(width: 1)
                 TimelineRuler(controller: controller, editor: editor)
             }
-            .frame(height: Self.rulerHeight)
+            .frame(height: Self.headerHeight)
             PanelDivider()
             ActionTimeline(controller: controller, editor: editor)
         }
@@ -50,15 +51,14 @@ struct StaggerCard: View {
 
 // MARK: - Transport
 
+/// The play controls, centred over the labels. The time itself rides in the
+/// playhead's pill in the ruler.
 private struct TransportBar: View {
     let controller: EditorController
     @Bindable var editor: EditorModel
 
-    @Environment(MenuHost.self) private var menus
-    @State private var staggerFrame: CGRect = .zero
-
     var body: some View {
-        HStack(spacing: Theme.barGap) {
+        HStack(spacing: 2) {
             BarButton(icon: .jumpStart, help: "Go to the start (Home)") { controller.jumpToStart() }
             BarButton(icon: .stepBack, help: "Previous frame (comma; Shift for ten, Option for the previous action edge)") { controller.step(-1) }
             BarButton(icon: editor.isPlaying ? .pause : .play, help: editor.isPlaying ? "Pause (Space)" : "Play (Space)") {
@@ -68,42 +68,7 @@ private struct TransportBar: View {
             BarButton(icon: .jumpEnd, help: "Go to the end (End)") { controller.jumpToEnd() }
             BarButton(icon: .loop, help: editor.loops ? "Looping: playback starts over at the end" : "Stops at the end",
                       isOn: editor.loops) { editor.loops.toggle() }
-
-            Button { editor.showsFrames.toggle() } label: {
-                HStack(spacing: 4) {
-                    Text(readout(editor.time))
-                        .foregroundStyle(Theme.textPrimary)
-                    Text("/ \(readout(controller.duration))")
-                        .foregroundStyle(Theme.textTertiary)
-                }
-                .font(ThemeFont.label)
-                .monospacedDigit()
-                .padding(.horizontal, 6)
-                .frame(height: Theme.control)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(editor.showsFrames ? "Show seconds" : "Show frames")
-            .padding(.leading, 6)
-
-            Spacer(minLength: 0)
-            BarButton(icon: .stagger, help: "Stagger the selected actions", disabled: controller.selectedActions.count < 2) {
-                menus.showPopup(at: CGPoint(x: staggerFrame.minX - Theme.cardWidth + staggerFrame.width, y: staggerFrame.maxY + 4)) {
-                    StaggerCard(controller: controller) { menus.dismiss() }
-                }
-            }
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { staggerFrame = $0 }
-            BarButton(icon: .filter, help: editor.timelineOnlySelected ? "Show every layer's actions" : "Show only the selected layers' actions",
-                      isOn: editor.timelineOnlySelected) { editor.timelineOnlySelected.toggle() }
-            Text("\(controller.frameRate.label) fps")
-                .font(ThemeFont.caption)
-                .foregroundStyle(Theme.textTertiary)
         }
-        .padding(.horizontal, Theme.barPad + 2)
-        .frame(height: Theme.barRow)
-    }
-
-    private func readout(_ t: Double) -> String {
-        editor.showsFrames ? "\(controller.frameRate.frame(at: t))" : TimeFormat.clock(t)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

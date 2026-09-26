@@ -256,6 +256,8 @@ final class EditorController {
             let center = point ?? Vec2(Double(composition.width) / 2, Double(composition.height) / 2)
             var offset = 0.0
             var known = project.media
+            // Play bars go at the bottom of the timeline, in import order.
+            var nextRow = ActionFactory.nextRowOrder(in: project)
             for url in urls {
                 guard var asset = await MediaImport.describe(url) else { skipped = true; continue }
                 if let existing = known.first(where: { $0.contentHash == asset.contentHash }) {
@@ -274,7 +276,8 @@ final class EditorController {
                     let start = editor.mode == .animate ? frameRate.snapped(editor.time) : 0
                     let play = Action(target: layer.id, start: start,
                                       duration: max(frameRate.snapped(asset.duration ?? 1), frameRate.frameDuration),
-                                      name: "Play", spec: .play(PlayAction()))
+                                      name: "Play", rowOrder: nextRow, spec: .play(PlayAction()))
+                    nextRow += 1
                     commands.append(.insertActions([play]))
                 }
                 added.append(layer.id)
@@ -290,24 +293,17 @@ final class EditorController {
     /// Kinds of action the selection can take together.
     var availableActions: [ActionKind] { ActionFactory.kinds(for: selectedLayers) }
 
-    /// Adds an action of `kind` to every selected layer, at the playhead,
-    /// slotted into each layer's rows by start time, and selects them.
+    /// Adds an action of `kind` to every selected layer, at the playhead, on
+    /// new rows at the bottom of the timeline, and selects them.
     func addAction(_ kind: ActionKind) {
         let tracks = ActionTracks(project.actions)
-        var working = project
-        var added: [Action] = []
-        var commands: [EditorCommand] = []
-        for layer in selectedLayers where ActionFactory.kinds(for: layer).contains(kind) {
-            let action = ActionFactory.make(kind, for: layer, at: editor.time, state: tracks.state(of: layer, at: editor.time),
-                                            frameRate: frameRate, rowOrder: 0)
-            let (new, changed) = ActionEditing.slotting(action, into: working)
-            let step: [EditorCommand] = [.updateActions(changed), .insertActions([new])]
-            for command in step { try? command.apply(to: &working) }
-            commands += step
-            added.append(new)
+        let made = selectedLayers.filter { ActionFactory.kinds(for: $0).contains(kind) }.map { layer in
+            ActionFactory.make(kind, for: layer, at: editor.time, state: tracks.state(of: layer, at: editor.time),
+                               frameRate: frameRate, rowOrder: 0, mediaLength: asset(ofLayer: layer.id)?.duration)
         }
+        let added = ActionEditing.appendingRows(made, in: project)
         guard let first = added.first else { return NSSound.beep() }
-        if perform(.batch(commands, name: "Add \(first.name)")) { selectActions(Set(added.map(\.id))) }
+        if perform(.batch([.insertActions(added)], name: "Add \(first.name)")) { selectActions(Set(added.map(\.id))) }
     }
 
     // MARK: Action selection

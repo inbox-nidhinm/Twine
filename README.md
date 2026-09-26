@@ -91,7 +91,7 @@ On the canvas in Animate:
 - With a Move selected, its path shows: a hollow dot where it starts, a filled dot where it ends, and a curved path's two handles. Drag the layer, or the end dot, to set where it ends; the layer stays where it rests. Drag the handles to bend the path. Drag the start dot to set where it starts (over the layer, hold ⌘).
 - With a Resize, Scale or Rotate selected, the layer's outline and handles show it as it will be at the end of the action; drag a handle (or just outside a corner, for Rotate) to set the end, and the playhead goes to the action's end so the layer follows.
 
-The timeline runs the full width of the window in Animate, with the panels above it; drag its top edge to change its height, which every window remembers. Each layer with actions has a divider with its name, then one row per action.
+The timeline runs the full width of the window in Animate, with the panels above it; drag its top edge to change its height, which every window remembers. The play controls sit over a column of labels naming each row's layer and action; the ruler beside them carries the playhead's time in a teal pill. Rows run in the order actions were added: a new one goes to the bottom, and dragging a label or bar up or down reorders.
 
 | | |
 |---|---|
@@ -103,17 +103,17 @@ The timeline runs the full width of the window in Animate, with the panels above
 | Click or drag the ruler | Scrub |
 | Drag the end marker on the ruler | Make the scene longer or shorter |
 | Click, Shift-click, ⌘-click, drag a box | Select actions (their layers are selected with them) |
-| Drag a bar | Move it in time; drop it on another of its layer's rows to reorder |
+| Drag a bar | Move it in time; drop it on another row to reorder |
 | Drag a bar's end | Change its length; with ⌥, both ends move around the middle |
-| Click an eye | Switch an action off without deleting it |
-| Double-click a bar | Rename it |
+| Hover a label and click its eye | Switch an action off without deleting it |
+| Double-click a label or bar | Rename it |
+| Drag a label up or down | Reorder the rows |
+| Right-click | Stagger, Show Only Selected Layers, Show Times as Frames |
 | ← and → | Move the selected actions a frame (Shift for ten) |
 | ⌫, ⌘C, ⌘V, ⌘D | Delete, copy, paste at the playhead (onto the selected layers), duplicate after the originals. After a click in the timeline, Delete only ever removes actions |
-| Stagger (timeline header, or Edit menu) | Start the selected actions a set gap apart, in row order |
-| Filter (timeline header) | Show only the selected layers' actions |
+| Stagger (right-click, or Edit menu) | Start the selected actions a set gap apart, in row order |
 | ⌘-scroll or pinch | Zoom the time axis |
 | Scroll sideways, or ⌥-drag empty space | Pan |
-| Click the time readout | Switch between seconds and frames |
 
 Bars snap to the playhead, the scene's start and end, and other actions' starts and ends, and always land on frames.
 

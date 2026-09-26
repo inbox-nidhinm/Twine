@@ -163,8 +163,8 @@ public enum ActionFactory {
         }
     }
 
-    /// The row order that puts a new action after every other on its layer.
-    public static func nextRowOrder(on layerID: UUID, in project: Project) -> Int {
-        (project.actions(on: layerID).map(\.rowOrder).max() ?? -1) + 1
+    /// The row at the bottom of the timeline, after every other action.
+    public static func nextRowOrder(in project: Project) -> Int {
+        (project.actions.map(\.rowOrder).max() ?? -1) + 1
     }
 }
