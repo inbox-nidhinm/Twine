@@ -76,9 +76,21 @@ final class EditorModel {
 @Observable
 final class TimelineViewport {
     var pointsPerSecond: Double = 100
-    /// The time at the left edge of the tracks.
-    var start: Double = 0
     var hasFitted = false
+
+    /// How far 0s sits in from the left edge when scrolled all the way back,
+    /// in points: room for the playhead's pill.
+    static let lead: Double = 24
+
+    /// The time at the left edge of the tracks. Never earlier than 0s less
+    /// the lead, at any zoom, so 0s is a hard stop.
+    var start: Double {
+        get { max(origin, earliest) }
+        set { origin = max(newValue, earliest) }
+    }
+
+    private var origin: Double = 0
+    private var earliest: Double { -Self.lead / pointsPerSecond }
 
     func x(for time: Double) -> Double { (time - start) * pointsPerSecond }
     func time(at x: Double) -> Double { x / pointsPerSecond + start }

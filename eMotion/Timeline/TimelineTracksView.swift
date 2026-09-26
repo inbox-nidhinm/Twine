@@ -147,8 +147,8 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
     /// The whole composition across the tracks at first sight.
     private func fitIfNeeded() {
         guard let viewport, let controller, !viewport.hasFitted, bounds.width - gutter > 40 else { return }
-        viewport.pointsPerSecond = max((bounds.width - gutter - 48) / max(controller.duration, 0.1), 1)
-        viewport.start = -24 / viewport.pointsPerSecond
+        viewport.pointsPerSecond = max((bounds.width - gutter - TimelineViewport.lead * 2) / max(controller.duration, 0.1), 1)
+        viewport.start = -TimelineViewport.lead / viewport.pointsPerSecond
         viewport.hasFitted = true
     }
 

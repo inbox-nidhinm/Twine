@@ -91,7 +91,7 @@ On the canvas in Animate:
 - With a Move selected, its path shows: a hollow dot where it starts, a filled dot where it ends, and a curved path's two handles. Drag the layer, or the end dot, to set where it ends; the layer stays where it rests. Drag the handles to bend the path. Drag the start dot to set where it starts (over the layer, hold ⌘).
 - With a Resize, Scale or Rotate selected, the layer's outline and handles show it as it will be at the end of the action; drag a handle (or just outside a corner, for Rotate) to set the end, and the playhead goes to the action's end so the layer follows.
 
-The timeline runs the full width of the window in Animate, with the panels above it; drag its top edge to change its height, which every window remembers. The play controls sit over a column of labels naming each row's layer and action; the ruler beside them carries the playhead's time in a teal pill. Rows run in the order actions were added: a new one goes to the bottom, and dragging a label or bar up or down reorders.
+The timeline runs the full width of the window in Animate, with the panels above it; drag its top edge to change its height, which every window remembers. The play controls sit over a column of labels naming each row's layer and action; the ruler beside them labels whole seconds and carries the playhead's time in a teal pill. The column lines up with the layers panel above it, and the timeline stops at 0s. Rows run in the order actions were added: a new one goes to the bottom, and dragging a label or bar up or down reorders.
 
 | | |
 |---|---|

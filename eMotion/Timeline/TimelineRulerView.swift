@@ -42,8 +42,8 @@ final class TimelineRulerView: NSView {
             ctx.fill(CGRect(x: max(endX, 0), y: 0, width: bounds.width - max(endX, 0), height: bounds.height))
         }
 
-        // Times at least 64 points apart, on round numbers of frames or
-        // seconds, with dots between.
+        // Whole seconds (or round numbers of frames) at least 64 points
+        // apart, with dots between.
         let step = Self.labelStep(pointsPerSecond: viewport.pointsPerSecond, rate: rate, framesShown: controller.editor.showsFrames)
         let minor = step / 5
         var t = (viewport.start / minor).rounded(.down) * minor
@@ -100,15 +100,13 @@ final class TimelineRulerView: NSView {
         let minimum = 64 / pointsPerSecond
         let frame = rate.frameDuration
         let frameSteps = [1.0, 2, 5, 10, 15, 30].map { $0 * frame }
-        let secondSteps = [0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300]
-        let candidates = framesShown ? frameSteps + secondSteps : [frame] + secondSteps
+        let secondSteps: [Double] = [1, 2, 5, 10, 15, 30, 60, 120, 300]
+        let candidates = framesShown ? frameSteps + secondSteps : secondSteps
         return candidates.first { $0 >= minimum } ?? 600
     }
 
     static func format(_ t: Double) -> String {
-        if t >= 60 { return TimeFormat.clock(t) }
-        if abs(t - t.rounded()) < 1e-6 { return "\(Int(t.rounded()))s" }
-        return String(format: "%.2fs", t).replacingOccurrences(of: "0s", with: "s")
+        t >= 60 ? TimeFormat.clock(t) : "\(Int(t.rounded()))s"
     }
 
     // MARK: Scrubbing

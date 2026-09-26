@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Timeline touches", changes: [
+            "The timeline's label column is as wide as the layers panel, so its divider lines up with the panel's right edge.",
+            "The timeline stops at 0s: it no longer scrolls back into time before the start.",
+            "The ruler labels whole seconds only, with dots between.",
+        ]),
         .init(date: "26 September 2026", title: "A new timeline", changes: [
             "Labels down the left name each row's layer and action, with the play controls above them. Rows are taller and the bars simpler, with a faint line between rows.",
             "Rows run in the order actions were added, whatever their layer: a new action goes to the bottom. Drag a row's label, or its bar, up or down to put it anywhere.",

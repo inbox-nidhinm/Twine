@@ -1,5 +1,6 @@
 import Foundation
 import MotionModel
+import Theme
 import MotionEditing
 
 /// The timeline's rows, top to bottom: one per action, in the order the
@@ -15,7 +16,9 @@ struct TimelineRow {
     /// The bar inside it.
     static let barHeight: CGFloat = 24
     /// The column of labels down the left, which the transport sits over.
-    static let labelWidth: CGFloat = 240
+    /// As wide as the layers panel, so the timeline's divider lines up with
+    /// that panel's right edge: both cards start at the same inset.
+    static let labelWidth: CGFloat = Theme.panelWidth
 
     var layerID: UUID { action.targetLayerID }
 
