@@ -143,14 +143,18 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
         #expect(abs(corner.x - 95) < 1e-9 && abs(corner.y - 5) < 1e-9)
     }
 
-    @Test func videoSourceTimeFollowsTrim() {
-        let clip = Layer(name: "Clip", content: .video(VideoContent(mediaID: UUID(), trimStart: 2)),
-                         size: Size2(10, 10), position: .zero)
-        guard case .video(_, let sourceTime) = evaluate(Project(layers: [clip]), at: 1.5).layers[0].content else {
-            Issue.record("expected video")
-            return
+    @Test func videoPlaysWhereItsPlayActionSays() {
+        let clip = Layer(name: "Clip", content: .video(VideoContent(mediaID: UUID())), size: Size2(10, 10), position: .zero)
+        let play = Action(target: clip.id, start: 1, duration: 2, spec: .play(PlayAction(trimStart: 2)))
+        func source(at t: Double) -> Double? {
+            guard case .video(_, let s) = evaluate(Project(layers: [clip], actions: [play]), at: t).layers[0].content else { return nil }
+            return s
         }
-        #expect(sourceTime == 3.5)
+        #expect(source(at: 0) == 2)      // waiting on its first frame
+        #expect(source(at: 1.5) == 2.5)
+        #expect(source(at: 5) == 4)      // resting on its last
+        guard case .video(_, let design) = evaluateDesign(Project(layers: [clip], actions: [play])).layers[0].content else { return }
+        #expect(design == 0)
     }
 }
 

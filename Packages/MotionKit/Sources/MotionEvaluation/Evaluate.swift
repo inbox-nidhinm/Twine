@@ -87,7 +87,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, at t: Dou
     case .image(let image):
         content = .image(mediaID: image.mediaID)
     case .video(let video):
-        content = .video(mediaID: video.mediaID, sourceTime: video.trimStart + t)
+        content = .video(mediaID: video.mediaID, sourceTime: state.sourceTime ?? 0)
     case .audio:
         return nil
     case .group(let group):

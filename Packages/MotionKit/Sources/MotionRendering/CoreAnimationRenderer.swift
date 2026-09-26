@@ -32,6 +32,10 @@ public final class CoreAnimationRenderer: SceneRenderer {
         didSet { for node in nodes.values { node.flipsContents = flipsContents } }
     }
 
+    /// Where image and video layers get their pictures. Without one they draw
+    /// as a grey box, as they do when a file is missing.
+    public var media: MediaProvider?
+
     /// How many device pixels to rasterise per point. Raise it for Retina
     /// screens and high-resolution exports.
     public var contentsScale: CGFloat = 2 {
@@ -70,7 +74,7 @@ public final class CoreAnimationRenderer: SceneRenderer {
                 nodes[resolved.id] = made
                 return made
             }()
-            node.update(resolved)
+            node.update(resolved, media: media)
             seen.insert(resolved.id)
             children[resolved.parentID, default: []].append(node.container)
         }
@@ -128,6 +132,8 @@ private final class Node {
     private var textLayers: [CALayer] = []
     private var textKeys: [TextImage.Key?] = [nil, nil]
     private var textImages: [TextImage?] = [nil, nil]
+    /// An image or video layer's picture.
+    private var mediaLayer: CALayer?
 
     init(scale: CGFloat) {
         self.scale = scale
@@ -145,7 +151,7 @@ private final class Node {
         textKeys = [nil, nil]
     }
 
-    func update(_ layer: ResolvedLayer) {
+    func update(_ layer: ResolvedLayer, media: MediaProvider?) {
         container.bounds = CGRect(origin: .zero, size: layer.size.cg)
         // The anchor point stays at the layer's origin and the whole local
         // transform goes in the matrix, so a layer of zero width or height
@@ -183,11 +189,20 @@ private final class Node {
         case .text(let text):
             if !signature.isEmpty { clearPaint() }
             updateText(text, size: layer.size)
-        case .image, .video:
-            // Drawn from milestone 8.
+        case .image(let id):
             if !signature.isEmpty { clearPaint() }
+            updateMedia(media?.image(id), size: layer.size)
+        case .video(let id, let time):
+            if !signature.isEmpty { clearPaint() }
+            updateMedia(media?.videoFrame(id, at: time), size: layer.size)
         }
         if case .text = layer.content {} else if !textLayers.isEmpty { clearText() }
+        switch layer.content {
+        case .image, .video: break
+        default:
+            mediaLayer?.removeFromSuperlayer()
+            mediaLayer = nil
+        }
     }
 
     /// The shadow's outline grown by `spread`, or shrunk for a negative one.
@@ -224,6 +239,29 @@ private final class Node {
         if blur.radius != backdropRadius {
             backdropRadius = blur.radius
             backdrop.filters = [Blur.filter(amount: blur.radius)]
+        }
+    }
+
+    /// The picture stretched to the layer's box, or a grey box where the file
+    /// is missing, so the layer can still be seen and picked.
+    private func updateMedia(_ image: CGImage?, size: Size2) {
+        if mediaLayer == nil {
+            let l = CALayer()
+            l.actions = Self.noActions
+            l.contentsGravity = .resize
+            container.sublayers = [l]
+            mediaLayer = l
+        }
+        guard let mediaLayer else { return }
+        mediaLayer.transform = CATransform3DIdentity
+        mediaLayer.frame = CGRect(origin: .zero, size: size.cg)
+        mediaLayer.transform = flipsContents ? CATransform3DMakeScale(1, -1, 1) : CATransform3DIdentity
+        if let image {
+            if (mediaLayer.contents as AnyObject?) !== image { mediaLayer.contents = image }
+            mediaLayer.backgroundColor = nil
+        } else {
+            mediaLayer.contents = nil
+            mediaLayer.backgroundColor = CGColor(gray: 0.5, alpha: 1)
         }
     }
 

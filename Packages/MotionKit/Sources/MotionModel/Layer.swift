@@ -169,34 +169,31 @@ public struct ImageContent: Codable, Sendable, Equatable {
     }
 }
 
-/// A video clip. Until its Play bar arrives (redesign milestone 8), the frame
-/// shown at composition time `t` is the one at `trimStart + t` in the source.
+/// A video clip. When it plays, and which part of the file, is set by its
+/// Play actions; the layer holds only what stays the same.
 public struct VideoContent: Codable, Sendable, Equatable {
     public var mediaID: UUID
-    public var trimStart: Double
     /// 1 is the clip's own level.
     public var volume: Double
     public var isMuted: Bool
 
-    public init(mediaID: UUID, trimStart: Double = 0) {
+    public init(mediaID: UUID, volume: Double = 1, isMuted: Bool = false) {
         self.mediaID = mediaID
-        self.trimStart = trimStart
-        self.volume = 1
-        self.isMuted = false
+        self.volume = volume
+        self.isMuted = isMuted
     }
 }
 
+/// A sound, played by its Play actions.
 public struct AudioContent: Codable, Sendable, Equatable {
     public var mediaID: UUID
-    public var trimStart: Double
     public var volume: Double
     public var isMuted: Bool
 
-    public init(mediaID: UUID, trimStart: Double = 0) {
+    public init(mediaID: UUID, volume: Double = 1, isMuted: Bool = false) {
         self.mediaID = mediaID
-        self.trimStart = trimStart
-        self.volume = 1
-        self.isMuted = false
+        self.volume = volume
+        self.isMuted = isMuted
     }
 }
 

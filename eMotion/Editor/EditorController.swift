@@ -13,6 +13,30 @@ final class EditorController {
     let store: ProjectStore
     let editor: EditorModel
     weak var canvas: CanvasNSView?
+    /// The document, for reading and storing imported files.
+    weak var document: ProjectDocument?
+    /// Pictures and video frames for the canvas.
+    private(set) lazy var media = MediaLibrary { [weak self] id in self?.document?.mediaURL(for: id) }
+    /// Sounds' loudness, for the timeline's Play bars.
+    let waveforms = Waveforms()
+    /// The sound while playing.
+    private lazy var audio = AudioPreview { [weak self] id in self?.document?.mediaURL(for: id) }
+
+    private func followAudio() {
+        audio.follow(project, time: editor.time, playing: editor.isPlaying)
+    }
+
+    /// The imported file a layer shows or plays, if it has one.
+    func asset(ofLayer id: UUID) -> MediaAsset? {
+        let mediaID: UUID
+        switch project.layer(withID: id)?.content {
+        case .image(let c): mediaID = c.mediaID
+        case .video(let c): mediaID = c.mediaID
+        case .audio(let c): mediaID = c.mediaID
+        default: return nil
+        }
+        return project.media.first { $0.id == mediaID }
+    }
 
     init(store: ProjectStore, editor: EditorModel) {
         self.store = store
@@ -167,9 +191,13 @@ final class EditorController {
     func togglePlay() {
         if !editor.isPlaying, editor.time >= lastFrameTime { editor.time = 0 }
         editor.isPlaying.toggle()
+        followAudio()
     }
 
-    func stop() { editor.isPlaying = false }
+    func stop() {
+        editor.isPlaying = false
+        followAudio()
+    }
 
     /// Moves the playhead, landing on a frame.
     func seek(to time: Double) {
@@ -207,6 +235,54 @@ final class EditorController {
             }
         }
         editor.time = next
+        followAudio()
+    }
+
+    // MARK: Importing
+
+    /// Imports pictures, video and sound as new layers, centred on `point`
+    /// (the middle of the composition when nil), and selects them. A video
+    /// or a sound gets a Play bar for its whole length, at the playhead in
+    /// Animate and at the start in Design. A file already in the project is
+    /// used again rather than stored twice. Files that are none of these, or
+    /// will not open, are skipped with a beep.
+    func importMedia(_ urls: [URL], at point: Vec2? = nil) {
+        guard let document else { return }
+        Task { @MainActor in
+            var commands: [EditorCommand] = []
+            var added: [UUID] = []
+            var skipped = false
+            let composition = project.composition
+            let center = point ?? Vec2(Double(composition.width) / 2, Double(composition.height) / 2)
+            var offset = 0.0
+            var known = project.media
+            for url in urls {
+                guard var asset = await MediaImport.describe(url) else { skipped = true; continue }
+                if let existing = known.first(where: { $0.contentHash == asset.contentHash }) {
+                    asset = existing
+                } else {
+                    do { try await document.stage(url, as: asset.fileName) } catch { skipped = true; continue }
+                    commands.append(.addMedia(asset))
+                    known.append(asset)
+                }
+                let name = url.deletingPathExtension().lastPathComponent
+                let layer = LayerFactory.media(asset, center: Vec2(center.x + offset, center.y + offset),
+                                               fitting: composition.size, name: name)
+                offset += 20
+                commands.append(.insertLayers([layer], parentID: nil, index: nil))
+                if asset.kind != .image {
+                    let start = editor.mode == .animate ? frameRate.snapped(editor.time) : 0
+                    let play = Action(target: layer.id, start: start,
+                                      duration: max(frameRate.snapped(asset.duration ?? 1), frameRate.frameDuration),
+                                      name: "Play", spec: .play(PlayAction()))
+                    commands.append(.insertActions([play]))
+                }
+                added.append(layer.id)
+            }
+            if skipped { NSSound.beep() }
+            guard !commands.isEmpty, perform(.batch(commands, name: added.count == 1 ? "Import" : "Import Files")) else { return }
+            select(added)
+        }
     }
 
     // MARK: Actions
@@ -347,6 +423,36 @@ final class EditorController {
     }
 
     static let actionPasteboardType = NSPasteboard.PasteboardType("com.nidhin.emotion.actions")
+    static let easingPasteboardType = NSPasteboard.PasteboardType("com.nidhin.emotion.easing")
+
+    /// Actions whose easing can be copied from or pasted onto: not instant,
+    /// and not a Play, which runs at its clip's speed.
+    private var easedSelection: [Action] {
+        selectedActions.filter { !$0.isInstant && $0.spec.kind != .play }
+    }
+
+    var canCopyEasing: Bool { !easedSelection.isEmpty }
+    var canPasteEasing: Bool {
+        !easedSelection.isEmpty && NSPasteboard.general.data(forType: Self.easingPasteboardType) != nil
+    }
+
+    /// Copies the easing of the first selected action, down the timeline.
+    func copyEasing() {
+        guard let first = TimelineRow.order(of: easedSelection, in: project).first,
+              let data = try? JSONEncoder().encode(first.easing) else { return NSSound.beep() }
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.setData(data, forType: Self.easingPasteboardType)
+    }
+
+    /// Gives every selected action the copied easing, as one undo step.
+    func pasteEasing() {
+        guard let data = NSPasteboard.general.data(forType: Self.easingPasteboardType),
+              let easing = try? JSONDecoder().decode(Easing.self, from: data), !easedSelection.isEmpty else { return NSSound.beep() }
+        editActions("Paste Easing") { a in
+            if !a.isInstant && a.spec.kind != .play { a.easing = easing }
+        }
+    }
 
     func copySelectedActions() {
         let actions = selectedActions

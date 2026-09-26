@@ -24,7 +24,8 @@ public enum ActionFactory {
         let transform: [ActionKind] = [.move, .scale, .rotate, .opacity, .resize, .visibility]
         switch layer.content {
         case .audio:
-            return []
+            // Sound has nothing to move or fade; it only plays.
+            return [.play]
         case .group:
             return transform.filter { $0 != .resize } + [.shadow, .layerBlur]
         case .shape(let shape):
@@ -41,8 +42,10 @@ public enum ActionFactory {
             // to resize.
             return transform.filter { $0 != .resize } + [.color, .shadow, .layerBlur,
                                                         .letterSpacing, .lineHeight, .counter, .changeText]
-        case .image, .video:
+        case .image:
             return transform + [.shadow, .layerBlur]
+        case .video:
+            return transform + [.shadow, .layerBlur, .play]
         }
     }
 
@@ -60,12 +63,13 @@ public enum ActionFactory {
     /// grows from the current size, and Hide/Show does whichever is not
     /// already the case. `rowOrder` should put it after the layer's others.
     public static func make(_ kind: ActionKind, for layer: Layer, at time: Double, state: LayerState,
-                            frameRate: FrameRate, rowOrder: Int) -> Action {
+                            frameRate: FrameRate, rowOrder: Int, mediaLength: Double? = nil) -> Action {
         let start = frameRate.snapped(max(time, 0))
         let duration = frameRate.snapped(defaultDuration)
         let spec: ActionSpec
         var name: String?
         var counting = false
+        var playing = false
         switch kind {
         case .move:
             spec = .move(MoveAction(mode: .by, end: Vec2(100, 0)))
@@ -128,10 +132,14 @@ public enum ActionFactory {
             var star = state.star ?? StarShape(points: 5, innerRadius: 0.4)
             star.points += 3
             spec = .star(StarAction(end: star))
+        case .play:
+            spec = .play(PlayAction(trimStart: 0))
+            playing = true
         }
         // Counting a hundred numbers in half a second is a blur; a counter
         // gets long enough to read.
-        let length = kind == .visibility ? 0 : counting ? frameRate.snapped(counterDuration) : duration
+        let length = kind == .visibility ? 0 : counting ? frameRate.snapped(counterDuration)
+            : playing ? max(frameRate.snapped(mediaLength ?? defaultDuration), frameRate.frameDuration) : duration
         return Action(target: layer.id, start: start, duration: length,
                       name: name, rowOrder: rowOrder, spec: spec)
     }

@@ -70,6 +70,7 @@ public enum ActionSpec: Sendable, Equatable {
     case changeText(ChangeTextAction)
     case arc(ArcAction)
     case star(StarAction)
+    case play(PlayAction)
 
     public var kind: ActionKind {
         switch self {
@@ -92,6 +93,7 @@ public enum ActionSpec: Sendable, Equatable {
         case .changeText: return .changeText
         case .arc: return .arc
         case .star: return .star
+        case .play: return .play
         }
     }
 }
@@ -102,6 +104,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     case layerBlur, backgroundBlur
     case letterSpacing, lineHeight, counter, changeText
     case arc, star
+    case play
 
     public var defaultName: String {
         switch self {
@@ -124,6 +127,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .changeText: return "Change Text"
         case .arc: return "Arc"
         case .star: return "Star"
+        case .play: return "Play"
         }
     }
 
@@ -135,12 +139,13 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .layerBlur, .backgroundBlur: return .blur
         case .letterSpacing, .lineHeight, .counter, .changeText: return .text
         case .arc, .star: return .shape
+        case .play: return .media
         }
     }
 }
 
 public enum ActionCategory: String, Sendable, CaseIterable {
-    case transform, style, blur, text, shape
+    case transform, style, blur, text, shape, media
 
     public var title: String {
         switch self {
@@ -149,6 +154,7 @@ public enum ActionCategory: String, Sendable, CaseIterable {
         case .blur: return "Blur"
         case .text: return "Text"
         case .shape: return "Shape"
+        case .media: return "Media"
         }
     }
 }
@@ -459,11 +465,23 @@ public struct StarAction: Codable, Sendable, Equatable {
     }
 }
 
+/// Plays a video or audio layer's media: from `trimStart` seconds into the
+/// file, for the action's duration, starting at the action's start. Before
+/// it, a video shows the frame it will start on; after it, the frame it
+/// stopped on. Every media layer gets one when it is imported.
+public struct PlayAction: Codable, Sendable, Equatable {
+    public var trimStart: Double
+
+    public init(trimStart: Double = 0) {
+        self.trimStart = trimStart
+    }
+}
+
 extension ActionSpec: Codable {
     private enum CodingKeys: String, CodingKey {
         case type, move, scale, rotate, opacity, resize, visibility
         case color, stroke, trim, cornerRadius, shadow, layerBlur, backgroundBlur
-        case letterSpacing, lineHeight, counter, changeText, arc, star
+        case letterSpacing, lineHeight, counter, changeText, arc, star, play
     }
 
     public init(from decoder: Decoder) throws {
@@ -488,6 +506,7 @@ extension ActionSpec: Codable {
         case .changeText: self = .changeText(try c.decode(ChangeTextAction.self, forKey: .changeText))
         case .arc: self = .arc(try c.decode(ArcAction.self, forKey: .arc))
         case .star: self = .star(try c.decode(StarAction.self, forKey: .star))
+        case .play: self = .play(try c.decode(PlayAction.self, forKey: .play))
         }
     }
 
@@ -514,6 +533,7 @@ extension ActionSpec: Codable {
         case .changeText(let v): try c.encode(v, forKey: .changeText)
         case .arc(let v): try c.encode(v, forKey: .arc)
         case .star(let v): try c.encode(v, forKey: .star)
+        case .play(let v): try c.encode(v, forKey: .play)
         }
     }
 }

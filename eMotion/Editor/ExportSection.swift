@@ -10,6 +10,8 @@ import Theme
 struct ExportSection: View {
     @Bindable var session: ExportSession
     let composition: Composition
+    /// Whether anything in the project makes a sound.
+    let hasSound: Bool
     @Binding var isOpen: Bool
 
     private var settings: ExportSettings { session.settings }
@@ -28,6 +30,10 @@ struct ExportSection: View {
                         MenuRow(label: "Quality", value: settings.quality.title, entries: qualityEntries)
                             .help("Lower quality makes a smaller file. Flat colour and clean edges look the "
                                   + "same at any setting; gradients and blur show the difference first.")
+                    }
+                    if hasSound && settings.format.isMovie {
+                        ToggleRow(label: "Audio", isOn: settings.includesAudio) { session.settings.includesAudio.toggle() }
+                            .help("Includes the sound of the project's video and audio layers.")
                     }
                     PanelButton(title: "Export…", icon: .export, disabled: session.isExporting) {
                         session.request(nil)

@@ -10,11 +10,20 @@ public enum ActionEditing {
     /// `rowOrder`; new actions are slotted in by start time, and the user can
     /// rearrange them. Start, then id, only settle ties.
     public static func rows(on layerID: UUID, in project: Project) -> [Action] {
-        project.actions(on: layerID).sorted {
-            if $0.rowOrder != $1.rowOrder { return $0.rowOrder < $1.rowOrder }
-            if $0.start != $1.start { return $0.start < $1.start }
-            return $0.id.uuidString < $1.id.uuidString
-        }
+        project.actions(on: layerID).sorted(by: rowOrder)
+    }
+
+    /// Every layer's actions in their rows at once, for the whole timeline:
+    /// one pass over the actions rather than one per layer.
+    public static func rowsByLayer(in project: Project) -> [UUID: [Action]] {
+        Dictionary(grouping: project.actions, by: \.targetLayerID).mapValues { $0.sorted(by: rowOrder) }
+    }
+
+    /// The order of rows within a layer.
+    public static func rowOrder(_ a: Action, _ b: Action) -> Bool {
+        if a.rowOrder != b.rowOrder { return a.rowOrder < b.rowOrder }
+        if a.start != b.start { return a.start < b.start }
+        return a.id.uuidString < b.id.uuidString
     }
 
     /// Where a new action goes among its layer's rows: after every row that
@@ -68,23 +77,36 @@ public enum ActionEditing {
     /// The action with one end dragged to `time`. The other end stays put,
     /// or with `symmetric` moves the opposite way, and the action never gets
     /// shorter than a frame or starts before zero.
+    ///
+    /// A Play bar trims its media: its start edge moves where in the file it
+    /// begins, so the picture and sound stay where they were in time, and
+    /// neither edge goes past the ends of the file (`mediaLength`, when known).
     public static func trimmed(_ action: Action, startEdge: Bool, to time: Double, symmetric: Bool,
-                               rate: FrameRate) -> Action {
+                               rate: FrameRate, mediaLength: Double? = nil) -> Action {
         let frame = rate.frameDuration
         var a = action
         let t = rate.snapped(time)
+        var play: PlayAction?
+        if case .play(let p) = action.spec { play = p }
+        // The furthest back the start can go, and forward the end, in the file.
+        let earliest = play.map { action.start - $0.trimStart } ?? -Double.infinity
+        let latest = play.flatMap { p in mediaLength.map { action.start - p.trimStart + $0 } } ?? .infinity
         if startEdge {
             var start = t, end = action.end
-            if symmetric { end = rate.snapped(action.end - (t - action.start)) }
-            start = max(0, min(start, end - frame))
+            if symmetric { end = min(rate.snapped(action.end - (t - action.start)), latest) }
+            start = max(0, earliest, min(start, end - frame))
             a.start = start
             a.duration = max(rate.snapped(end - start), frame)
         } else {
-            var start = action.start, end = t
-            if symmetric { start = max(0, rate.snapped(action.start - (t - action.end))) }
+            var start = action.start, end = min(t, latest)
+            if symmetric { start = max(0, earliest, rate.snapped(action.start - (t - action.end))) }
             end = max(end, start + frame)
             a.start = start
             a.duration = rate.snapped(end - start)
+        }
+        if var p = play {
+            p.trimStart = max(0, p.trimStart + (a.start - action.start))
+            a.spec = .play(p)
         }
         return a
     }

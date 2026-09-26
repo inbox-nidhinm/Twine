@@ -36,9 +36,10 @@ struct TimelineRow {
     static func rows(of project: Project, only: Set<UUID>? = nil) -> [TimelineRow] {
         var out: [TimelineRow] = []
         var y: CGFloat = 0
+        let byLayer = ActionEditing.rowsByLayer(in: project)
         for layer in panelOrder(project.layers) {
             if let only, !only.contains(layer.id) { continue }
-            let actions = ActionEditing.rows(on: layer.id, in: project)
+            let actions = byLayer[layer.id] ?? []
             guard !actions.isEmpty else { continue }
             out.append(TimelineRow(kind: .layer(layer), y: y, height: dividerHeight))
             y += dividerHeight

@@ -15,7 +15,17 @@ struct LayerInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            transformSection
+            // Sound has nowhere to be and nothing to show.
+            if case .audio = layer.content {} else { transformSection }
+            switch layer.content {
+            case .video(let v):
+                PanelDivider()
+                SoundSection(layer: layer, volume: v.volume, isMuted: v.isMuted, controller: controller)
+            case .audio(let a):
+                SoundSection(layer: layer, volume: a.volume, isMuted: a.isMuted, controller: controller)
+            default:
+                EmptyView()
+            }
             if case .shape(let shape) = layer.content {
                 shapeSection(shape.geometry)
                 PanelDivider()
@@ -271,6 +281,52 @@ struct LayerInspector: View {
                         _ set: @escaping (inout Layer, Double) -> Void) -> some View {
         UnitField(unit: unit, value: value, decimals: 1, accepts: accepts) { v in
             controller.edit(layer.id) { l in set(&l, v) }
+        }
+    }
+}
+
+// MARK: - Sound
+
+/// A video's or a sound's level, for preview and export alike.
+private struct SoundSection: View {
+    let layer: Layer
+    let volume: Double
+    let isMuted: Bool
+    let controller: EditorController
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HeaderRow(title: "Sound") {
+                IconButton(icon: isMuted ? .speakerOff : .speaker, help: isMuted ? "Unmute" : "Mute") {
+                    controller.edit(layer.id) { l in l.content = Self.with(l.content) { $1.toggle() } }
+                }
+            }
+            SliderRow(label: "Volume", value: volume * 100, range: 0...200, readout: { "\(Int($0.rounded()))%" },
+                      onChange: { v in
+                          var l = layer
+                          l.content = Self.with(l.content) { level, _ in level = v / 100 }
+                          controller.update([l])
+                      },
+                      onBegin: { controller.begin("Volume") },
+                      onEnd: { controller.end() })
+                .opacity(isMuted ? 0.4 : 1)
+                .padding(.horizontal, Theme.panelPad)
+                .help("100% is the file's own level")
+        }
+        .padding(.bottom, Theme.panelPad)
+    }
+
+    /// The content with its volume and mute changed, whichever kind it is.
+    static func with(_ content: LayerContent, _ change: (inout Double, inout Bool) -> Void) -> LayerContent {
+        switch content {
+        case .video(var v):
+            change(&v.volume, &v.isMuted)
+            return .video(v)
+        case .audio(var a):
+            change(&a.volume, &a.isMuted)
+            return .audio(a)
+        default:
+            return content
         }
     }
 }

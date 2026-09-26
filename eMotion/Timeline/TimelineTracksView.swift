@@ -42,7 +42,9 @@ struct ActionTimeline: NSViewRepresentable {
 /// an action off. Double-click a bar to rename it. Option-drag empty space,
 /// or scroll sideways, to pan; Command-scroll or pinch to zoom.
 final class TimelineTracksView: NSView, NSTextFieldDelegate {
-    var controller: EditorController?
+    var controller: EditorController? {
+        didSet { controller?.waveforms.onChange = { [weak self] in self?.needsDisplay = true } }
+    }
     private(set) var rows: [TimelineRow] = []
 
     private var drag: Drag?
@@ -212,6 +214,8 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         ctx.setLineWidth(1)
         ctx.strokePath()
 
+        if case .play(let play) = action.spec { drawWaveform(action, play: play, in: rect, selected: selected, ctx: ctx) }
+
         // Icon, name and layer: inside a bar, or beside an instant marker.
         let label = action.isInstant
             ? CGRect(x: rect.maxX + 4, y: row.y, width: 400, height: row.height)
@@ -230,6 +234,33 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         (layerName as NSString).draw(at: CGPoint(x: cursor, y: row.y + 5), withAttributes: [
             .font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor(Theme.textTertiary),
         ])
+        ctx.restoreGState()
+    }
+
+    /// A sound's loudness along its Play bar, for the part of the file it
+    /// plays, drawn faintly behind the label.
+    private func drawWaveform(_ action: Action, play: PlayAction, in rect: CGRect, selected: Bool, ctx: CGContext) {
+        guard let controller, let asset = controller.asset(ofLayer: action.targetLayerID), asset.hasAudio,
+              let peaks = controller.waveforms.peaks(for: asset.id, at: controller.document?.mediaURL(for: asset.id)),
+              !peaks.isEmpty, action.duration > 0 else { return }
+        ctx.saveGState()
+        ctx.clip(to: rect.insetBy(dx: 1, dy: 2))
+        let visible = rect.intersection(CGRect(x: gutter, y: rect.minY, width: bounds.width - gutter, height: rect.height))
+        let path = CGMutablePath()
+        let mid = rect.midY, half = rect.height / 2 - 3
+        var x = visible.minX.rounded(.down)
+        while x <= visible.maxX {
+            let t = play.trimStart + Double(x - rect.minX) / rect.width * action.duration
+            let i = Int(t * Waveforms.peaksPerSecond)
+            if i >= 0, i < peaks.count {
+                let h = max(CGFloat(peaks[i]) * half, 0.5)
+                path.addRect(CGRect(x: x, y: mid - h, width: 1, height: h * 2))
+            }
+            x += 2
+        }
+        ctx.addPath(path)
+        ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.textTertiary).withAlphaComponent(0.35).cgColor)
+        ctx.fillPath()
         ctx.restoreGState()
     }
 
@@ -336,7 +367,8 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
             let edge = startEdge ? original.start : original.end
             let target = edge + snapped((p.x - startX) / viewport.pointsPerSecond, edges: [edge], ignoring: [original.id])
             let trimmed = ActionEditing.trimmed(original, startEdge: startEdge, to: target,
-                                                symmetric: event.modifierFlags.contains(.option), rate: rate)
+                                                symmetric: event.modifierFlags.contains(.option), rate: rate,
+                                                mediaLength: controller.asset(ofLayer: original.targetLayerID)?.duration)
             controller.update(.updateActions([trimmed]))
 
         case .marquee(let start, _, let base):
@@ -499,6 +531,7 @@ extension ActionKind {
         case .changeText: return .changeText
         case .arc: return .arc
         case .star: return .star
+        case .play: return .play
         }
     }
 }

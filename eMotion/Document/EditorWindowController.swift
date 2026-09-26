@@ -14,6 +14,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     init(document: ProjectDocument, store: ProjectStore) {
         editor = document.editor
         controller = EditorController(store: store, editor: document.editor)
+        controller.document = document
         let window = makeChromelessWindow(size: NSSize(width: 1440, height: 920), minSize: NSSize(width: 980, height: 660))
         super.init(window: window)
 
@@ -59,7 +60,19 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         controller.stop()
         editor.exports.begin(format: format, project: controller.project, time: editor.time,
                              design: editor.mode == .design, name: exportName,
-                             window: window)
+                             media: (document as? ProjectDocument)?.mediaURLs ?? [:], window: window)
+    }
+
+    /// Asks for pictures, video or sound to bring in as layers.
+    @objc func importMedia(_ sender: Any?) {
+        guard let window else { return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = MediaImport.types
+        panel.allowsMultipleSelection = true
+        panel.beginSheetModal(for: window) { [weak self, weak panel] response in
+            guard response == .OK, let urls = panel?.urls else { return }
+            self?.controller.importMedia(urls)
+        }
     }
 
     /// The project's name without its extension, which Finder shows in
@@ -90,6 +103,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         editor.showLayers = true
         editor.renaming = controller.selection.first
     }
+    @objc func copyEasing(_ sender: Any?) { controller.copyEasing() }
+    @objc func pasteEasing(_ sender: Any?) { controller.pasteEasing() }
     @objc func groupLayers(_ sender: Any?) { controller.groupSelection() }
     @objc func ungroupLayers(_ sender: Any?) { controller.ungroupSelection() }
     @objc func bringForward(_ sender: Any?) { controller.restack(.forward) }
@@ -146,6 +161,10 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         case #selector(previousFrame(_:)), #selector(nextFrame(_:)), #selector(goToStart(_:)), #selector(goToEnd(_:)),
              #selector(previousEdge(_:)), #selector(nextEdge(_:)):
             return editor.mode == .animate
+        case #selector(copyEasing(_:)):
+            return controller.canCopyEasing
+        case #selector(pasteEasing(_:)):
+            return controller.canPasteEasing
         case #selector(staggerActions(_:)):
             return editor.mode == .animate && controller.selectedActions.count > 1
         case #selector(toggleLoop(_:)):

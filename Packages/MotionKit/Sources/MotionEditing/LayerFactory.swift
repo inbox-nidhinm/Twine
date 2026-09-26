@@ -54,6 +54,24 @@ public enum LayerFactory {
                      position: Vec2(point.x + size.width / 2, point.y + size.height / 2))
     }
 
+    /// A layer for an imported file, centred on `center`. Pictures and video
+    /// come in at their own size, shrunk to fit `fitting` if they are larger;
+    /// sound has no size and sits at the origin.
+    public static func media(_ asset: MediaAsset, center: Vec2, fitting: Size2, name: String) -> Layer {
+        let content: LayerContent
+        switch asset.kind {
+        case .image: content = .image(ImageContent(mediaID: asset.id))
+        case .video: content = .video(VideoContent(mediaID: asset.id))
+        case .audio: content = .audio(AudioContent(mediaID: asset.id))
+        }
+        guard asset.kind != .audio, let w = asset.pixelWidth, let h = asset.pixelHeight, w > 0, h > 0 else {
+            return Layer(name: name, content: content, size: Size2(0, 0), position: .zero)
+        }
+        let scale = min(1, fitting.width / Double(w), fitting.height / Double(h))
+        return Layer(name: name, content: content, size: Size2((Double(w) * scale).rounded(), (Double(h) * scale).rounded()),
+                     position: center)
+    }
+
     /// A line from `start` to `end`: a box as long as the line and no taller,
     /// turned to point the right way, with its anchor in the middle.
     public static func line(from start: Vec2, to end: Vec2, name: String) -> Layer {

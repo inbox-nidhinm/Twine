@@ -60,6 +60,7 @@ final class CanvasNSView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        registerForDraggedTypes([.fileURL])
         wantsLayer = true
         // Core Image filters on layers, which layer blur uses, only render in
         // a view that allows them.
@@ -128,6 +129,7 @@ final class CanvasNSView: NSView {
             compositionSize = scene.size
             hasFitted = false
         }
+        if renderer.media == nil { renderer.media = controller?.media }
         renderer.render(scene)
         checker.isHidden = scene.background != nil
         if hovered.map({ scene.layer($0) == nil }) == true { hovered = nil }
@@ -391,6 +393,27 @@ final class CanvasNSView: NSView {
         // The outermost unlocked group, so a click on a shape in a group
         // selects the group, and in a locked group selects nothing above it.
         return project.ancestors(of: id).first ?? id
+    }
+
+    // MARK: Dropping files
+
+    private func importable(_ info: NSDraggingInfo) -> [URL] {
+        let urls = info.draggingPasteboard.readObjects(forClasses: [NSURL.self],
+                                                       options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        return urls.filter { MediaImport.kind(of: $0) != nil }
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        importable(sender).isEmpty ? [] : .copy
+    }
+
+    /// Pictures, video and sound dropped on the canvas come in where they
+    /// land.
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let urls = importable(sender)
+        guard !urls.isEmpty, let controller else { return false }
+        controller.importMedia(urls, at: viewToComposition(convert(sender.draggingLocation, from: nil)))
+        return true
     }
 
     // MARK: Mouse

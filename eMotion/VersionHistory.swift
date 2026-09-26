@@ -23,6 +23,14 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Pictures, video and sound", changes: [
+            "Import pictures, video and sound with File > Import… (⌘I), or drop them on the canvas. Each becomes a layer; the file is copied into the project, so moving or deleting the original does no harm, and importing the same file twice keeps one copy.",
+            "Video and sound get a Play bar on the timeline. Drag it to set when it plays. Drag its left end to trim the start of the clip, its right end to trim the end; neither goes past the clip's own ends. A video shows its first frame before its bar and its last frame after.",
+            "Sound plays with the timeline, and a sound's waveform shows in its Play bar. Volume and mute are in Design, under Sound.",
+            "Exports include the sound (switch it off under Export > Audio) and every video frame exactly as it falls on the timeline.",
+            "Copy Easing and Paste Easing (Option-Command-C and V, in the Edit menu) give one action's easing to others.",
+            "The timeline stays quick with thousands of actions.",
+        ]),
         .init(date: "26 September 2026", title: "Text, and text and shape actions", changes: [
             "Text layers. Pick the Text tool (T) and click: a text layer appears with its words selected in the inspector, ready to type over. Double-click a text layer to edit its words again. The layer's name follows its words until you rename it.",
             "The Text section sets the font (a searchable list of every font on this Mac, each shown in itself), weight, size, colour, alignment, letter spacing, line height, and auto or fixed width. A font this Mac does not have shows crossed out, and the text draws in SF Pro. Dragging a text box's side makes it fixed width.",

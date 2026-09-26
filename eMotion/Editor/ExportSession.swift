@@ -37,7 +37,7 @@ final class ExportSession {
     /// layout as designed rather than the frame at `time`, which is what the
     /// canvas shows in Design mode.
     func begin(format: ExportFormat? = nil, project: Project, time: Double, design: Bool, name: String,
-               window: NSWindow?) {
+               media: [UUID: URL] = [:], window: NSWindow?) {
         guard !isExporting else { return }
         self.window = window
         var settings = settings
@@ -51,7 +51,7 @@ final class ExportSession {
         panel.canCreateDirectories = true
         let start: (NSApplication.ModalResponse) -> Void = { [weak self, weak panel] response in
             guard response == .OK, let url = panel?.url else { return }
-            self?.run(project, settings: settings, time: time, to: url)
+            self?.run(project, settings: settings, time: time, to: url, media: media)
         }
         if let window { panel.beginSheetModal(for: window, completionHandler: start) } else { start(panel.runModal()) }
     }
@@ -60,7 +60,7 @@ final class ExportSession {
 
     func dismissFinished() { finished = nil }
 
-    private func run(_ project: Project, settings: ExportSettings, time: Double, to url: URL) {
+    private func run(_ project: Project, settings: ExportSettings, time: Double, to url: URL, media: [UUID: URL]) {
         let job = ExportJob()
         self.job = job
         finished = nil
@@ -69,7 +69,7 @@ final class ExportSession {
             // Progress crosses to the main thread at most a hundred times.
             var shown = 0
             let result = Result {
-                try Exporter.export(project, settings: settings, at: time, to: url, job: job) { value in
+                try Exporter.export(project, settings: settings, at: time, to: url, media: media, job: job) { value in
                     let step = Int(value * 100)
                     guard step > shown else { return }
                     shown = step

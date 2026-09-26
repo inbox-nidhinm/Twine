@@ -8,6 +8,7 @@ public enum Channel: String, Hashable, Sendable, CaseIterable {
     case position, scale, rotation, opacity, size, visibility
     case fill, stroke, trim, cornerRadius, shadow, layerBlur, backgroundBlur
     case letterSpacing, lineHeight, text, arc, star
+    case media
 }
 
 extension ActionKind {
@@ -31,6 +32,7 @@ extension ActionKind {
         case .counter, .changeText: return .text
         case .arc: return .arc
         case .star: return .star
+        case .play: return .media
         }
     }
 }
@@ -113,6 +115,8 @@ public struct LayerState: Sendable, Equatable {
     public var arc: EllipseArc?
     /// A star's shape, nil for any other layer.
     public var star: StarShape?
+    /// Video and audio only: where in the file the layer is, in seconds.
+    public var sourceTime: Double?
 
     /// The layer as it is designed, with no actions.
     public init(design layer: Layer) {
@@ -133,6 +137,10 @@ public struct LayerState: Sendable, Equatable {
                 star = StarShape(points: points, innerRadius: inner, cornerRadius: corner)
             default: break
             }
+        }
+        switch layer.content {
+        case .video, .audio: sourceTime = 0
+        default: break
         }
         if case .text(let t) = layer.content {
             // A text's colour is its fill, so Colour acts on it too.
@@ -227,6 +235,7 @@ public struct ActionTracks: Sendable {
         if let shown = state.text { state.text = Self.shownText(design: shown.text, list(.text), at: time) }
         if let arc = state.arc { state.arc = walk(arc, list(.arc).compactMap(Self.arcStep), at: time) }
         if let star = state.star { state.star = walk(star, list(.star).compactMap(Self.starStep), at: time) }
+        if state.sourceTime != nil { state.sourceTime = Self.sourceTime(list(.media), at: time) }
         return state
     }
 
@@ -314,6 +323,23 @@ public struct ActionTracks: Sendable {
     private static func starStep(_ a: Action) -> Step<StarShape>? {
         guard case .star(let v) = a.spec else { return nil }
         return Step(a, initial: v.initial, target: { _ in v.end })
+    }
+
+    // MARK: Media
+
+    /// Where in its file a media layer is at `time`. The latest Play to have
+    /// started is the one showing; before the first, the layer waits on the
+    /// frame it will start with, and after a Play ends it rests on the frame
+    /// it stopped on.
+    static func sourceTime(_ plays: [Action], at time: Double) -> Double {
+        let runs = plays.compactMap { a -> (Action, PlayAction)? in
+            if case .play(let p) = a.spec { return (a, p) }
+            return nil
+        }
+        guard let first = runs.first else { return 0 }
+        guard time >= first.0.start else { return first.1.trimStart }
+        let (action, play) = runs.last { $0.0.start <= time } ?? first
+        return play.trimStart + min(max(time - action.start, 0), action.duration)
     }
 
     // MARK: Text

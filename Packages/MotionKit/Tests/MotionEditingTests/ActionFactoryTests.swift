@@ -31,7 +31,8 @@ import MotionEvaluation
         let text = LayerFactory.text(at: .zero, name: "T")
         let ellipse = LayerFactory.shape(.ellipse, in: Box(minX: 0, minY: 0, maxX: 100, maxY: 100), name: "E")
         let star = LayerFactory.shape(.star, in: Box(minX: 0, minY: 0, maxX: 100, maxY: 100), name: "S")
-        let layers = [stroked, text, ellipse, star]
+        let video = Layer(name: "V", content: .video(VideoContent(mediaID: UUID())), size: Size2(10, 10), position: .zero)
+        let layers = [stroked, text, ellipse, star, video]
         // Between them, every kind is offered somewhere.
         #expect(Set(layers.flatMap { ActionFactory.kinds(for: $0) }) == Set(ActionKind.allCases))
         for layer in layers {
@@ -70,7 +71,7 @@ import MotionEvaluation
         #expect(ActionFactory.kinds(for: square) == [.move, .scale, .rotate, .opacity, .resize, .visibility,
                                                      .color, .cornerRadius, .shadow, .layerBlur, .backgroundBlur])
         #expect(!ActionFactory.kinds(for: group).contains(.resize))
-        #expect(ActionFactory.kinds(for: audio).isEmpty)
+        #expect(ActionFactory.kinds(for: audio) == [.play])
         #expect(ActionFactory.kinds(for: [square, group]) == ActionFactory.kinds(for: group))
         #expect(ActionFactory.kinds(for: []).isEmpty)
     }

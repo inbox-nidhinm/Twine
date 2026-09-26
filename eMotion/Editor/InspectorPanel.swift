@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import MotionModel
 import MotionEditing
+import MotionEvaluation
 import MotionExport
 import Theme
 
@@ -50,7 +51,8 @@ struct InspectorPanel: View {
         } else {
             compositionSection
             PanelDivider()
-            ExportSection(session: editor.exports, composition: composition, isOpen: $exportOpen)
+            ExportSection(session: editor.exports, composition: composition,
+                          hasSound: !audioClips(store.project).isEmpty, isOpen: $exportOpen)
             PanelDivider()
         }
     }

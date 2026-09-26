@@ -41,6 +41,6 @@ let package = Package(
         .testTarget(name: "MotionEditingTests", dependencies: ["MotionEditing"]),
         .testTarget(name: "MotionEvaluationTests", dependencies: ["MotionEvaluation"]),
         .testTarget(name: "MotionRenderingTests", dependencies: ["MotionRendering"]),
-        .testTarget(name: "MotionExportTests", dependencies: ["MotionExport"]),
+        .testTarget(name: "MotionExportTests", dependencies: ["MotionExport", "MotionRendering"]),
     ]
 )

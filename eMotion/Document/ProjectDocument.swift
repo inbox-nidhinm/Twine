@@ -55,7 +55,7 @@ final class ProjectDocument: NSDocument {
     nonisolated override func fileWrapper(ofType typeName: String) throws -> FileWrapper {
         let (json, thumbnail) = try MainActor.assumeIsolated { () throws -> (Data, Data?) in
             guard let store else { throw ProjectFileError.missingDocument }
-            return (try ProjectFormat.encode(store.project), Thumbnail.png(of: store.project))
+            return (try ProjectFormat.encode(store.project), Thumbnail.png(of: store.project, media: mediaURLs))
         }
         let root = package ?? FileWrapper(directoryWithFileWrappers: [:])
 
@@ -76,8 +76,59 @@ final class ProjectDocument: NSDocument {
             media.preferredFilename = ProjectFormat.mediaFolderName
             root.addFileWrapper(media)
         }
+        // Files imported since the last save join the package now. Each is
+        // read from its staged copy as it is written, never held in memory.
+        let staged = MainActor.assumeIsolated { () -> [(String, URL)] in
+            (store?.project.media ?? []).compactMap { asset in stagedMedia[asset.fileName].map { (asset.fileName, $0) } }
+        }
+        if let folder = root.fileWrappers?[ProjectFormat.mediaFolderName] {
+            for (name, url) in staged where folder.fileWrappers?[name] == nil {
+                if let file = try? FileWrapper(url: url, options: []) {
+                    file.preferredFilename = name
+                    folder.addFileWrapper(file)
+                }
+            }
+        }
         package = root
         return root
+    }
+
+    // MARK: Media
+
+    /// Files imported this session, by their name in the package, copied
+    /// aside the moment they are imported so the original can move or go.
+    private var stagedMedia: [String: URL] = [:]
+    private lazy var stagingFolder: URL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("eMotion-media", isDirectory: true)
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+
+    /// Where to read an imported file: its staged copy if it came in this
+    /// session, otherwise its place in the saved package. Nil if it is in
+    /// neither, and the layer shows grey.
+    func mediaURL(for id: UUID) -> URL? {
+        guard let asset = store?.project.media.first(where: { $0.id == id }) else { return nil }
+        if let staged = stagedMedia[asset.fileName] { return staged }
+        guard let fileURL else { return nil }
+        let saved = fileURL.appendingPathComponent(ProjectFormat.mediaFolderName).appendingPathComponent(asset.fileName)
+        return FileManager.default.fileExists(atPath: saved.path) ? saved : nil
+    }
+
+    /// Every file the project uses, for an export to read on its own thread.
+    var mediaURLs: [UUID: URL] {
+        Dictionary((store?.project.media ?? []).compactMap { a in mediaURL(for: a.id).map { (a.id, $0) } },
+                   uniquingKeysWith: { a, _ in a })
+    }
+
+    /// Copies `source` aside under `fileName`, on a worker thread.
+    func stage(_ source: URL, as fileName: String) async throws {
+        let folder = stagingFolder
+        let target = folder.appendingPathComponent(fileName)
+        try await Task.detached(priority: .userInitiated) {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            if FileManager.default.fileExists(atPath: target.path) { try FileManager.default.removeItem(at: target) }
+            try FileManager.default.copyItem(at: source, to: target)
+        }.value
+        stagedMedia[fileName] = target
     }
 
     // MARK: Saving soon
@@ -145,7 +196,7 @@ enum Thumbnail {
 
     private static var renderer: OffscreenRenderer?
 
-    static func png(of project: Project) -> Data? {
+    static func png(of project: Project, media: [UUID: URL] = [:]) -> Data? {
         let size = project.composition.size
         guard size.width > 0, size.height > 0 else { return nil }
         let scale = longSide / max(size.width, size.height)
@@ -153,6 +204,7 @@ enum Thumbnail {
         if renderer?.pixelWidth != width || renderer?.pixelHeight != height {
             renderer = OffscreenRenderer(pixelWidth: width, pixelHeight: height)
         }
+        renderer?.media = MediaLibrary(locate: { media[$0] })
         guard let image = renderer?.image(of: evaluate(project, at: 0)) else { return nil }
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)

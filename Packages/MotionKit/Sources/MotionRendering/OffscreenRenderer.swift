@@ -22,6 +22,12 @@ public final class OffscreenRenderer {
     private let root = CALayer()
     private let renderer = CoreAnimationRenderer()
 
+    /// Where image and video layers get their pictures.
+    public var media: MediaProvider? {
+        get { renderer.media }
+        set { renderer.media = newValue }
+    }
+
     /// Nil when there is no GPU to render with.
     public init?(pixelWidth: Int, pixelHeight: Int) {
         guard pixelWidth > 0, pixelHeight > 0,

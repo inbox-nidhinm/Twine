@@ -19,7 +19,8 @@ struct ActionInspector: View {
             HeaderRow(title: actions.count == 1 ? first.name : sameKind ? first.spec.kind.defaultName : "Actions") {}
             VStack(alignment: .leading, spacing: 10) {
                 TimingFields(controller: controller, actions: actions)
-                if actions.contains(where: { !$0.isInstant }) {
+                // A Play runs at the clip's own speed, so it has no easing.
+                if actions.contains(where: { !$0.isInstant && $0.spec.kind != .play }) {
                     EasingFields(controller: controller, actions: actions)
                 }
             }

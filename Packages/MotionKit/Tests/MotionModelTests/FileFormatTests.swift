@@ -48,7 +48,7 @@ func kitchenSinkProject() -> Project {
         alignment: .center, letterSpacing: -1.5, lineHeight: 80, sizing: .fixedWidth)),
         size: Size2(400, 200), position: Vec2(960, 540))
 
-    var video = Layer(name: "Clip", content: .video(VideoContent(mediaID: clip.id, trimStart: 0.5)),
+    var video = Layer(name: "Clip", content: .video(VideoContent(mediaID: clip.id, volume: 0.5, isMuted: true)),
                       size: Size2(1920, 1080), position: Vec2(960, 540))
     video.isLocked = true
     let audio = Layer(name: "Song", content: .audio(AudioContent(mediaID: song.id)),
@@ -89,6 +89,7 @@ func kitchenSinkProject() -> Project {
             text: "Bye", transitionOut: .scale, transitionIn: .none, overlaps: true))),
         Action(target: ellipse.id, start: 1, duration: 1, spec: .arc(ArcAction(initial: .full, end: EllipseArc(end: 90)))),
         Action(target: star.id, start: 1, duration: 1, spec: .star(StarAction(end: StarShape(points: 7, innerRadius: 0.5, cornerRadius: 2)))),
+        Action(target: video.id, start: 0.5, duration: 2, spec: .play(PlayAction(trimStart: 1.25))),
         Action(target: rect.id, start: 1, duration: 1, spec: .backgroundBlur(BackgroundBlurAction(end: BackgroundBlur(radius: 4, blend: 0.5)))),
     ]
 

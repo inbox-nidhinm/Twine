@@ -53,6 +53,8 @@ public enum Icon: String, CaseIterable, Sendable {
     case eyedropper
     case minus
     case plus
+    case speakerOff
+    case speaker
     case trash
     case keyframeNext
     case keyframePrev
@@ -297,6 +299,16 @@ public enum Icon: String, CaseIterable, Sendable {
         case .plus: return [   // Shared/plus.svg
             "M12 5 V19",
             "M5 12 H19"
+        ]
+        case .speakerOff: return [   // Shared/speaker-off.svg
+            "M4 9.5 H7.5 L12 5.5 V18.5 L7.5 14.5 H4 Z",
+            "M15.5 9.5 L20.5 14.5",
+            "M20.5 9.5 L15.5 14.5"
+        ]
+        case .speaker: return [   // Shared/speaker.svg
+            "M4 9.5 H7.5 L12 5.5 V18.5 L7.5 14.5 H4 Z",
+            "M15.5 9 C16.5 10.5 16.5 13.5 15.5 15",
+            "M18 6.5 C20.5 9.5 20.5 14.5 18 17.5"
         ]
         case .trash: return [   // Shared/trash.svg
             "M5 7 H19",

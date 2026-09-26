@@ -65,8 +65,11 @@ public enum Exporter {
     /// Writes `settings.format` to `url`. For a movie that is the whole
     /// composition; for a PNG it is the frame at `time`. `progress` is called
     /// from the exporting thread after each frame, from 0 to 1.
+    /// `media` locates each imported file by its id, for pictures, video
+    /// frames and sound.
     public static func export(_ project: Project, settings: ExportSettings, at time: Double = 0, to url: URL,
-                              job: ExportJob = ExportJob(), progress: (Double) -> Void = { _ in }) throws {
+                              media: [UUID: URL] = [:], job: ExportJob = ExportJob(),
+                              progress: (Double) -> Void = { _ in }) throws {
         var project = project
         if !settings.format.keepsTransparency {
             project.composition.background.isTransparent = false
@@ -77,10 +80,12 @@ public enum Exporter {
         defer { try? fileManager.removeItem(at: folder) }
         let temporary = folder.appendingPathComponent(url.lastPathComponent)
 
+        let library = MediaLibrary(locate: { media[$0] })
         if settings.format.isMovie {
-            try writeMovie(project, settings: settings, to: temporary, job: job, progress: progress)
+            try writeMovie(project, settings: settings, library: library, media: media, to: temporary, job: job,
+                           progress: progress)
         } else {
-            try writeStill(project, settings: settings, at: time, to: temporary)
+            try writeStill(project, settings: settings, library: library, at: time, to: temporary)
             progress(1)
         }
         if job.isCancelled { throw ExportError.cancelled }
@@ -94,10 +99,11 @@ public enum Exporter {
 
     // MARK: Still
 
-    private static func writeStill(_ project: Project, settings: ExportSettings, at time: Double,
+    private static func writeStill(_ project: Project, settings: ExportSettings, library: MediaLibrary, at time: Double,
                                    to url: URL) throws {
         let (width, height) = settings.pixelSize(of: project.composition)
         guard let renderer = OffscreenRenderer(pixelWidth: width, pixelHeight: height) else { throw ExportError.noGPU }
+        renderer.media = library
         let snapped = project.composition.frameRate.snapped(time)
         guard let image = renderer.image(of: evaluate(project, at: snapped)),
               let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
@@ -110,7 +116,8 @@ public enum Exporter {
 
     // MARK: Movie
 
-    private static func writeMovie(_ project: Project, settings: ExportSettings, to url: URL, job: ExportJob,
+    private static func writeMovie(_ project: Project, settings: ExportSettings, library: MediaLibrary,
+                                   media: [UUID: URL], to url: URL, job: ExportJob,
                                    progress: (Double) -> Void) throws {
         let composition = project.composition
         let timing = ExportTiming(composition)
@@ -118,8 +125,7 @@ public enum Exporter {
 
         let writer: AVAssetWriter
         do {
-            writer = try AVAssetWriter(outputURL: url, fileType: settings.format == .h264 || settings.format == .hevc
-                                       ? .mp4 : .mov)
+            writer = try AVAssetWriter(outputURL: url, fileType: isMOV(settings.format) ? .mov : .mp4)
         } catch {
             throw ExportError.failed(error.localizedDescription)
         }
@@ -142,6 +148,18 @@ public enum Exporter {
         // Only once the encoder has agreed to the size, so a size it refuses
         // never takes the memory for a picture that large.
         guard let renderer = OffscreenRenderer(pixelWidth: width, pixelHeight: height) else { throw ExportError.noGPU }
+        renderer.media = library
+
+        // The sound, mixed from its clips and read alongside the frames.
+        let sound = settings.includesAudio
+            ? AudioMixdown(clips: audioClips(project), media: media, duration: composition.duration,
+                           compressed: !isMOV(settings.format))
+            : nil
+        if let sound {
+            guard writer.canAdd(sound.input) else { throw ExportError.failed("The sound couldn't be added to the movie.") }
+            writer.add(sound.input)
+        }
+
         // An encoder may accept the settings and refuse the size only while
         // finishing, with no useful message. A failure at a size past what
         // H.264 and HEVC hardware encodes is put down to the size.
@@ -153,6 +171,7 @@ public enum Exporter {
         }
         guard writer.startWriting() else { throw failure() }
         writer.startSession(atSourceTime: .zero)
+        sound?.start(job: job)
 
         for frame in 0..<timing.frameCount {
             while !input.isReadyForMoreMediaData {
@@ -160,6 +179,7 @@ public enum Exporter {
                 Thread.sleep(forTimeInterval: 0.001)
             }
             if job.isCancelled {
+                sound?.cancel()
                 writer.cancelWriting()
                 throw ExportError.cancelled
             }
@@ -179,6 +199,11 @@ public enum Exporter {
         }
 
         input.markAsFinished()
+        sound?.wait()
+        if job.isCancelled {
+            writer.cancelWriting()
+            throw ExportError.cancelled
+        }
         // The last frame lasts one frame, not until the movie's first.
         writer.endSession(atSourceTime: timing.duration)
         let done = DispatchSemaphore(value: 0)
@@ -186,6 +211,8 @@ public enum Exporter {
         done.wait()
         guard writer.status == .completed else { throw failure() }
     }
+
+    static func isMOV(_ format: ExportFormat) -> Bool { format.fileExtension == "mov" }
 
     /// Rec. 709 throughout, as video players expect. The composition's sRGB
     /// colours go in unchanged: the two share their primaries.

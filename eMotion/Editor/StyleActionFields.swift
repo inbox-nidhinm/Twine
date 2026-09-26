@@ -26,6 +26,7 @@ struct StyleValueFields: View {
         case .changeText(let c): changeText(c)
         case .arc(let a): arc(a)
         case .star(let s): star(s)
+        case .play(let p): play(p)
         default: EmptyView()
         }
     }
@@ -450,6 +451,25 @@ struct StyleValueFields: View {
             editing("Star", Self.star { a, _ in a.end.cornerRadius = x })
         }
         .help("Rounds every point, in pixels")
+    }
+
+    // MARK: Media
+
+    @ViewBuilder private func play(_ p: PlayAction) -> some View {
+        let length = controller.asset(ofLayer: action.targetLayerID)?.duration
+        LabeledRow(label: "Trim") {
+            UnitField(value: p.trimStart, decimals: 2, suffix: "s", accepts: { v in v >= 0 && (length.map { v < $0 } ?? true) }) { v in
+                controller.editActions("Trim") { a in
+                    guard case .play(var play) = a.spec else { return }
+                    play.trimStart = v
+                    // Never past the end of the file.
+                    if let length { a.duration = min(a.duration, max(controller.frameRate.snapped(length - v), controller.frameRate.frameDuration)) }
+                    a.spec = .play(play)
+                }
+            }
+            spacer
+        }
+        .help("How far into the file it starts playing. Dragging the bar's left end on the timeline trims it too.")
     }
 
     // MARK: Editing

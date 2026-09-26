@@ -84,13 +84,26 @@ public struct ExportSettings: Codable, Sendable, Equatable {
     /// Output size as a multiple of the composition's: 0.5, 1 or 2.
     public var scale: Double
     public var quality: ExportQuality
+    /// Movies only: the composition's sound, when it has any.
+    public var includesAudio: Bool
 
     public static let scales: [Double] = [0.5, 1, 2]
 
-    public init(format: ExportFormat = .h264, scale: Double = 1, quality: ExportQuality = .high) {
+    public init(format: ExportFormat = .h264, scale: Double = 1, quality: ExportQuality = .high, includesAudio: Bool = true) {
         self.format = format
         self.scale = scale
         self.quality = quality
+        self.includesAudio = includesAudio
+    }
+
+    private enum CodingKeys: String, CodingKey { case format, scale, quality, includesAudio }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        format = try c.decode(ExportFormat.self, forKey: .format)
+        scale = try c.decode(Double.self, forKey: .scale)
+        quality = try c.decode(ExportQuality.self, forKey: .quality)
+        includesAudio = try c.decodeIfPresent(Bool.self, forKey: .includesAudio) ?? true
     }
 
     /// The output's size in pixels. Movies are rounded to even numbers,
