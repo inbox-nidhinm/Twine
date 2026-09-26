@@ -114,7 +114,7 @@ The timeline runs the full width of the window in Animate, with the panels above
 | Drag the end marker on the ruler | Make the scene longer or shorter |
 | Click, Shift-click, ⌘-click, drag a box | Select actions (their layers are selected with them) |
 | Drag a bar | Move it in time; drop it on another row to reorder |
-| Drag a bar's end | Change its length; with ⌥, both ends move around the middle |
+| Drag a bar's end (hover it for the handles) | Change its length; with ⌥, both ends move around the middle |
 | Hover a label and click its eye | Switch an action off without deleting it |
 | Double-click a label or bar | Rename it |
 | Drag a label up or down | Reorder the rows |

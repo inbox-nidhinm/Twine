@@ -58,11 +58,21 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
     private var drag: Drag?
     private var lastSelection: Set<UUID> = []
     private var renaming: (id: UUID, field: NSTextField)?
-    private var hoveredRow: Int?
+    /// The row whose label is under the pointer, which shows its eye and
+    /// lights up as the layers panel's rows do.
+    private var hoveredLabel: Int?
+    /// The bar under the pointer, which shows a handle at each end.
+    private var hoveredBar: UUID?
 
     /// How near, in points, a dragged time jumps to something worth lining up with.
     static let snapDistance = 6.0
     static let edgeHit = 5.0
+    /// On a bar long enough to keep a middle to grab, a trim reaches this
+    /// far in from each end, so the handle drawn there is all trim.
+    static let edgeReach = 10.0
+    /// The handles a hovered bar shows at its ends.
+    static let handleSize = CGSize(width: 3, height: 12)
+    static let handleInset = 4.0
     static let instantWidth = 12.0
     /// The eye's square at the right of a label.
     static let eyeBox = 22.0
@@ -134,6 +144,18 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         return CGRect(x: x0, y: top, width: max(x(for: action.end) - x0, 4), height: h)
     }
 
+    /// How far in from each end a press trims rather than moves.
+    private func trimReach(_ rect: CGRect) -> Double { rect.width >= Self.edgeReach * 3.6 ? Self.edgeReach : Self.edgeHit }
+
+    /// Which end of a bar a point would trim, if any.
+    private func trimEdge(at p: CGPoint, of action: Action, rect: CGRect) -> Bool? {
+        guard !action.isInstant, p.x >= rect.minX - Self.edgeHit, p.x <= rect.maxX + Self.edgeHit else { return nil }
+        let reach = trimReach(rect)
+        if p.x <= rect.minX + reach { return true }
+        if p.x >= rect.maxX - reach { return false }
+        return nil
+    }
+
     private func eyeRect(_ row: TimelineRow) -> CGRect {
         CGRect(x: gutter - Self.eyeBox - 8, y: row.y + (TimelineRow.height - Self.eyeBox) / 2,
                width: Self.eyeBox, height: Self.eyeBox)
@@ -160,15 +182,31 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        let now = rowIndex(at: convert(event.locationInWindow, from: nil).y)
-        if now != hoveredRow {
-            hoveredRow = now
+        let p = convert(event.locationInWindow, from: nil)
+        let index = rowIndex(at: p.y)
+        let label = p.x < gutter ? index : nil
+        var bar: UUID?
+        var trims = false
+        if let index, p.x >= gutter {
+            let row = rows[index]
+            let rect = barRect(row.action, in: row)
+            if rect.insetBy(dx: -Self.edgeHit, dy: 0).contains(p) {
+                bar = row.action.id
+                trims = trimEdge(at: p, of: row.action, rect: rect) != nil
+            }
+        }
+        (trims ? NSCursor.resizeLeftRight : NSCursor.arrow).set()
+        if label != hoveredLabel || bar != hoveredBar {
+            hoveredLabel = label
+            hoveredBar = bar
             needsDisplay = true
         }
     }
 
     override func mouseExited(with event: NSEvent) {
-        hoveredRow = nil
+        NSCursor.arrow.set()
+        hoveredLabel = nil
+        hoveredBar = nil
         needsDisplay = true
     }
 
@@ -225,6 +263,11 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
             ctx.setFillColor(NSColor(Theme.rowHover).cgColor)
             ctx.fill(full)
         }
+        // Under the pointer, the label lights up as a layers panel row does.
+        if hoveredLabel == index, !selected {
+            ctx.setFillColor(NSColor(Theme.rowHover).cgColor)
+            ctx.fill(label)
+        }
         // The faint line under every row.
         ctx.setFillColor(NSColor(Theme.border).withAlphaComponent(0.45).cgColor)
         ctx.fill(CGRect(x: 0, y: row.y + TimelineRow.height - 1, width: bounds.width, height: 1))
@@ -233,7 +276,9 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         let dimmed = !action.isEnabled
         let primary = NSColor(selected ? Theme.textPrimary : dimmed ? Theme.textTertiary : Theme.textPrimary)
         let secondary = NSColor(selected ? Theme.textPrimary : Theme.textTertiary).withAlphaComponent(selected ? 0.75 : 1)
-        let showsEye = hoveredRow == index || dimmed
+        // Only under the pointer: an action switched off already shows as
+        // much in its dimmed label and bar.
+        let showsEye = hoveredLabel == index
         let room = gutter - 16 - (showsEye ? Self.eyeBox + 12 : 12)
         ctx.saveGState()
         ctx.clip(to: CGRect(x: 16, y: row.y, width: max(room, 0), height: TimelineRow.height))
@@ -266,6 +311,16 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.panelHover).cgColor)
         ctx.fillPath()
         if case .play(let play) = action.spec { drawWaveform(action, play: play, in: rect, selected: selected, ctx: ctx) }
+        // Under the pointer, a handle at each end says the ends drag.
+        if hoveredBar == action.id, !action.isInstant, rect.width >= Self.edgeReach * 2.4 {
+            let size = Self.handleSize
+            ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+            for x in [rect.minX + Self.handleInset, rect.maxX - Self.handleInset - size.width] {
+                let handle = CGRect(x: x, y: rect.midY - size.height / 2, width: size.width, height: size.height)
+                ctx.addPath(CGPath(roundedRect: handle, cornerWidth: size.width / 2, cornerHeight: size.width / 2, transform: nil))
+            }
+            ctx.fillPath()
+        }
         ctx.restoreGState()
     }
 
@@ -321,7 +376,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         // The label: the eye switches the action off; a double-click
         // renames it; a drag reorders.
         if p.x < gutter {
-            if eyeRect(row).contains(p), hoveredRow == index || !action.isEnabled { return controller.toggleEnabled(action) }
+            if eyeRect(row).contains(p), hoveredLabel == index { return controller.toggleEnabled(action) }
             if event.clickCount == 2 { return beginRename(row) }
             pick(action, extending: extending)
             if !extending { drag = .reorder(action: action, began: false) }
@@ -334,11 +389,8 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         if event.clickCount == 2 { return beginRename(row) }
         guard pick(action, extending: extending) else { return }
 
-        if !action.isInstant, !extending, abs(p.x - rect.minX) <= Self.edgeHit {
-            drag = .trim(original: action, startEdge: true, startX: p.x)
-            controller.begin("Change Timing")
-        } else if !action.isInstant, !extending, abs(p.x - rect.maxX) <= Self.edgeHit {
-            drag = .trim(original: action, startEdge: false, startX: p.x)
+        if !extending, let startEdge = trimEdge(at: p, of: action, rect: rect) {
+            drag = .trim(original: action, startEdge: startEdge, startX: p.x)
             controller.begin("Change Timing")
         } else {
             let originals = controller.selectedActions

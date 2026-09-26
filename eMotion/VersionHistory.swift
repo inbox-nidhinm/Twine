@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Timeline hover", changes: [
+            "Hovering a bar shows a handle at each end. Grab a handle to change when the action starts or ends; the pointer turns into a resize arrow over them.",
+            "A timeline label lights up under the pointer, as a layers panel row does, and shows its eye only then. An action switched off shows as a dimmed label and bar.",
+        ]),
         .init(date: "26 September 2026", title: "Smart guides and alignment", changes: [
             "Moving, resizing and drawing snap to the composition's edges and centre and to other layers' edges and centres, with red guides showing what lined up.",
             "Moving also snaps to even spacing: centred between two neighbours, or one gap on from a row that already keeps one. The equal gaps show with their size.",
