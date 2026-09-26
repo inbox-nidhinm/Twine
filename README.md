@@ -110,7 +110,8 @@ The timeline runs the full width of the window in Animate, with the panels above
 | , and . | Previous and next frame (Shift for ten frames) |
 | ⌥, and ⌥. | Previous and next start or end of an action |
 | Home, End | Go to the start or the end |
-| Click or drag the ruler, or click empty timeline | Scrub (the playhead goes there) |
+| Click the ruler or empty timeline | The playhead slides there |
+| Drag the ruler | Scrub |
 | Drag the end marker on the ruler | Make the scene longer or shorter |
 | Click, Shift-click, ⌘-click, drag a box | Select actions (their layers are selected with them) |
 | Drag a bar | Move it in time; drop it on another row to reorder |

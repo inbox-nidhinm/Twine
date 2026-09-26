@@ -189,6 +189,7 @@ final class EditorController {
     var lastFrameTime: Double { frameRate.time(ofFrame: max(project.composition.frameCount - 1, 0)) }
 
     func togglePlay() {
+        cancelGlide()
         if !editor.isPlaying, editor.time >= lastFrameTime { editor.time = 0 }
         editor.isPlaying.toggle()
         followAudio()
@@ -201,7 +202,39 @@ final class EditorController {
 
     /// Moves the playhead, landing on a frame.
     func seek(to time: Double) {
+        cancelGlide()
         editor.time = min(max(frameRate.snapped(time), 0), lastFrameTime)
+    }
+
+    /// The playhead sliding to where a click landed, rather than jumping.
+    private var glideTimer: Timer?
+    static let glideLength = 0.22
+
+    /// Moves the playhead to `time` over a moment, easing out, and lands on
+    /// the frame. Any other seek, a scrub or playing takes over at once.
+    func glide(to time: Double) {
+        cancelGlide()
+        let target = min(max(frameRate.snapped(time), 0), lastFrameTime)
+        let from = editor.time
+        guard abs(target - from) > 1e-9 else { return }
+        let began = CACurrentMediaTime()
+        let timer = Timer(timeInterval: 1.0 / 120, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let t = min((CACurrentMediaTime() - began) / Self.glideLength, 1)
+                let eased = 1 - pow(1 - t, 3)
+                self.editor.time = t >= 1 ? target : from + (target - from) * eased
+                if t >= 1 { self.cancelGlide() }
+            }
+        }
+        // Also while the mouse is down, so it runs during a click's tracking.
+        RunLoop.main.add(timer, forMode: .common)
+        glideTimer = timer
+    }
+
+    private func cancelGlide() {
+        glideTimer?.invalidate()
+        glideTimer = nil
     }
 
     func step(_ frames: Int) {

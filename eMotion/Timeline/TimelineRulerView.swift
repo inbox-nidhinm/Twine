@@ -112,6 +112,9 @@ final class TimelineRulerView: NSView {
     // MARK: Scrubbing
 
     private var draggingEnd = false
+    /// Where a press began, so a click that wobbles a point still glides
+    /// rather than turning into a scrub.
+    private var pressX: CGFloat?
 
     override func mouseDown(with event: NSEvent) {
         guard let controller else { return }
@@ -122,7 +125,9 @@ final class TimelineRulerView: NSView {
             return
         }
         controller.stop()
-        scrub(event)
+        // A click slides the playhead there; dragging on scrubs directly.
+        pressX = x
+        controller.glide(to: controller.editor.viewport.time(at: x))
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -131,11 +136,15 @@ final class TimelineRulerView: NSView {
             let x = convert(event.locationInWindow, from: nil).x
             controller.setDuration(controller.editor.viewport.time(at: x))
         } else {
+            let x = convert(event.locationInWindow, from: nil).x
+            if let start = pressX, abs(x - start) < 3 { return }
+            pressX = nil
             scrub(event)
         }
     }
 
     override func mouseUp(with event: NSEvent) {
+        pressX = nil
         if draggingEnd {
             draggingEnd = false
             controller?.end()

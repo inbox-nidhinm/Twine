@@ -523,7 +523,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
             // A click rather than a box: the playhead goes there.
             if let controller, start.x >= gutter, hypot(current.x - start.x, current.y - start.y) < 3 {
                 controller.stop()
-                controller.seek(to: max(time(at: start.x), 0))
+                controller.glide(to: max(time(at: start.x), 0))
             }
         case .pan:
             NSCursor.arrow.set()
