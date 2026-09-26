@@ -27,9 +27,11 @@ struct LayersPanel: View {
             PanelDivider()
             SectionHeader(title: "Layers")
             ScrollView {
+                // Worked out once, not by every row scanning every layer.
+                let masks = controller.project.maskSourceIDs
                 LazyVStack(spacing: 0) {
                     ForEach(rows) { row in
-                        LayerRow(row: row, editor: editor, controller: controller,
+                        LayerRow(row: row, editor: editor, controller: controller, isMask: masks.contains(row.id),
                                  isExpanded: expanded.contains(row.id),
                                  toggleExpanded: { toggle(row.id) },
                                  click: { click(row.id, NSEvent.modifierFlags) })
@@ -157,6 +159,8 @@ private struct LayerRow: View {
     let row: LayerRowItem
     let editor: EditorModel
     let controller: EditorController
+    /// Used as another layer's mask.
+    let isMask: Bool
     let isExpanded: Bool
     let toggleExpanded: () -> Void
     let click: () -> Void
@@ -171,7 +175,6 @@ private struct LayerRow: View {
     /// Hovered here or on the canvas: either way the row shows its hover
     /// state, switches and all.
     private var lit: Bool { hovering || editor.hoveredLayer == layer.id }
-    private var isMask: Bool { controller.project.allLayers.contains { $0.mask?.layerID == layer.id } }
 
     enum DropEdge { case above, into, below }
 

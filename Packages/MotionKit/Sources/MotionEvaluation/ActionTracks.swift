@@ -184,7 +184,7 @@ public struct ActionTracks: Sendable {
     static func order(_ a: Action, _ b: Action) -> Bool {
         if a.start != b.start { return a.start < b.start }
         if a.rowOrder != b.rowOrder { return a.rowOrder < b.rowOrder }
-        return a.id.uuidString < b.id.uuidString
+        return a.id.precedes(b.id)
     }
 
     public var isEmpty: Bool { tracks.isEmpty }

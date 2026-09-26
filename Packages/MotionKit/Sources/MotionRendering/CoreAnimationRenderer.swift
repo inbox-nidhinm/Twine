@@ -192,7 +192,11 @@ private final class Node {
     ]
 
     let container = CALayer()
-    var flipsContents = false
+    var flipsContents = false { didSet { last = nil } }
+    /// The layer as it was last drawn. A frame where it has not changed
+    /// leaves it alone: in a busy scene most layers are still at any moment,
+    /// and during a drag only one moves.
+    private var last: ResolvedLayer?
     private var scale: CGFloat
     /// The kinds of fill and stroke layers currently built, so they are only
     /// rebuilt when a paint changes kind rather than on every frame.
@@ -222,6 +226,7 @@ private final class Node {
 
     func setContentsScale(_ scale: CGFloat) {
         self.scale = scale
+        last = nil
         container.contentsScale = scale
         for p in paintLayers { p.setContentsScale(scale) }
         // Text is a picture drawn at a scale, so it is drawn again.
@@ -229,6 +234,14 @@ private final class Node {
     }
 
     func update(_ layer: ResolvedLayer, media: MediaProvider?) {
+        // Pictures and video may arrive from the media library after the
+        // layer first asks, so they are always looked at again.
+        switch layer.content {
+        case .image, .video: last = nil
+        default:
+            if layer == last { return }
+            last = layer
+        }
         container.bounds = CGRect(origin: .zero, size: layer.size.cg)
         // The anchor point stays at the layer's origin and the whole local
         // transform goes in the matrix, so a layer of zero width or height

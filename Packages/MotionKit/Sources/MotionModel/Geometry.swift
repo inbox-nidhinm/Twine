@@ -102,3 +102,15 @@ public struct CornerRadii: AnimatableValue, Hashable {
         topLeft == topRight && topRight == bottomRight && bottomRight == bottomLeft
     }
 }
+
+extension UUID {
+    /// Orders ids the way their text does, comparing the sixteen bytes
+    /// rather than making two strings: settling ties when sorting hundreds
+    /// of actions on every frame and every drag.
+    public func precedes(_ other: UUID) -> Bool {
+        var a = uuid, b = other.uuid
+        return withUnsafeBytes(of: &a) { x in
+            withUnsafeBytes(of: &b) { y in memcmp(x.baseAddress!, y.baseAddress!, 16) < 0 }
+        }
+    }
+}

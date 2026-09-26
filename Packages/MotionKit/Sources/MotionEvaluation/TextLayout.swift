@@ -1,5 +1,6 @@
 import Foundation
 import CoreText
+import Synchronization
 import CoreGraphics
 import MotionModel
 
@@ -81,6 +82,46 @@ public enum TextLayout {
     /// The font for a style. A family that is not installed falls back to
     /// the system font at the same weight and size.
     public static func font(_ style: TextStyle) -> CTFont {
+        let key = FontKey(style)
+        if let known = fonts.withLock({ $0[key] }) { return known.font }
+        let made = makeFont(style)
+        fonts.withLock { cache in
+            if cache.count > 64 { cache.removeAll() }
+            cache[key] = Unchecked(font: made)
+        }
+        return made
+    }
+
+    // MARK: Caches
+    //
+    // Setting text is the dearest part of working out a frame, and the same
+    // words in the same style come round on every frame and every edit. Core
+    // Text's fonts and lines never change once made, so they are shared
+    // between the canvas and a background export, behind a lock.
+
+    private struct FontKey: Hashable {
+        let family: String, weight: Int, size: Double, tabular: Bool
+        init(_ s: TextStyle) { (family, weight, size, tabular) = (s.fontFamily, s.fontWeight, s.fontSize, s.tabularDigits) }
+    }
+
+    private struct Unchecked: @unchecked Sendable { let font: CTFont }
+
+    private struct LayoutKey: Hashable {
+        let text: String, style: TextStyle, width: Double?
+    }
+
+    private struct LaidOut: @unchecked Sendable {
+        let lines: [PositionedLine]
+        let size: Size2
+    }
+
+    private static let fonts = Mutex<[FontKey: Unchecked]>([:])
+    private static let layouts = Mutex<[LayoutKey: LaidOut]>([:])
+    /// Enough for every text in a busy scene, several times over; past it
+    /// the cache starts again rather than growing without end.
+    private static let layoutLimit = 512
+
+    private static func makeFont(_ style: TextStyle) -> CTFont {
         let size = CGFloat(max(style.fontSize, 1))
         let traits: [CFString: Any] = [kCTFontWeightTrait: weightTrait(style.fontWeight)]
         var attributes: [CFString: Any] = [kCTFontTraitsAttribute: traits]
@@ -127,6 +168,17 @@ public enum TextLayout {
 
     /// The lines of `text`, placed in its box.
     public static func layout(_ text: String, style: TextStyle, width: Double?) -> (lines: [PositionedLine], size: Size2) {
+        let key = LayoutKey(text: text, style: style, width: width)
+        if let known = layouts.withLock({ $0[key] }) { return (known.lines, known.size) }
+        let made = setLines(text, style: style, width: width)
+        layouts.withLock { cache in
+            if cache.count >= layoutLimit { cache.removeAll() }
+            cache[key] = LaidOut(lines: made.lines, size: made.size)
+        }
+        return made
+    }
+
+    private static func setLines(_ text: String, style: TextStyle, width: Double?) -> (lines: [PositionedLine], size: Size2) {
         let f = font(style)
         let ascent = Double(CTFontGetAscent(f)), descent = Double(CTFontGetDescent(f))
         let lineHeight = style.lineHeight ?? naturalLineHeight(style)

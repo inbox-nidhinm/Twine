@@ -17,14 +17,31 @@ public enum ActionEditing {
     /// whole project, in the order the actions were added unless rows have
     /// been dragged. A new action takes the next row at the bottom.
     public static func timeline(in project: Project) -> [Action] {
-        project.actions.sorted(by: rowOrder)
+        // Sorted by small keys and gathered after, rather than moving whole
+        // actions about: the timeline asks for this on every step of a drag.
+        let actions = project.actions
+        let keys = actions.indices.map { RowKey(order: actions[$0].rowOrder, start: actions[$0].start, id: actions[$0].id, index: $0) }
+        return keys.sorted().map { actions[$0.index] }
+    }
+
+    private struct RowKey: Comparable {
+        let order: Int
+        let start: Double
+        let id: UUID
+        let index: Int
+
+        static func < (a: RowKey, b: RowKey) -> Bool {
+            if a.order != b.order { return a.order < b.order }
+            if a.start != b.start { return a.start < b.start }
+            return a.id.precedes(b.id)
+        }
     }
 
     /// The order of rows.
     public static func rowOrder(_ a: Action, _ b: Action) -> Bool {
         if a.rowOrder != b.rowOrder { return a.rowOrder < b.rowOrder }
         if a.start != b.start { return a.start < b.start }
-        return a.id.uuidString < b.id.uuidString
+        return a.id.precedes(b.id)
     }
 
     /// The timeline with `actionID` moved to row `index`, renumbered from 0.

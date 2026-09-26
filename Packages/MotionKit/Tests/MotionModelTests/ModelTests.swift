@@ -104,3 +104,12 @@ import Testing
         #expect(project.maskCandidates(for: inner.id).map(\.name) == ["Target", "Sibling", "Masked by target"])
     }
 }
+
+@Suite struct IDOrderTests {
+    @Test func idsOrderAsTheirTextDoes() {
+        let ids = (0..<300).map { _ in UUID() }
+        #expect(ids.sorted { $0.precedes($1) } == ids.sorted { $0.uuidString < $1.uuidString })
+        let one = UUID()
+        #expect(!one.precedes(one))
+    }
+}

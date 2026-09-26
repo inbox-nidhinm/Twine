@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Faster with busy scenes", changes: [
+            "Measured on a scene of 200 layers and 990 actions: dragging a layer is about twice as quick (15 to 7 milliseconds a step), dragging a timeline bar a fifth quicker, and scrubbing about a third quicker. Playback holds 60 frames a second.",
+            "Working out a frame takes less than half as long as before, and a still layout under a fifth, which also speeds up exports.",
+            "Text is measured once for each set of words and style and remembered, the canvas only redraws layers that changed, and the layers panel no longer checks every layer for every row.",
+        ]),
         .init(date: "26 September 2026", title: "Presets", changes: [
             "Add Preset, under Add Action in Animate, applies a ready-made animation at the playhead: entrances (fade, slide in from each side, scale pop, rotate in, blur in, drop in), exits (fade, slide out to each side, scale out, blur out) and emphasis (pulse, bounce, shake, wiggle).",
             "A preset only adds ordinary actions, on new rows, selected and played through, so every part of it can be retimed, re-eased or deleted like any other action. It works from the layer as it looks at the playhead, wherever it is and however faded.",

@@ -396,7 +396,8 @@ final class EditorController {
     /// at the action's start, with the earlier actions on its channel.
     func inheritedState(for action: Action) -> LayerState? {
         guard let layer = project.layer(withID: action.targetLayerID) else { return nil }
-        return ActionTracks(project.actions).inheritedState(for: action, of: layer)
+        // Only this layer's actions matter, and the canvas asks on every redraw.
+        return ActionTracks(project.actions.filter { $0.targetLayerID == layer.id }).inheritedState(for: action, of: layer)
     }
 
     /// Changes every selected action the same way, as one undo step.

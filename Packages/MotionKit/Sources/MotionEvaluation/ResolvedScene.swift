@@ -15,11 +15,21 @@ public struct ResolvedScene: Sendable, Equatable {
     public var size: Size2
     /// Nil when the composition's background is transparent.
     public var background: RGBA?
-    public var layers: [ResolvedLayer]
+    public let layers: [ResolvedLayer]
     /// Layers used as masks, which draw only through the layers they mask.
     /// Kept apart from `layers` so nothing draws them by accident, but found
     /// by `layer(_:)`, so a selected mask still shows its box and handles.
-    public var masks: [ResolvedLayer]
+    public let masks: [ResolvedLayer]
+
+    /// Where each layer is in `layers` or `masks`, so finding one by id,
+    /// which hit testing, snapping and every world transform do for every
+    /// layer, never searches the whole list.
+    private let index: [UUID: Slot]
+
+    private struct Slot: Sendable, Equatable {
+        var isMask: Bool
+        var position: Int
+    }
 
     public init(time: Double, size: Size2, background: RGBA?, layers: [ResolvedLayer], masks: [ResolvedLayer] = []) {
         self.time = time
@@ -27,13 +37,22 @@ public struct ResolvedScene: Sendable, Equatable {
         self.background = background
         self.layers = layers
         self.masks = masks
+        var made: [UUID: Slot] = [:]
+        made.reserveCapacity(layers.count + masks.count)
+        for (i, layer) in masks.enumerated() { made[layer.id] = Slot(isMask: true, position: i) }
+        for (i, layer) in layers.enumerated() { made[layer.id] = Slot(isMask: false, position: i) }
+        index = made
     }
 
     public func layer(_ id: UUID) -> ResolvedLayer? {
-        layers.first { $0.id == id } ?? masks.first { $0.id == id }
+        guard let slot = index[id] else { return nil }
+        return slot.isMask ? masks[slot.position] : layers[slot.position]
     }
 
-    public func mask(_ id: UUID) -> ResolvedLayer? { masks.first { $0.id == id } }
+    public func mask(_ id: UUID) -> ResolvedLayer? {
+        guard let slot = index[id], slot.isMask else { return nil }
+        return masks[slot.position]
+    }
 
     /// From a layer's own space into composition space, through every group
     /// it sits inside.
