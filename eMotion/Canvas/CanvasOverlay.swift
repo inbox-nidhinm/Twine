@@ -60,8 +60,11 @@ nonisolated final class CanvasOverlay: CALayer {
             l.strokeColor = Self.accent
             l.lineWidth = 1
         }
-        // Light: one point, like a selection outline but without handles.
+        // Monochrome, so it never reads as a selection: a faint grey wash
+        // over the layer's box inside a thin grey outline.
         hover.lineWidth = 1
+        hover.strokeColor = NSColor(Theme.canvasHover).cgColor
+        hover.fillColor = NSColor(Theme.canvasHover).withAlphaComponent(0.16).cgColor
         marquee.fillColor = NSColor(Theme.accent).withAlphaComponent(0.08).cgColor
         marquee.strokeColor = Self.accent
         marquee.lineWidth = 1

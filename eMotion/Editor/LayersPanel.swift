@@ -168,6 +168,9 @@ private struct LayerRow: View {
 
     private var layer: Layer { row.layer }
     private var selected: Bool { editor.selection.contains(layer.id) }
+    /// Hovered here or on the canvas: either way the row shows its hover
+    /// state, switches and all.
+    private var lit: Bool { hovering || editor.hoveredLayer == layer.id }
     private var isMask: Bool { controller.project.allLayers.contains { $0.mask?.layerID == layer.id } }
 
     enum DropEdge { case above, into, below }
@@ -192,17 +195,17 @@ private struct LayerRow: View {
                 .help(isMask ? "Masking another layer: it shows only through that layer" : "")
             name
             Spacer(minLength: 0)
-            if layer.isSoloed || hovering {
+            if layer.isSoloed || lit {
                 toggle(.solo, on: layer.isSoloed, help: layer.isSoloed ? "Unsolo" : "Solo: show only this") {
                     controller.perform(.setSoloed([layer.id], !layer.isSoloed))
                 }
             }
-            if layer.isLocked || hovering {
+            if layer.isLocked || lit {
                 toggle(layer.isLocked ? .lock : .unlock, on: layer.isLocked, help: layer.isLocked ? "Unlock" : "Lock") {
                     controller.perform(.setLocked([layer.id], !layer.isLocked))
                 }
             }
-            if !layer.isVisible || hovering {
+            if !layer.isVisible || lit {
                 toggle(layer.isVisible ? .eye : .eyeSlash, on: !layer.isVisible, help: layer.isVisible ? "Hide" : "Show") {
                     controller.perform(.setVisible([layer.id], !layer.isVisible))
                 }
@@ -212,7 +215,7 @@ private struct LayerRow: View {
         .padding(.trailing, 2)
         .frame(height: Theme.listRow)
         .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
-            .fill(selected ? Theme.rowSelected : hovering || editor.hoveredLayer == layer.id ? Theme.rowHover : .clear))
+            .fill(selected ? Theme.rowSelected : lit ? Theme.rowHover : .clear))
         .overlay {
             if dropTargeted {
                 RoundedRectangle(cornerRadius: Theme.radiusRow).strokeBorder(Theme.accent, lineWidth: 1.5)

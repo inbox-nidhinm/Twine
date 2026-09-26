@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Clearer hover", changes: [
+            "Hovering a layer on the canvas now gives it a faint grey wash inside a thin grey outline, which never reads as a selection.",
+            "Its row in the layers panel shows the full hover state, solo, lock and eye switches included, just as when the pointer is on the row itself.",
+        ]),
         .init(date: "26 September 2026", title: "New rows come into view", changes: [
             "When a new action's row lands below what the timeline shows, the timeline scrolls down to it, so you always see what you added.",
             "eMotion's arrow now really is the pointer over the side panels and the timeline too. Those parts put the system arrow back on every move; the app now hands them its own whenever they ask for the arrow.",
