@@ -26,6 +26,23 @@ struct ExportSection: View {
                               + "exports as its colour. HEVC with alpha, ProRes 4444 and PNG keep it. "
                               + "A PNG is the frame under the playhead, or in Design, the layout as designed.")
                     MenuRow(label: "Size", value: sizeTitle(settings.scale), entries: sizeEntries)
+                    if settings.format.isMovie {
+                        MenuRow(label: "Range", value: session.range == nil ? "Whole scene" : "Part of the scene",
+                                entries: rangeEntries)
+                        if let range = session.range {
+                            HStack(spacing: 8) {
+                                UnitField(unit: "From", value: range.lowerBound, decimals: 2, suffix: "s",
+                                          accepts: { $0 >= 0 && $0 < range.upperBound }) { v in
+                                    session.range = snapped(v)...range.upperBound
+                                }
+                                UnitField(unit: "To", value: range.upperBound, decimals: 2, suffix: "s",
+                                          accepts: { $0 > range.lowerBound }) { v in
+                                    session.range = range.lowerBound...min(snapped(v), composition.duration)
+                                }
+                            }
+                            .help("The part of the scene to export, in seconds. The movie starts at From.")
+                        }
+                    }
                     if settings.format.hasQuality {
                         MenuRow(label: "Quality", value: settings.quality.title, entries: qualityEntries)
                             .help("Lower quality makes a smaller file. Flat colour and clean edges look the "
@@ -70,6 +87,17 @@ struct ExportSection: View {
             }
         }
     }
+
+    private func rangeEntries() -> [MenuEntry] {
+        [
+            .item("Whole scene", checked: session.range == nil) { session.range = nil },
+            .item("Part of the scene", checked: session.range != nil) {
+                if session.range == nil { session.range = 0...composition.duration }
+            },
+        ]
+    }
+
+    private func snapped(_ seconds: Double) -> Double { composition.frameRate.snapped(max(seconds, 0)) }
 
     private func qualityEntries() -> [MenuEntry] {
         ExportQuality.allCases.map { quality in

@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Export part of the scene", changes: [
+            "Export > Range exports the whole scene or only part of it: choose Part of the scene and type where it starts and ends. The movie starts at the From time, and its sound comes with it, in step.",
+        ]),
         .init(date: "26 September 2026", title: "Option-drag to duplicate", changes: [
             "In Design, hold Option and drag a layer to leave it where it is and drag away a copy, animation included, as in Figma. The copy snaps to the original like any other layer, and one Undo takes it back. An Option-click that never moves makes no copy.",
         ]),

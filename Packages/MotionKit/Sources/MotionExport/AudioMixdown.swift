@@ -16,9 +16,13 @@ final class AudioMixdown: @unchecked Sendable {
     private let done = DispatchSemaphore(value: 0)
     private var started = false
     private let mix: AudioComposition
+    /// Where the movie starts in the composition: the sound is read from
+    /// here and moved back to start at zero, with the frames.
+    private let offset: CMTime
 
-    /// Nil when there is nothing to hear: no clips, or none of their files.
-    init?(clips: [AudioClip], media: [UUID: URL], duration: Double, compressed: Bool) {
+    /// The sound from `start` for `duration` seconds. Nil when there is
+    /// nothing to hear: no clips, or none of their files.
+    init?(clips: [AudioClip], media: [UUID: URL], start: Double = 0, duration: Double, compressed: Bool) {
         guard let mix = AudioComposition(clips: clips, media: media),
               let reader = try? AVAssetReader(asset: mix.composition) else { return nil }
         let output = AVAssetReaderAudioMixOutput(audioTracks: mix.tracks, audioSettings: [
@@ -31,7 +35,8 @@ final class AudioMixdown: @unchecked Sendable {
             AVLinearPCMIsNonInterleaved: false,
         ])
         output.audioMix = mix.audioMix
-        reader.timeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: duration, preferredTimescale: 48000))
+        let offset = CMTime(seconds: start, preferredTimescale: 48000)
+        reader.timeRange = CMTimeRange(start: offset, duration: CMTime(seconds: duration, preferredTimescale: 48000))
         guard reader.canAdd(output) else { return nil }
         reader.add(output)
 
@@ -46,6 +51,25 @@ final class AudioMixdown: @unchecked Sendable {
         self.reader = reader
         self.output = output
         self.mix = mix
+        self.offset = offset
+    }
+
+    /// A sample moved back by `offset`, so a movie of part of the
+    /// composition hears the sound from its own start.
+    private func shifted(_ sample: CMSampleBuffer) -> CMSampleBuffer? {
+        guard offset != .zero else { return sample }
+        var count: CMItemCount = 0
+        CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: 0, arrayToFill: nil, entriesNeededOut: &count)
+        var timing = [CMSampleTimingInfo](repeating: CMSampleTimingInfo(), count: count)
+        CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: count, arrayToFill: &timing, entriesNeededOut: &count)
+        for i in timing.indices {
+            timing[i].presentationTimeStamp = timing[i].presentationTimeStamp - offset
+            if timing[i].decodeTimeStamp.isValid { timing[i].decodeTimeStamp = timing[i].decodeTimeStamp - offset }
+        }
+        var moved: CMSampleBuffer?
+        CMSampleBufferCreateCopyWithNewTiming(allocator: nil, sampleBuffer: sample, sampleTimingEntryCount: count,
+                                              sampleTimingArray: &timing, sampleBufferOut: &moved)
+        return moved
     }
 
     /// Starts feeding the writer. Call after the writer has started.
@@ -64,7 +88,7 @@ final class AudioMixdown: @unchecked Sendable {
                     done.signal()
                     return
                 }
-                guard let sample = output.copyNextSampleBuffer(), input.append(sample) else {
+                guard let sample = output.copyNextSampleBuffer().flatMap(shifted), input.append(sample) else {
                     input.markAsFinished()
                     done.signal()
                     return

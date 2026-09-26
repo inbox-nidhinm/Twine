@@ -66,6 +66,20 @@ private func pixel(_ buffer: CVPixelBuffer, _ x: Int, _ y: Int) -> (r: Int, g: I
         #expect(abs(timing.time(ofFrame: 150) - 150 * 1001.0 / 30000) < 1e-12)
     }
 
+    @Test func aRangeStartsTheMovieAtItsFirstFrame() {
+        let composition = Composition(frameRate: .fps30, duration: 2)
+        let frames = ExportTiming.frames(from: 0.5, to: 1.5, in: composition)
+        #expect(frames == 15..<45)
+        let timing = ExportTiming(composition, frames: frames)
+        #expect(timing.frameCount == 30)
+        #expect(timing.time(ofFrame: 0) == 0.5)
+        #expect(timing.presentationTime(ofFrame: 0) == .zero)
+        #expect(timing.duration.seconds == 1)
+        // Past the end, or back to front, it still holds at least a frame of the composition.
+        #expect(ExportTiming(composition, frames: 50..<90).frameCount == 10)
+        #expect(ExportTiming.frames(from: 1, to: 1, in: composition).count == 1)
+    }
+
     @Test func moviesAreEvenSizedAndStillsExact() {
         let composition = Composition(width: 101, height: 57)
         #expect(ExportSettings(format: .h264).pixelSize(of: composition) == (102, 58))

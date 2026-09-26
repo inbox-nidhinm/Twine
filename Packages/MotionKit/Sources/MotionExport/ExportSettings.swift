@@ -125,20 +125,41 @@ public struct ExportSettings: Codable, Sendable, Equatable {
 }
 
 /// When each frame of a movie is drawn and when it is shown. Frame `n` shows
-/// the composition at the moment the playhead reads for frame `n`, and lasts
-/// exactly one frame, counted in the rate's own fraction so 29.97 fps never
-/// drifts.
+/// the composition at the moment the playhead reads for frame `n` (counted
+/// from the start of the range being exported), and lasts exactly one frame,
+/// counted in the rate's own fraction so 29.97 fps never drifts. The movie
+/// always starts at zero, whatever part of the composition it holds.
 public struct ExportTiming: Sendable, Equatable {
     public let frameRate: FrameRate
+    /// The composition frame the movie starts on.
+    public let firstFrame: Int
     public let frameCount: Int
 
-    public init(_ composition: Composition) {
+    /// The whole composition, or only `frames` of it (clamped to it, and
+    /// never empty).
+    public init(_ composition: Composition, frames: Range<Int>? = nil) {
         frameRate = composition.frameRate
-        frameCount = composition.frameCount
+        let all = composition.frameCount
+        let first = min(max(frames?.lowerBound ?? 0, 0), max(all - 1, 0))
+        let end = min(max(frames?.upperBound ?? all, first + 1), max(all, first + 1))
+        firstFrame = first
+        frameCount = end - first
     }
 
-    /// The composition time drawn for frame `index`.
-    public func time(ofFrame index: Int) -> Double { frameRate.time(ofFrame: index) }
+    /// The composition frames from `start` to `end` in seconds: the frame
+    /// under `start`, up to but not including the frame under `end`.
+    public static func frames(from start: Double, to end: Double, in composition: Composition) -> Range<Int> {
+        let rate = composition.frameRate
+        let first = rate.frame(at: rate.snapped(max(start, 0)))
+        let last = rate.frame(at: rate.snapped(min(end, composition.duration)))
+        return first..<max(last, first + 1)
+    }
+
+    /// The composition time drawn for frame `index` of the movie.
+    public func time(ofFrame index: Int) -> Double { frameRate.time(ofFrame: firstFrame + index) }
+
+    /// Where the movie starts in the composition, in seconds.
+    public var startTime: Double { frameRate.time(ofFrame: firstFrame) }
 
     /// When frame `index` appears in the file.
     public func presentationTime(ofFrame index: Int) -> CMTime {

@@ -130,7 +130,7 @@ Bars snap to the playhead, the scene's start and end, and other actions' starts 
 
 ## Exporting
 
-With nothing selected in Design, the Export section sits under Composition: pick a format, a size (50%, 100% or 200%) and, for H.264 and HEVC, a quality, then Export… (⌘E) and choose where to save. The settings are remembered.
+With nothing selected in Design, the Export section sits under Composition: pick a format, a size (50%, 100% or 200%), a range (the whole scene, or part of it from and to a time) and, for H.264 and HEVC, a quality, then Export… (⌘E) and choose where to save. The settings are remembered; the range is kept for the window.
 
 | Format | File | Transparency |
 |---|---|---|
@@ -141,7 +141,7 @@ With nothing selected in Design, the Export section sits under Composition: pick
 | ProRes 4444 | MOV | Yes |
 | PNG | PNG | Yes |
 
-Export Current Frame… (Shift-⌘E) saves a PNG of what the canvas shows: the frame at the playhead in Animate, the layout in Design. Exports run in the background, with progress and a cancel button at the top of the window, and match the canvas frame for frame. There is no audio yet; it comes with media layers.
+Export Current Frame… (Shift-⌘E) saves a PNG of what the canvas shows: the frame at the playhead in Animate, the layout in Design. Exports run in the background, with progress and a cancel button at the top of the window, and match the canvas frame for frame. Movies include the sound of video and audio layers unless Audio is off.
 
 ## Status
 

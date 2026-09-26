@@ -17,6 +17,11 @@ final class ExportSession {
         didSet { Self.save(settings) }
     }
 
+    /// The part of the scene a movie holds, from and to in seconds; nil is
+    /// all of it. Kept for this window only, not saved, since it belongs to
+    /// this scene rather than to every export.
+    var range: ClosedRange<Double>?
+
     /// From 0 to 1 while an export runs, nil otherwise.
     private(set) var progress: Double?
     /// The file just written, offered for a few seconds to show in Finder.
@@ -44,6 +49,9 @@ final class ExportSession {
         if let format { settings.format = format }
         var project = project
         if design && !settings.format.isMovie { project.actions = [] }
+        let frames = settings.format.isMovie
+            ? range.map { ExportTiming.frames(from: $0.lowerBound, to: $0.upperBound, in: project.composition) }
+            : nil
 
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: settings.format.fileExtension) ?? .data]
@@ -51,7 +59,7 @@ final class ExportSession {
         panel.canCreateDirectories = true
         let start: (NSApplication.ModalResponse) -> Void = { [weak self, weak panel] response in
             guard response == .OK, let url = panel?.url else { return }
-            self?.run(project, settings: settings, time: time, to: url, media: media)
+            self?.run(project, settings: settings, time: time, frames: frames, to: url, media: media)
         }
         if let window { panel.beginSheetModal(for: window, completionHandler: start) } else { start(panel.runModal()) }
     }
@@ -60,7 +68,8 @@ final class ExportSession {
 
     func dismissFinished() { finished = nil }
 
-    private func run(_ project: Project, settings: ExportSettings, time: Double, to url: URL, media: [UUID: URL]) {
+    private func run(_ project: Project, settings: ExportSettings, time: Double, frames: Range<Int>?, to url: URL,
+                     media: [UUID: URL]) {
         let job = ExportJob()
         self.job = job
         finished = nil
@@ -69,7 +78,8 @@ final class ExportSession {
             // Progress crosses to the main thread at most a hundred times.
             var shown = 0
             let result = Result {
-                try Exporter.export(project, settings: settings, at: time, to: url, media: media, job: job) { value in
+                try Exporter.export(project, settings: settings, at: time, frames: frames, to: url, media: media,
+                                    job: job) { value in
                     let step = Int(value * 100)
                     guard step > shown else { return }
                     shown = step

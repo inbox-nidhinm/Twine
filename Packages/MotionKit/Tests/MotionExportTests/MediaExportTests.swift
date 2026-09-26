@@ -15,18 +15,21 @@ private func temporaryURL(_ ext: String) -> URL {
 /// A one-second, 30 fps, 64 by 64 movie of eMotion's own making: black, with
 /// a white bar whose height counts the frames, so a frame shows which one it
 /// is. Frame n is n * 2 pixels tall.
-private func countingMovie() throws -> URL {
+private func countingProject() -> Project {
     var bar = Layer(name: "Bar", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
                                                               fills: [Fill(paint: .color(.white))])),
                     size: Size2(64, 0), position: .zero)
     bar.transform.anchor = .zero
     let grow = Action(target: bar.id, start: 0, duration: 1, easing: .linear,
                       spec: .resize(ResizeAction(initial: Size2(64, 0), end: Size2(64, 60))))
-    let project = Project(composition: Composition(width: 64, height: 64, frameRate: .fps30, duration: 1,
-                                                   background: Background(color: .black)),
-                          layers: [bar], actions: [grow])
+    return Project(composition: Composition(width: 64, height: 64, frameRate: .fps30, duration: 1,
+                                            background: Background(color: .black)),
+                   layers: [bar], actions: [grow])
+}
+
+private func countingMovie() throws -> URL {
     let url = temporaryURL("mov")
-    try Exporter.export(project, settings: ExportSettings(format: .proRes422), to: url)
+    try Exporter.export(countingProject(), settings: ExportSettings(format: .proRes422), to: url)
     return url
 }
 
@@ -159,6 +162,43 @@ private func loudness(of url: URL) async throws -> [Double] {
         defer { try? FileManager.default.removeItem(at: url) }
         try Exporter.export(muted, settings: ExportSettings(format: .h264), to: url, media: [asset.id: sound])
         #expect(try await AVURLAsset(url: url).loadTracks(withMediaType: .audio).isEmpty)
+    }
+
+    @Test func aRangeHoldsOnlyItsFrames() async throws {
+        let url = temporaryURL("mov")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Exporter.export(countingProject(), settings: ExportSettings(format: .proRes422), frames: 10..<20, to: url)
+        let out = try await frames(of: url).map(barHeight)
+        #expect(out.count == 10)
+        // Frame n of the composition is n * 2 pixels tall.
+        #expect(abs(out[0] - 20) <= 1)
+        #expect(abs(out[9] - 38) <= 1)
+    }
+
+    @Test func aRangeCarriesItsOwnStretchOfSound() async throws {
+        let sound = try tone(seconds: 2)
+        defer { try? FileManager.default.removeItem(at: sound) }
+        let asset = MediaAsset(kind: .audio, fileName: "t.wav", originalName: "t.wav", contentHash: "y", duration: 2)
+        let layer = Layer(name: "Tone", content: .audio(AudioContent(mediaID: asset.id)), size: Size2(0, 0), position: .zero)
+        // Heard from 0.5 to 1.5; the export runs from 1 to 2, so it is
+        // heard for its first half second only.
+        let play = Action(target: layer.id, start: 0.5, duration: 1, spec: .play(PlayAction()))
+        let project = Project(composition: Composition(width: 64, height: 64, frameRate: .fps30, duration: 2),
+                              layers: [layer], actions: [play], media: [asset])
+        for format in [ExportFormat.h264, .proRes4444] {
+            let url = temporaryURL(format.fileExtension)
+            defer { try? FileManager.default.removeItem(at: url) }
+            let range = ExportTiming.frames(from: 1, to: 2, in: project.composition)
+            try Exporter.export(project, settings: ExportSettings(format: format), frames: range, to: url,
+                                media: [asset.id: sound])
+            let levels = try await loudness(of: url)
+            try #require(levels.count >= 5, "\(format)")
+            #expect(levels[2] > 0.2, "the tone at the start, \(format)")
+            #expect(levels.dropFirst(6).allSatisfy { $0 < 0.01 }, "silent after its bar, \(format)")
+            let video = try #require(try await AVURLAsset(url: url).loadTracks(withMediaType: .video).first)
+            let length = try await video.load(.timeRange).duration.seconds
+            #expect(abs(length - 1) < 0.001, "\(format)")
+        }
     }
 
     @Test func picturesDrawAndMissingFilesShowGrey() throws {

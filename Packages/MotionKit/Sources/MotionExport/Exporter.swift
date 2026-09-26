@@ -63,11 +63,13 @@ public final class ExportJob: Sendable {
 /// export never leaves half a movie, or destroys the file it would replace.
 public enum Exporter {
     /// Writes `settings.format` to `url`. For a movie that is the whole
-    /// composition; for a PNG it is the frame at `time`. `progress` is called
+    /// composition, or only `frames` of it; for a PNG it is the frame at
+    /// `time`. `progress` is called
     /// from the exporting thread after each frame, from 0 to 1.
     /// `media` locates each imported file by its id, for pictures, video
     /// frames and sound.
-    public static func export(_ project: Project, settings: ExportSettings, at time: Double = 0, to url: URL,
+    public static func export(_ project: Project, settings: ExportSettings, at time: Double = 0,
+                              frames: Range<Int>? = nil, to url: URL,
                               media: [UUID: URL] = [:], job: ExportJob = ExportJob(),
                               progress: (Double) -> Void = { _ in }) throws {
         var project = project
@@ -82,8 +84,8 @@ public enum Exporter {
 
         let library = MediaLibrary(locate: { media[$0] })
         if settings.format.isMovie {
-            try writeMovie(project, settings: settings, library: library, media: media, to: temporary, job: job,
-                           progress: progress)
+            try writeMovie(project, settings: settings, frames: frames, library: library, media: media, to: temporary,
+                           job: job, progress: progress)
         } else {
             try writeStill(project, settings: settings, library: library, at: time, to: temporary)
             progress(1)
@@ -116,11 +118,11 @@ public enum Exporter {
 
     // MARK: Movie
 
-    private static func writeMovie(_ project: Project, settings: ExportSettings, library: MediaLibrary,
-                                   media: [UUID: URL], to url: URL, job: ExportJob,
+    private static func writeMovie(_ project: Project, settings: ExportSettings, frames: Range<Int>?,
+                                   library: MediaLibrary, media: [UUID: URL], to url: URL, job: ExportJob,
                                    progress: (Double) -> Void) throws {
         let composition = project.composition
-        let timing = ExportTiming(composition)
+        let timing = ExportTiming(composition, frames: frames)
         let (width, height) = settings.pixelSize(of: composition)
 
         let writer: AVAssetWriter
@@ -152,8 +154,8 @@ public enum Exporter {
 
         // The sound, mixed from its clips and read alongside the frames.
         let sound = settings.includesAudio
-            ? AudioMixdown(clips: audioClips(project), media: media, duration: composition.duration,
-                           compressed: !isMOV(settings.format))
+            ? AudioMixdown(clips: audioClips(project), media: media, start: timing.startTime,
+                           duration: timing.duration.seconds, compressed: !isMOV(settings.format))
             : nil
         if let sound {
             guard writer.canAdd(sound.input) else { throw ExportError.failed("The sound couldn't be added to the movie.") }
