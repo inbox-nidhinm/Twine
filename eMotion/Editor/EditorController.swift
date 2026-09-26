@@ -334,15 +334,36 @@ final class EditorController {
             ActionFactory.make(kind, for: layer, at: editor.time, state: tracks.state(of: layer, at: editor.time),
                                frameRate: frameRate, rowOrder: 0, mediaLength: asset(ofLayer: layer.id)?.duration)
         }
+        insertAndShow(made, name: made.first.map { "Add \($0.name)" } ?? "Add Action")
+    }
+
+    var availablePresets: [Preset] { Presets.available(for: selectedLayers) }
+
+    /// Applies a preset to every selected layer at the playhead: its actions
+    /// go on new rows at the bottom, selected and played, as Add Action's do.
+    func addPreset(_ preset: Preset) {
+        let tracks = ActionTracks(project.actions)
+        let layers = selectedLayers.filter { layer in
+            let kinds = Set(ActionFactory.kinds(for: layer))
+            return preset.steps.allSatisfy { kinds.contains($0.effect.kind) }
+        }
+        let made = layers.flatMap { layer in
+            Presets.actions(preset, for: layer, at: editor.time, state: tracks.state(of: layer, at: editor.time),
+                            frameRate: frameRate)
+        }
+        insertAndShow(made, name: preset.name)
+    }
+
+    /// Puts new actions on rows at the bottom, selects them, brings their
+    /// rows into view, and plays them: the playhead runs from their start to
+    /// their end at real speed (a long run hurried to a second) and waits
+    /// there, ready for the next to follow on.
+    private func insertAndShow(_ made: [Action], name: String) {
         let added = ActionEditing.appendingRows(made, in: project)
-        guard let first = added.first else { return NSSound.beep() }
-        guard perform(.batch([.insertActions(added)], name: "Add \(first.name)")) else { return }
+        guard !added.isEmpty else { return NSSound.beep() }
+        guard perform(.batch([.insertActions(added)], name: name)) else { return }
         selectActions(Set(added.map(\.id)))
-        // The new rows may be below the timeline's fold.
         editor.revealActions = (Set(added.map(\.id)), editor.revealActions.request + 1)
-        // Show what it does: the playhead runs from its start to its end at
-        // real speed (a long one hurried to a second), and waits there,
-        // ready for the next action to follow on.
         guard let last = added.max(by: { $0.end < $1.end }), last.end > editor.time else { return }
         stop()
         glide(to: last.end, over: min(last.end - editor.time, 1), eased: false)

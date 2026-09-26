@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Presets", changes: [
+            "Add Preset, under Add Action in Animate, applies a ready-made animation at the playhead: entrances (fade, slide in from each side, scale pop, rotate in, blur in, drop in), exits (fade, slide out to each side, scale out, blur out) and emphasis (pulse, bounce, shake, wiggle).",
+            "A preset only adds ordinary actions, on new rows, selected and played through, so every part of it can be retimed, re-eased or deleted like any other action. It works from the layer as it looks at the playhead, wherever it is and however faded.",
+        ]),
         .init(date: "26 September 2026", title: "Keyboard shortcuts card", changes: [
             "Help > Keyboard Shortcuts (⌘/) shows every eMotion shortcut on one card, grouped by where it works: modes and tools, view, the canvas, arranging, playback, the timeline and the project. Escape, ⌘/ or a click outside closes it.",
             "The Pen tool's greyed-out button is gone from the toolbar, since the pen tool is no longer planned.",

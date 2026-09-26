@@ -92,6 +92,8 @@ Add Action lists what the selected layers can take, grouped:
 - **Shape**: Arc (ellipses: slices and rings), Star (points, inner radius, corners).
 - **Media**: Play (video and sound).
 
+Add Preset, under Add Action, applies a ready-made animation at the playhead: entrances, exits and emphasis such as Slide In from Left, Scale Pop, Blur Out, Pulse or Shake. A preset only adds ordinary actions, so each part can be edited afterwards.
+
 Copy Easing and Paste Easing (⌥⌘C, ⌥⌘V) copy one action's easing onto the selected actions.
 
 Shadows and blurs on a layer designed without them fade in from nothing. Blur amounts use Figma's measure.

@@ -35,6 +35,7 @@ public enum Icon: String, CaseIterable, Sendable {
     case distributeH
     case distributeV
     case link
+    case preset
     case unlink
     case audio
     case eyeSlash
@@ -240,6 +241,10 @@ public enum Icon: String, CaseIterable, Sendable {
             "M10 14 L14 10",
             "M8.5 11.5 L6.5 13.5 C5.1 14.9 5.1 17.1 6.5 18.5 C7.9 19.9 10.1 19.9 11.5 18.5 L13.5 16.5",
             "M15.5 12.5 L17.5 10.5 C18.9 9.1 18.9 6.9 17.5 5.5 C16.1 4.1 13.9 4.1 12.5 5.5 L10.5 7.5"
+        ]
+        case .preset: return [   // Inspector/preset.svg
+            "M10 4 C10.6 8.2 12.8 10.4 17 11 C12.8 11.6 10.6 13.8 10 18 C9.4 13.8 7.2 11.6 3 11 C7.2 10.4 9.4 8.2 10 4 Z",
+            "M18 14.5 C18.2 16.2 18.8 16.8 20.5 17 C18.8 17.2 18.2 17.8 18 19.5 C17.8 17.8 17.2 17.2 15.5 17 C17.2 16.8 17.8 16.2 18 14.5 Z"
         ]
         case .unlink: return [   // Inspector/unlink.svg
             "M8.5 11.5 L6.5 13.5 C5.1 14.9 5.1 17.1 6.5 18.5 C7.9 19.9 10.1 19.9 11.5 18.5 L13.5 16.5",
