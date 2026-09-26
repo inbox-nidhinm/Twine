@@ -564,22 +564,38 @@ final class EditorController {
         guard !layers.isEmpty else { return }
         // Duplicates land just in front of their originals, nudged so they
         // can be seen, the way Figma and Flip do it.
+        let (command, copies) = duplicates(of: layers, offset: Vec2(10, 10))
+        if perform(.batch([command], name: layers.count == 1 ? "Duplicate Layer" : "Duplicate Layers")) {
+            editor.selection = Set(copies.map(\.id))
+        }
+    }
+
+    /// Copies of layers where they stand, for an Option-drag, made inside
+    /// the continuous change the drag has begun and selected. The drag then
+    /// moves them, so the whole thing undoes as one step.
+    func duplicateForDrag(_ layers: [Layer]) -> [Layer] {
+        let (command, copies) = duplicates(of: layers, offset: .zero)
+        update(command)
+        editor.selection = Set(copies.map(\.id))
+        return copies.compactMap { project.layer(withID: $0.id) }
+    }
+
+    /// Copies of layers, each just in front of its original and moved by
+    /// `offset`, with their animation (moved with them where it is absolute).
+    private func duplicates(of layers: [Layer], offset: Vec2) -> (EditorCommand, [Layer]) {
         var commands: [EditorCommand] = []
-        var copies: [UUID] = []
+        var copies: [Layer] = []
         var map: [UUID: UUID] = [:]
         for layer in layers {
             guard let location = project.location(of: layer.id) else { continue }
-            var copy = layer.duplicated(recordingIDs: &map).translated(by: Vec2(10, 10))
+            var copy = layer.duplicated(recordingIDs: &map).translated(by: offset)
             copy.name = layer.name
             commands.append(.insertLayers([copy], parentID: location.parentID, index: location.index + 1))
-            copies.append(copy.id)
+            copies.append(copy)
         }
-        // Their animation comes too, nudged with them where it is absolute.
-        let actions = project.actionCopies(for: map).map { $0.remapped(point: { $0 + Vec2(10, 10) }, vector: { $0 }) }
+        let actions = project.actionCopies(for: map).map { $0.remapped(point: { $0 + offset }, vector: { $0 }) }
         if !actions.isEmpty { commands.append(.insertActions(actions)) }
-        if perform(.batch(commands, name: layers.count == 1 ? "Duplicate Layer" : "Duplicate Layers")) {
-            editor.selection = Set(copies)
-        }
+        return (.batch(commands, name: "Duplicate"), copies)
     }
 
     func groupSelection() {

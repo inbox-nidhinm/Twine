@@ -556,12 +556,21 @@ final class CanvasNSView: NSView {
                 // And on text, it starts typing where it was clicked.
                 return beginTextEditing(hit, selectAll: false, at: point)
             }
-            let moving = controller.topmost(controller.selectedLayers).filter { !controller.isLocked($0.id) }
-            snapTargets = targets(excluding: Set(moving.map(\.id)))
+            var moving = controller.topmost(controller.selectedLayers).filter { !controller.isLocked($0.id) }
+            let sources = Set(moving.map(\.id))
             let boxes = moving.compactMap { scene.bounds(of: $0.id) }
             snapBox = boxes.dropFirst().reduce(boxes.first) { $0?.union($1) }
-            drag = .move(CanvasDrag.Move(originals: moving, start: point))
-            controller.begin(moving.count == 1 ? "Move Layer" : "Move Layers")
+            // Option-drag in Design leaves the originals behind and drags
+            // copies of them, as in Figma. The originals stay snap targets.
+            let duplicating = event.modifierFlags.contains(.option) && !animating && !moving.isEmpty
+            if duplicating {
+                controller.begin(moving.count == 1 ? "Duplicate Layer" : "Duplicate Layers")
+                moving = controller.duplicateForDrag(moving)
+            } else {
+                controller.begin(moving.count == 1 ? "Move Layer" : "Move Layers")
+            }
+            snapTargets = targets(excluding: Set(moving.map(\.id)))
+            drag = .move(CanvasDrag.Move(originals: moving, start: point, duplicating: duplicating, sources: sources))
         } else {
             if !shift { controller.deselectAll() }
             drag = .marquee(CanvasDrag.Marquee(start: viewPoint, current: viewPoint, additive: shift,
@@ -704,6 +713,11 @@ final class CanvasNSView: NSView {
             }
             // Back to the arrow after drawing, as in Figma.
             controller.editor.tool = .select
+        case .move(let move) where move.duplicating
+            && viewToComposition(convert(event.locationInWindow, from: nil)) == move.start:
+            // Option-clicked without moving: no copies after all.
+            controller.cancel()
+            controller.editor.selection = move.sources
         case .move, .resize, .rotate, .anchor, .action:
             controller.end()
         case .marquee:

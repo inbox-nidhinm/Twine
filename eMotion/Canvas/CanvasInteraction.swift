@@ -17,6 +17,10 @@ enum CanvasDrag {
     struct Move {
         let originals: [Layer]
         let start: Vec2
+        /// Option-dragged copies: a press that never moves takes them back,
+        /// and the originals are selected again.
+        var duplicating = false
+        var sources: Set<UUID> = []
     }
 
     struct Resize {

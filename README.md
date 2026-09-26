@@ -41,7 +41,7 @@ Name.emotion/
 | Drag | Draw. Shift: square, circle or 45° line. Option: from the centre. A click makes a standard size. |
 | Click, Shift-click, drag on empty canvas | Select, add to the selection, marquee |
 | ⌘-click, double-click | Reach a layer inside a group |
-| Drag a layer | Move. Shift keeps to one axis. |
+| Drag a layer | Move. Shift keeps to one axis. Option (Design) drags away a copy. |
 | Dragging, resizing or drawing | Snaps to the composition's edges and centre, other layers' edges and centres, and even spacing, with red guides. Hold ⌘ to place freely; View > Smart Guides turns snapping off. |
 | ⌥A, ⌥H, ⌥D | Align left, horizontal centres, right |
 | ⌥W, ⌥V, ⌥S | Align top, vertical centres, bottom |

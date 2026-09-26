@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Option-drag to duplicate", changes: [
+            "In Design, hold Option and drag a layer to leave it where it is and drag away a copy, animation included, as in Figma. The copy snaps to the original like any other layer, and one Undo takes it back. An Option-click that never moves makes no copy.",
+        ]),
         .init(date: "26 September 2026", title: "Hover everywhere on the canvas", changes: [
             "Fixed: hover failed over the upper part of the canvas, worst in Animate, where a layer near the top did not respond and a tall one only answered over its lower half. The check for whether the pointer was over a panel looked at the spot mirrored top to bottom, which in Animate landed on the timeline.",
             "The same mix-up could end typing in a text field when clicking inside it; that is fixed too.",
