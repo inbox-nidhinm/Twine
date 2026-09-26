@@ -57,18 +57,33 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks) -
 }
 
 private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, at t: Double) -> ResolvedLayer? {
-    let size = state.size
+    var size = state.size
     let content: ResolvedContent
     var clips = false
+    // A text box is as big as its words, so it is measured here, and grows
+    // from its anchor the way its alignment reads.
+    var textAnchor: Vec2?
 
     switch layer.content {
     case .shape(let shape):
         content = .shape(resolve(shape, size: size, state: state))
     case .text(let text):
-        content = .text(ResolvedText(text: text.text, fontFamily: text.fontFamily, fontWeight: text.fontWeight,
-                                     fontSize: text.fontSize, color: text.color,
-                                     alignment: text.alignment, letterSpacing: text.letterSpacing,
-                                     lineHeight: text.lineHeight, sizing: text.sizing))
+        let shown = state.text ?? ShownText(text: text.text)
+        var color = text.color
+        switch state.fill {
+        case .solid(let c): color = c
+        case .linearGradient(let g), .radialGradient(let g): color = g.stops.first?.color ?? color
+        case nil: break
+        }
+        let resolved = ResolvedText(text: shown.text, swap: shown.swap, fontFamily: text.fontFamily,
+                                    fontWeight: text.fontWeight, fontSize: text.fontSize, color: color,
+                                    alignment: text.alignment, letterSpacing: state.letterSpacing ?? text.letterSpacing,
+                                    lineHeight: state.lineHeight ?? text.lineHeight, sizing: text.sizing,
+                                    tabularDigits: shown.isCounting)
+        let width = text.sizing == .fixedWidth ? state.size.width : nil
+        size = TextLayout.size(of: shown.visible, style: resolved.style, width: width)
+        textAnchor = TextLayout.anchor(layer.transform.anchor, from: layer.size, to: size, alignment: text.alignment)
+        content = .text(resolved)
     case .image(let image):
         content = .image(mediaID: image.mediaID)
     case .video(let video):
@@ -104,7 +119,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, at t: Dou
     // A resized layer grows around its anchor: the anchor keeps its place as
     // a fraction of the box, and the position keeps the anchor where it was.
     let designSize = layer.size
-    let anchor = Vec2(designSize.width != 0 ? layer.transform.anchor.x * size.width / designSize.width : layer.transform.anchor.x,
+    let anchor = textAnchor ?? Vec2(designSize.width != 0 ? layer.transform.anchor.x * size.width / designSize.width : layer.transform.anchor.x,
                       designSize.height != 0 ? layer.transform.anchor.y * size.height / designSize.height : layer.transform.anchor.y)
 
     return ResolvedLayer(id: layer.id, parentID: parent, size: size,
@@ -132,14 +147,19 @@ private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState) -> R
         }
     }
     if let radii = state.cornerRadii, case .rectangle = shape.geometry { shape.geometry = .rectangle(cornerRadii: radii) }
+    if let arc = state.arc, case .ellipse = shape.geometry { shape.geometry = .ellipse(arc: arc) }
+    if let star = state.star, case .star = shape.geometry {
+        shape.geometry = .star(points: star.points, innerRadius: star.innerRadius, cornerRadius: star.cornerRadius)
+    }
 
     let path: BezierPath
     switch shape.geometry {
     case .rectangle(let radii): path = ShapePaths.rectangle(size, radii: radii)
-    case .ellipse: path = ShapePaths.ellipse(size)
+    case .ellipse(let arc): path = ShapePaths.ellipse(size, arc: arc)
     case .line: path = ShapePaths.line(size)
     case .polygon(let sides): path = ShapePaths.polygon(size, sides: sides)
-    case .star(let points, let inner): path = ShapePaths.star(size, points: points, innerRadius: inner)
+    case .star(let points, let inner, let corner):
+        path = ShapePaths.star(size, points: points, innerRadius: inner, cornerRadius: corner)
     case .path(let p): path = p
     }
     let closed = shape.geometry.isClosed

@@ -22,13 +22,13 @@ func kitchenSinkProject() -> Project {
                     Effect(kind: .backgroundBlur(BackgroundBlur(radius: 20, blend: 0.6)))]
 
     let ellipse = Layer(name: "Ellipse", content: .shape(ShapeContent(
-        geometry: .ellipse,
+        geometry: .ellipse(arc: EllipseArc(start: -90, end: 180, innerRadius: 0.6)),
         fills: [Fill(paint: .linearGradient(Gradient(stops: [
             GradientStop(position: 0, color: .white), GradientStop(position: 1, color: .black),
         ])))])), size: Size2(50, 50), position: Vec2(10, 10))
 
     var star = Layer(name: "Star", content: .shape(ShapeContent(
-        geometry: .star(points: 5, innerRadius: 0.4),
+        geometry: .star(points: 5, innerRadius: 0.4, cornerRadius: 4),
         fills: [Fill(paint: .radialGradient(Gradient(stops: [GradientStop(position: 0.5, color: .clear)],
                                                     start: Vec2(0.5, 0.5), end: Vec2(1, 0.5))))])),
         size: Size2(80, 80), position: Vec2(0, 0))
@@ -82,6 +82,13 @@ func kitchenSinkProject() -> Project {
             end: CornerRadii(topLeft: 1, topRight: 2, bottomRight: 3, bottomLeft: 4), isLinked: false))),
         Action(target: rect.id, start: 1, duration: 1, spec: .shadow(ShadowAction(initial: .noShadow, end: DropShadow(spread: -2)))),
         Action(target: group.id, start: 1, duration: 1, spec: .layerBlur(LayerBlurAction(initial: 2, end: 10))),
+        Action(target: text.id, start: 1, duration: 1, spec: .letterSpacing(LetterSpacingAction(initial: 0, end: 4))),
+        Action(target: text.id, start: 1, duration: 1, spec: .lineHeight(LineHeightAction(end: 90))),
+        Action(target: text.id, start: 1, duration: 1, spec: .counter(CounterAction(from: 1, to: 9, step: 2, transition: .slide))),
+        Action(target: text.id, start: 1, duration: 1, spec: .changeText(ChangeTextAction(
+            text: "Bye", transitionOut: .scale, transitionIn: .none, overlaps: true))),
+        Action(target: ellipse.id, start: 1, duration: 1, spec: .arc(ArcAction(initial: .full, end: EllipseArc(end: 90)))),
+        Action(target: star.id, start: 1, duration: 1, spec: .star(StarAction(end: StarShape(points: 7, innerRadius: 0.5, cornerRadius: 2)))),
         Action(target: rect.id, start: 1, duration: 1, spec: .backgroundBlur(BackgroundBlurAction(end: BackgroundBlur(radius: 4, blend: 0.5)))),
     ]
 
@@ -123,6 +130,13 @@ func kitchenSinkProject() -> Project {
         for key in ["\"actions\"", "\"targetLayerID\"", "\"rowOrder\"", "\"intensity\"", "\"curve\"", "\"isEnabled\""] {
             #expect(text.contains(key))
         }
+    }
+
+    @Test func shapesSavedBeforeArcsAndStarCornersStillOpen() throws {
+        let ellipse = try JSONDecoder().decode(ShapeGeometry.self, from: Data(#"{"type": "ellipse"}"#.utf8))
+        #expect(ellipse == .ellipse(arc: .full))
+        let star = try JSONDecoder().decode(ShapeGeometry.self, from: Data(#"{"type": "star", "points": 5, "innerRadius": 0.4}"#.utf8))
+        #expect(star == .star(points: 5, innerRadius: 0.4, cornerRadius: 0))
     }
 
     @Test func shadowsSavedBeforeSpreadStillOpen() throws {

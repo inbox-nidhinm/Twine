@@ -7,10 +7,15 @@ import SwiftUI
 ///
 /// Parsed once on first use and cached. See `IconShape` for the drawing.
 public enum Icon: String, CaseIterable, Sendable {
+    case arc
     case backgroundBlur
+    case changeText
     case color
+    case counter
     case filter
     case layerBlur
+    case letterSpacing
+    case lineHeight
     case move
     case opacity
     case resize
@@ -65,6 +70,10 @@ public enum Icon: String, CaseIterable, Sendable {
     /// The subpaths, in the order they are drawn.
     public var data: [String] {
         switch self {
+        case .arc: return [   // Actions/arc.svg
+            "M12 4.5 C16.1 4.5 19.5 7.9 19.5 12 C19.5 16.1 16.1 19.5 12 19.5 C7.9 19.5 4.5 16.1 4.5 12",
+            "M4.5 12 H12 V4.5"
+        ]
         case .backgroundBlur: return [   // Actions/background-blur.svg
             "M7 4.5 H17 C17.8 4.5 18.5 5.2 18.5 6 V18 C18.5 18.8 17.8 19.5 17 19.5 H7 C6.2 19.5 5.5 18.8 5.5 18 V6 C5.5 5.2 6.2 4.5 7 4.5 Z",
             "M2.5 9 H5.5",
@@ -76,8 +85,22 @@ public enum Icon: String, CaseIterable, Sendable {
             "M9 15 H11",
             "M14 15 H15"
         ]
+        case .changeText: return [   // Actions/change-text.svg
+            "M4 5 H12",
+            "M8 5 V14",
+            "M14 12 H20",
+            "M17 12 V20",
+            "M13 17 L10 20 L7 17",
+            "M10 20 V17",
+            "M15 7 L18 4 L21 7"
+        ]
         case .color: return [   // Actions/color.svg
             "M12 4 C12 4 6 10.5 6 14.5 C6 17.8 8.7 20.5 12 20.5 C15.3 20.5 18 17.8 18 14.5 C18 10.5 12 4 12 4 Z"
+        ]
+        case .counter: return [   // Actions/counter.svg
+            "M5 8 L7 6 V18",
+            "M5 18 H9",
+            "M12 9 C12 7.3 13.3 6 15 6 C16.7 6 18 7.2 18 8.8 C18 11.5 12 13.5 12 18 H18"
         ]
         case .filter: return [   // Actions/filter.svg
             "M4 5 H20 L14 12 V19 L10 17 V12 Z"
@@ -92,6 +115,21 @@ public enum Icon: String, CaseIterable, Sendable {
             "M17.3 17.3 L18 18",
             "M6 18 L6.7 17.3",
             "M17.3 6.7 L18 6"
+        ]
+        case .letterSpacing: return [   // Actions/letter-spacing.svg
+            "M8 15 L12 5 L16 15",
+            "M9.5 11.5 H14.5",
+            "M3 19 H21",
+            "M5 17 L3 19 L5 21",
+            "M19 17 L21 19 L19 21"
+        ]
+        case .lineHeight: return [   // Actions/line-height.svg
+            "M10 6 H20",
+            "M10 12 H20",
+            "M10 18 H20",
+            "M5 4 V20",
+            "M3 6 L5 4 L7 6",
+            "M3 18 L5 20 L7 18"
         ]
         case .move: return [   // Actions/move.svg
             "M4 12 H19",

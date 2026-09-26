@@ -6,7 +6,7 @@ import MotionModel
 @MainActor
 @Suite struct ProjectStoreTests {
     private func shape(_ name: String) -> Layer {
-        Layer(name: name, content: .shape(ShapeContent(geometry: .ellipse)),
+        Layer(name: name, content: .shape(ShapeContent(geometry: .ellipse(arc: .full))),
               size: Size2(10, 10), position: .zero)
     }
 

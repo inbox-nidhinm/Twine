@@ -163,6 +163,24 @@ extension DropShadow: Interpolatable {
     }
 }
 
+/// Angles travel freely, so an arc can sweep past a full turn on its way;
+/// the hole stays inside the ellipse.
+extension EllipseArc: Interpolatable {
+    public static func interpolate(_ a: EllipseArc, _ b: EllipseArc, _ t: Double) -> EllipseArc {
+        EllipseArc(start: lerp(a.start, b.start, t), end: lerp(a.end, b.end, t),
+                   innerRadius: min(max(lerp(a.innerRadius, b.innerRadius, t), 0), 0.999))
+    }
+}
+
+/// The number of points changes a whole point at a time, at the nearest.
+extension StarShape: Interpolatable {
+    public static func interpolate(_ a: StarShape, _ b: StarShape, _ t: Double) -> StarShape {
+        StarShape(points: max(3, Int(lerp(Double(a.points), Double(b.points), t).rounded())),
+                  innerRadius: max(0, lerp(a.innerRadius, b.innerRadius, t)),
+                  cornerRadius: max(0, lerp(a.cornerRadius, b.cornerRadius, t)))
+    }
+}
+
 extension BackgroundBlur: Interpolatable {
     public static func interpolate(_ a: BackgroundBlur, _ b: BackgroundBlur, _ t: Double) -> BackgroundBlur {
         BackgroundBlur(radius: max(0, lerp(a.radius, b.radius, t)), blend: min(max(lerp(a.blend, b.blend, t), 0), 1))

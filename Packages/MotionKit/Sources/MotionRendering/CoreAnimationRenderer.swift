@@ -24,6 +24,14 @@ public final class CoreAnimationRenderer: SceneRenderer {
     private let contentLayer = CALayer()
     private var nodes: [UUID: Node] = [:]
 
+    /// Whether pictures (text now; images and video later) are drawn upside
+    /// down and must be turned over. Off screen the layer tree runs y up and
+    /// the texture's rows turn it the right way, which shapes never notice
+    /// but a picture does. The offscreen renderer turns this on.
+    public var flipsContents = false {
+        didSet { for node in nodes.values { node.flipsContents = flipsContents } }
+    }
+
     /// How many device pixels to rasterise per point. Raise it for Retina
     /// screens and high-resolution exports.
     public var contentsScale: CGFloat = 2 {
@@ -58,6 +66,7 @@ public final class CoreAnimationRenderer: SceneRenderer {
         for resolved in scene.layers {
             let node = nodes[resolved.id] ?? {
                 let made = Node(scale: contentsScale)
+                made.flipsContents = flipsContents
                 nodes[resolved.id] = made
                 return made
             }()
@@ -102,6 +111,7 @@ private final class Node {
     ]
 
     let container = CALayer()
+    var flipsContents = false
     private var scale: CGFloat
     /// The kinds of fill and stroke layers currently built, so they are only
     /// rebuilt when a paint changes kind rather than on every frame.
@@ -113,6 +123,11 @@ private final class Node {
     private var backdrop: CALayer?
     private let backdropMask = CAShapeLayer()
     private var backdropRadius = 0.0
+    /// A text layer's words: the current text, and the previous one while a
+    /// Counter or Change Text moves from one to the other.
+    private var textLayers: [CALayer] = []
+    private var textKeys: [TextImage.Key?] = [nil, nil]
+    private var textImages: [TextImage?] = [nil, nil]
 
     init(scale: CGFloat) {
         self.scale = scale
@@ -126,6 +141,8 @@ private final class Node {
         self.scale = scale
         container.contentsScale = scale
         for p in paintLayers { p.setContentsScale(scale) }
+        // Text is a picture drawn at a scale, so it is drawn again.
+        textKeys = [nil, nil]
     }
 
     func update(_ layer: ResolvedLayer) {
@@ -163,10 +180,14 @@ private final class Node {
         case .group:
             // A group's sublayers are its children, set by the renderer.
             if !signature.isEmpty { clearPaint() }
-        case .text, .image, .video:
-            // Drawn from milestones 6 and 7.
+        case .text(let text):
+            if !signature.isEmpty { clearPaint() }
+            updateText(text, size: layer.size)
+        case .image, .video:
+            // Drawn from milestone 8.
             if !signature.isEmpty { clearPaint() }
         }
+        if case .text = layer.content {} else if !textLayers.isEmpty { clearText() }
     }
 
     /// The shadow's outline grown by `spread`, or shrunk for a negative one.
@@ -203,6 +224,89 @@ private final class Node {
         if blur.radius != backdropRadius {
             backdropRadius = blur.radius
             backdrop.filters = [Blur.filter(amount: blur.radius)]
+        }
+    }
+
+    private func clearText() {
+        for l in textLayers { l.removeFromSuperlayer() }
+        textLayers = []
+        textKeys = [nil, nil]
+        textImages = [nil, nil]
+    }
+
+    /// Draws the current text, and the previous one during a swap, each at
+    /// its point in its transition. Each text keeps its own box, placed in
+    /// the layer's by the alignment, so the old and new line up as they
+    /// would in the design.
+    private func updateText(_ text: ResolvedText, size: Size2) {
+        if textLayers.isEmpty {
+            textLayers = (0..<2).map { _ in
+                let l = CALayer()
+                l.actions = Self.noActions
+                l.contentsScale = scale
+                return l
+            }
+            container.sublayers = textLayers
+        }
+        let width = text.sizing == .fixedWidth ? size.width : nil
+        let swap = text.swap
+        let texts = [swap?.previous, text.text]
+        for (i, string) in texts.enumerated() {
+            let layer = textLayers[i]
+            // How far this text is through its transition, and which one.
+            let progress: Double, transition: TextTransition, leaving: Bool
+            if i == 0 {
+                guard let swap, swap.outProgress < 1 else { layer.isHidden = true; continue }
+                progress = swap.outProgress
+                transition = swap.transitionOut
+                leaving = true
+            } else {
+                if let swap, swap.inProgress <= 0 { layer.isHidden = true; continue }
+                progress = swap?.inProgress ?? 1
+                transition = swap?.transitionIn ?? .none
+                leaving = false
+            }
+            guard let string else { layer.isHidden = true; continue }
+            layer.isHidden = false
+            let key = TextImage.Key(text: string, style: text.style, color: text.color, width: width, scale: scale)
+            if textKeys[i] != key {
+                textKeys[i] = key
+                textImages[i] = TextImage(key)
+                layer.contents = textImages[i]?.image
+                layer.contentsScale = scale
+            }
+            guard let image = textImages[i] else { continue }
+            let x: Double
+            switch text.alignment {
+            case .left, .justified: x = 0
+            case .center: x = (size.width - image.box.width) / 2
+            case .right: x = size.width - image.box.width
+            }
+            layer.transform = CATransform3DIdentity
+            let turn = flipsContents ? CATransform3DMakeScale(1, -1, 1) : CATransform3DIdentity
+            layer.frame = CGRect(x: x - image.margin, y: -image.margin,
+                                 width: image.box.width + image.margin * 2, height: image.box.height + image.margin * 2)
+            // Leaving goes from nothing done (0) to gone (1); arriving from
+            // not there (0) to settled (1). Both read as one amount, `shown`.
+            let shown = leaving ? 1 - progress : progress
+            let distance = text.fontSize
+            var effect = CATransform3DIdentity
+            switch transition {
+            case .none:
+                layer.opacity = 1
+            case .fade:
+                layer.opacity = Float(shown)
+            case .slide:
+                layer.opacity = Float(shown)
+                // Up and away when leaving, up from below when arriving.
+                let dy = leaving ? -distance * progress : distance * (1 - progress)
+                effect = CATransform3DMakeTranslation(0, dy, 0)
+            case .scale:
+                layer.opacity = Float(shown)
+                let s = 0.6 + 0.4 * shown
+                effect = CATransform3DMakeScale(s, s, 1)
+            }
+            layer.transform = CATransform3DConcat(turn, effect)
         }
     }
 

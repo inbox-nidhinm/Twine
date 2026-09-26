@@ -53,6 +53,7 @@ public final class OffscreenRenderer {
         // lands on the image's top-left as it is.
         root.addSublayer(renderer.rootLayer)
         renderer.contentsScale = 1
+        renderer.flipsContents = true
         CATransaction.commit()
         caRenderer.layer = root
         caRenderer.bounds = root.bounds

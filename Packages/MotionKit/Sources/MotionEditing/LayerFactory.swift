@@ -30,10 +30,10 @@ public enum LayerFactory {
         let geometry: ShapeGeometry
         switch kind {
         case .rectangle: geometry = .rectangle(cornerRadii: .zero)
-        case .ellipse: geometry = .ellipse
+        case .ellipse: geometry = .ellipse(arc: .full)
         case .line: geometry = .line
         case .polygon: geometry = .polygon(sides: 6)
-        case .star: geometry = .star(points: 5, innerRadius: 0.4)
+        case .star: geometry = .star(points: 5, innerRadius: 0.4, cornerRadius: 0)
         }
         let content: ShapeContent
         if kind == .line {
@@ -42,6 +42,16 @@ public enum LayerFactory {
             content = ShapeContent(geometry: geometry, fills: [Fill(paint: .color(defaultFill))])
         }
         return Layer(name: name, content: .shape(content), size: size, position: box.center)
+    }
+
+    /// A new text layer with its top-left corner at `point`: the word Text,
+    /// in the system font, dark, one line wide. Its anchor is at its centre.
+    public static func text(at point: Vec2, name: String, color: RGBA = defaultStroke) -> Layer {
+        let content = TextContent(text: "Text", fontFamily: TextLayout.systemFamily, fontWeight: 400, fontSize: 48,
+                                  color: color)
+        let size = TextLayout.size(of: content.text, style: TextStyle(content), width: nil)
+        return Layer(name: name, content: .text(content), size: size,
+                     position: Vec2(point.x + size.width / 2, point.y + size.height / 2))
     }
 
     /// A line from `start` to `end`: a box as long as the line and no taller,

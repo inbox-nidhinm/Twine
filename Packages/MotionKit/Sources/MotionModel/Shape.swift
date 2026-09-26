@@ -16,14 +16,15 @@ public struct ShapeContent: Codable, Sendable, Equatable {
 /// `size`, so resizing a rectangle is just changing its size.
 public enum ShapeGeometry: Sendable, Equatable {
     case rectangle(cornerRadii: CornerRadii)
-    case ellipse
+    /// A full ellipse, or with `arc`, a slice or a ring of one.
+    case ellipse(arc: EllipseArc)
     /// A straight line across the middle of the box, left to right. Rotation
     /// points it anywhere, which is how Figma represents lines too.
     case line
     case polygon(sides: Int)
     /// `innerRadius` is the inner points' distance from the centre as a fraction
-    /// of the outer radius.
-    case star(points: Int, innerRadius: Double)
+    /// of the outer radius. `cornerRadius` rounds every point, in pixels.
+    case star(points: Int, innerRadius: Double, cornerRadius: Double)
     /// Drawn with the pen tool, in the layer's own pixel space.
     case path(BezierPath)
 
@@ -38,19 +39,21 @@ public enum ShapeGeometry: Sendable, Equatable {
 
 extension ShapeGeometry: Codable {
     private enum Kind: String, Codable { case rectangle, ellipse, line, polygon, star, path }
-    private enum CodingKeys: String, CodingKey { case type, cornerRadii, sides, points, innerRadius, path }
+    private enum CodingKeys: String, CodingKey { case type, cornerRadii, sides, points, innerRadius, cornerRadius, arc, path }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         switch try c.decode(Kind.self, forKey: .type) {
         case .rectangle:
             self = .rectangle(cornerRadii: try c.decode(CornerRadii.self, forKey: .cornerRadii))
-        case .ellipse: self = .ellipse
+        // Arcs and star corners arrived after the first files were written.
+        case .ellipse: self = .ellipse(arc: try c.decodeIfPresent(EllipseArc.self, forKey: .arc) ?? .full)
         case .line: self = .line
         case .polygon: self = .polygon(sides: try c.decode(Int.self, forKey: .sides))
         case .star:
             self = .star(points: try c.decode(Int.self, forKey: .points),
-                         innerRadius: try c.decode(Double.self, forKey: .innerRadius))
+                         innerRadius: try c.decode(Double.self, forKey: .innerRadius),
+                         cornerRadius: try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? 0)
         case .path: self = .path(try c.decode(BezierPath.self, forKey: .path))
         }
     }
@@ -61,19 +64,57 @@ extension ShapeGeometry: Codable {
         case .rectangle(let radii):
             try c.encode(Kind.rectangle, forKey: .type)
             try c.encode(radii, forKey: .cornerRadii)
-        case .ellipse: try c.encode(Kind.ellipse, forKey: .type)
+        case .ellipse(let arc):
+            try c.encode(Kind.ellipse, forKey: .type)
+            if arc != .full { try c.encode(arc, forKey: .arc) }
         case .line: try c.encode(Kind.line, forKey: .type)
         case .polygon(let sides):
             try c.encode(Kind.polygon, forKey: .type)
             try c.encode(sides, forKey: .sides)
-        case .star(let points, let inner):
+        case .star(let points, let inner, let corner):
             try c.encode(Kind.star, forKey: .type)
             try c.encode(points, forKey: .points)
             try c.encode(inner, forKey: .innerRadius)
+            if corner != 0 { try c.encode(corner, forKey: .cornerRadius) }
         case .path(let path):
             try c.encode(Kind.path, forKey: .type)
             try c.encode(path, forKey: .path)
         }
+    }
+}
+
+/// How much of an ellipse is drawn, as Figma describes it. Angles are in
+/// degrees, clockwise from three o'clock; the slice runs from `start` round
+/// to `end`. `innerRadius` cuts a hole in the middle, as a fraction of the
+/// outer size: 0 is solid, 0.8 a thin ring.
+public struct EllipseArc: AnimatableValue, Hashable {
+    public var start: Double
+    public var end: Double
+    public var innerRadius: Double
+
+    public init(start: Double = 0, end: Double = 360, innerRadius: Double = 0) {
+        self.start = start
+        self.end = end
+        self.innerRadius = innerRadius
+    }
+
+    public static let full = EllipseArc()
+
+    /// Whether the slice goes all the way round.
+    public var isWhole: Bool { abs(end - start) >= 360 - 1e-9 }
+}
+
+/// A star's shape: how many points, how far in the inner ones sit, and how
+/// round the points are.
+public struct StarShape: AnimatableValue, Hashable {
+    public var points: Int
+    public var innerRadius: Double
+    public var cornerRadius: Double
+
+    public init(points: Int, innerRadius: Double, cornerRadius: Double = 0) {
+        self.points = points
+        self.innerRadius = innerRadius
+        self.cornerRadius = cornerRadius
     }
 }
 

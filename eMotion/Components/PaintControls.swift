@@ -17,12 +17,16 @@ struct EditCallbacks<Value> {
 struct PaintControls: View {
     let paint: Paint
     var title = "Colour"
+    /// Off for text, which is one colour.
+    var allowsGradients = true
     let edit: EditCallbacks<Paint>
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SegmentRow(selection: paint.kindName, options: ["Solid", "Linear", "Radial"], title: { $0 }) { kind in
-                edit.commit(paint.converted(to: kind))
+            if allowsGradients {
+                SegmentRow(selection: paint.kindName, options: ["Solid", "Linear", "Radial"], title: { $0 }) { kind in
+                    edit.commit(paint.converted(to: kind))
+                }
             }
             switch paint {
             case .solid(let color):

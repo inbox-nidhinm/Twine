@@ -65,6 +65,11 @@ public enum EditorCommand: Sendable {
         // goes with its layer, whichever command took the layer away.
         let remaining = Set(draft.allLayers.map(\.id))
         draft.actions.removeAll { !remaining.contains($0.targetLayerID) }
+        // A text box is always the size of its words, whatever changed them.
+        for layer in draft.allLayers where layer.isText {
+            let fitted = layer.fittedText()
+            if fitted != layer { _ = draft.updateLayer(layer.id) { $0 = fitted } }
+        }
         project = draft
     }
 

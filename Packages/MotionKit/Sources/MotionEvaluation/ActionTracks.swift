@@ -7,6 +7,7 @@ import MotionModel
 public enum Channel: String, Hashable, Sendable, CaseIterable {
     case position, scale, rotation, opacity, size, visibility
     case fill, stroke, trim, cornerRadius, shadow, layerBlur, backgroundBlur
+    case letterSpacing, lineHeight, text, arc, star
 }
 
 extension ActionKind {
@@ -25,7 +26,54 @@ extension ActionKind {
         case .shadow: return .shadow
         case .layerBlur: return .layerBlur
         case .backgroundBlur: return .backgroundBlur
+        case .letterSpacing: return .letterSpacing
+        case .lineHeight: return .lineHeight
+        case .counter, .changeText: return .text
+        case .arc: return .arc
+        case .star: return .star
         }
+    }
+}
+
+/// The words a text layer shows at one moment, and, part way through a
+/// Counter or a Change Text, the words on their way out.
+public struct ShownText: Sendable, Equatable {
+    public var text: String
+    public var swap: TextSwap?
+    /// Set while a Counter is counting, so its digits keep an even width.
+    public var isCounting: Bool
+
+    public init(text: String, swap: TextSwap? = nil, isCounting: Bool = false) {
+        self.text = text
+        self.swap = swap
+        self.isCounting = isCounting
+    }
+
+    /// The text that takes up the box: the new one once it has begun to
+    /// arrive, the old one before.
+    public var visible: String {
+        guard let swap else { return text }
+        return swap.inProgress > 0 ? text : swap.previous
+    }
+}
+
+/// One text giving way to another. The previous text shows until its
+/// `outProgress` reaches 1, the current one from when its `inProgress`
+/// passes 0, each with its transition at that point.
+public struct TextSwap: Sendable, Equatable {
+    public var previous: String
+    public var transitionOut: TextTransition
+    public var transitionIn: TextTransition
+    public var outProgress: Double
+    public var inProgress: Double
+
+    public init(previous: String, transitionOut: TextTransition, transitionIn: TextTransition,
+                outProgress: Double, inProgress: Double) {
+        self.previous = previous
+        self.transitionOut = transitionOut
+        self.transitionIn = transitionIn
+        self.outProgress = outProgress
+        self.inProgress = inProgress
     }
 }
 
@@ -56,6 +104,15 @@ public struct LayerState: Sendable, Equatable {
     public var layerBlur: Double
     /// The first background blur that is switched on, or `.noBlur`.
     public var backgroundBlur: BackgroundBlur
+    /// Text layers only: letter spacing, line height (the font's own when the
+    /// design leaves it empty) and the words.
+    public var letterSpacing: Double?
+    public var lineHeight: Double?
+    public var text: ShownText?
+    /// An ellipse's slice and hole, nil for any other layer.
+    public var arc: EllipseArc?
+    /// A star's shape, nil for any other layer.
+    public var star: StarShape?
 
     /// The layer as it is designed, with no actions.
     public init(design layer: Layer) {
@@ -69,7 +126,20 @@ public struct LayerState: Sendable, Equatable {
             fill = shape.fills.first?.paint
             stroke = shape.strokes.first.map { StrokeLook(width: $0.width, paint: $0.paint) }
             trim = shape.strokes.first.map { TrimRange(start: $0.trimStart, end: $0.trimEnd) }
-            if case .rectangle(let radii) = shape.geometry { cornerRadii = radii }
+            switch shape.geometry {
+            case .rectangle(let radii): cornerRadii = radii
+            case .ellipse(let a): arc = a
+            case .star(let points, let inner, let corner):
+                star = StarShape(points: points, innerRadius: inner, cornerRadius: corner)
+            default: break
+            }
+        }
+        if case .text(let t) = layer.content {
+            // A text's colour is its fill, so Colour acts on it too.
+            fill = .solid(t.color)
+            letterSpacing = t.letterSpacing
+            lineHeight = t.lineHeight ?? TextLayout.naturalLineHeight(TextStyle(t))
+            text = ShownText(text: t.text)
         }
         shadow = .noShadow
         layerBlur = 0
@@ -148,6 +218,15 @@ public struct ActionTracks: Sendable {
         state.layerBlur = walk(state.layerBlur, list(.layerBlur).compactMap(Self.layerBlurStep), at: time)
         state.backgroundBlur = walk(state.backgroundBlur, list(.backgroundBlur).compactMap(Self.backgroundBlurStep),
                                     at: time)
+        if let spacing = state.letterSpacing {
+            state.letterSpacing = walk(spacing, list(.letterSpacing).compactMap(Self.letterSpacingStep), at: time)
+        }
+        if let height = state.lineHeight {
+            state.lineHeight = walk(height, list(.lineHeight).compactMap(Self.lineHeightStep), at: time)
+        }
+        if let shown = state.text { state.text = Self.shownText(design: shown.text, list(.text), at: time) }
+        if let arc = state.arc { state.arc = walk(arc, list(.arc).compactMap(Self.arcStep), at: time) }
+        if let star = state.star { state.star = walk(star, list(.star).compactMap(Self.starStep), at: time) }
         return state
     }
 
@@ -215,6 +294,89 @@ public struct ActionTracks: Sendable {
     private static func backgroundBlurStep(_ a: Action) -> Step<BackgroundBlur>? {
         guard case .backgroundBlur(let b) = a.spec else { return nil }
         return Step(a, initial: b.initial, target: { _ in b.end })
+    }
+
+    private static func letterSpacingStep(_ a: Action) -> Step<Double>? {
+        guard case .letterSpacing(let v) = a.spec else { return nil }
+        return Step(a, initial: v.initial, target: { _ in v.end })
+    }
+
+    private static func lineHeightStep(_ a: Action) -> Step<Double>? {
+        guard case .lineHeight(let v) = a.spec else { return nil }
+        return Step(a, initial: v.initial, target: { _ in v.end })
+    }
+
+    private static func arcStep(_ a: Action) -> Step<EllipseArc>? {
+        guard case .arc(let v) = a.spec else { return nil }
+        return Step(a, initial: v.initial, target: { _ in v.end })
+    }
+
+    private static func starStep(_ a: Action) -> Step<StarShape>? {
+        guard case .star(let v) = a.spec else { return nil }
+        return Step(a, initial: v.initial, target: { _ in v.end })
+    }
+
+    // MARK: Text
+
+    /// The text channel follows the same rules as the rest, with words in
+    /// place of numbers: actions in start order, each taking over from the
+    /// text showing when it starts, and a first Counter with its own From
+    /// showing that number from the start of the scene.
+    static func shownText(design: String, _ actions: [Action], at time: Double) -> ShownText {
+        guard let first = actions.first else { return ShownText(text: design) }
+        if time < first.start {
+            if case .counter(let c) = first.spec, let from = c.from {
+                return ShownText(text: Counting(c, base: design).text(for: from), isCounting: true)
+            }
+            return ShownText(text: design)
+        }
+        var current: (action: Action, base: String)?
+        for action in actions where action.start <= time {
+            let base = current.map { settledText($0.action, base: $0.base, at: action.start) } ?? design
+            current = (action, base)
+        }
+        guard let current else { return ShownText(text: design) }
+        return shown(current.action, base: current.base, at: time)
+    }
+
+    /// What an action is showing at `time` with any transition finished: the
+    /// number a counter has reached, or whichever text a change is on.
+    private static func settledText(_ action: Action, base: String, at time: Double) -> String {
+        let s = shown(action, base: base, at: time)
+        guard let swap = s.swap else { return s.text }
+        if case .counter = action.spec { return swap.previous }
+        return s.visible
+    }
+
+    private static func progress(_ action: Action, at time: Double) -> Double {
+        guard action.duration > 0 else { return 1 }
+        return min(max(action.easing.progress((time - action.start) / action.duration), 0), 1)
+    }
+
+    private static func shown(_ action: Action, base: String, at time: Double) -> ShownText {
+        let p = time >= action.end ? 1 : progress(action, at: time)
+        switch action.spec {
+        case .counter(let c):
+            let counting = Counting(c, base: base)
+            let q = counting.steps * p
+            guard p < 1, q < counting.steps else { return ShownText(text: counting.text(for: c.to), isCounting: true) }
+            let k = q.rounded(.down), frac = q - k
+            let now = counting.text(for: counting.value(atStep: k))
+            guard c.transition != .none, frac > 0 else { return ShownText(text: now, isCounting: true) }
+            return ShownText(text: counting.text(for: counting.value(atStep: k + 1)),
+                             swap: TextSwap(previous: now, transitionOut: c.transition, transitionIn: c.transition,
+                                            outProgress: frac, inProgress: frac),
+                             isCounting: true)
+        case .changeText(let change):
+            guard p < 1 else { return ShownText(text: change.text) }
+            let out = change.overlaps ? p : min(1, p * 2)
+            let into = change.overlaps ? p : max(0, p * 2 - 1)
+            return ShownText(text: change.text, swap: TextSwap(previous: base, transitionOut: change.transitionOut,
+                                                               transitionIn: change.transitionIn,
+                                                               outProgress: out, inProgress: into))
+        default:
+            return ShownText(text: base)
+        }
     }
 
     /// Visibility walks as 1 (shown) and 0 (hidden), every step instant. The
@@ -309,4 +471,34 @@ private func cubic(_ a: Vec2, _ b: Vec2, _ c: Vec2, _ d: Vec2, _ p: Double) -> V
     let q = 1 - p
     let wa = q * q * q, wb = 3 * q * q * p, wc = 3 * q * p * p, wd = p * p * p
     return Vec2(wa * a.x + wb * b.x + wc * c.x + wd * d.x, wa * a.y + wb * b.y + wc * c.y + wd * d.y)
+}
+
+/// A Counter worked out against the text it starts from: where it counts
+/// from, how many steps it takes, and how each number is written.
+struct Counting {
+    let from: Double
+    let to: Double
+    let step: Double
+    let format: NumberFormat
+
+    init(_ counter: CounterAction, base: String) {
+        let read = NumberFormat.read(base)
+        from = counter.from ?? read?.value ?? 0
+        to = counter.to
+        step = counter.step > 0 ? counter.step : 1
+        var format = read?.format ?? NumberFormat()
+        format.decimals = max(format.decimals, NumberFormat.decimals(of: step), NumberFormat.decimals(of: from),
+                              NumberFormat.decimals(of: to))
+        self.format = format
+    }
+
+    /// Steps from `from` to `to`, which need not be a whole number: the last
+    /// step lands on `to` however far short of a full step it is.
+    var steps: Double { abs(to - from) / step }
+
+    func value(atStep k: Double) -> Double {
+        k >= steps ? to : from + (to >= from ? 1 : -1) * k * step
+    }
+
+    func text(for value: Double) -> String { format.text(for: value) }
 }

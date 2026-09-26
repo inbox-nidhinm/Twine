@@ -48,7 +48,7 @@ import Testing
 
 @Suite struct LayerTreeTests {
     private func project() -> (Project, group: UUID, child: UUID, top: UUID) {
-        let child = Layer(name: "Child", content: .shape(ShapeContent(geometry: .ellipse)),
+        let child = Layer(name: "Child", content: .shape(ShapeContent(geometry: .ellipse(arc: .full))),
                           size: Size2(10, 10), position: .zero)
         let group = Layer(name: "Group", content: .group(GroupContent(children: [child])),
                           size: Size2(10, 10), position: .zero)
@@ -76,7 +76,7 @@ import Testing
 
     @Test func insertsIntoGroupsOnly() {
         var (p, group, _, top) = project()
-        let new = Layer(name: "New", content: .shape(ShapeContent(geometry: .ellipse)),
+        let new = Layer(name: "New", content: .shape(ShapeContent(geometry: .ellipse(arc: .full))),
                         size: Size2(1, 1), position: .zero)
         let intoShape = p.insertLayer(new, parentID: top, at: nil)
         let intoGroup = p.insertLayer(new, parentID: group, at: 0)

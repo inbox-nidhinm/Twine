@@ -1,5 +1,6 @@
 import Foundation
 import MotionModel
+import MotionEvaluation
 
 extension Layer {
     public var shapeContent: ShapeContent? {
@@ -16,6 +17,27 @@ extension Layer {
         var copy = self
         copy.transform.position = transform.position + delta
         return copy
+    }
+}
+
+extension Layer {
+    public var isText: Bool {
+        if case .text = content { return true }
+        return false
+    }
+
+    /// A text layer with its box fitted to its words: as wide as its longest
+    /// line for auto width, or its own width for fixed width, and as tall as
+    /// its lines. The anchor moves so the text grows the way its alignment
+    /// reads, and nothing else moves. Any other layer comes back unchanged.
+    public func fittedText() -> Layer {
+        guard case .text(let t) = content else { return self }
+        let fitted = TextLayout.size(of: t.text, style: TextStyle(t), width: t.sizing == .fixedWidth ? size.width : nil)
+        guard fitted != size else { return self }
+        var l = self
+        l.transform.anchor = TextLayout.anchor(transform.anchor, from: size, to: fitted, alignment: t.alignment)
+        l.size = fitted
+        return l
     }
 }
 

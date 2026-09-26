@@ -31,6 +31,9 @@ final class EditorModel {
     var selection: Set<UUID> = []
     /// The layer whose name is being edited in the layers panel.
     var renaming: UUID?
+    /// Set to a text layer to put the keyboard in its text box in the
+    /// inspector, as the Text tool and a double-click on text do.
+    var editingText: UUID?
     /// The playhead, in seconds.
     var time: Double = 0
     var isPlaying = false
@@ -127,9 +130,9 @@ enum Tool: String, CaseIterable {
     static let shapes: [Tool] = [.rectangle, .ellipse, .line, .polygon, .star]
     var isShape: Bool { Self.shapes.contains(self) }
 
-    /// The pen arrives in milestone 8 and text in milestone 6. Until then
-    /// their buttons show as disabled rather than doing nothing when picked.
-    var isAvailable: Bool { self != .pen && self != .text }
+    /// The pen comes after milestone 8. Until then its button shows as
+    /// disabled rather than doing nothing when picked.
+    var isAvailable: Bool { self != .pen }
 
     /// The tool a letter picks, for the canvas's keyboard.
     static func forKey(_ key: String) -> Tool? {

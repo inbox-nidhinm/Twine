@@ -53,6 +53,10 @@ Name.emotion/
 | Two-finger scroll | Pan |
 | ⌘0, ⌥⌘0, ⌘=, ⌘- | Fit, actual size, zoom in, zoom out |
 
+## Text
+
+Pick the Text tool (T) and click the canvas: a text layer appears with its words selected in the inspector's text box, ready to type over. Double-click a text layer to edit its words again. The Text section sets the font (from a searchable list of the fonts on this Mac), weight, size, colour, alignment, letter spacing, line height and auto or fixed width. A font that is not installed shows crossed out and the text draws in SF Pro. The box always fits the words; dragging its side makes it fixed width.
+
 ## Animating
 
 Animation is being rebuilt around Jitter-style actions (see `docs/redesign.md`). A layer's own properties are its design state; an action is one timed instruction on top of it, such as "move by 200 px over 0.5 s, smoothly", with an optional starting value and an end value.
@@ -67,6 +71,8 @@ Add Action lists what the selected layers can take, grouped:
 - **Transform**: Move, Scale, Rotate, Opacity, Resize, Hide/Show.
 - **Style**: Colour (the first fill: a colour or a gradient), Stroke (width and colour), Trim (draws a stroke on), Corner Radius (rectangles), Shadow.
 - **Blur**: Layer Blur, Background Blur (frosted glass, for shapes; it shows through a see-through fill).
+- **Text**: Letter Spacing, Line Height, Counter (counts in the text's own style, like `$1,200.50`), Change Text (with transitions out and in).
+- **Shape**: Arc (ellipses: slices and rings), Star (points, inner radius, corners).
 
 Shadows and blurs on a layer designed without them fade in from nothing. Blur amounts use Figma's measure.
 
@@ -119,4 +125,4 @@ Export Current Frame… (Shift-⌘E) saves a PNG of what the canvas shows: the f
 
 ## Status
 
-Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then redesign milestones 2 to 6 of 8 and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, MP4, MOV and PNG export, and Style and Blur actions. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.
+Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then redesign milestones 2 to 7 of 8 and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, MP4, MOV and PNG export, Style and Blur actions, and text layers with Text and Shape actions. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.

@@ -119,6 +119,8 @@ public struct ResolvedStroke: Sendable, Equatable {
 
 public struct ResolvedText: Sendable, Equatable {
     public var text: String
+    /// Part way through a Counter or a Change Text: the words going out.
+    public var swap: TextSwap?
     public var fontFamily: String
     public var fontWeight: Int
     public var fontSize: Double
@@ -127,6 +129,12 @@ public struct ResolvedText: Sendable, Equatable {
     public var letterSpacing: Double
     public var lineHeight: Double?
     public var sizing: TextSizing
+    public var tabularDigits: Bool
+
+    public var style: TextStyle {
+        TextStyle(fontFamily: fontFamily, fontWeight: fontWeight, fontSize: fontSize, alignment: alignment,
+                  letterSpacing: letterSpacing, lineHeight: lineHeight, tabularDigits: tabularDigits)
+    }
 }
 
 public struct ResolvedShadow: Sendable, Equatable {

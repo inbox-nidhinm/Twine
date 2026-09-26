@@ -48,6 +48,56 @@ enum ShapePaths {
         return BezierPath(subpaths: [Subpath(points: points, isClosed: true)])
     }
 
+    /// An ellipse, or a slice or ring of one. The slice runs clockwise from
+    /// `arc.start` to `arc.end`, in degrees from three o'clock. A hole makes
+    /// the inner edge a smaller copy of the outer one; with no hole, a slice
+    /// is a pie wedge to the centre.
+    static func ellipse(_ size: Size2, arc: EllipseArc) -> BezierPath {
+        let inner = min(max(arc.innerRadius, 0), 0.999)
+        if arc.isWhole {
+            guard inner > 0 else { return ellipse(size) }
+            // A ring: the outer ellipse clockwise, the inner one the other way
+            // round, so the middle is left empty.
+            let outer = ellipse(size).subpaths[0]
+            let w = size.width * inner, h = size.height * inner
+            let hole = ellipse(Size2(w, h)).subpaths[0]
+            let offset = Vec2((size.width - w) / 2, (size.height - h) / 2)
+            let reversed = hole.points.reversed().map { p in
+                PathPoint(p.position + offset, inHandle: p.outHandle, outHandle: p.inHandle)
+            }
+            return BezierPath(subpaths: [outer, Subpath(points: Array(reversed), isClosed: true)])
+        }
+        let rx = size.width / 2, ry = size.height / 2
+        let center = Vec2(rx, ry)
+        var sweep = (arc.end - arc.start).truncatingRemainder(dividingBy: 360)
+        if sweep < 0 { sweep += 360 }
+        var points = arcPoints(center: center, rx: rx, ry: ry, from: arc.start, sweep: sweep)
+        if inner > 0 {
+            let back = arcPoints(center: center, rx: rx * inner, ry: ry * inner, from: arc.start + sweep, sweep: -sweep)
+            points += back
+        } else {
+            points.append(PathPoint(center))
+        }
+        return BezierPath(subpaths: [Subpath(points: points, isClosed: true)])
+    }
+
+    /// Points along an elliptical arc, in cubic pieces of at most 90° each.
+    private static func arcPoints(center: Vec2, rx: Double, ry: Double, from start: Double, sweep: Double) -> [PathPoint] {
+        let pieces = max(1, Int((abs(sweep) / 90).rounded(.up)))
+        let step = sweep / Double(pieces) * .pi / 180
+        let k = 4.0 / 3.0 * tan(step / 4)
+        var points: [PathPoint] = []
+        for i in 0...pieces {
+            let a = start * .pi / 180 + Double(i) * step
+            let p = Vec2(center.x + cos(a) * rx, center.y + sin(a) * ry)
+            // The tangent, scaled to the handle length for this piece.
+            let tangent = Vec2(-sin(a) * rx * k, cos(a) * ry * k)
+            points.append(PathPoint(p, inHandle: i == 0 ? .zero : Vec2(-tangent.x, -tangent.y),
+                                    outHandle: i == pieces ? .zero : tangent))
+        }
+        return points
+    }
+
     static func line(_ size: Size2) -> BezierPath {
         BezierPath(subpaths: [Subpath(points: [PathPoint(Vec2(0, size.height / 2)),
                                                PathPoint(Vec2(size.width, size.height / 2))],
@@ -60,9 +110,38 @@ enum ShapePaths {
         return closed(size, count: n) { _ in 1 }
     }
 
-    static func star(_ size: Size2, points: Int, innerRadius: Double) -> BezierPath {
+    static func star(_ size: Size2, points: Int, innerRadius: Double, cornerRadius: Double = 0) -> BezierPath {
         let n = max(points, 3)
-        return closed(size, count: n * 2) { $0.isMultiple(of: 2) ? 1 : max(innerRadius, 0) }
+        let sharp = closed(size, count: n * 2) { $0.isMultiple(of: 2) ? 1 : max(innerRadius, 0) }
+        return cornerRadius > 0 ? rounded(sharp, radius: cornerRadius) : sharp
+    }
+
+    /// Every corner of a straight-sided path rounded by `radius`, which
+    /// shrinks where two corners would otherwise overlap on a short side.
+    static func rounded(_ path: BezierPath, radius: Double) -> BezierPath {
+        BezierPath(subpaths: path.subpaths.map { sub in
+            let ps = sub.points.map(\.position)
+            guard ps.count >= 3 else { return sub }
+            var out: [PathPoint] = []
+            for (i, p) in ps.enumerated() {
+                let a = ps[(i + ps.count - 1) % ps.count], b = ps[(i + 1) % ps.count]
+                let la = hypot(a.x - p.x, a.y - p.y), lb = hypot(b.x - p.x, b.y - p.y)
+                guard la > 0, lb > 0 else { out.append(PathPoint(p)); continue }
+                let u = Vec2((a.x - p.x) / la, (a.y - p.y) / la), v = Vec2((b.x - p.x) / lb, (b.y - p.y) / lb)
+                let angle = acos(min(max(u.x * v.x + u.y * v.y, -1), 1))
+                guard angle > 1e-3, angle < .pi - 1e-3 else { out.append(PathPoint(p)); continue }
+                // How far from the corner the curve starts, kept to half of
+                // each side, and the radius that distance allows.
+                let distance = min(radius / tan(angle / 2), la / 2, lb / 2)
+                let r = distance * tan(angle / 2)
+                let handle = 4.0 / 3.0 * tan((.pi - angle) / 4) * r
+                let start = Vec2(p.x + u.x * distance, p.y + u.y * distance)
+                let end = Vec2(p.x + v.x * distance, p.y + v.y * distance)
+                out.append(PathPoint(start, outHandle: Vec2(-u.x * handle, -u.y * handle)))
+                out.append(PathPoint(end, inHandle: Vec2(-v.x * handle, -v.y * handle)))
+            }
+            return Subpath(points: out, isClosed: sub.isClosed)
+        })
     }
 
     private static func closed(_ size: Size2, count: Int, radius: (Int) -> Double) -> BezierPath {

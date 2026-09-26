@@ -493,6 +493,12 @@ extension ActionKind {
         case .shadow: return .shadow
         case .layerBlur: return .layerBlur
         case .backgroundBlur: return .backgroundBlur
+        case .letterSpacing: return .letterSpacing
+        case .lineHeight: return .lineHeight
+        case .counter: return .counter
+        case .changeText: return .changeText
+        case .arc: return .arc
+        case .star: return .star
         }
     }
 }

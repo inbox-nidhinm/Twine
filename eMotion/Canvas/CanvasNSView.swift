@@ -363,18 +363,23 @@ final class CanvasNSView: NSView {
         guard let scene, let controller else { return nil }
         let tolerance = 5 / zoom
         for resolved in scene.layers.reversed() {
-            guard case .shape(let shape) = resolved.content, !controller.isLocked(resolved.id),
+            guard resolved.content != .group, !controller.isLocked(resolved.id),
                   let world = scene.worldTransform(of: resolved.id), let inverse = world.inverted else { continue }
             let local = inverse.apply(point).cg
-            let path = shape.path.cgPath
             // Scale the tolerance into the layer's space, so it is the same
             // few screen points whatever the layer's own scale.
             let localTolerance = tolerance / max(sqrt(abs(world.determinant)), 1e-6)
             var hit = false
-            if shape.isClosed && (!shape.fills.isEmpty || shape.strokes.isEmpty) && path.contains(local) { hit = true }
-            if !hit {
-                let width = (shape.strokes.map(\.width).max() ?? 0) + localTolerance * 2
-                hit = path.copy(strokingWithWidth: width, lineCap: .round, lineJoin: .round, miterLimit: 10).contains(local)
+            if case .shape(let shape) = resolved.content {
+                let path = shape.path.cgPath
+                if shape.isClosed && (!shape.fills.isEmpty || shape.strokes.isEmpty) && path.contains(local) { hit = true }
+                if !hit {
+                    let width = (shape.strokes.map(\.width).max() ?? 0) + localTolerance * 2
+                    hit = path.copy(strokingWithWidth: width, lineCap: .round, lineJoin: .round, miterLimit: 10).contains(local)
+                }
+            } else {
+                // Text, images and video: anywhere in their box.
+                hit = CGRect(origin: .zero, size: resolved.size.cg).insetBy(dx: -localTolerance, dy: -localTolerance).contains(local)
             }
             if hit { return deep ? resolved.id : topLevel(of: resolved.id) }
         }
@@ -401,6 +406,14 @@ final class CanvasNSView: NSView {
 
         if tool.isShape, !animating {
             drag = .create(CanvasDrag.Create(tool: tool, start: point, layerID: nil))
+            return
+        }
+
+        // The Text tool places a text layer where it is clicked and puts the
+        // keyboard in its text box, then hands back the arrow.
+        if tool == .text, !animating {
+            controller.addText(at: point)
+            controller.editor.tool = .select
             return
         }
 
@@ -449,6 +462,9 @@ final class CanvasNSView: NSView {
                let inner = layer(at: point, deep: true), inner != hit {
                 // A double-click goes into a group, as in Figma.
                 controller.select([inner])
+            } else if event.clickCount == 2, !animating, controller.project.layer(withID: hit)?.isText == true {
+                // And on text, it goes to the words.
+                controller.editor.editingText = hit
             }
             let moving = controller.topmost(controller.selectedLayers).filter { !controller.isLocked($0.id) }
             drag = .move(CanvasDrag.Move(originals: moving, start: point))
@@ -494,9 +510,15 @@ final class CanvasNSView: NSView {
 
         case .resize(let resize):
             guard let parentInverse = parentInverse(of: resize.layer.id) else { return }
-            let edited = CanvasGeometry.resized(resize.layer, handle: resize.handle,
+            var edited = CanvasGeometry.resized(resize.layer, handle: resize.handle,
                                                 pointer: parentInverse.apply(point),
                                                 keepAspect: shift, fromCenter: option)
+            // A text box given a new width keeps it and wraps inside it; its
+            // height always follows its lines.
+            if case .text(var t) = edited.content, abs(edited.size.width - resize.layer.size.width) > 0.5 {
+                t.sizing = .fixedWidth
+                edited.content = .text(t)
+            }
             controller.update([edited])
 
         case .rotate(let rotate):
@@ -742,7 +764,7 @@ final class CanvasNSView: NSView {
 
     override func resetCursorRects() {
         discardCursorRects()
-        addCursorRect(bounds, cursor: tool.isShape ? .crosshair : .arrow)
+        addCursorRect(bounds, cursor: tool == .text ? .iBeam : tool.isShape ? .crosshair : .arrow)
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -755,7 +777,7 @@ final class CanvasNSView: NSView {
             setHover(nil)
             return
         }
-        guard !tool.isShape else { return }
+        guard !tool.isShape, tool != .text else { return }
         setHover(layer(at: viewToComposition(viewPoint), deep: event.modifierFlags.contains(.command)))
         updateCursor(at: viewPoint)
     }

@@ -3,8 +3,9 @@ import MotionModel
 import MotionEvaluation
 import Theme
 
-/// The values of Style and Blur actions: where each starts (empty picks up
-/// whatever the layer has when the action begins) and where it ends.
+/// The values of Style, Blur, Text and Shape actions: where each starts
+/// (empty picks up whatever the layer has when the action begins) and where
+/// it ends.
 struct StyleValueFields: View {
     let controller: EditorController
     let action: Action
@@ -19,9 +20,17 @@ struct StyleValueFields: View {
         case .shadow(let s): shadow(s)
         case .layerBlur(let b): layerBlur(b)
         case .backgroundBlur(let b): backgroundBlur(b)
+        case .letterSpacing(let v): letterSpacing(v)
+        case .lineHeight(let v): lineHeight(v)
+        case .counter(let c): counter(c)
+        case .changeText(let c): changeText(c)
+        case .arc(let a): arc(a)
+        case .star(let s): star(s)
         default: EmptyView()
         }
     }
+
+    private var isText: Bool { inherited?.text != nil }
 
     // MARK: Colour
 
@@ -31,12 +40,13 @@ struct StyleValueFields: View {
                       set: { editing("Starting Colour", Self.color { a, s in a.initial = s?.fill ?? a.end }) },
                       clear: { editing("Starting Colour", Self.color { a, _ in a.initial = nil }) }) {
             if let initial = c.initial {
-                PaintControls(paint: initial, edit: callbacks("Starting Colour", Self.color) { $0.initial = $1 })
+                PaintControls(paint: initial, allowsGradients: !isText,
+                              edit: callbacks("Starting Colour", Self.color) { $0.initial = $1 })
             }
         }
         .help("The colour it starts from. Empty starts from the layer's fill when the action begins.")
         sectionLabel("To")
-        PaintControls(paint: c.end, edit: callbacks("Colour", Self.color) { $0.end = $1 })
+        PaintControls(paint: c.end, allowsGradients: !isText, edit: callbacks("Colour", Self.color) { $0.end = $1 })
     }
 
     // MARK: Stroke
@@ -250,6 +260,198 @@ struct StyleValueFields: View {
         }
     }
 
+    // MARK: Text
+
+    @ViewBuilder private func letterSpacing(_ v: LetterSpacingAction) -> some View {
+        LabeledRow(label: "From") {
+            OptionalField(value: v.initial, placeholder: inherited?.letterSpacing ?? 0, decimals: 1, suffix: "px") { x in
+                editing("Starting Spacing", Self.letterSpacing { a, _ in a.initial = x })
+            }
+            clearButton(v.initial != nil) { editing("Starting Spacing", Self.letterSpacing { a, _ in a.initial = nil }) }
+        }
+        .help("The letter spacing it starts at. Empty starts from the text's own.")
+        LabeledRow(label: "To") {
+            UnitField(value: v.end, decimals: 1, suffix: "px") { x in editing("Letter Spacing", Self.letterSpacing { a, _ in a.end = x }) }
+            spacer
+        }
+    }
+
+    @ViewBuilder private func lineHeight(_ v: LineHeightAction) -> some View {
+        LabeledRow(label: "From") {
+            OptionalField(value: v.initial, placeholder: inherited?.lineHeight ?? 0, decimals: 1, suffix: "px",
+                          accepts: { $0 > 0 }) { x in
+                editing("Starting Line Height", Self.lineHeight { a, _ in a.initial = x })
+            }
+            clearButton(v.initial != nil) { editing("Starting Line Height", Self.lineHeight { a, _ in a.initial = nil }) }
+        }
+        .help("The line height it starts at, baseline to baseline. Empty starts from the text's own.")
+        LabeledRow(label: "To") {
+            UnitField(value: v.end, decimals: 1, suffix: "px", accepts: { $0 > 0 }) { x in
+                editing("Line Height", Self.lineHeight { a, _ in a.end = x })
+            }
+            spacer
+        }
+    }
+
+    @ViewBuilder private func counter(_ c: CounterAction) -> some View {
+        let found = NumberFormat.read(inherited?.text?.text ?? "")?.value ?? 0
+        LabeledRow(label: "From") {
+            OptionalField(value: c.from, placeholder: found, decimals: 4) { x in
+                editing("Counter", Self.counter { a, _ in a.from = x })
+            }
+            clearButton(c.from != nil) { editing("Counter", Self.counter { a, _ in a.from = nil }) }
+        }
+        .help("The number it counts from. Empty starts from the number in the text, or 0. Set, it shows from the start of the scene.")
+        LabeledRow(label: "To") {
+            UnitField(value: c.to, decimals: 4) { x in editing("Counter", Self.counter { a, _ in a.to = x }) }
+            spacer
+        }
+        LabeledRow(label: "Step") {
+            UnitField(value: c.step, decimals: 4, accepts: { $0 > 0 }) { x in editing("Counter", Self.counter { a, _ in a.step = x }) }
+            spacer
+        }
+        .help("How much each change adds. The count keeps the text's own look: its symbols, decimals, separators and zeros.")
+        SegmentRow(selection: c.transition, options: [.none, .fade, .slide], title: Self.transitionTitle) { t in
+            editing("Counter", Self.counter { a, _ in a.transition = t })
+        }
+        .help("How each number gives way to the next. Fade and slide roll smoothly from one to the next.")
+    }
+
+    @ViewBuilder private func changeText(_ c: ChangeTextAction) -> some View {
+        sectionLabel("To")
+        WordsField(text: c.text) { new in editing("Change Text", Self.changeText { a, _ in a.text = new }) }
+            .help("The new words. Option-Return starts a new line.")
+        sectionLabel("Out")
+        SegmentRow(selection: c.transitionOut, options: TextTransition.allCases, title: Self.transitionTitle) { t in
+            editing("Change Text", Self.changeText { a, _ in a.transitionOut = t })
+        }
+        .help("How the old words leave")
+        sectionLabel("In")
+        SegmentRow(selection: c.transitionIn, options: TextTransition.allCases, title: Self.transitionTitle) { t in
+            editing("Change Text", Self.changeText { a, _ in a.transitionIn = t })
+        }
+        .help("How the new words arrive")
+        ToggleRow(label: "Overlap", isOn: c.overlaps) {
+            editing("Change Text", Self.changeText { a, _ in a.overlaps.toggle() })
+        }
+        .help("Runs out and in at the same time, instead of one after the other.")
+    }
+
+    static func transitionTitle(_ t: TextTransition) -> String {
+        switch t {
+        case .none: return "None"
+        case .fade: return "Fade"
+        case .slide: return "Slide"
+        case .scale: return "Scale"
+        }
+    }
+
+    // MARK: Shape
+
+    @ViewBuilder private func arc(_ v: ArcAction) -> some View {
+        let from = inherited?.arc ?? .full
+        sectionLabel("From") {
+            clearButton(v.initial != nil) { editing("Starting Arc", Self.arc { a, _ in a.initial = nil }) }
+        }
+        HStack(spacing: 8) {
+            OptionalField(unit: "Start", value: v.initial?.start, placeholder: from.start, decimals: 1, suffix: "°") { x in
+                editing("Starting Arc", Self.arc { a, st in
+                    guard let x else { a.initial = nil; return }
+                    let base = a.initial ?? st?.arc ?? .full
+                    a.initial = EllipseArc(start: x, end: x + base.end - base.start, innerRadius: base.innerRadius)
+                })
+            }
+            OptionalField(unit: "Sweep", value: v.initial.map { $0.end - $0.start }, placeholder: from.end - from.start,
+                          decimals: 1, suffix: "°") { x in
+                editing("Starting Arc", Self.arc { a, st in
+                    guard let x else { a.initial = nil; return }
+                    let base = a.initial ?? st?.arc ?? .full
+                    a.initial = EllipseArc(start: base.start, end: base.start + x, innerRadius: base.innerRadius)
+                })
+            }
+        }
+        OptionalField(unit: "Ratio", value: v.initial.map { $0.innerRadius * 100 }, placeholder: from.innerRadius * 100,
+                      decimals: 1, suffix: "%", accepts: { $0 >= 0 && $0 < 100 }) { x in
+            editing("Starting Arc", Self.arc { a, st in
+                guard let x else { a.initial = nil; return }
+                var base = a.initial ?? st?.arc ?? .full
+                base.innerRadius = x / 100
+                a.initial = base
+            })
+        }
+        .help("The slice it starts as. Empty starts from the ellipse's own.")
+        sectionLabel("To")
+        HStack(spacing: 8) {
+            UnitField(unit: "Start", value: v.end.start, decimals: 1, suffix: "°") { x in
+                editing("Arc", Self.arc { a, _ in
+                    let sweep = a.end.end - a.end.start
+                    a.end.start = x
+                    a.end.end = x + sweep
+                })
+            }
+            UnitField(unit: "Sweep", value: v.end.end - v.end.start, decimals: 1, suffix: "°") { x in
+                editing("Arc", Self.arc { a, _ in a.end.end = a.end.start + x })
+            }
+        }
+        .help("Where the slice ends up: its start, in degrees clockwise from three o'clock, and how far round it goes.")
+        UnitField(unit: "Ratio", value: v.end.innerRadius * 100, decimals: 1, suffix: "%", accepts: { $0 >= 0 && $0 < 100 }) { x in
+            editing("Arc", Self.arc { a, _ in a.end.innerRadius = x / 100 })
+        }
+        .help("The hole in the middle, as a share of the ellipse")
+    }
+
+    @ViewBuilder private func star(_ v: StarAction) -> some View {
+        let from = inherited?.star ?? v.end
+        sectionLabel("From") {
+            clearButton(v.initial != nil) { editing("Starting Star", Self.star { a, _ in a.initial = nil }) }
+        }
+        HStack(spacing: 8) {
+            OptionalField(unit: "Points", value: v.initial.map { Double($0.points) }, placeholder: Double(from.points),
+                          accepts: { $0 >= 3 && $0 <= 60 }) { x in
+                editing("Starting Star", Self.star { a, st in
+                    guard let x else { a.initial = nil; return }
+                    var base = a.initial ?? st?.star ?? a.end
+                    base.points = Int(x.rounded())
+                    a.initial = base
+                })
+            }
+            OptionalField(unit: "Inner", value: v.initial.map { $0.innerRadius * 100 }, placeholder: from.innerRadius * 100,
+                          decimals: 1, suffix: "%", accepts: { $0 >= 0 }) { x in
+                editing("Starting Star", Self.star { a, st in
+                    guard let x else { a.initial = nil; return }
+                    var base = a.initial ?? st?.star ?? a.end
+                    base.innerRadius = x / 100
+                    a.initial = base
+                })
+            }
+        }
+        OptionalField(unit: "Radius", value: v.initial?.cornerRadius, placeholder: from.cornerRadius, decimals: 1,
+                      accepts: { $0 >= 0 }) { x in
+            editing("Starting Star", Self.star { a, st in
+                guard let x else { a.initial = nil; return }
+                var base = a.initial ?? st?.star ?? a.end
+                base.cornerRadius = x
+                a.initial = base
+            })
+        }
+        .help("The star it starts as. Empty starts from the star's own shape.")
+        sectionLabel("To")
+        HStack(spacing: 8) {
+            UnitField(unit: "Points", value: Double(v.end.points), accepts: { $0 >= 3 && $0 <= 60 }) { x in
+                editing("Star", Self.star { a, _ in a.end.points = Int(x.rounded()) })
+            }
+            .help("Points change a whole point at a time.")
+            UnitField(unit: "Inner", value: v.end.innerRadius * 100, decimals: 1, suffix: "%", accepts: { $0 >= 0 }) { x in
+                editing("Star", Self.star { a, _ in a.end.innerRadius = x / 100 })
+            }
+            .help("How far in the inner points sit, as a share of the outer ones")
+        }
+        UnitField(unit: "Radius", value: v.end.cornerRadius, decimals: 1, accepts: { $0 >= 0 }) { x in
+            editing("Star", Self.star { a, _ in a.end.cornerRadius = x })
+        }
+        .help("Rounds every point, in pixels")
+    }
+
     // MARK: Editing
 
     /// A change to one kind's values, given what the action would inherit.
@@ -275,6 +477,24 @@ struct StyleValueFields: View {
     }
     private static func backgroundBlur(_ change: @escaping Change<BackgroundBlurAction>) -> (inout Action, LayerState?) -> Void {
         { a, st in if case .backgroundBlur(var v) = a.spec { change(&v, st); a.spec = .backgroundBlur(v) } }
+    }
+    private static func letterSpacing(_ change: @escaping Change<LetterSpacingAction>) -> (inout Action, LayerState?) -> Void {
+        { a, st in if case .letterSpacing(var v) = a.spec { change(&v, st); a.spec = .letterSpacing(v) } }
+    }
+    private static func lineHeight(_ change: @escaping Change<LineHeightAction>) -> (inout Action, LayerState?) -> Void {
+        { a, st in if case .lineHeight(var v) = a.spec { change(&v, st); a.spec = .lineHeight(v) } }
+    }
+    private static func counter(_ change: @escaping Change<CounterAction>) -> (inout Action, LayerState?) -> Void {
+        { a, st in if case .counter(var v) = a.spec { change(&v, st); a.spec = .counter(v) } }
+    }
+    private static func changeText(_ change: @escaping Change<ChangeTextAction>) -> (inout Action, LayerState?) -> Void {
+        { a, st in if case .changeText(var v) = a.spec { change(&v, st); a.spec = .changeText(v) } }
+    }
+    private static func arc(_ change: @escaping Change<ArcAction>) -> (inout Action, LayerState?) -> Void {
+        { a, st in if case .arc(var v) = a.spec { change(&v, st); a.spec = .arc(v) } }
+    }
+    private static func star(_ change: @escaping Change<StarAction>) -> (inout Action, LayerState?) -> Void {
+        { a, st in if case .star(var v) = a.spec { change(&v, st); a.spec = .star(v) } }
     }
 
     /// Applies `change` to every selected action as one undo step.
@@ -347,5 +567,30 @@ struct StyleValueFields: View {
         } else {
             spacer
         }
+    }
+}
+
+/// Words typed into a box, kept when Return is pressed or the box is left,
+/// so a whole phrase undoes as one step.
+private struct WordsField: View {
+    let text: String
+    let commit: (String) -> Void
+
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        TextField("", text: $draft, axis: .vertical)
+            .textFieldStyle(.plain)
+            .font(ThemeFont.label)
+            .lineLimit(1...4)
+            .focused($focused)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+            .onAppear { draft = text }
+            .onChange(of: text) { _, now in if !focused { draft = now } }
+            .onSubmit { if draft != text { commit(draft) } }
+            .onChange(of: focused) { _, now in if !now, draft != text { commit(draft) } }
     }
 }

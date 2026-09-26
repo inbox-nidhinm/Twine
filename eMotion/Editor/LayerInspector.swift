@@ -23,6 +23,10 @@ struct LayerInspector: View {
                 PanelDivider()
                 StrokeSection(layer: layer, shape: shape, controller: controller)
             }
+            if case .text(let text) = layer.content {
+                PanelDivider()
+                TextSection(layer: layer, text: text, controller: controller)
+            }
             if case .group(let group) = layer.content {
                 ToggleRow(label: "Clip content", isOn: group.clipsContent) {
                     controller.edit(layer.id) { l in
@@ -143,6 +147,11 @@ struct LayerInspector: View {
         l.size = target
         l.transform.anchor = newAnchor
         l.transform.position = Vec2(topLeft.x - offset.x, topLeft.y - offset.y)
+        // A text box given a width keeps it, and wraps inside it.
+        if width != nil, case .text(var t) = l.content {
+            t.sizing = .fixedWidth
+            l.content = .text(t)
+        }
     }
 
     /// Typing an anchor moves the anchor, not the layer.
@@ -190,17 +199,41 @@ struct LayerInspector: View {
             }
             .padding(.horizontal, Theme.panelPad)
             .padding(.bottom, Theme.panelPad)
-        case .star(let points, let inner):
+        case .star(let points, let inner, let corner):
             VStack(alignment: .leading, spacing: 8) {
                 StepRow(label: "Points", value: points, range: 3...60) { n in
-                    setGeometry(.star(points: n, innerRadius: inner))
+                    setGeometry(.star(points: n, innerRadius: inner, cornerRadius: corner))
                 }
-                LabeledRow(label: "Inner") {
-                    UnitField(value: inner * 100, decimals: 1, suffix: "%", accepts: { $0 >= 0 }) { v in
-                        setGeometry(.star(points: points, innerRadius: v / 100))
+                HStack(spacing: 8) {
+                    UnitField(unit: "Inner", value: inner * 100, decimals: 1, suffix: "%", accepts: { $0 >= 0 }) { v in
+                        setGeometry(.star(points: points, innerRadius: v / 100, cornerRadius: corner))
                     }
+                    .help("How far in the inner points sit, as a share of the outer ones")
+                    UnitField(unit: "Radius", value: corner, decimals: 1, accepts: { $0 >= 0 }) { v in
+                        setGeometry(.star(points: points, innerRadius: inner, cornerRadius: v))
+                    }
+                    .help("Rounds every point, in pixels")
                 }
-                .help("How far in the inner points sit, as a share of the outer ones")
+            }
+            .padding(.horizontal, Theme.panelPad)
+            .padding(.bottom, Theme.panelPad)
+        case .ellipse(let arc):
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    UnitField(unit: "Start", value: arc.start, decimals: 1, suffix: "°") { v in
+                        setGeometry(.ellipse(arc: EllipseArc(start: v, end: v + (arc.end - arc.start), innerRadius: arc.innerRadius)))
+                    }
+                    .help("Where the slice starts, in degrees clockwise from three o'clock")
+                    UnitField(unit: "Sweep", value: arc.end - arc.start, decimals: 1, suffix: "°",
+                              accepts: { $0 >= 0 && $0 <= 360 }) { v in
+                        setGeometry(.ellipse(arc: EllipseArc(start: arc.start, end: arc.start + v, innerRadius: arc.innerRadius)))
+                    }
+                    .help("How far round the slice goes. 360° is the whole ellipse.")
+                }
+                UnitField(unit: "Ratio", value: arc.innerRadius * 100, decimals: 1, suffix: "%", accepts: { $0 >= 0 && $0 < 100 }) { v in
+                    setGeometry(.ellipse(arc: EllipseArc(start: arc.start, end: arc.end, innerRadius: v / 100)))
+                }
+                .help("The hole in the middle, as a share of the ellipse: 0% is solid, 80% a thin ring")
             }
             .padding(.horizontal, Theme.panelPad)
             .padding(.bottom, Theme.panelPad)

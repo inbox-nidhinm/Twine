@@ -64,6 +64,12 @@ public enum ActionSpec: Sendable, Equatable {
     case shadow(ShadowAction)
     case layerBlur(LayerBlurAction)
     case backgroundBlur(BackgroundBlurAction)
+    case letterSpacing(LetterSpacingAction)
+    case lineHeight(LineHeightAction)
+    case counter(CounterAction)
+    case changeText(ChangeTextAction)
+    case arc(ArcAction)
+    case star(StarAction)
 
     public var kind: ActionKind {
         switch self {
@@ -80,6 +86,12 @@ public enum ActionSpec: Sendable, Equatable {
         case .shadow: return .shadow
         case .layerBlur: return .layerBlur
         case .backgroundBlur: return .backgroundBlur
+        case .letterSpacing: return .letterSpacing
+        case .lineHeight: return .lineHeight
+        case .counter: return .counter
+        case .changeText: return .changeText
+        case .arc: return .arc
+        case .star: return .star
         }
     }
 }
@@ -88,6 +100,8 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     case move, scale, rotate, opacity, resize, visibility
     case color, stroke, trim, cornerRadius, shadow
     case layerBlur, backgroundBlur
+    case letterSpacing, lineHeight, counter, changeText
+    case arc, star
 
     public var defaultName: String {
         switch self {
@@ -104,6 +118,12 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .shadow: return "Shadow"
         case .layerBlur: return "Layer Blur"
         case .backgroundBlur: return "Background Blur"
+        case .letterSpacing: return "Letter Spacing"
+        case .lineHeight: return "Line Height"
+        case .counter: return "Counter"
+        case .changeText: return "Change Text"
+        case .arc: return "Arc"
+        case .star: return "Star"
         }
     }
 
@@ -113,18 +133,22 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .move, .scale, .rotate, .opacity, .resize, .visibility: return .transform
         case .color, .stroke, .trim, .cornerRadius, .shadow: return .style
         case .layerBlur, .backgroundBlur: return .blur
+        case .letterSpacing, .lineHeight, .counter, .changeText: return .text
+        case .arc, .star: return .shape
         }
     }
 }
 
 public enum ActionCategory: String, Sendable, CaseIterable {
-    case transform, style, blur
+    case transform, style, blur, text, shape
 
     public var title: String {
         switch self {
         case .transform: return "Transform"
         case .style: return "Style"
         case .blur: return "Blur"
+        case .text: return "Text"
+        case .shape: return "Shape"
         }
     }
 }
@@ -338,10 +362,108 @@ public struct BackgroundBlurAction: Codable, Sendable, Equatable {
     }
 }
 
+/// Extra space between letters, in pixels.
+public struct LetterSpacingAction: Codable, Sendable, Equatable {
+    public var initial: Double?
+    public var end: Double
+
+    public init(initial: Double? = nil, end: Double) {
+        self.initial = initial
+        self.end = end
+    }
+}
+
+/// Baseline to baseline, in pixels. A layer whose line height is the font's
+/// own starts from that.
+public struct LineHeightAction: Codable, Sendable, Equatable {
+    public var initial: Double?
+    public var end: Double
+
+    public init(initial: Double? = nil, end: Double) {
+        self.initial = initial
+        self.end = end
+    }
+}
+
+/// How the whole layer changes from one text to the next.
+public enum TextTransition: String, Codable, Sendable, CaseIterable {
+    /// Swaps at once.
+    case none
+    case fade
+    /// Out moves up and fades; in rises from below and fades up.
+    case slide
+    /// Out shrinks and fades; in grows from smaller and fades up.
+    case scale
+}
+
+/// Counts from one number to another in the layer's text, keeping the text's
+/// look: `$1,200.50` counts as dollars with a thousands separator and two
+/// decimals; `007` keeps its zeros.
+public struct CounterAction: Codable, Sendable, Equatable {
+    /// Nil starts from the number in the text when the action begins, or 0.
+    public var from: Double?
+    public var to: Double
+    /// The amount each change adds. Always positive; the count goes whichever
+    /// way `to` is.
+    public var step: Double
+    /// How each number gives way to the next. Slide and fade roll
+    /// continuously, like an odometer.
+    public var transition: TextTransition
+
+    public init(from: Double? = nil, to: Double, step: Double = 1, transition: TextTransition = .none) {
+        self.from = from
+        self.to = to
+        self.step = step
+        self.transition = transition
+    }
+}
+
+/// Replaces the layer's text. The old text goes out in the first half of the
+/// action and the new comes in during the second, or both at once when they
+/// overlap.
+public struct ChangeTextAction: Codable, Sendable, Equatable {
+    public var text: String
+    public var transitionOut: TextTransition
+    public var transitionIn: TextTransition
+    public var overlaps: Bool
+
+    public init(text: String, transitionOut: TextTransition = .fade, transitionIn: TextTransition = .fade,
+                overlaps: Bool = false) {
+        self.text = text
+        self.transitionOut = transitionOut
+        self.transitionIn = transitionIn
+        self.overlaps = overlaps
+    }
+}
+
+/// An ellipse's slice and hole.
+public struct ArcAction: Codable, Sendable, Equatable {
+    public var initial: EllipseArc?
+    public var end: EllipseArc
+
+    public init(initial: EllipseArc? = nil, end: EllipseArc) {
+        self.initial = initial
+        self.end = end
+    }
+}
+
+/// A star's points, inner radius and corner radius. The number of points
+/// changes a whole point at a time.
+public struct StarAction: Codable, Sendable, Equatable {
+    public var initial: StarShape?
+    public var end: StarShape
+
+    public init(initial: StarShape? = nil, end: StarShape) {
+        self.initial = initial
+        self.end = end
+    }
+}
+
 extension ActionSpec: Codable {
     private enum CodingKeys: String, CodingKey {
         case type, move, scale, rotate, opacity, resize, visibility
         case color, stroke, trim, cornerRadius, shadow, layerBlur, backgroundBlur
+        case letterSpacing, lineHeight, counter, changeText, arc, star
     }
 
     public init(from decoder: Decoder) throws {
@@ -360,6 +482,12 @@ extension ActionSpec: Codable {
         case .shadow: self = .shadow(try c.decode(ShadowAction.self, forKey: .shadow))
         case .layerBlur: self = .layerBlur(try c.decode(LayerBlurAction.self, forKey: .layerBlur))
         case .backgroundBlur: self = .backgroundBlur(try c.decode(BackgroundBlurAction.self, forKey: .backgroundBlur))
+        case .letterSpacing: self = .letterSpacing(try c.decode(LetterSpacingAction.self, forKey: .letterSpacing))
+        case .lineHeight: self = .lineHeight(try c.decode(LineHeightAction.self, forKey: .lineHeight))
+        case .counter: self = .counter(try c.decode(CounterAction.self, forKey: .counter))
+        case .changeText: self = .changeText(try c.decode(ChangeTextAction.self, forKey: .changeText))
+        case .arc: self = .arc(try c.decode(ArcAction.self, forKey: .arc))
+        case .star: self = .star(try c.decode(StarAction.self, forKey: .star))
         }
     }
 
@@ -380,6 +508,12 @@ extension ActionSpec: Codable {
         case .shadow(let v): try c.encode(v, forKey: .shadow)
         case .layerBlur(let v): try c.encode(v, forKey: .layerBlur)
         case .backgroundBlur(let v): try c.encode(v, forKey: .backgroundBlur)
+        case .letterSpacing(let v): try c.encode(v, forKey: .letterSpacing)
+        case .lineHeight(let v): try c.encode(v, forKey: .lineHeight)
+        case .counter(let v): try c.encode(v, forKey: .counter)
+        case .changeText(let v): try c.encode(v, forKey: .changeText)
+        case .arc(let v): try c.encode(v, forKey: .arc)
+        case .star(let v): try c.encode(v, forKey: .star)
         }
     }
 }

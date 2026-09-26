@@ -380,6 +380,18 @@ final class EditorController {
 
     // MARK: Making layers
 
+    /// A new text layer with its top-left at `point`, selected, with the
+    /// keyboard in its text box. Dark on a light background, light on dark.
+    func addText(at point: Vec2) {
+        let background = project.composition.background
+        let light = background.isTransparent || (background.color.r + background.color.g + background.color.b) / 3 > 0.5
+        let layer = LayerFactory.text(at: point, name: LayerFactory.nextName("Text", in: project),
+                                      color: light ? LayerFactory.defaultStroke : .white)
+        guard perform(.insertLayers([layer], parentID: nil, index: nil)) else { return }
+        select([layer.id])
+        editor.editingText = layer.id
+    }
+
     func makeShape(_ tool: Tool, from start: Vec2, to end: Vec2) -> Layer? {
         guard let kind = tool.shapeKind else { return nil }
         let name = LayerFactory.nextName(kind.title, in: project)

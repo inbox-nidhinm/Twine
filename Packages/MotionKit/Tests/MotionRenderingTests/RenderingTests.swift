@@ -165,6 +165,39 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
         #expect(pixel(image, 30, 4).r < 5 && pixel(image, 34, 4).r > 250)
     }
 
+    @Test func textDrawsInsideItsBox() throws {
+        let content = TextContent(text: "IIII", fontFamily: "SF Pro", fontWeight: 900, fontSize: 40, color: RGBA(1, 0, 0))
+        let size = TextLayout.size(of: content.text, style: TextStyle(content), width: nil)
+        var layer = Layer(name: "T", content: .text(content), size: size, position: .zero)
+        layer.transform.anchor = .zero
+        layer.transform.position = Vec2(4, 4)
+        let image = try render(Project(composition: transparentComposition(), layers: [layer]))
+        // Some red ink inside the box, none well outside it.
+        var inked = 0
+        for x in 4..<Int(4 + size.width) {
+            let p = pixel(image, x, Int(4 + size.height / 2))
+            if p.a > 200 && p.r > 200 { inked += 1 }
+        }
+        #expect(inked > 4)
+        #expect(pixel(image, 60, 60).a == 0)
+    }
+
+    /// Text is a picture, which the offscreen renderer must not turn upside
+    /// down: an underscore sits at the bottom of its box, not the top.
+    @Test func textIsTheRightWayUp() throws {
+        let content = TextContent(text: "____", fontFamily: "SF Pro", fontWeight: 900, fontSize: 40, color: RGBA(1, 0, 0))
+        let size = TextLayout.size(of: content.text, style: TextStyle(content), width: nil)
+        var layer = Layer(name: "T", content: .text(content), size: size, position: .zero)
+        layer.transform.anchor = .zero
+        let image = try render(Project(composition: transparentComposition(), layers: [layer]))
+        func ink(rows: Range<Int>) -> Int {
+            rows.reduce(0) { total, y in total + (0..<Int(size.width)).filter { pixel(image, $0, y).a > 128 }.count }
+        }
+        let half = Int(size.height / 2)
+        #expect(ink(rows: half..<Int(size.height)) > 20)
+        #expect(ink(rows: 0..<half) == 0)
+    }
+
     @Test func spreadGrowsTheShadow() throws {
         func shadowed(spread: Double) throws -> Int {
             var layer = shape(fill: RGBA(1, 1, 1), at: Vec2(16, 16), size: Size2(32, 32))

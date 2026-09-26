@@ -23,6 +23,15 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Text, and text and shape actions", changes: [
+            "Text layers. Pick the Text tool (T) and click: a text layer appears with its words selected in the inspector, ready to type over. Double-click a text layer to edit its words again. The layer's name follows its words until you rename it.",
+            "The Text section sets the font (a searchable list of every font on this Mac, each shown in itself), weight, size, colour, alignment, letter spacing, line height, and auto or fixed width. A font this Mac does not have shows crossed out, and the text draws in SF Pro. Dragging a text box's side makes it fixed width.",
+            "Text actions: Letter Spacing, Line Height, Counter and Change Text. Colour, Shadow and Layer Blur work on text too.",
+            "Counter counts in the text's own style: \"$1,200.50\" counts in dollars and cents, \"007\" keeps its zeros. It can snap, fade or slide from number to number, with evenly spaced digits so the text does not jiggle.",
+            "Change Text swaps the words with a transition out and in (none, fade, slide or scale), one after the other or overlapping.",
+            "Ellipses gain Start, Sweep and Ratio in Design, for pie slices and rings, and an Arc action. Stars gain a corner radius, and a Star action for points, inner radius and corners.",
+            "Text boxes grow the way their alignment reads: left-aligned text to the right, centred both ways, right-aligned to the left.",
+        ]),
         .init(date: "26 September 2026", title: "Style and blur actions", changes: [
             "Seven new actions, listed under Style and Blur in Add Action: Colour, Stroke, Trim, Corner Radius, Shadow, Layer Blur and Background Blur. Each is offered only where it applies: Stroke and Trim for shapes with a stroke, Corner Radius for rectangles, Background Blur for shapes.",
             "Colour changes the first fill, to a colour or a linear or radial gradient. Gradients blend their colours, stops and direction, even between different numbers of stops.",

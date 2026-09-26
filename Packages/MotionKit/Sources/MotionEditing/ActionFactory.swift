@@ -7,6 +7,13 @@ import MotionEvaluation
 public enum ActionFactory {
     /// How long a new action runs, before landing on a frame.
     public static let defaultDuration = 0.5
+    /// How long a new Counter runs.
+    public static let counterDuration = 2.0
+
+    private static func fontSize(of layer: Layer) -> Double {
+        if case .text(let t) = layer.content { return t.fontSize }
+        return 48
+    }
 
     /// The actions that make sense on `layer`, in menu order. Audio has
     /// nothing to move or fade; a group's size is its children's, so it
@@ -25,8 +32,16 @@ public enum ActionFactory {
             if !shape.fills.isEmpty { kinds.append(.color) }
             if !shape.strokes.isEmpty { kinds += [.stroke, .trim] }
             if case .rectangle = shape.geometry { kinds.append(.cornerRadius) }
-            return kinds + [.shadow, .layerBlur, .backgroundBlur]
-        case .text, .image, .video:
+            kinds += [.shadow, .layerBlur, .backgroundBlur]
+            if case .ellipse = shape.geometry { kinds.append(.arc) }
+            if case .star = shape.geometry { kinds.append(.star) }
+            return kinds
+        case .text:
+            // A text box is always the size of its words, so it has nothing
+            // to resize.
+            return transform.filter { $0 != .resize } + [.color, .shadow, .layerBlur,
+                                                        .letterSpacing, .lineHeight, .counter, .changeText]
+        case .image, .video:
             return transform + [.shadow, .layerBlur]
         }
     }
@@ -50,6 +65,7 @@ public enum ActionFactory {
         let duration = frameRate.snapped(defaultDuration)
         let spec: ActionSpec
         var name: String?
+        var counting = false
         switch kind {
         case .move:
             spec = .move(MoveAction(mode: .by, end: Vec2(100, 0)))
@@ -91,8 +107,32 @@ public enum ActionFactory {
             spec = .layerBlur(LayerBlurAction(end: state.layerBlur > 0 ? 0 : 12))
         case .backgroundBlur:
             spec = .backgroundBlur(BackgroundBlurAction(end: BackgroundBlur(radius: state.backgroundBlur.radius > 0 ? 0 : 24)))
+        case .letterSpacing:
+            let current = state.letterSpacing ?? 0
+            spec = .letterSpacing(LetterSpacingAction(end: current > 0 ? 0 : (fontSize(of: layer) * 0.2).rounded()))
+        case .lineHeight:
+            let current = state.lineHeight ?? fontSize(of: layer) * 1.2
+            spec = .lineHeight(LineHeightAction(end: (current * 1.5).rounded()))
+        case .counter:
+            // Up by a hundred from the number in the text, or from 0.
+            let from = NumberFormat.read(state.text?.text ?? "")?.value ?? 0
+            spec = .counter(CounterAction(to: from + 100))
+            counting = true
+        case .changeText:
+            spec = .changeText(ChangeTextAction(text: state.text?.text == "Hello" ? "World" : "Hello"))
+        case .arc:
+            let arc = state.arc ?? .full
+            spec = .arc(ArcAction(end: arc.isWhole ? EllipseArc(start: arc.start, end: arc.start + 270, innerRadius: arc.innerRadius)
+                                                  : EllipseArc(start: arc.start, end: arc.start + 360, innerRadius: arc.innerRadius)))
+        case .star:
+            var star = state.star ?? StarShape(points: 5, innerRadius: 0.4)
+            star.points += 3
+            spec = .star(StarAction(end: star))
         }
-        return Action(target: layer.id, start: start, duration: kind == .visibility ? 0 : duration,
+        // Counting a hundred numbers in half a second is a blur; a counter
+        // gets long enough to read.
+        let length = kind == .visibility ? 0 : counting ? frameRate.snapped(counterDuration) : duration
+        return Action(target: layer.id, start: start, duration: length,
                       name: name, rowOrder: rowOrder, spec: spec)
     }
 
