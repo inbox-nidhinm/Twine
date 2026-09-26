@@ -80,7 +80,7 @@ Animation is being rebuilt around Jitter-style actions (see `docs/redesign.md`).
 Press M to switch between the two modes. They never share a control:
 
 - **Design** shows the layout as designed, with no animation, and its inspector edits the design.
-- **Animate** shows the moment at the playhead. Select a layer and use Add Action in the inspector to add an action at the playhead, half a second long. Select an action (on the timeline, or straight after adding it) and the inspector shows only its fields: start and length, easing (None, Smooth, Slow down, Accelerate, Overshoot, Spring, each with an intensity, or a Custom curve), To or By where it applies, the starting value (leave it empty to start from wherever the layer is; the greyed number is what it would start from), and the end value. Several actions of one kind edit together; mixed kinds share timing and easing.
+- **Animate** shows the moment at the playhead. Select a layer and use Add Action in the inspector to add an action at the playhead, half a second long; the playhead then runs to its end, so you see it play and the next action follows on. Select an action (on the timeline, or straight after adding it) and the inspector shows only its fields: start and length, easing (None, Smooth, Slow down, Accelerate, Overshoot, Spring, each with an intensity, or a Custom curve), To or By where it applies, the starting value (leave it empty to start from wherever the layer is; the greyed number is what it would start from), and the end value. Several actions of one kind edit together; mixed kinds share timing and easing.
 
 Add Action lists what the selected layers can take, grouped:
 

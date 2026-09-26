@@ -212,7 +212,7 @@ final class EditorController {
 
     /// Moves the playhead to `time` over a moment, easing out, and lands on
     /// the frame. Any other seek, a scrub or playing takes over at once.
-    func glide(to time: Double) {
+    func glide(to time: Double, over length: Double = EditorController.glideLength, eased: Bool = true) {
         cancelGlide()
         let target = min(max(frameRate.snapped(time), 0), lastFrameTime)
         let from = editor.time
@@ -221,9 +221,9 @@ final class EditorController {
         let timer = Timer(timeInterval: 1.0 / 120, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                let t = min((CACurrentMediaTime() - began) / Self.glideLength, 1)
-                let eased = 1 - pow(1 - t, 3)
-                self.editor.time = t >= 1 ? target : from + (target - from) * eased
+                let t = min((CACurrentMediaTime() - began) / max(length, 0.01), 1)
+                let progress = eased ? 1 - pow(1 - t, 3) : t
+                self.editor.time = t >= 1 ? target : from + (target - from) * progress
                 if t >= 1 { self.cancelGlide() }
             }
         }
@@ -336,7 +336,14 @@ final class EditorController {
         }
         let added = ActionEditing.appendingRows(made, in: project)
         guard let first = added.first else { return NSSound.beep() }
-        if perform(.batch([.insertActions(added)], name: "Add \(first.name)")) { selectActions(Set(added.map(\.id))) }
+        guard perform(.batch([.insertActions(added)], name: "Add \(first.name)")) else { return }
+        selectActions(Set(added.map(\.id)))
+        // Show what it does: the playhead runs from its start to its end at
+        // real speed (a long one hurried to a second), and waits there,
+        // ready for the next action to follow on.
+        guard let last = added.max(by: { $0.end < $1.end }), last.end > editor.time else { return }
+        stop()
+        glide(to: last.end, over: min(last.end - editor.time, 1), eased: false)
     }
 
     // MARK: Action selection

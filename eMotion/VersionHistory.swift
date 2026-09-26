@@ -25,6 +25,7 @@ enum VersionHistory {
     static let builds: [Build] = [
         .init(date: "26 September 2026", title: "Gliding playhead", changes: [
             "A click on the ruler or on empty timeline slides the playhead to that point in a fifth of a second, rather than jumping. Dragging still scrubs directly.",
+            "Adding an action plays it: the playhead runs from its start to its end at real speed (a long one hurried to a second) and waits there, so the next action you add follows on.",
         ]),
         .init(date: "26 September 2026", title: "Hover and pointers", changes: [
             "Hovering a layer on the canvas outlines it and lights up its row in the layers panel; hovering a row outlines its layer on the canvas.",
