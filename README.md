@@ -54,7 +54,7 @@ Name.emotion/
 | ⌘D, ⌘G, ⇧⌘G, ⌘R | Duplicate, group, ungroup, rename |
 | ⌘], ⌘[, ⌥⌘], ⌥⌘[ | Forward, backward, to front, to back |
 | Pinch, ⌘-scroll | Zoom about the pointer |
-| Two-finger scroll | Pan |
+| Two-finger scroll, Space-drag, middle-button drag | Pan |
 | ⌘0, ⌥⌘0, ⌘=, ⌘- | Fit, actual size, zoom in, zoom out |
 
 One layer aligns with the composition; several align with each other. The same commands are in the Arrange menu and in a row of buttons at the top of the inspector.
@@ -110,7 +110,7 @@ The timeline runs the full width of the window in Animate, with the panels above
 | , and . | Previous and next frame (Shift for ten frames) |
 | ⌥, and ⌥. | Previous and next start or end of an action |
 | Home, End | Go to the start or the end |
-| Click or drag the ruler | Scrub |
+| Click or drag the ruler, or click empty timeline | Scrub (the playhead goes there) |
 | Drag the end marker on the ruler | Make the scene longer or shorter |
 | Click, Shift-click, ⌘-click, drag a box | Select actions (their layers are selected with them) |
 | Drag a bar | Move it in time; drop it on another row to reorder |

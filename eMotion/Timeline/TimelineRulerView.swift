@@ -145,7 +145,7 @@ final class TimelineRulerView: NSView {
     override func resetCursorRects() {
         guard let controller else { return }
         let x = controller.editor.viewport.x(for: controller.duration)
-        addCursorRect(CGRect(x: x - 5, y: 0, width: 10, height: bounds.height), cursor: .resizeLeftRight)
+        addCursorRect(CGRect(x: x - 5, y: 0, width: 10, height: bounds.height), cursor: Cursors.resizeHorizontal)
     }
 
     private func scrub(_ event: NSEvent) {

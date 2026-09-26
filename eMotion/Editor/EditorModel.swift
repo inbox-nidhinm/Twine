@@ -29,6 +29,9 @@ final class EditorModel {
     /// The shape that the shape slot shows, which is the one used last.
     var lastShape: Tool = .rectangle
     var selection: Set<UUID> = []
+    /// The layer under the pointer, on the canvas or in the layers panel,
+    /// which both light up.
+    var hoveredLayer: UUID?
     /// The layer whose name is being edited in the layers panel.
     var renaming: UUID?
     /// Set to a text layer to put the keyboard in its text box in the

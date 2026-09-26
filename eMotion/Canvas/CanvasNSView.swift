@@ -47,7 +47,13 @@ final class CanvasNSView: NSView {
     /// Animate mode: the canvas shows the playhead's moment and only selects
     /// and moves. Resizing, turning and the anchor are design edits.
     private(set) var animating = false
-    private var hovered: UUID?
+    /// The layer outlined under the pointer, shared with the layers panel.
+    private var hovered: UUID? { controller?.editor.hoveredLayer }
+    /// What the canvas itself last hovered, so moving off a layer clears
+    /// only its own hover and never one the layers panel has set.
+    private var ownHover: UUID?
+    /// Space is held: a drag pans rather than acting on layers.
+    private var spaceHeld = false
     private var drag: CanvasDrag?
     /// What the drag in progress has snapped to, for the guides.
     private var snap: Snapping.Result?
@@ -143,7 +149,6 @@ final class CanvasNSView: NSView {
         if renderer.media == nil { renderer.media = controller?.media }
         renderer.render(scene)
         checker.isHidden = scene.background != nil
-        if hovered.map({ scene.layer($0) == nil }) == true { hovered = nil }
         // Typing stops when its layer goes, is deselected, or the mode changes.
         if let id = textSession?.layerID, animating || !selection.contains(id) || scene.layer(id) == nil {
             endTextEditing()
@@ -477,6 +482,8 @@ final class CanvasNSView: NSView {
         let point = viewToComposition(viewPoint)
         let shift = event.modifierFlags.contains(.shift)
 
+        if spaceHeld { return beginPan(event) }
+
         // While typing, a click on the text places the caret; anywhere else
         // it ends the typing and carries on as a click.
         if textMouseDown(event, at: point) { return }
@@ -569,6 +576,9 @@ final class CanvasNSView: NSView {
         let option = event.modifierFlags.contains(.option)
 
         switch drag {
+        case .pan(let p):
+            return continuePan(event, p)
+
         case .create(var create):
             // Held square, the corner follows the square rather than a guide.
             let reach = shift ? point : snapped(point, event, shaping: Box(around: [create.start, point]))
@@ -695,6 +705,8 @@ final class CanvasNSView: NSView {
             controller.end()
         case .marquee:
             break
+        case .pan:
+            (spaceHeld ? Cursors.hand : Cursors.arrow).set()
         }
         redrawOverlay()
     }
@@ -943,7 +955,7 @@ final class CanvasNSView: NSView {
 
     override func resetCursorRects() {
         discardCursorRects()
-        addCursorRect(bounds, cursor: tool == .text ? .iBeam : tool.isShape ? .crosshair : .arrow)
+        addCursorRect(bounds, cursor: spaceHeld ? Cursors.hand : tool == .text ? .iBeam : tool.isShape ? Cursors.crosshair : Cursors.arrow)
         // While typing, the text being edited takes the I-beam.
         if let id = textSession?.layerID, let corners = scene?.worldCorners(of: id) {
             let points = corners.map(compositionToView)
@@ -963,7 +975,7 @@ final class CanvasNSView: NSView {
             setHover(nil)
             return
         }
-        guard !tool.isShape, tool != .text else { return }
+        guard !tool.isShape, tool != .text, !spaceHeld else { return }
         setHover(layer(at: viewToComposition(viewPoint), deep: event.modifierFlags.contains(.command)))
         updateCursor(at: viewPoint)
     }
@@ -973,31 +985,94 @@ final class CanvasNSView: NSView {
     }
 
     private func setHover(_ id: UUID?) {
-        guard hovered != id else { return }
-        hovered = id
-        redrawOverlay()
+        guard let editor = controller?.editor, ownHover != id else { return }
+        let previous = ownHover
+        ownHover = id
+        if let id { editor.hoveredLayer = id } else if editor.hoveredLayer == previous { editor.hoveredLayer = nil }
     }
 
     private func updateCursor(at viewPoint: CGPoint) {
-        guard let scene, let controller, selection.count == 1, let id = selection.first, !controller.isLocked(id) else { return }
+        guard let scene, let controller, selection.count == 1, let id = selection.first, !controller.isLocked(id) else {
+            return Cursors.arrow.set()
+        }
         let view: [CGPoint]
         let line: Bool
         if animating {
-            guard let end = actionEndBox() else { return }
+            guard let end = actionEndBox() else { return Cursors.arrow.set() }
             view = end.box
             line = end.isLine
         } else {
-            guard let corners = scene.worldCorners(of: id), let resolved = scene.layer(id) else { return }
+            guard let corners = scene.worldCorners(of: id), let resolved = scene.layer(id) else { return Cursors.arrow.set() }
             view = corners.map(compositionToView)
             line = isLine(resolved)
         }
-        if actionKindOnCanvas != .rotate, let handle = CanvasHandles.handle(at: viewPoint, box: view, isLine: line) {
-            CanvasHandles.cursor(for: handle).set()
-        } else if !animating || actionKindOnCanvas == .rotate, CanvasHandles.isRotateZone(viewPoint, box: view) {
-            NSCursor.crosshair.set()
-        } else {
-            NSCursor.arrow.set()
+        cursor(at: viewPoint, box: view, isLine: line).set()
+    }
+
+    /// Over a handle, the resize arrows that follow its direction; just past
+    /// a corner, the turn arrows curling round it; otherwise the arrow.
+    private func cursor(at viewPoint: CGPoint, box view: [CGPoint], isLine line: Bool) -> NSCursor {
+        let center = CGPoint(x: view.map(\.x).reduce(0, +) / 4, y: view.map(\.y).reduce(0, +) / 4)
+        func away(_ p: CGPoint) -> CGVector { CGVector(dx: p.x - center.x, dy: p.y - center.y) }
+        if actionKindOnCanvas != .rotate, let handle = CanvasHandles.handle(at: viewPoint, box: view, isLine: line),
+           let point = CanvasHandles.handles(for: view, isLine: line).first(where: { $0.0 == handle })?.1 {
+            return Cursors.resize(toward: away(point))
         }
+        if !animating || actionKindOnCanvas == .rotate, CanvasHandles.isRotateZone(viewPoint, box: view),
+           let corner = view.min(by: { hypot($0.x - viewPoint.x, $0.y - viewPoint.y) < hypot($1.x - viewPoint.x, $1.y - viewPoint.y) }) {
+            return Cursors.rotate(toward: away(corner))
+        }
+        return Cursors.arrow
+    }
+
+    // MARK: Panning with Space
+
+    /// Space's release goes to whoever has the keyboard, so losing it ends
+    /// the hand rather than leaving it stuck on.
+    override func resignFirstResponder() -> Bool {
+        if spaceHeld {
+            spaceHeld = false
+            window?.invalidateCursorRects(for: self)
+        }
+        return super.resignFirstResponder()
+    }
+
+    override func keyUp(with event: NSEvent) {
+        if event.keyCode == 49, spaceHeld {
+            spaceHeld = false
+            if drag == nil { Cursors.arrow.set() }
+            window?.invalidateCursorRects(for: self)
+            return
+        }
+        super.keyUp(with: event)
+    }
+
+    /// Starts panning from a press, with Space held or the middle button.
+    private func beginPan(_ event: NSEvent) {
+        drag = .pan(CanvasDrag.Pan(start: convert(event.locationInWindow, from: nil), origin: pan))
+        Cursors.handGrabbed.set()
+    }
+
+    private func continuePan(_ event: NSEvent, _ p: CanvasDrag.Pan) {
+        let now = convert(event.locationInWindow, from: nil)
+        pan = CGPoint(x: p.origin.x + now.x - p.start.x, y: p.origin.y + now.y - p.start.y)
+        hasFitted = true
+        layoutWorld()
+    }
+
+    override func otherMouseDown(with event: NSEvent) {
+        guard drag == nil else { return }
+        beginPan(event)
+    }
+
+    override func otherMouseDragged(with event: NSEvent) {
+        if case .pan(let p) = drag { continuePan(event, p) }
+    }
+
+    override func otherMouseUp(with event: NSEvent) {
+        guard case .pan = drag else { return }
+        drag = nil
+        (spaceHeld ? Cursors.hand : Cursors.arrow).set()
     }
 
     // MARK: Keyboard
@@ -1009,6 +1084,18 @@ final class CanvasNSView: NSView {
         if event.keyCode == 36, !animating, selection.count == 1, let id = selection.first,
            controller.project.layer(withID: id)?.isText == true, !controller.isLocked(id) {
             return beginTextEditing(id, selectAll: true)
+        }
+        // In Design, holding Space turns the pointer into a hand that pans.
+        // (In Animate, Space plays.)
+        if event.keyCode == 49, !animating, event.modifierFlags.intersection([.command, .control, .option]).isEmpty {
+            if !spaceHeld {
+                spaceHeld = true
+                setHover(nil)
+                if drag == nil { Cursors.hand.set() }
+                window?.invalidateCursorRects(for: self)
+                redrawOverlay()
+            }
+            return
         }
         if EditorKeys.handle(event, controller) { return }
         if !animating, AlignKeys.handle(event, controller) { return }

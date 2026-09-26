@@ -89,7 +89,7 @@ struct EditorView: View {
         Color.clear
             .frame(height: 6)
             .contentShape(Rectangle())
-            .background(CursorArea(cursor: .resizeUpDown))
+            .background(CursorArea(cursor: Cursors.resizeVertical))
             .gesture(DragGesture(coordinateSpace: .global)
                 .onChanged { g in
                     if gripStart == nil { gripStart = editor.timelineHeight }

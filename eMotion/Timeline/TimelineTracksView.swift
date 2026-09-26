@@ -195,7 +195,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
                 trims = trimEdge(at: p, of: row.action, rect: rect) != nil
             }
         }
-        (trims ? NSCursor.resizeLeftRight : NSCursor.arrow).set()
+        if drag == nil { (trims ? Cursors.resizeHorizontal : NSCursor.arrow).set() }
         if label != hoveredLabel || bar != hoveredBar {
             hoveredLabel = label
             hoveredBar = bar
@@ -420,6 +420,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         guard let controller, let viewport else { return }
         if event.modifierFlags.contains(.option) {
             drag = .pan(startX: p.x, startTime: viewport.start)
+            Cursors.handGrabbed.set()
             return
         }
         let extending = event.modifierFlags.contains(.shift) || event.modifierFlags.contains(.command)
@@ -431,6 +432,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
     override func otherMouseDown(with event: NSEvent) {
         guard let viewport else { return }
         drag = .pan(startX: convert(event.locationInWindow, from: nil).x, startTime: viewport.start)
+        Cursors.handGrabbed.set()
     }
 
     override func otherMouseDragged(with event: NSEvent) { mouseDragged(with: event) }
@@ -517,7 +519,14 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         switch drag {
         case .move, .trim: controller?.end()
         case .reorder(_, let began): if began { controller?.end() }
-        case .marquee, .pan: break
+        case .marquee(let start, let current, _):
+            // A click rather than a box: the playhead goes there.
+            if let controller, start.x >= gutter, hypot(current.x - start.x, current.y - start.y) < 3 {
+                controller.stop()
+                controller.seek(to: max(time(at: start.x), 0))
+            }
+        case .pan:
+            NSCursor.arrow.set()
         }
         self.drag = nil
         needsDisplay = true

@@ -68,7 +68,14 @@ enum CanvasDrag {
         let worldAtEnd: Affine?
     }
 
+    /// Panning the view: where the press was, and the pan then.
+    struct Pan {
+        let start: CGPoint
+        let origin: CGPoint
+    }
+
     case create(Create)
+    case pan(Pan)
     case move(Move)
     case resize(Resize)
     case rotate(Edit)
@@ -123,21 +130,6 @@ enum CanvasHandles {
     static func isRotateZone(_ point: CGPoint, box: [CGPoint]) -> Bool {
         guard box.count == 4, !contains(box, point) else { return false }
         return box.contains { hypot($0.x - point.x, $0.y - point.y) <= rotateReach }
-    }
-
-    static func cursor(for handle: Int) -> NSCursor {
-        let position: NSCursor.FrameResizePosition
-        switch handle {
-        case 0: position = .topLeft
-        case 1: position = .top
-        case 2: position = .topRight
-        case 3: position = .right
-        case 4: position = .bottomRight
-        case 5: position = .bottom
-        case 6: position = .bottomLeft
-        default: position = .left
-        }
-        return NSCursor.frameResize(position: position, directions: .all)
     }
 
     private static func contains(_ polygon: [CGPoint], _ p: CGPoint) -> Bool {

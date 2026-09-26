@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Hover and pointers", changes: [
+            "Hovering a layer on the canvas outlines it and lights up its row in the layers panel; hovering a row outlines its layer on the canvas.",
+            "New pointers: an arrow and a crosshair for the canvas, resize arrows that follow a turned layer's handles, turn arrows that curl round each corner, and resize arrows on the timeline's bar ends, the scene's end and the timeline's top edge.",
+            "Hold Space in Design and drag to pan the canvas, with a hand pointer; the middle mouse button pans too. Option-dragging the timeline shows the hand while it pans.",
+            "Click an empty part of the timeline to move the playhead there.",
+        ]),
         .init(date: "26 September 2026", title: "Timeline hover", changes: [
             "Hovering a bar shows a handle at each end. Grab a handle to change when the action starts or ends; the pointer turns into a resize arrow over them.",
             "A timeline label lights up under the pointer, as a layers panel row does, and shows its eye only then. An action switched off shows as a dimmed label and bar.",

@@ -212,7 +212,7 @@ private struct LayerRow: View {
         .padding(.trailing, 2)
         .frame(height: Theme.listRow)
         .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
-            .fill(selected ? Theme.rowSelected : hovering ? Theme.rowHover : .clear))
+            .fill(selected ? Theme.rowSelected : hovering || editor.hoveredLayer == layer.id ? Theme.rowHover : .clear))
         .overlay {
             if dropTargeted {
                 RoundedRectangle(cornerRadius: Theme.radiusRow).strokeBorder(Theme.accent, lineWidth: 1.5)
@@ -220,7 +220,12 @@ private struct LayerRow: View {
         }
         .opacity(layer.isVisible ? 1 : 0.5)
         .contentShape(Rectangle())
-        .onHover { hovering = $0 }
+        .onHover { inside in
+            hovering = inside
+            // Shared with the canvas, which outlines the layer. Leaving only
+            // clears it if nothing else has taken it since.
+            if inside { editor.hoveredLayer = layer.id } else if editor.hoveredLayer == layer.id { editor.hoveredLayer = nil }
+        }
         .onTapGesture(perform: click)
         .rightClickMenu(menu)
         .draggable(layer.id.uuidString) {
