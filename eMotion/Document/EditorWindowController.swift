@@ -2,6 +2,7 @@ import AppKit
 import Theme
 import SwiftUI
 import MotionEditing
+import MotionExport
 
 /// The window a project edits in. It sits in the responder chain, so the View
 /// menu's commands find the editor of whichever window is in front.
@@ -21,6 +22,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         window.contentView = NSHostingView(rootView: root)
         window.delegate = self
         shouldCascadeWindows = true
+        editor.exports.request = { [weak self] in self?.export($0) }
     }
 
     @available(*, unavailable)
@@ -41,8 +43,30 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     /// never a moment with no window at all.
     func windowWillClose(_ notification: Notification) {
         menus.dismiss()
+        editor.exports.cancel()
         let others = NSApp.windows.filter { $0 !== window && $0.windowController is EditorWindowController && $0.isVisible }
         if others.isEmpty { HomeWindowController.shared.showWindow(nil) }
+    }
+
+    // MARK: File menu
+
+    /// Exports in the format the Export section has chosen.
+    @objc func exportFile(_ sender: Any?) { export(nil) }
+    /// A PNG of what the canvas shows, whatever the Export section has chosen.
+    @objc func exportFrame(_ sender: Any?) { export(.png) }
+
+    private func export(_ format: ExportFormat?) {
+        controller.stop()
+        editor.exports.begin(format: format, project: controller.project, time: editor.time,
+                             design: editor.mode == .design, name: exportName,
+                             window: window)
+    }
+
+    /// The project's name without its extension, which Finder shows in
+    /// `displayName` when extensions are on.
+    private var exportName: String {
+        let document = document as? NSDocument
+        return document?.fileURL?.deletingPathExtension().lastPathComponent ?? document?.displayName ?? "Untitled"
     }
 
     // MARK: View menu
@@ -104,6 +128,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         let hasSelection = !controller.selection.isEmpty
         switch item.action {
+        case #selector(exportFile(_:)), #selector(exportFrame(_:)):
+            return !editor.exports.isExporting
         case #selector(delete(_:)), #selector(copy(_:)), #selector(cut(_:)), #selector(duplicateLayers(_:)),
              #selector(groupLayers(_:)), #selector(bringForward(_:)), #selector(sendBackward(_:)),
              #selector(bringToFront(_:)), #selector(sendToBack(_:)):

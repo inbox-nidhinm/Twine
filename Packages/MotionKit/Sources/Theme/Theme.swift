@@ -123,6 +123,8 @@ public enum Theme {
     public static let barPad: CGFloat = 6
     public static let barGap: CGFloat = 4
     public static let rowGap: CGFloat = 4
+    /// The thickness of a progress bar.
+    public static let progressBar: CGFloat = 4
 
     // MARK: Widths (width/*)
 

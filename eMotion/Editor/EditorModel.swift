@@ -64,6 +64,7 @@ final class EditorModel {
     enum Focus { case canvas, timeline }
 
     let viewport = TimelineViewport()
+    let exports = ExportSession()
 }
 
 /// How the timeline maps time to points. Shared by the ruler and the tracks

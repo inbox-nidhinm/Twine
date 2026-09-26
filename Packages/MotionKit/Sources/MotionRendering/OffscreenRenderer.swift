@@ -2,11 +2,12 @@ import Foundation
 import QuartzCore
 import Metal
 import CoreGraphics
+import CoreVideo
 import MotionEvaluation
 
 /// Renders scenes off screen, through the same `CoreAnimationRenderer` the
-/// canvas uses, into a Metal texture. Thumbnails use it now; export uses it
-/// from milestone 5, adding a pixel buffer in place of the image at the end.
+/// canvas uses, into a Metal texture. Thumbnails and stills read it back as an
+/// image; movie export copies it straight into each frame's pixel buffer.
 ///
 /// `CARenderer` draws the layer tree on the GPU without a window, and does so
 /// only when asked, so the output depends on the scene and never on a clock.
@@ -72,6 +73,21 @@ public final class OffscreenRenderer {
                        bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue
                                                 | CGBitmapInfo.byteOrder32Little.rawValue),
                        provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
+    }
+
+    /// Draws `scene` into `buffer`, which must be 32-bit BGRA at this
+    /// renderer's size. The pixels are premultiplied, as Core Animation
+    /// draws them, with the top row first.
+    public func render(_ scene: ResolvedScene, into buffer: CVPixelBuffer) {
+        precondition(CVPixelBufferGetWidth(buffer) == pixelWidth && CVPixelBufferGetHeight(buffer) == pixelHeight
+                     && CVPixelBufferGetPixelFormatType(buffer) == kCVPixelFormatType_32BGRA,
+                     "the pixel buffer must match the renderer")
+        draw(scene)
+        CVPixelBufferLockBaseAddress(buffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        guard let base = CVPixelBufferGetBaseAddress(buffer) else { return }
+        texture.getBytes(base, bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
+                         from: MTLRegionMake2D(0, 0, pixelWidth, pixelHeight), mipmapLevel: 0)
     }
 
     private func draw(_ scene: ResolvedScene) {

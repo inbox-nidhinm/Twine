@@ -94,6 +94,21 @@ The timeline runs the full width of the window in Animate, with the panels above
 
 Bars snap to the playhead, the scene's start and end, and other actions' starts and ends, and always land on frames.
 
+## Exporting
+
+With nothing selected in Design, the Export section sits under Composition: pick a format, a size (50%, 100% or 200%) and, for H.264 and HEVC, a quality, then Export… (⌘E) and choose where to save. The settings are remembered.
+
+| Format | File | Transparency |
+|---|---|---|
+| H.264 | MP4 | No: a transparent background exports as its colour |
+| HEVC | MP4 | No |
+| HEVC with transparency | MOV | Yes |
+| ProRes 422 | MOV | No |
+| ProRes 4444 | MOV | Yes |
+| PNG | PNG | Yes |
+
+Export Current Frame… (Shift-⌘E) saves a PNG of what the canvas shows: the frame at the playhead in Animate, the layout in Design. Exports run in the background, with progress and a cancel button at the top of the window, and match the canvas frame for frame. There is no audio yet; it comes with media layers.
+
 ## Status
 
-Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then redesign milestones 2 to 5 of 8: the action model and its evaluation, separate Design and Animate modes, the action timeline, and editing actions in the inspector and on the canvas. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.
+Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then redesign milestones 2 to 5 of 8 and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, and MP4, MOV and PNG export. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.

@@ -5,8 +5,6 @@ import PackageDescription
 // module so the compiler enforces the direction of every dependency: the model
 // knows nothing, editing knows the model, and nothing here knows about views
 // except Theme, which is only tokens and drawing primitives.
-//
-// Milestone 5 adds MotionExport here.
 let package = Package(
     name: "MotionKit",
     platforms: [.macOS(.v26)],
@@ -15,6 +13,7 @@ let package = Package(
         .library(name: "MotionEditing", targets: ["MotionEditing"]),
         .library(name: "MotionEvaluation", targets: ["MotionEvaluation"]),
         .library(name: "MotionRendering", targets: ["MotionRendering"]),
+        .library(name: "MotionExport", targets: ["MotionExport"]),
         .library(name: "Theme", targets: ["Theme"]),
     ],
     targets: [
@@ -29,6 +28,10 @@ let package = Package(
         // The SceneRenderer protocol and its Core Animation implementation,
         // shared by the canvas and offscreen rendering.
         .target(name: "MotionRendering", dependencies: ["MotionModel", "MotionEvaluation"]),
+        // Steps through a composition frame by frame, drawing each through
+        // the offscreen renderer, and writes a movie or a still. Never tied to
+        // a clock, so an export is the same every time.
+        .target(name: "MotionExport", dependencies: ["MotionModel", "MotionEvaluation", "MotionRendering"]),
         // Tokens from the Flip Design System in Figma, the grain, the fonts,
         // and the icon set. Copied rather than processed, because any
         // re-encoding of the grain would undo how it was packed.
@@ -38,5 +41,6 @@ let package = Package(
         .testTarget(name: "MotionEditingTests", dependencies: ["MotionEditing"]),
         .testTarget(name: "MotionEvaluationTests", dependencies: ["MotionEvaluation"]),
         .testTarget(name: "MotionRenderingTests", dependencies: ["MotionRendering"]),
+        .testTarget(name: "MotionExportTests", dependencies: ["MotionExport"]),
     ]
 )

@@ -38,6 +38,7 @@ public enum Icon: String, CaseIterable, Sendable {
     case chevronDown
     case chevronRight
     case close
+    case export
     case eyedropper
     case minus
     case plus
@@ -198,6 +199,11 @@ public enum Icon: String, CaseIterable, Sendable {
         case .close: return [   // Shared/close.svg
             "M6 6 L18 18",
             "M18 6 L6 18"
+        ]
+        case .export: return [   // Shared/export.svg
+            "M12 15 V4",
+            "M8 8 L12 4 L16 8",
+            "M5 13 V18 C5 19.1 5.9 20 7 20 H17 C18.1 20 19 19.1 19 18 V13"
         ]
         case .eyedropper: return [   // Shared/eyedropper.svg
             "M14.5 6.5 L17.5 9.5",

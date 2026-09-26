@@ -64,6 +64,10 @@ enum MainMenu {
         menu.addItem(item("Move To…", #selector(NSDocument.move(_:))))
         menu.addItem(item("Revert To…", #selector(NSDocument.browseVersions(_:))))
         menu.addItem(.separator())
+        menu.addItem(item("Export…", #selector(EditorWindowController.exportFile(_:)), "e"))
+        menu.addItem(item("Export Current Frame…", #selector(EditorWindowController.exportFrame(_:)), "e",
+                          [.command, .shift]))
+        menu.addItem(.separator())
         menu.addItem(item("Show in Finder", #selector(NSDocument.showInFinder(_:))))
         return menu
     }

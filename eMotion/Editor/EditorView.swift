@@ -44,11 +44,19 @@ struct EditorView: View {
 
             bottomSurface
 
+            if editor.exports.isExporting || editor.exports.finished != nil {
+                ExportStatus(session: editor.exports)
+                    .padding(Theme.floatInset)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .transition(.opacity)
+            }
+
             MenuLayer()
         }
         .animation(.easeOut(duration: 0.18), value: editor.showLayers)
         .animation(.easeOut(duration: 0.18), value: editor.showInspector)
         .animation(.easeOut(duration: 0.18), value: editor.mode)
+        .animation(.easeOut(duration: 0.18), value: editor.exports.isExporting || editor.exports.finished != nil)
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
         .tint(Theme.accent)

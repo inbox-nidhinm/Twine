@@ -12,6 +12,7 @@
 		E00000000000000000000005 /* Theme in Frameworks */ = {isa = PBXBuildFile; productRef = E00000000000000000000006 /* Theme */; };
 		E0000000000000000000001A /* MotionEvaluation in Frameworks */ = {isa = PBXBuildFile; productRef = E0000000000000000000001B /* MotionEvaluation */; };
 		E0000000000000000000001C /* MotionRendering in Frameworks */ = {isa = PBXBuildFile; productRef = E0000000000000000000001D /* MotionRendering */; };
+		E0000000000000000000001E /* MotionExport in Frameworks */ = {isa = PBXBuildFile; productRef = E0000000000000000000001F /* MotionExport */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +34,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E0000000000000000000001E /* MotionExport in Frameworks */,
 				E0000000000000000000001C /* MotionRendering in Frameworks */,
 				E0000000000000000000001A /* MotionEvaluation in Frameworks */,
 				E00000000000000000000001 /* MotionModel in Frameworks */,
@@ -90,6 +92,7 @@
 			);
 			name = eMotion;
 			packageProductDependencies = (
+				E0000000000000000000001F /* MotionExport */,
 				E0000000000000000000001D /* MotionRendering */,
 				E0000000000000000000001B /* MotionEvaluation */,
 				E00000000000000000000002 /* MotionModel */,
@@ -334,6 +337,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E00000000000000000000007 /* XCLocalSwiftPackageReference "Packages/MotionKit" */;
 			productName = MotionRendering;
+		};
+		E0000000000000000000001F /* MotionExport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E00000000000000000000007 /* XCLocalSwiftPackageReference "Packages/MotionKit" */;
+			productName = MotionExport;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -1,0 +1,137 @@
+import AppKit
+import Observation
+import UniformTypeIdentifiers
+import MotionModel
+import MotionExport
+
+/// One window's exports: the settings the Export section edits, and the
+/// export in flight, if any. Frames are drawn on a background thread from a
+/// copy of the project taken when the export starts, so editing carries on
+/// while it runs and cannot change what is being written.
+@MainActor
+@Observable
+final class ExportSession {
+    /// Saved whenever they change, and read by each new window, so the next
+    /// export starts from the last one's choices.
+    var settings: ExportSettings = ExportSession.savedSettings {
+        didSet { Self.save(settings) }
+    }
+
+    /// From 0 to 1 while an export runs, nil otherwise.
+    private(set) var progress: Double?
+    /// The file just written, offered for a few seconds to show in Finder.
+    private(set) var finished: URL?
+
+    var isExporting: Bool { progress != nil }
+
+    private var job: ExportJob?
+    private var finishedToken = 0
+    /// Where a failure is reported.
+    private weak var window: NSWindow?
+
+    /// Set by the window, which knows the document's name: asks for an
+    /// export, in `format` or in the chosen one when nil.
+    var request: (ExportFormat?) -> Void = { _ in }
+
+    /// Asks where to save, then exports. `design` exports a still of the
+    /// layout as designed rather than the frame at `time`, which is what the
+    /// canvas shows in Design mode.
+    func begin(format: ExportFormat? = nil, project: Project, time: Double, design: Bool, name: String,
+               window: NSWindow?) {
+        guard !isExporting else { return }
+        self.window = window
+        var settings = settings
+        if let format { settings.format = format }
+        var project = project
+        if design && !settings.format.isMovie { project.actions = [] }
+
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: settings.format.fileExtension) ?? .data]
+        panel.nameFieldStringValue = "\(name).\(settings.format.fileExtension)"
+        panel.canCreateDirectories = true
+        let start: (NSApplication.ModalResponse) -> Void = { [weak self, weak panel] response in
+            guard response == .OK, let url = panel?.url else { return }
+            self?.run(project, settings: settings, time: time, to: url)
+        }
+        if let window { panel.beginSheetModal(for: window, completionHandler: start) } else { start(panel.runModal()) }
+    }
+
+    func cancel() { job?.cancel() }
+
+    func dismissFinished() { finished = nil }
+
+    private func run(_ project: Project, settings: ExportSettings, time: Double, to url: URL) {
+        let job = ExportJob()
+        self.job = job
+        finished = nil
+        progress = 0
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Progress crosses to the main thread at most a hundred times.
+            var shown = 0
+            let result = Result {
+                try Exporter.export(project, settings: settings, at: time, to: url, job: job) { value in
+                    let step = Int(value * 100)
+                    guard step > shown else { return }
+                    shown = step
+                    Task { @MainActor [weak self] in
+                        if self?.job === job { self?.progress = value }
+                    }
+                }
+            }
+            Task { @MainActor [weak self] in self?.end(job, result: result, url: url) }
+        }
+    }
+
+    private func end(_ ended: ExportJob, result: Result<Void, Error>, url: URL) {
+        guard job === ended else { return }
+        job = nil
+        progress = nil
+        switch result {
+        case .success:
+            finished = url
+            finishedToken += 1
+            let token = finishedToken
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
+                if self?.finishedToken == token { self?.finished = nil }
+            }
+        case .failure(ExportError.cancelled):
+            break
+        case .failure(let error):
+            if let window {
+                window.presentError(error, modalFor: window, delegate: nil, didPresent: nil, contextInfo: nil)
+            } else {
+                NSApp.presentError(error)
+            }
+        }
+    }
+
+    // MARK: Remembered settings
+
+    private static let settingsKey = "exportSettings"
+
+    private static var savedSettings: ExportSettings {
+        guard let data = UserDefaults.standard.data(forKey: settingsKey),
+              let settings = try? JSONDecoder().decode(ExportSettings.self, from: data) else { return ExportSettings() }
+        return settings
+    }
+
+    private static func save(_ settings: ExportSettings) {
+        if let data = try? JSONEncoder().encode(settings) {
+            UserDefaults.standard.set(data, forKey: settingsKey)
+        }
+    }
+}
+
+extension ExportFormat {
+    /// What the Format menu reads when shut, where the full name would not fit.
+    var shortTitle: String {
+        switch self {
+        case .h264: "H.264"
+        case .hevc: "HEVC"
+        case .hevcAlpha: "HEVC with alpha"
+        case .proRes422: "ProRes 422"
+        case .proRes4444: "ProRes 4444"
+        case .png: "PNG frame"
+        }
+    }
+}

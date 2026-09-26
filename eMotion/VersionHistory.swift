@@ -23,6 +23,14 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Export", changes: [
+            "Export movies: MP4 in H.264 or HEVC, or MOV in HEVC with transparency, ProRes 422 or ProRes 4444. Or save the current frame as a PNG.",
+            "With nothing selected in Design, the Export section under Composition picks the format, the size (50%, 100% or 200%) and, for H.264 and HEVC, the quality. It remembers them for next time.",
+            "Export… (⌘E) asks where to save and exports with those settings. Export Current Frame… (Shift-⌘E) saves a PNG of what the canvas shows: the frame at the playhead in Animate, the layout in Design.",
+            "Exports run in the background with a progress bar at the top of the window and a button to cancel; you can keep working. When it's done, Show in Finder takes you to the file.",
+            "A transparent background stays transparent in HEVC with transparency, ProRes 4444 and PNG, with clean soft edges in editing apps. The other formats fill it with the background colour.",
+            "Every frame is drawn by the same renderer as the canvas, one after another, so an export matches what you see and is the same every time. A cancelled export never leaves half a file or replaces the old one.",
+        ]),
         .init(date: "26 September 2026", title: "Editing actions", changes: [
             "Select an action and the inspector shows only its fields: start and length, easing, To or By, where it starts and where it ends. Several actions of one kind edit together.",
             "Easing: None, Smooth, Slow down, Accelerate, Overshoot and Spring, each with an intensity, or a Custom curve with handles to drag.",
