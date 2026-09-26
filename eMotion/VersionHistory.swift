@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Pointers on the timeline", changes: [
+            "The timeline's top edge shows the up-and-down arrows, and the scene's end on the ruler the sideways arrows, reliably now: the window's SwiftUI had been putting its arrow back over them.",
+            "The playhead's pill is a handle: the open hand over it, the closed hand while it is held, and it drags from where it was grabbed instead of jumping to the pointer.",
+        ]),
         .init(date: "26 September 2026", title: "Faster with busy scenes", changes: [
             "Measured on a scene of 200 layers and 990 actions: dragging a layer is about twice as quick (15 to 7 milliseconds a step), dragging a timeline bar a fifth quicker, and scrubbing about a third quicker. Playback holds 60 frames a second.",
             "Working out a frame takes less than half as long as before, and a still layout under a fifth, which also speeds up exports.",

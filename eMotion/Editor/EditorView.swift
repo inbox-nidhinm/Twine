@@ -96,6 +96,9 @@ struct EditorView: View {
             .frame(height: 6)
             .contentShape(Rectangle())
             .background(CursorArea(cursor: Cursors.resizeVertical))
+            // SwiftUI's own pointer as well, since the window's SwiftUI puts
+            // its arrow back over a cursor rect as the pointer moves.
+            .pointerStyle(.image(Image(nsImage: Cursors.resizeVertical.image), hotSpot: .center))
             .gesture(DragGesture(coordinateSpace: .global)
                 .onChanged { g in
                     if gripStart == nil { gripStart = editor.timelineHeight }
