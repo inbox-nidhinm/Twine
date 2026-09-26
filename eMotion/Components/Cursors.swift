@@ -4,9 +4,10 @@ import AppKit
 /// `Resources/Cursors`. Each falls back to the nearest system cursor if its
 /// file is ever missing, so a pointer never disappears.
 ///
-/// The arrow and the crosshair are the canvas's; panels keep the system
-/// arrow. The resize, turn and hand pointers are used wherever those things
-/// happen, canvas and timeline alike.
+/// The arrow replaces the system's everywhere in the app: panels, timeline,
+/// home and canvas alike, so the pointer never changes style as it moves.
+/// Text fields keep the I-beam. The resize, turn and hand pointers are used
+/// wherever those things happen.
 enum Cursors {
     static let arrow = make("cursor-arrow", hotSpot: CGPoint(x: 11.5, y: 11.5), fallback: .arrow)
     static let crosshair = make("cursor-shape", fallback: .crosshair)

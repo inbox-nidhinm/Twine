@@ -154,6 +154,9 @@ final class TimelineRulerView: NSView {
     override func resetCursorRects() {
         guard let controller else { return }
         let x = controller.editor.viewport.x(for: controller.duration)
+        // The app's arrow either side of the scene's end, which drags.
+        addCursorRect(CGRect(x: 0, y: 0, width: max(x - 5, 0), height: bounds.height), cursor: Cursors.arrow)
+        addCursorRect(CGRect(x: x + 5, y: 0, width: max(bounds.width - x - 5, 0), height: bounds.height), cursor: Cursors.arrow)
         addCursorRect(CGRect(x: x - 5, y: 0, width: 10, height: bounds.height), cursor: Cursors.resizeHorizontal)
     }
 

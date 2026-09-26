@@ -8,7 +8,7 @@ extension View {
     /// shadow alone as a smudge.
     func floatingPanel(corner: CGFloat = Theme.radiusPanel) -> some View {
         // The cursor area sits behind the fill, where it can never take a click.
-        // It is there only to claim the arrow back from a canvas underneath.
+        // It is there to claim the app's arrow back from a canvas underneath.
         background(CursorArea())
             // Grained inside the background rather than over the finished card,
             // so the texture stays under the labels and glyphs.
@@ -23,14 +23,14 @@ extension View {
     }
 }
 
-/// Gives the area it covers the arrow cursor.
+/// Gives the area it covers the app's arrow (or another pointer).
 ///
 /// A canvas that fills the window sets its tool's cursor over its whole
 /// bounds, including the parts covered by floating panels. AppKit resolves
 /// cursor rects per view and the topmost wins, so a panel that carries one of
 /// these takes the arrow back without the canvas knowing where panels are.
 struct CursorArea: NSViewRepresentable {
-    var cursor: NSCursor = .arrow
+    var cursor: NSCursor = Cursors.arrow
 
     func makeNSView(context: Context) -> Area {
         let view = Area()
@@ -46,7 +46,7 @@ struct CursorArea: NSViewRepresentable {
     }
 
     final class Area: NSView {
-        var cursor: NSCursor = .arrow
+        var cursor: NSCursor = Cursors.arrow
 
         override func resetCursorRects() {
             discardCursorRects()

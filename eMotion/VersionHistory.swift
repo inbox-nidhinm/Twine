@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "One pointer", changes: [
+            "eMotion's own arrow is the pointer everywhere in the app: panels, timeline, home screen and canvas. It no longer switches to the system arrow as it crosses from one to another. Text fields keep the text cursor.",
+        ]),
         .init(date: "26 September 2026", title: "Gliding playhead", changes: [
             "A click on the ruler or on empty timeline slides the playhead to that point in a fifth of a second, rather than jumping. Dragging still scrubs directly.",
             "Adding an action plays it: the playhead runs from its start to its end at real speed (a long one hurried to a second) and waits there, so the next action you add follows on.",

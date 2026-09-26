@@ -31,6 +31,8 @@ struct HomeView: View {
             shelf
         }
         .background(Theme.canvas.grained())
+        // The app's arrow everywhere, never the system's.
+        .background(CursorArea())
         .overlay {
             if library.showVersionHistory {
                 VersionHistoryCard { library.showVersionHistory = false }

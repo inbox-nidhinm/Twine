@@ -174,6 +174,12 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         viewport.hasFitted = true
     }
 
+    /// The app's arrow over the whole timeline, so AppKit never falls back
+    /// to the system's between moves.
+    override func resetCursorRects() {
+        addCursorRect(visibleRect, cursor: Cursors.arrow)
+    }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         for area in trackingAreas { removeTrackingArea(area) }
@@ -195,7 +201,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
                 trims = trimEdge(at: p, of: row.action, rect: rect) != nil
             }
         }
-        if drag == nil { (trims ? Cursors.resizeHorizontal : NSCursor.arrow).set() }
+        if drag == nil { (trims ? Cursors.resizeHorizontal : Cursors.arrow).set() }
         if label != hoveredLabel || bar != hoveredBar {
             hoveredLabel = label
             hoveredBar = bar
@@ -204,7 +210,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
     }
 
     override func mouseExited(with event: NSEvent) {
-        NSCursor.arrow.set()
+        Cursors.arrow.set()
         hoveredLabel = nil
         hoveredBar = nil
         needsDisplay = true
@@ -526,7 +532,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
                 controller.glide(to: max(time(at: start.x), 0))
             }
         case .pan:
-            NSCursor.arrow.set()
+            Cursors.arrow.set()
         }
         self.drag = nil
         needsDisplay = true
