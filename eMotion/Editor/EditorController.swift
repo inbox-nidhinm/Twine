@@ -338,6 +338,8 @@ final class EditorController {
         guard let first = added.first else { return NSSound.beep() }
         guard perform(.batch([.insertActions(added)], name: "Add \(first.name)")) else { return }
         selectActions(Set(added.map(\.id)))
+        // The new rows may be below the timeline's fold.
+        editor.revealActions = (Set(added.map(\.id)), editor.revealActions.request + 1)
         // Show what it does: the playhead runs from its start to its end at
         // real speed (a long one hurried to a second), and waits there,
         // ready for the next action to follow on.

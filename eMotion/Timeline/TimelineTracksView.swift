@@ -31,7 +31,7 @@ struct ActionTimeline: NSViewRepresentable {
         guard let tracks = scroll.documentView as? TimelineTracksView else { return }
         // Read here so SwiftUI calls this whenever any of them change.
         _ = (editor.time, editor.selection, editor.selectedActions, editor.timelineOnlySelected,
-             editor.viewport.pointsPerSecond, editor.viewport.start, controller.project)
+             editor.viewport.pointsPerSecond, editor.viewport.start, controller.project, editor.revealActions.request)
         tracks.menus = menus
         tracks.reload()
     }
@@ -57,6 +57,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
 
     private var drag: Drag?
     private var lastSelection: Set<UUID> = []
+    private var lastReveal = 0
     private var renaming: (id: UUID, field: NSTextField)?
     /// The row whose label is under the pointer, which shows its eye and
     /// lights up as the layers panel's rows do.
@@ -108,7 +109,33 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
             lastSelection = editor.selection
             if editor.focus != .timeline { scrollToRows(of: editor.selection) }
         }
+        if editor.revealActions.request != lastReveal {
+            lastReveal = editor.revealActions.request
+            reveal(editor.revealActions.ids)
+        }
         needsDisplay = true
+    }
+
+    /// Scrolls, gently, just far enough to bring these actions' rows into
+    /// view: a row added below the fold slides up into sight.
+    private func reveal(_ ids: Set<UUID>) {
+        let mine = rows.filter { ids.contains($0.action.id) }
+        guard let first = mine.first, let last = mine.last, let scroll = enclosingScrollView else { return }
+        let clip = scroll.contentView
+        let visible = clip.bounds
+        let top = first.y, bottom = last.y + TimelineRow.height
+        var y = visible.minY
+        if bottom > visible.maxY { y = bottom - visible.height }
+        if top < y { y = top }
+        y = min(max(y, 0), max(bounds.height - visible.height, 0))
+        guard abs(y - visible.minY) > 0.5 else { return }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.25
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            clip.animator().setBoundsOrigin(NSPoint(x: visible.minX, y: y))
+        } completionHandler: {
+            MainActor.assumeIsolated { scroll.reflectScrolledClipView(clip) }
+        }
     }
 
     private func sizeToRows() {

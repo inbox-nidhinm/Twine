@@ -55,6 +55,10 @@ final class EditorModel {
     var focus: Focus = .canvas
     /// Actions picked in the timeline. Their layers are selected with them.
     var selectedActions: Set<UUID> = []
+    /// Actions the timeline should scroll to, such as ones just added. The
+    /// count changes with every request, so the same actions can be asked
+    /// for twice and the timeline never has to clear it.
+    var revealActions: (ids: Set<UUID>, request: Int) = ([], 0)
     /// The timeline lists only the selected layers' actions.
     var timelineOnlySelected = false
     /// The timeline card's height, which its top edge drags. Remembered for

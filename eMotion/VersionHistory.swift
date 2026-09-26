@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "New rows come into view", changes: [
+            "When a new action's row lands below what the timeline shows, the timeline scrolls down to it, so you always see what you added.",
+        ]),
         .init(date: "26 September 2026", title: "One pointer", changes: [
             "eMotion's own arrow is the pointer everywhere in the app: panels, timeline, home screen and canvas. It no longer switches to the system arrow as it crosses from one to another. Text fields keep the text cursor.",
         ]),
