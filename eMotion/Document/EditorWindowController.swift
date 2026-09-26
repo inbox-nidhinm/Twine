@@ -132,6 +132,17 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     }
     @objc func goToEnd(_ sender: Any?) { controller.jumpToEnd() }
     @objc func toggleLoop(_ sender: Any?) { editor.loops.toggle() }
+    @objc func toggleSnapping(_ sender: Any?) { editor.snaps.toggle() }
+
+    // MARK: Arrange
+
+    /// The menu item's tag is the edge's place in `Alignment.Edge.allCases`.
+    @objc func alignLayers(_ sender: Any?) {
+        guard let tag = (sender as? NSMenuItem)?.tag, Alignment.Edge.allCases.indices.contains(tag) else { return }
+        controller.align(Alignment.Edge.allCases[tag])
+    }
+    @objc func distributeHorizontally(_ sender: Any?) { controller.distribute(.x) }
+    @objc func distributeVertically(_ sender: Any?) { controller.distribute(.y) }
 
     // MARK: Zoom
 
@@ -169,6 +180,12 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
             return editor.mode == .animate && controller.selectedActions.count > 1
         case #selector(toggleLoop(_:)):
             item.state = editor.loops ? .on : .off
+        case #selector(toggleSnapping(_:)):
+            item.state = editor.snaps ? .on : .off
+        case #selector(alignLayers(_:)):
+            return controller.canAlign
+        case #selector(distributeHorizontally(_:)), #selector(distributeVertically(_:)):
+            return controller.canDistribute
         case #selector(selectAll(_:)):
             return !controller.project.layers.isEmpty
         case #selector(toggleLayersPanel(_:)):

@@ -49,6 +49,13 @@ final class CanvasNSView: NSView {
     private(set) var animating = false
     private var hovered: UUID?
     private var drag: CanvasDrag?
+    /// What the drag in progress has snapped to, for the guides.
+    private var snap: Snapping.Result?
+    /// What a drag can snap to, gathered as it begins: the boxes of every
+    /// layer not being dragged.
+    private var snapTargets: [Box] = []
+    /// A move's boxes when it began, all together.
+    private var snapBox: Box?
     /// Typing into a text layer on the canvas, when it is happening.
     var textSession: TextSession?
     /// Blinks the caret while typing.
@@ -326,6 +333,8 @@ final class CanvasNSView: NSView {
         }
         overlay.update(outlines: outlines, union: union, handles: handles, anchor: anchor,
                        hover: textSession == nil ? hover : nil, marquee: drag?.marqueeRect, motion: motionOverlay())
+        let marks = snapMarks()
+        overlay.updateSnap(lines: marks.lines, gaps: marks.gaps)
         updateTextOverlay()
     }
 
@@ -473,7 +482,8 @@ final class CanvasNSView: NSView {
         if textMouseDown(event, at: point) { return }
 
         if tool.isShape, !animating {
-            drag = .create(CanvasDrag.Create(tool: tool, start: point, layerID: nil))
+            snapTargets = targets(excluding: [])
+            drag = .create(CanvasDrag.Create(tool: tool, start: snapped(point, event), layerID: nil))
             return
         }
 
@@ -508,6 +518,7 @@ final class CanvasNSView: NSView {
                 return
             }
             if let handle = CanvasHandles.handle(at: viewPoint, box: view, isLine: isLine(resolved)) {
+                snapTargets = targets(excluding: [id])
                 drag = .resize(CanvasDrag.Resize(layer: layer, handle: handle, start: point))
                 controller.begin(layer.isGroup ? "Scale" : "Resize")
                 return
@@ -536,6 +547,9 @@ final class CanvasNSView: NSView {
                 return beginTextEditing(hit, selectAll: false, at: point)
             }
             let moving = controller.topmost(controller.selectedLayers).filter { !controller.isLocked($0.id) }
+            snapTargets = targets(excluding: Set(moving.map(\.id)))
+            let boxes = moving.compactMap { scene.bounds(of: $0.id) }
+            snapBox = boxes.dropFirst().reduce(boxes.first) { $0?.union($1) }
             drag = .move(CanvasDrag.Move(originals: moving, start: point))
             controller.begin(moving.count == 1 ? "Move Layer" : "Move Layers")
         } else {
@@ -556,7 +570,9 @@ final class CanvasNSView: NSView {
 
         switch drag {
         case .create(var create):
-            let end = CanvasGeometry.constrainedEnd(create.start, point, tool: create.tool, square: shift)
+            // Held square, the corner follows the square rather than a guide.
+            let reach = shift ? point : snapped(point, event, shaping: Box(around: [create.start, point]))
+            let end = CanvasGeometry.constrainedEnd(create.start, reach, tool: create.tool, square: shift)
             let from = option && create.tool != .line ? Vec2(2 * create.start.x - end.x, 2 * create.start.y - end.y) : create.start
             guard var layer = controller.makeShape(create.tool, from: from, to: end) else { return }
             if let id = create.layerID, let existing = controller.project.layer(withID: id) {
@@ -575,14 +591,37 @@ final class CanvasNSView: NSView {
         case .move(let move):
             guard let scene else { return }
             var delta = point - move.start
-            if shift { delta = abs(delta.x) >= abs(delta.y) ? Vec2(delta.x, 0) : Vec2(0, delta.y) }
+            var axes: Set<Snapping.Axis> = [.x, .y]
+            if shift {
+                let across = abs(delta.x) >= abs(delta.y)
+                delta = across ? Vec2(delta.x, 0) : Vec2(0, delta.y)
+                axes = across ? [.x] : [.y]
+            }
+            snap = nil
+            if snapping(event), let box = snapBox {
+                let result = Snapping.move(box.moved(by: delta), targets: snapTargets, frame: frameBox,
+                                           threshold: snapReach, axes: axes)
+                delta = delta + result.offset
+                snap = result
+            }
             controller.update(move.originals.map { $0.translated(by: controller.parentDelta(delta, for: $0.id, in: scene)) })
 
         case .resize(let resize):
             guard let parentInverse = parentInverse(of: resize.layer.id) else { return }
-            var edited = CanvasGeometry.resized(resize.layer, handle: resize.handle,
-                                                pointer: parentInverse.apply(point),
-                                                keepAspect: shift, fromCenter: option)
+            func resized(_ pointer: Vec2) -> Layer {
+                CanvasGeometry.resized(resize.layer, handle: resize.handle, pointer: parentInverse.apply(pointer),
+                                       keepAspect: shift, fromCenter: option)
+            }
+            var edited = resized(point)
+            // Kept to its proportions, a corner cannot follow a guide on
+            // both axes, so only a free resize snaps.
+            snap = nil
+            if snapping(event), !shift, let parentWorld = parentInverse.inverted,
+               let result = snapped(edited, handle: resize.handle, parentWorld: parentWorld),
+               result.offset != .zero || !result.guides.isEmpty {
+                edited = resized(point + result.offset)
+                snap = snapped(edited, handle: resize.handle, parentWorld: parentWorld)
+            }
             // A text box given a new width keeps it and wraps inside it; its
             // height always follows its lines.
             if case .text(var t) = edited.content, abs(edited.size.width - resize.layer.size.width) > 0.5 {
@@ -632,6 +671,7 @@ final class CanvasNSView: NSView {
         if textMouseUp() { return }
         guard let controller, let drag else { return }
         self.drag = nil
+        snap = nil
         switch drag {
         case .create(let create):
             if create.layerID == nil {
@@ -657,6 +697,74 @@ final class CanvasNSView: NSView {
             break
         }
         redrawOverlay()
+    }
+
+    // MARK: Snapping
+
+    /// How near counts as lined up: a few screen points at any zoom.
+    private var snapReach: Double { 6 / zoom }
+
+    private var frameBox: Box { Box(origin: .zero, size: scene?.size ?? Size2(0, 0)) }
+
+    /// Snapping is on, and Command is not held to set it aside for a moment.
+    private func snapping(_ event: NSEvent) -> Bool {
+        controller?.editor.snaps == true && !event.modifierFlags.contains(.command)
+    }
+
+    /// The boxes of every drawn layer except those in `moving` and anything
+    /// inside them. Groups are left out: their layers are there instead.
+    private func targets(excluding moving: Set<UUID>) -> [Box] {
+        guard let scene, let project else { return [] }
+        snap = nil
+        return scene.layers.compactMap { layer in
+            guard layer.content != .group, !moving.contains(layer.id),
+                  project.ancestors(of: layer.id).allSatisfy({ !moving.contains($0) }) else { return nil }
+            return scene.bounds(of: layer.id)
+        }
+    }
+
+    /// A point being drawn to, pulled onto a guide when one is near.
+    private func snapped(_ point: Vec2, _ event: NSEvent, shaping box: Box? = nil) -> Vec2 {
+        snap = nil
+        guard snapping(event) else { return point }
+        let result = Snapping.point(point, box: box ?? Box(around: [point])!, targets: snapTargets, frame: frameBox,
+                                    threshold: snapReach)
+        snap = result
+        return point + result.offset
+    }
+
+    /// Where a resize handle wants to go to line up. Only for a layer that
+    /// sits upright on screen, since a turned box has no edges to line up.
+    private func snapped(_ layer: Layer, handle: Int, parentWorld: Affine) -> Snapping.Result? {
+        let t = layer.transform
+        let world = Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation).then(parentWorld)
+        guard abs(world.b) < 1e-9, abs(world.c) < 1e-9,
+              let box = Box(around: Box(origin: .zero, size: layer.size).corners.map(world.apply)) else { return nil }
+        let left = [0, 6, 7].contains(handle), right = [2, 3, 4].contains(handle)
+        let top = [0, 1, 2].contains(handle), bottom = [4, 5, 6].contains(handle)
+        let w = layer.size.width, h = layer.size.height
+        let local = Vec2(left ? 0 : right ? w : w / 2, top ? 0 : bottom ? h : h / 2)
+        var axes = Set<Snapping.Axis>()
+        if left || right { axes.insert(.x) }
+        if top || bottom { axes.insert(.y) }
+        return Snapping.point(world.apply(local), box: box, targets: snapTargets, frame: frameBox,
+                              threshold: snapReach, axes: axes)
+    }
+
+    /// The guides and gaps in view points.
+    private func snapMarks() -> (lines: [(CGPoint, CGPoint)], gaps: [CanvasOverlay.GapMark]) {
+        guard let snap else { return ([], []) }
+        let lines = snap.guides.map { g -> (CGPoint, CGPoint) in
+            g.axis == .x ? (compositionToView(Vec2(g.value, g.from)), compositionToView(Vec2(g.value, g.to)))
+                         : (compositionToView(Vec2(g.from, g.value)), compositionToView(Vec2(g.to, g.value)))
+        }
+        let gaps = snap.gaps.map { g -> CanvasOverlay.GapMark in
+            let a = g.axis == .x ? Vec2(g.start, g.cross) : Vec2(g.cross, g.start)
+            let b = g.axis == .x ? Vec2(g.end, g.cross) : Vec2(g.cross, g.end)
+            return CanvasOverlay.GapMark(from: compositionToView(a), to: compositionToView(b),
+                                         label: GuideLabel.text(g.length))
+        }
+        return (lines, gaps)
     }
 
     // MARK: Editing the selected action
@@ -903,6 +1011,7 @@ final class CanvasNSView: NSView {
             return beginTextEditing(id, selectAll: true)
         }
         if EditorKeys.handle(event, controller) { return }
+        if !animating, AlignKeys.handle(event, controller) { return }
         let step = event.modifierFlags.contains(.shift) ? 10.0 : 1.0
         switch event.keyCode {
         case 51, 117: controller.deleteSelection()                   // delete, forward delete
@@ -910,6 +1019,7 @@ final class CanvasNSView: NSView {
             if drag != nil {
                 controller.cancel()
                 drag = nil
+                snap = nil
                 redrawOverlay()
             } else {
                 controller.deselectAll()
@@ -977,3 +1087,16 @@ final class CanvasNSView: NSView {
     }()
 }
 
+
+private extension Box {
+    func moved(by d: Vec2) -> Box { Box(minX: minX + d.x, minY: minY + d.y, maxX: maxX + d.x, maxY: maxY + d.y) }
+}
+
+/// A distance as the guides label it: whole pixels, or one decimal place
+/// when it falls between.
+enum GuideLabel {
+    static func text(_ v: Double) -> String {
+        let rounded = (v * 10).rounded() / 10
+        return rounded == rounded.rounded() ? "\(Int(rounded))" : String(format: "%.1f", rounded)
+    }
+}

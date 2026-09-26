@@ -94,14 +94,16 @@ struct IconButton: View {
     let action: () -> Void
 
     @State private var hovering = false
+    @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
         Button(action: action) {
             IconView(icon, size: iconBox)
-                .foregroundStyle(hovering ? Theme.textPrimary : Theme.textTertiary)
+                .foregroundStyle(hovering && isEnabled ? Theme.textPrimary : Theme.textTertiary)
+                .opacity(isEnabled ? 1 : 0.4)
                 .frame(width: size, height: size)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
-                    .fill(hovering ? Theme.panelRaised : .clear))
+                    .fill(hovering && isEnabled ? Theme.panelRaised : .clear))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -586,6 +586,52 @@ final class EditorController {
         perform(layerUpdate(moved))
     }
 
+    // MARK: Aligning
+
+    /// What aligning and distributing act on: the selected layers not
+    /// inside another selected one, and not locked. Design only: in Animate
+    /// the canvas shows a moment, not the layout.
+    private var arrangeable: [Layer] {
+        editor.mode == .design ? topmost(selectedLayers).filter { !isLocked($0.id) } : []
+    }
+
+    var canAlign: Bool { !arrangeable.isEmpty }
+    var canDistribute: Bool { arrangeable.count >= 3 }
+
+    /// Lines the selected layers up on one edge or centre: one layer with
+    /// the composition, several with the box around them all.
+    func align(_ edge: Alignment.Edge) {
+        let boxes = arrangeableBoxes()
+        guard let first = boxes.values.first else { return }
+        let reference = boxes.count == 1 ? Box(origin: .zero, size: project.composition.size)
+                                         : boxes.values.reduce(first) { $0.union($1) }
+        move(by: Alignment.align(boxes, edge, to: reference), name: edge.title)
+    }
+
+    /// Spaces three or more selected layers evenly, keeping the outer two.
+    func distribute(_ axis: Snapping.Axis) {
+        move(by: Alignment.distribute(arrangeableBoxes(), along: axis),
+             name: axis == .x ? "Distribute Horizontally" : "Distribute Vertically")
+    }
+
+    private func arrangeableBoxes() -> [UUID: Box] {
+        let scene = self.scene
+        var boxes: [UUID: Box] = [:]
+        for layer in arrangeable { boxes[layer.id] = scene.bounds(of: layer.id) }
+        return boxes
+    }
+
+    /// Moves layers by composition-space amounts, as one undo step.
+    private func move(by moves: [UUID: Vec2], name: String) {
+        let scene = self.scene
+        let moved = arrangeable.compactMap { layer -> Layer? in
+            guard let d = moves[layer.id], abs(d.x) > 1e-9 || abs(d.y) > 1e-9 else { return nil }
+            return layer.translated(by: parentDelta(d, for: layer.id, in: scene))
+        }
+        guard !moved.isEmpty else { return }
+        perform(.batch([layerUpdate(moved)], name: name))
+    }
+
     /// A composition-space movement expressed in a layer's parent's space,
     /// which is what its position is measured in.
     func parentDelta(_ delta: Vec2, for id: UUID, in scene: ResolvedScene) -> Vec2 {

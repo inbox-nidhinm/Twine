@@ -2,6 +2,7 @@ import AppKit
 import MotionModel
 import MotionEditing
 import MotionEvaluation
+import Theme
 
 /// What a drag on the canvas is doing, from mouse down to mouse up.
 enum CanvasDrag {
@@ -246,5 +247,74 @@ extension Layer {
         copy.size = other.size
         copy.transform = other.transform
         return copy
+    }
+}
+
+extension Alignment.Edge {
+    var title: String {
+        switch self {
+        case .left: "Align Left"
+        case .centerX: "Align Horizontal Centres"
+        case .right: "Align Right"
+        case .top: "Align Top"
+        case .centerY: "Align Vertical Centres"
+        case .bottom: "Align Bottom"
+        }
+    }
+
+    var icon: Icon {
+        switch self {
+        case .left: .alignLeft
+        case .centerX: .alignCenterX
+        case .right: .alignRight
+        case .top: .alignTop
+        case .centerY: .alignCenterY
+        case .bottom: .alignBottom
+        }
+    }
+
+    /// Figma's keys: Option with A, H, D for left, centre, right, and W, V,
+    /// S for top, middle, bottom.
+    var shortcut: String {
+        switch self {
+        case .left: "⌥A"
+        case .centerX: "⌥H"
+        case .right: "⌥D"
+        case .top: "⌥W"
+        case .centerY: "⌥V"
+        case .bottom: "⌥S"
+        }
+    }
+
+    fileprivate var keyCode: UInt16 {
+        switch self {
+        case .left: 0
+        case .centerX: 4
+        case .right: 2
+        case .top: 13
+        case .centerY: 9
+        case .bottom: 1
+        }
+    }
+}
+
+/// Aligning and distributing from the keyboard, on the canvas in Design.
+/// Handled here rather than as menu keys, so Option with a letter still
+/// types its accent in a text field. Matched by key code, since Option
+/// changes the character a key types.
+enum AlignKeys {
+    static func handle(_ event: NSEvent, _ controller: EditorController) -> Bool {
+        let flags = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        if flags == .option, let edge = Alignment.Edge.allCases.first(where: { $0.keyCode == event.keyCode }) {
+            guard controller.canAlign else { return false }
+            controller.align(edge)
+            return true
+        }
+        if flags == [.control, .option], event.keyCode == 4 || event.keyCode == 9 {
+            guard controller.canDistribute else { return false }
+            controller.distribute(event.keyCode == 4 ? .x : .y)
+            return true
+        }
+        return false
     }
 }

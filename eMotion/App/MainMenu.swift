@@ -1,4 +1,5 @@
 import AppKit
+import MotionEditing
 
 /// The menu bar, built in code. Items name a selector and no target, so each
 /// one goes to whichever window, window controller or document is in front,
@@ -9,6 +10,7 @@ enum MainMenu {
         bar.addItem(submenu(appMenu()))
         bar.addItem(submenu(fileMenu()))
         bar.addItem(submenu(editMenu()))
+        bar.addItem(submenu(arrangeMenu()))
         bar.addItem(submenu(viewMenu()))
         bar.addItem(submenu(playbackMenu()))
         let window = windowMenu()
@@ -102,6 +104,22 @@ enum MainMenu {
         return menu
     }
 
+    /// Aligning and spacing. The keys are named in the titles but handled by
+    /// the canvas, so Option with a letter still types an accent in a field.
+    private static func arrangeMenu() -> NSMenu {
+        let menu = NSMenu(title: "Arrange")
+        for (index, edge) in Alignment.Edge.allCases.enumerated() {
+            if index == 3 { menu.addItem(.separator()) }
+            let entry = item("\(edge.title)    \(edge.shortcut)", #selector(EditorWindowController.alignLayers(_:)))
+            entry.tag = index
+            menu.addItem(entry)
+        }
+        menu.addItem(.separator())
+        menu.addItem(item("Distribute Horizontally    ⌃⌥H", #selector(EditorWindowController.distributeHorizontally(_:))))
+        menu.addItem(item("Distribute Vertically    ⌃⌥V", #selector(EditorWindowController.distributeVertically(_:))))
+        return menu
+    }
+
     private static func viewMenu() -> NSMenu {
         let menu = NSMenu(title: "View")
         // M works on the canvas and the timeline without being a menu key,
@@ -109,6 +127,8 @@ enum MainMenu {
         menu.addItem(item("Design", #selector(EditorWindowController.switchToDesignMode(_:))))
         menu.addItem(item("Animate", #selector(EditorWindowController.switchToAnimateMode(_:))))
         menu.addItem(item("Switch Mode    M", #selector(EditorWindowController.toggleMode(_:))))
+        menu.addItem(.separator())
+        menu.addItem(item("Smart Guides", #selector(EditorWindowController.toggleSnapping(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Hide Layers", #selector(EditorWindowController.toggleLayersPanel(_:)), "1"))
         menu.addItem(item("Hide Inspector", #selector(EditorWindowController.toggleInspectorPanel(_:)), "2"))

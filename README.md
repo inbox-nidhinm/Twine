@@ -42,6 +42,10 @@ Name.emotion/
 | Click, Shift-click, drag on empty canvas | Select, add to the selection, marquee |
 | ⌘-click, double-click | Reach a layer inside a group |
 | Drag a layer | Move. Shift keeps to one axis. |
+| Dragging, resizing or drawing | Snaps to the composition's edges and centre, other layers' edges and centres, and even spacing, with red guides. Hold ⌘ to place freely; View > Smart Guides turns snapping off. |
+| ⌥A, ⌥H, ⌥D | Align left, horizontal centres, right |
+| ⌥W, ⌥V, ⌥S | Align top, vertical centres, bottom |
+| ⌃⌥H, ⌃⌥V | Distribute horizontally, vertically (three or more layers) |
 | Drag a handle | Resize. Shift keeps proportions, Option resizes from the centre. |
 | Just outside a corner | Rotate. Shift snaps to 15°. |
 | ⌘-drag the anchor marker | Move the anchor |
@@ -52,6 +56,8 @@ Name.emotion/
 | Pinch, ⌘-scroll | Zoom about the pointer |
 | Two-finger scroll | Pan |
 | ⌘0, ⌥⌘0, ⌘=, ⌘- | Fit, actual size, zoom in, zoom out |
+
+One layer aligns with the composition; several align with each other. The same commands are in the Arrange menu and in a row of buttons at the top of the inspector.
 
 ## Text
 
@@ -138,4 +144,4 @@ Export Current Frame… (Shift-⌘E) saves a PNG of what the canvas shows: the f
 
 ## Status
 
-Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then all 8 redesign milestones and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, MP4, MOV and PNG export, Style and Blur actions, text layers with Text and Shape actions, and pictures, video and sound with Play bars. After those, masks. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.
+Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then all 8 redesign milestones and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, MP4, MOV and PNG export, Style and Blur actions, text layers with Text and Shape actions, and pictures, video and sound with Play bars. After those, masks, then snapping and alignment. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.

@@ -52,6 +52,8 @@ public enum Theme {
     /// The playhead: its line down the timeline and the pill in the ruler
     /// that carries the time. Teal, so it never reads as a selection.
     public static let playhead = Color(red: 0x2B / 255, green: 0x88 / 255, blue: 0x85 / 255)
+    /// Smart guides and equal-spacing marks while something snaps.
+    public static let guide = Color(red: 0xF2 / 255, green: 0x4E / 255, blue: 0x6B / 255)
 
     // MARK: Text (text/*)
 

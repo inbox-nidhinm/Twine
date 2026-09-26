@@ -43,6 +43,10 @@ struct InspectorPanel: View {
     /// share, or with nothing selected, the composition.
     @ViewBuilder private var designContent: some View {
         let selected = controller.selectedLayers
+        if !selected.isEmpty {
+            AlignRow(controller: controller)
+            PanelDivider()
+        }
         if selected.count == 1, let layer = selected.first {
             LayerInspector(layer: layer, controller: controller)
                 .id(layer.id)
@@ -191,4 +195,32 @@ struct InspectorPanel: View {
     }
 
     private static func gcd(_ a: Int, _ b: Int) -> Int { b == 0 ? a : gcd(b, a % b) }
+}
+
+/// Aligning and spacing the selection, across the top of Design's
+/// inspector: one layer lines up with the composition, several with each
+/// other.
+private struct AlignRow: View {
+    let controller: EditorController
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Alignment.Edge.allCases, id: \.self) { edge in
+                IconButton(icon: edge.icon, help: "\(edge.title) (\(edge.shortcut))") { controller.align(edge) }
+            }
+            .disabled(!controller.canAlign)
+            Spacer(minLength: 0)
+            Group {
+                IconButton(icon: .distributeH, help: "Distribute horizontally: equal spaces across, for three or more layers (⌃⌥H)") {
+                    controller.distribute(.x)
+                }
+                IconButton(icon: .distributeV, help: "Distribute vertically: equal spaces down, for three or more layers (⌃⌥V)") {
+                    controller.distribute(.y)
+                }
+            }
+            .disabled(!controller.canDistribute)
+        }
+        .padding(.horizontal, Theme.panelPad)
+        .padding(.vertical, 8)
+    }
 }

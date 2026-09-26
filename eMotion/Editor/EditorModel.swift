@@ -38,6 +38,12 @@ final class EditorModel {
     var time: Double = 0
     var isPlaying = false
     var loops = true
+    /// Whether dragging, resizing and drawing snap to the composition and
+    /// to other layers. Remembered for every window and every launch.
+    var snaps: Bool = UserDefaults.standard.object(forKey: EditorModel.snapsKey) as? Bool ?? true {
+        didSet { UserDefaults.standard.set(snaps, forKey: Self.snapsKey) }
+    }
+    private static let snapsKey = "snapping"
     /// Whether times read as frame numbers rather than seconds.
     var showsFrames = false
 

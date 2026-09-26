@@ -25,7 +25,15 @@ public enum Icon: String, CaseIterable, Sendable {
     case stagger
     case stroke
     case trim
+    case alignBottom
+    case alignCenterX
+    case alignCenterY
+    case alignLeft
+    case alignRight
+    case alignTop
     case corners
+    case distributeH
+    case distributeV
     case link
     case unlink
     case audio
@@ -178,11 +186,55 @@ public enum Icon: String, CaseIterable, Sendable {
             "M12 5 C15.9 5 19 8.1 19 12 C19 15.9 15.9 19 12 19 C8.1 19 5 15.9 5 12",
             "M3.5 12 H6.5"
         ]
+        case .alignBottom: return [   // Inspector/align-bottom.svg
+            "M4 19.5 H20",
+            "M6.5 6 H10.5 V16 H6.5 Z",
+            "M13.5 10 H17.5 V16 H13.5 Z"
+        ]
+        case .alignCenterX: return [   // Inspector/align-center-x.svg
+            "M12 4 V6.5",
+            "M12 10.5 V13.5",
+            "M12 17.5 V20",
+            "M6 6.5 H18 V10.5 H6 Z",
+            "M8.5 13.5 H15.5 V17.5 H8.5 Z"
+        ]
+        case .alignCenterY: return [   // Inspector/align-center-y.svg
+            "M4 12 H6.5",
+            "M10.5 12 H13.5",
+            "M17.5 12 H20",
+            "M6.5 6 H10.5 V18 H6.5 Z",
+            "M13.5 8.5 H17.5 V15.5 H13.5 Z"
+        ]
+        case .alignLeft: return [   // Inspector/align-left.svg
+            "M4.5 4 V20",
+            "M8 6.5 H18 V10.5 H8 Z",
+            "M8 13.5 H14 V17.5 H8 Z"
+        ]
+        case .alignRight: return [   // Inspector/align-right.svg
+            "M19.5 4 V20",
+            "M6 6.5 H16 V10.5 H6 Z",
+            "M10 13.5 H16 V17.5 H10 Z"
+        ]
+        case .alignTop: return [   // Inspector/align-top.svg
+            "M4 4.5 H20",
+            "M6.5 8 H10.5 V18 H6.5 Z",
+            "M13.5 8 H17.5 V14 H13.5 Z"
+        ]
         case .corners: return [   // Inspector/corners.svg
             "M4 9 V6 C4 4.895 4.895 4 6 4 H9",
             "M15 4 H18 C19.105 4 20 4.895 20 6 V9",
             "M20 15 V18 C20 19.105 19.105 20 18 20 H15",
             "M9 20 H6 C4.895 20 4 19.105 4 18 V15"
+        ]
+        case .distributeH: return [   // Inspector/distribute-h.svg
+            "M4.5 4 V20",
+            "M19.5 4 V20",
+            "M9.5 7 H14.5 V17 H9.5 Z"
+        ]
+        case .distributeV: return [   // Inspector/distribute-v.svg
+            "M4 4.5 H20",
+            "M4 19.5 H20",
+            "M7 9.5 H17 V14.5 H7 Z"
         ]
         case .link: return [   // Inspector/link.svg
             "M10 14 L14 10",

@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Smart guides and alignment", changes: [
+            "Moving, resizing and drawing snap to the composition's edges and centre and to other layers' edges and centres, with red guides showing what lined up.",
+            "Moving also snaps to even spacing: centred between two neighbours, or one gap on from a row that already keeps one. The equal gaps show with their size.",
+            "Hold ⌘ while dragging to place freely. View > Smart Guides turns snapping off altogether.",
+            "Align and distribute from the new Arrange menu, the buttons across the top of the inspector, or Figma's keys: ⌥A, ⌥H, ⌥D, ⌥W, ⌥V, ⌥S, and ⌃⌥H and ⌃⌥V to space three or more layers evenly. One layer aligns with the composition; several with each other.",
+        ]),
         .init(date: "26 September 2026", title: "Masks", changes: [
             "Any layer can be masked by another: press + under Mask in the inspector and pick the mask. The layer shows only where the mask draws, and the mask itself stops drawing. Invert shows it everywhere else.",
             "Shapes, text, pictures and video can all be masks, and a group can be masked by a layer inside it.",

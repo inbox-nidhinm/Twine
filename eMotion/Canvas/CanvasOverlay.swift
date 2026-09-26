@@ -25,6 +25,11 @@ nonisolated final class CanvasOverlay: CALayer {
     private let textSelection = CAShapeLayer()
     private let textMarked = CAShapeLayer()
     private let caret = CAShapeLayer()
+    /// Smart guides while something snaps: the lines it lines up on, and
+    /// equal spaces with their lengths.
+    private let guides = CAShapeLayer()
+    private let gapLines = CAShapeLayer()
+    private var gapLabels: [CATextLayer] = []
 
     private static let accent = NSColor(Theme.accent).cgColor
 
@@ -44,7 +49,7 @@ nonisolated final class CanvasOverlay: CALayer {
         anchorPoint = .zero
         actions = Self.none
         for l in [textSelection, hover, outlines, union, marquee, motion, motionArms, anchor, handles, motionStart, motionEnd,
-                  motionHandles, textMarked, caret] {
+                  motionHandles, textMarked, caret, guides, gapLines] {
             l.anchorPoint = .zero
             l.actions = Self.none
             l.contentsScale = 2
@@ -86,7 +91,76 @@ nonisolated final class CanvasOverlay: CALayer {
         textMarked.strokeColor = Self.accent
         textMarked.lineWidth = 1.5
         caret.fillColor = Self.accent
+        for l in [guides, gapLines] {
+            l.fillColor = nil
+            l.strokeColor = Self.guide
+            l.lineWidth = 1
+        }
     }
+
+    private static let guide = NSColor(Theme.guide).cgColor
+
+    /// An equal space: a line across it with a tick at each end, and its
+    /// length in a pill beside it.
+    struct GapMark {
+        var from: CGPoint
+        var to: CGPoint
+        var label: String
+    }
+
+    func updateSnap(lines: [(CGPoint, CGPoint)], gaps: [GapMark]) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        let path = CGMutablePath()
+        for (a, b) in lines {
+            // On the half point, so a one-point line stays crisp.
+            path.move(to: CGPoint(x: crisp(a.x), y: crisp(a.y)))
+            path.addLine(to: CGPoint(x: crisp(b.x), y: crisp(b.y)))
+        }
+        guides.path = lines.isEmpty ? nil : path
+
+        let marks = CGMutablePath()
+        for gap in gaps {
+            let across = abs(gap.to.x - gap.from.x) >= abs(gap.to.y - gap.from.y)
+            let a = CGPoint(x: crisp(gap.from.x), y: crisp(gap.from.y)), b = CGPoint(x: crisp(gap.to.x), y: crisp(gap.to.y))
+            marks.move(to: a)
+            marks.addLine(to: b)
+            for p in [a, b] {
+                marks.move(to: across ? CGPoint(x: p.x, y: p.y - 4) : CGPoint(x: p.x - 4, y: p.y))
+                marks.addLine(to: across ? CGPoint(x: p.x, y: p.y + 4) : CGPoint(x: p.x + 4, y: p.y))
+            }
+        }
+        gapLines.path = gaps.isEmpty ? nil : marks
+
+        while gapLabels.count < gaps.count {
+            let label = CATextLayer()
+            label.actions = Self.none
+            label.contentsScale = 2
+            label.fontSize = 10
+            label.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .semibold)
+            label.foregroundColor = CGColor(gray: 1, alpha: 1)
+            label.backgroundColor = Self.guide
+            label.alignmentMode = .center
+            label.cornerRadius = 3
+            addSublayer(label)
+            gapLabels.append(label)
+        }
+        for (i, label) in gapLabels.enumerated() {
+            guard i < gaps.count else { label.isHidden = true; continue }
+            let gap = gaps[i]
+            let across = abs(gap.to.x - gap.from.x) >= abs(gap.to.y - gap.from.y)
+            let width = CGFloat(gap.label.count) * 6.5 + 8
+            let mid = CGPoint(x: (gap.from.x + gap.to.x) / 2, y: (gap.from.y + gap.to.y) / 2)
+            label.isHidden = false
+            label.string = gap.label
+            // Beside the line, clear of the ticks.
+            label.frame = across ? CGRect(x: mid.x - width / 2, y: mid.y + 6, width: width, height: 15)
+                                 : CGRect(x: mid.x + 6, y: mid.y - 7.5, width: width, height: 15)
+        }
+    }
+
+    private func crisp(_ v: CGFloat) -> CGFloat { v.rounded(.down) + 0.5 }
 
     /// The text being typed into: its selection, half-typed input and caret,
     /// all in view points. Nil paths clear them.
@@ -123,7 +197,7 @@ nonisolated final class CanvasOverlay: CALayer {
                                                    "position": NSNull(), "hidden": NSNull(), "contents": NSNull()]
 
     override var frame: CGRect {
-        didSet { for l in sublayers ?? [] { l.frame = bounds } }
+        didSet { for l in sublayers ?? [] where !(l is CATextLayer) { l.frame = bounds } }
     }
 
     func update(outlines boxes: [[CGPoint]], union unionBox: [CGPoint]?, handles points: [CGPoint],

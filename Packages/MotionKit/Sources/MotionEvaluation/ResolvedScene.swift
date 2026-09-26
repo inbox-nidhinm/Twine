@@ -54,6 +54,22 @@ public struct ResolvedScene: Sendable, Equatable {
         guard let layer = layer(id), let world = worldTransform(of: id) else { return nil }
         return Box(origin: .zero, size: layer.size).corners.map(world.apply)
     }
+
+    /// What the layer covers on screen, as an upright box in composition
+    /// space: a turned layer's box is the one around its corners. A group's
+    /// is the box around what is drawn inside it (clipped to its own box
+    /// when it clips), since a group's own size is only where it was made.
+    public func bounds(of id: UUID) -> Box? {
+        guard let layer = layer(id) else { return nil }
+        guard layer.content == .group else { return worldCorners(of: id).flatMap { Box(around: $0) } }
+        let inside = layers.filter { $0.parentID == id }.compactMap { bounds(of: $0.id) }
+        guard let first = inside.first else { return nil }
+        let all = inside.dropFirst().reduce(first) { $0.union($1) }
+        guard layer.clipsContent, let own = worldCorners(of: id).flatMap({ Box(around: $0) }) else { return all }
+        let clipped = Box(minX: max(all.minX, own.minX), minY: max(all.minY, own.minY),
+                          maxX: min(all.maxX, own.maxX), maxY: min(all.maxY, own.maxY))
+        return clipped.width >= 0 && clipped.height >= 0 ? clipped : nil
+    }
 }
 
 public struct ResolvedLayer: Sendable, Equatable, Identifiable {
