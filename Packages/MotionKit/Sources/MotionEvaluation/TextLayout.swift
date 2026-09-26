@@ -39,6 +39,15 @@ public struct TextStyle: Sendable, Hashable {
 public struct PositionedLine {
     public let line: CTLine
     public let origin: CGPoint
+    /// The characters it shows, in UTF-16 units of the whole text, without
+    /// the line break that may end it.
+    public let range: NSRange
+    /// Where its paragraph starts in the whole text: the line's own string
+    /// indices count from there.
+    public let paragraphStart: Int
+    /// Its box, a line height tall, from the top of the text.
+    public let top: Double
+    public let height: Double
 }
 
 /// Sets text the same way for measuring and for drawing, with Core Text, so
@@ -129,12 +138,15 @@ public enum TextLayout {
 
         // Each paragraph broken into lines: wrapped to the width when there
         // is one, otherwise one line each.
-        var set: [(line: CTLine, lastInParagraph: Bool)] = []
+        var set: [(line: CTLine, lastInParagraph: Bool, range: NSRange, paragraphStart: Int)] = []
+        var paragraphStart = 0
         for paragraph in text.components(separatedBy: "\n") {
             let string = CFAttributedStringCreate(nil, paragraph as CFString, attributes as CFDictionary)!
             let length = CFAttributedStringGetLength(string)
+            defer { paragraphStart += length + 1 }
             guard let width, length > 0 else {
-                set.append((CTLineCreateWithAttributedString(string), true))
+                set.append((CTLineCreateWithAttributedString(string), true, NSRange(location: paragraphStart, length: length),
+                            paragraphStart))
                 continue
             }
             let typesetter = CTTypesetterCreateWithAttributedString(string)
@@ -142,8 +154,9 @@ public enum TextLayout {
             while start < length {
                 let count = max(CTTypesetterSuggestLineBreak(typesetter, start, max(width, 1)), 1)
                 let line = CTTypesetterCreateLine(typesetter, CFRange(location: start, length: count))
+                set.append((line, start + count >= length, NSRange(location: paragraphStart + start, length: count),
+                            paragraphStart))
                 start += count
-                set.append((line, start >= length))
             }
         }
 
@@ -172,8 +185,10 @@ public enum TextLayout {
             case .center: x = (boxWidth - lineWidth) / 2
             case .right: x = boxWidth - lineWidth
             }
-            let baseline = Double(index) * lineHeight + (lineHeight - (ascent + descent)) / 2 + ascent
-            lines.append(PositionedLine(line: line, origin: CGPoint(x: x, y: baseline)))
+            let top = Double(index) * lineHeight
+            let baseline = top + (lineHeight - (ascent + descent)) / 2 + ascent
+            lines.append(PositionedLine(line: line, origin: CGPoint(x: x, y: baseline), range: entry.range,
+                                        paragraphStart: entry.paragraphStart, top: top, height: lineHeight))
         }
         return (lines, Size2(ceil(boxWidth), Double(max(set.count, 1)) * lineHeight))
     }

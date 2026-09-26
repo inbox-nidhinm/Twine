@@ -20,6 +20,11 @@ nonisolated final class CanvasOverlay: CALayer {
     private let motionStart = CAShapeLayer()
     private let motionEnd = CAShapeLayer()
     private let motionHandles = CAShapeLayer()
+    /// Typing on the canvas: the selected letters, the half-typed ones, and
+    /// the caret.
+    private let textSelection = CAShapeLayer()
+    private let textMarked = CAShapeLayer()
+    private let caret = CAShapeLayer()
 
     private static let accent = NSColor(Theme.accent).cgColor
 
@@ -38,7 +43,8 @@ nonisolated final class CanvasOverlay: CALayer {
     private func commonInit() {
         anchorPoint = .zero
         actions = Self.none
-        for l in [hover, outlines, union, marquee, motion, motionArms, anchor, handles, motionStart, motionEnd, motionHandles] {
+        for l in [textSelection, hover, outlines, union, marquee, motion, motionArms, anchor, handles, motionStart, motionEnd,
+                  motionHandles, textMarked, caret] {
             l.anchorPoint = .zero
             l.actions = Self.none
             l.contentsScale = 2
@@ -75,6 +81,30 @@ nonisolated final class CanvasOverlay: CALayer {
         motionHandles.fillColor = CGColor(gray: 1, alpha: 1)
         motionHandles.strokeColor = Self.accent
         motionHandles.lineWidth = 1
+        textSelection.fillColor = NSColor(Theme.accent).withAlphaComponent(0.3).cgColor
+        textMarked.fillColor = nil
+        textMarked.strokeColor = Self.accent
+        textMarked.lineWidth = 1.5
+        caret.fillColor = Self.accent
+    }
+
+    /// The text being typed into: its selection, half-typed input and caret,
+    /// all in view points. Nil paths clear them.
+    func updateText(selection: CGPath?, marked: CGPath?, caret caretPath: CGPath?) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        textSelection.path = selection
+        textMarked.path = marked
+        caret.path = caretPath
+        CATransaction.commit()
+    }
+
+    /// The caret blinks by showing and hiding.
+    func showCaret(_ visible: Bool) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        caret.isHidden = !visible
+        CATransaction.commit()
     }
 
     /// A Move's path in view points: the dashed route, a hollow dot where it

@@ -144,8 +144,8 @@ struct TextSection: View {
 }
 
 /// The words, typed. Every keystroke shows on the canvas at once, and one
-/// visit to the box undoes as one step. The Text tool and a double-click on a
-/// text layer put the keyboard here.
+/// visit to the box undoes as one step. The words can also be typed on the
+/// canvas itself; this box follows along.
 private struct TextBox: View {
     let layerID: UUID
     let text: String
@@ -166,10 +166,7 @@ private struct TextBox: View {
             .frame(minHeight: Theme.control * 2, maxHeight: Theme.control * 5)
             .fixedSize(horizontal: false, vertical: true)
             .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
-            .onAppear {
-                draft = text
-                focusIfAsked()
-            }
+            .onAppear { draft = text }
             .onChange(of: text) { _, now in if !focused { draft = now } }
             .onChange(of: draft) { _, now in
                 guard focused, now != text else { return }
@@ -179,10 +176,7 @@ private struct TextBox: View {
                 }
                 guard let layer = controller.project.layer(withID: layerID), case .text(var t) = layer.content else { return }
                 var l = layer
-                // A name never changed by hand follows the words, as in Figma.
-                if l.name == Self.name(for: t.text) || l.name.wholeMatch(of: /Text \d+/) != nil {
-                    l.name = Self.name(for: now)
-                }
+                l.name = EditorController.textName(renaming: l.name, from: t.text, to: now)
                 t.text = now
                 l.content = .text(t)
                 controller.update([l])
@@ -193,7 +187,6 @@ private struct TextBox: View {
                     controller.end()
                 }
             }
-            .onChange(of: controller.editor.editingText) { _, _ in focusIfAsked() }
             .onDisappear {
                 if editing {
                     editing = false
@@ -201,30 +194,6 @@ private struct TextBox: View {
                 }
             }
             .help("The layer's words. Return starts a new line.")
-    }
-
-    /// The first line of the words, as a layer name.
-    static func name(for text: String) -> String {
-        let first = text.split(separator: "\n", omittingEmptySubsequences: true).first.map(String.init) ?? ""
-        let trimmed = first.trimmingCharacters(in: .whitespaces)
-        return trimmed.isEmpty ? "Text" : String(trimmed.prefix(40))
-    }
-
-    /// Puts the keyboard here with every word selected, so typing replaces
-    /// them, as it does in a new text layer in Figma.
-    private func focusIfAsked() {
-        guard controller.editor.editingText == layerID else { return }
-        DispatchQueue.main.async {
-            focused = true
-            controller.editor.editingText = nil
-            // The box's own text view, found by what it holds, rather than
-            // the front window's, which may be another window's.
-            DispatchQueue.main.async {
-                for window in NSApp.windows {
-                    if let view = window.firstResponder as? NSTextView, view.string == draft { view.selectAll(nil) }
-                }
-            }
-        }
     }
 }
 

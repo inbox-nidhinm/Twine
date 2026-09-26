@@ -55,7 +55,7 @@ Name.emotion/
 
 ## Text
 
-Pick the Text tool (T) and click the canvas: a text layer appears with its words selected in the inspector's text box, ready to type over. Double-click a text layer to edit its words again. The Text section sets the font (from a searchable list of the fonts on this Mac), weight, size, colour, alignment, letter spacing, line height and auto or fixed width. A font that is not installed shows crossed out and the text draws in SF Pro. The box always fits the words; dragging its side makes it fixed width.
+Pick the Text tool (T) and click the canvas: a text layer appears with its word selected, ready to type over, right on the canvas. Double-click a text layer to type where you clicked, or press Return with it selected to edit all of it; Escape or a click away finishes. All the usual Mac typing keys, Copy and Paste, held-key accents and input methods work, and Undo steps back through your typing while you type. The words can also be typed in the inspector's text box. The Text section sets the font (from a searchable list of the fonts on this Mac), weight, size, colour, alignment, letter spacing, line height and auto or fixed width. A font that is not installed shows crossed out and the text draws in SF Pro. The box always fits the words; dragging its side makes it fixed width.
 
 ## Pictures, video and sound
 

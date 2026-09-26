@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "26 September 2026", title: "Typing on the canvas", changes: [
+            "Type straight onto the canvas. The Text tool places a text layer ready to type over; double-click a text layer to type where you clicked; press Return with a text layer selected to edit all of it. Escape, or a click away, finishes.",
+            "The caret and selection sit exactly on the letters, at any zoom and on turned text. Click to move the caret, drag or Shift-click to select, double-click for a word, triple-click for everything.",
+            "Every Mac typing habit works: arrows with Option and Command, Shift to select, Delete by letter or word, Copy, Cut and Paste, accents by holding a key, and input methods for other languages.",
+            "While typing, Undo steps back through your typing; afterwards the whole edit undoes as one step. A text left empty is removed.",
+        ]),
         .init(date: "26 September 2026", title: "Pictures, video and sound", changes: [
             "Import pictures, video and sound with File > Import… (⌘I), or drop them on the canvas. Each becomes a layer; the file is copied into the project, so moving or deleting the original does no harm, and importing the same file twice keeps one copy.",
             "Video and sound get a Play bar on the timeline. Drag it to set when it plays. Drag its left end to trim the start of the clip, its right end to trim the end; neither goes past the clip's own ends. A video shows its first frame before its bar and its last frame after.",

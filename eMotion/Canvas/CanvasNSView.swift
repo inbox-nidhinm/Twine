@@ -32,7 +32,7 @@ final class CanvasNSView: NSView {
     private let world = CALayer()
     private let checker = CALayer()
     private let frameEdge = CAShapeLayer()
-    private let overlay = CanvasOverlay()
+    let overlay = CanvasOverlay()
 
     private(set) var zoom: Double = 1
     /// How far the composition's centre sits from the centre of the visible area.
@@ -42,13 +42,17 @@ final class CanvasNSView: NSView {
 
     private(set) var scene: ResolvedScene?
     private var project: Project?
-    private var selection: [UUID] = []
+    private(set) var selection: [UUID] = []
     private var tool: Tool = .select
     /// Animate mode: the canvas shows the playhead's moment and only selects
     /// and moves. Resizing, turning and the anchor are design edits.
-    private var animating = false
+    private(set) var animating = false
     private var hovered: UUID?
     private var drag: CanvasDrag?
+    /// Typing into a text layer on the canvas, when it is happening.
+    var textSession: TextSession?
+    /// Blinks the caret while typing.
+    var caretTimer: Timer?
 
     /// Ticks with the display while playing, so playback advances in step
     /// with what is shown.
@@ -133,6 +137,10 @@ final class CanvasNSView: NSView {
         renderer.render(scene)
         checker.isHidden = scene.background != nil
         if hovered.map({ scene.layer($0) == nil }) == true { hovered = nil }
+        // Typing stops when its layer goes, is deselected, or the mode changes.
+        if let id = textSession?.layerID, animating || !selection.contains(id) || scene.layer(id) == nil {
+            endTextEditing()
+        }
         layoutWorld()
     }
 
@@ -270,7 +278,7 @@ final class CanvasNSView: NSView {
 
     // MARK: The overlay
 
-    private func redrawOverlay() {
+    func redrawOverlay() {
         guard let scene, let controller else { return }
         var outlines: [[CGPoint]] = []
         let endBox = actionEndBox()
@@ -310,8 +318,15 @@ final class CanvasNSView: NSView {
             hover = corners.map(compositionToView)
         }
 
+        // While typing, the box shows without handles: the letters are
+        // being edited, not the layer.
+        if textSession != nil {
+            handles = []
+            anchor = nil
+        }
         overlay.update(outlines: outlines, union: union, handles: handles, anchor: anchor,
-                       hover: hover, marquee: drag?.marqueeRect, motion: motionOverlay())
+                       hover: textSession == nil ? hover : nil, marquee: drag?.marqueeRect, motion: motionOverlay())
+        updateTextOverlay()
     }
 
     /// The kind of the action the canvas is editing, in Animate.
@@ -427,6 +442,10 @@ final class CanvasNSView: NSView {
         let point = viewToComposition(viewPoint)
         let shift = event.modifierFlags.contains(.shift)
 
+        // While typing, a click on the text places the caret; anywhere else
+        // it ends the typing and carries on as a click.
+        if textMouseDown(event, at: point) { return }
+
         if tool.isShape, !animating {
             drag = .create(CanvasDrag.Create(tool: tool, start: point, layerID: nil))
             return
@@ -435,8 +454,8 @@ final class CanvasNSView: NSView {
         // The Text tool places a text layer where it is clicked and puts the
         // keyboard in its text box, then hands back the arrow.
         if tool == .text, !animating {
-            controller.addText(at: point)
             controller.editor.tool = .select
+            if let id = controller.addText(at: point) { beginTextEditing(id, selectAll: true) }
             return
         }
 
@@ -485,9 +504,10 @@ final class CanvasNSView: NSView {
                let inner = layer(at: point, deep: true), inner != hit {
                 // A double-click goes into a group, as in Figma.
                 controller.select([inner])
-            } else if event.clickCount == 2, !animating, controller.project.layer(withID: hit)?.isText == true {
-                // And on text, it goes to the words.
-                controller.editor.editingText = hit
+            } else if event.clickCount == 2, !animating, controller.project.layer(withID: hit)?.isText == true,
+                      !controller.isLocked(hit) {
+                // And on text, it starts typing where it was clicked.
+                return beginTextEditing(hit, selectAll: false, at: point)
             }
             let moving = controller.topmost(controller.selectedLayers).filter { !controller.isLocked($0.id) }
             drag = .move(CanvasDrag.Move(originals: moving, start: point))
@@ -501,6 +521,7 @@ final class CanvasNSView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        if textSession != nil, textMouseDragged(at: viewToComposition(convert(event.locationInWindow, from: nil))) { return }
         guard let controller, let drag else { return }
         let viewPoint = convert(event.locationInWindow, from: nil)
         let point = viewToComposition(viewPoint)
@@ -582,6 +603,7 @@ final class CanvasNSView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        if textMouseUp() { return }
         guard let controller, let drag else { return }
         self.drag = nil
         switch drag {
@@ -788,6 +810,13 @@ final class CanvasNSView: NSView {
     override func resetCursorRects() {
         discardCursorRects()
         addCursorRect(bounds, cursor: tool == .text ? .iBeam : tool.isShape ? .crosshair : .arrow)
+        // While typing, the text being edited takes the I-beam.
+        if let id = textSession?.layerID, let corners = scene?.worldCorners(of: id) {
+            let points = corners.map(compositionToView)
+            let xs = points.map(\.x), ys = points.map(\.y)
+            addCursorRect(CGRect(x: xs.min()!, y: ys.min()!, width: xs.max()! - xs.min()!, height: ys.max()! - ys.min()!),
+                          cursor: .iBeam)
+        }
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -841,6 +870,12 @@ final class CanvasNSView: NSView {
 
     override func keyDown(with event: NSEvent) {
         guard let controller else { return super.keyDown(with: event) }
+        if textKeyDown(event) { return }
+        // Return on one selected text layer starts typing into it.
+        if event.keyCode == 36, !animating, selection.count == 1, let id = selection.first,
+           controller.project.layer(withID: id)?.isText == true, !controller.isLocked(id) {
+            return beginTextEditing(id, selectAll: true)
+        }
         if EditorKeys.handle(event, controller) { return }
         let step = event.modifierFlags.contains(.shift) ? 10.0 : 1.0
         switch event.keyCode {
@@ -866,6 +901,38 @@ final class CanvasNSView: NSView {
                 super.keyDown(with: event)
             }
         }
+    }
+
+    // MARK: Menu commands while typing
+
+    /// While typing, Copy, Cut, Paste, Select All, Delete, Undo and Redo work
+    /// on the letters; otherwise the canvas lets them pass to the window,
+    /// where they work on layers.
+    nonisolated private static let textActions: Set<Selector> = [
+        #selector(NSText.copy(_:)), #selector(NSText.cut(_:)), #selector(NSText.paste(_:)),
+        #selector(NSText.selectAll(_:)), #selector(NSText.delete(_:)), Selector(("undo:")), Selector(("redo:")),
+    ]
+
+    /// AppKit asks this from the main thread, when it looks for a menu
+    /// command's target.
+    nonisolated override func responds(to aSelector: Selector!) -> Bool {
+        if let aSelector, Self.textActions.contains(aSelector) {
+            return MainActor.assumeIsolated { isEditingText }
+        }
+        return super.responds(to: aSelector)
+    }
+
+    @objc func copy(_ sender: Any?) { textCopy(sender) }
+    @objc func cut(_ sender: Any?) { textCut(sender) }
+    @objc func paste(_ sender: Any?) { textPaste(sender) }
+    @objc func delete(_ sender: Any?) { _ = textCommand(#selector(deleteBackward(_:))) }
+    @objc func undo(_ sender: Any?) { textUndo(sender) }
+    @objc func redo(_ sender: Any?) { textRedo(sender) }
+    override func selectAll(_ sender: Any?) { textSelectAll(sender) }
+
+    override func doCommand(by selector: Selector) {
+        if textCommand(selector) { return }
+        super.doCommand(by: selector)
     }
 
     // MARK: Transparency
