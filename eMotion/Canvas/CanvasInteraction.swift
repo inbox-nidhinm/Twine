@@ -72,6 +72,45 @@ enum CanvasDrag {
         let worldAtEnd: Affine?
     }
 
+    /// A press on a path's points, handles or segments while its points
+    /// are being edited or drawn. Every step works from the path as it was
+    /// when the press began.
+    struct PathEdit {
+        enum Part: Equatable {
+            /// Points moving together, their handles with them.
+            case points(Set<PointRef>)
+            case handle(PointRef, HandleSide)
+            /// Both handles pulled out of a point as mirror images: the pen's
+            /// click and drag, or ⌘-drag on a point.
+            case pull(PointRef)
+            /// A segment moving, and the points at both its ends.
+            case segment(PointRef)
+            /// A box selecting points, in view points.
+            case marquee(start: CGPoint, current: CGPoint, base: Set<PointRef>)
+        }
+
+        var part: Part
+        /// Where the press began, in composition space.
+        let start: Vec2
+        /// The path in the layer's own space, and the layer and actions it
+        /// belongs to, when the press began.
+        let path: BezierPath
+        let layer: Layer
+        let actions: [Action]
+        /// The Path action being edited, in Animate.
+        let action: Action?
+        /// From composition space into the path's.
+        let toLocal: Affine
+        /// The press has moved, or has already changed the path.
+        var moved = false
+        /// A ⌘-click that never moves bends the point instead of pulling it.
+        var bendsOnClick = false
+        /// Releasing ends the pen's drawing: the press closed the path.
+        var finishesDrawing = false
+        /// A continuous change was begun for this press.
+        var began = false
+    }
+
     /// Panning the view: where the press was, and the pan then.
     struct Pan {
         let start: CGPoint
@@ -86,11 +125,19 @@ enum CanvasDrag {
     case anchor(Edit)
     case marquee(Marquee)
     case action(ActionEdit)
+    case path(PathEdit)
 
     var marqueeRect: CGRect? {
-        guard case .marquee(let m) = self else { return nil }
-        return CGRect(x: min(m.start.x, m.current.x), y: min(m.start.y, m.current.y),
-                      width: abs(m.current.x - m.start.x), height: abs(m.current.y - m.start.y))
+        switch self {
+        case .marquee(let m):
+            return CGRect(x: min(m.start.x, m.current.x), y: min(m.start.y, m.current.y),
+                          width: abs(m.current.x - m.start.x), height: abs(m.current.y - m.start.y))
+        case .path(let p):
+            guard case .marquee(let a, let b, _) = p.part else { return nil }
+            return CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(b.x - a.x), height: abs(b.y - a.y))
+        default:
+            return nil
+        }
     }
 }
 

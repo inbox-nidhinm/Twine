@@ -22,6 +22,8 @@ public enum LayerFactory {
     public static let defaultFill = RGBA(hex: "D9D9D9")!
     /// Lines have no area to fill, so they get a stroke instead.
     public static let defaultStroke = RGBA(hex: "1E1E1E")!
+    /// A new line's stroke, which open pen paths wear too.
+    public static var lineStroke: Stroke { Stroke(paint: .color(defaultStroke), width: 4, cap: .round) }
 
     /// A shape filling `box` in its parent's space, with its anchor at the
     /// centre.
@@ -37,7 +39,7 @@ public enum LayerFactory {
         }
         let content: ShapeContent
         if kind == .line {
-            content = ShapeContent(geometry: geometry, strokes: [Stroke(paint: .color(defaultStroke), width: 4, cap: .round)])
+            content = ShapeContent(geometry: geometry, strokes: [lineStroke])
         } else {
             content = ShapeContent(geometry: geometry, fills: [Fill(paint: .color(defaultFill))])
         }

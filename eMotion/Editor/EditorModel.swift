@@ -157,12 +157,8 @@ enum Tool: String, CaseIterable {
     static let shapes: [Tool] = [.rectangle, .ellipse, .line, .polygon, .star]
     var isShape: Bool { Self.shapes.contains(self) }
 
-    /// The pen comes after milestone 8. Until then its button shows as
-    /// disabled rather than doing nothing when picked.
-    var isAvailable: Bool { self != .pen }
-
     /// The tool a letter picks, for the canvas's keyboard.
     static func forKey(_ key: String) -> Tool? {
-        allCases.first { $0.key.lowercased() == key.lowercased() && $0.isAvailable }
+        allCases.first { $0.key.lowercased() == key.lowercased() }
     }
 }

@@ -41,9 +41,9 @@ final class CanvasNSView: NSView {
     private var compositionSize: Size2?
 
     private(set) var scene: ResolvedScene?
-    private var project: Project?
+    private(set) var project: Project?
     private(set) var selection: [UUID] = []
-    private var tool: Tool = .select
+    private(set) var tool: Tool = .select
     /// Animate mode: the canvas shows the playhead's moment and only selects
     /// and moves. Resizing, turning and the anchor are design edits.
     private(set) var animating = false
@@ -54,18 +54,20 @@ final class CanvasNSView: NSView {
     private var ownHover: UUID?
     /// Space is held: a drag pans rather than acting on layers.
     private var spaceHeld = false
-    private var drag: CanvasDrag?
+    var drag: CanvasDrag?
     /// What the drag in progress has snapped to, for the guides.
-    private var snap: Snapping.Result?
+    var snap: Snapping.Result?
     /// What a drag can snap to, gathered as it begins: the boxes of every
     /// layer not being dragged.
-    private var snapTargets: [Box] = []
+    var snapTargets: [Box] = []
     /// A move's boxes when it began, all together.
     private var snapBox: Box?
     /// Typing into a text layer on the canvas, when it is happening.
     var textSession: TextSession?
     /// Blinks the caret while typing.
     var caretTimer: Timer?
+    /// A shape's points shown for editing, or the pen drawing, when happening.
+    var pathSession: PathSession?
 
     /// Ticks with the display while playing, so playback advances in step
     /// with what is shown.
@@ -153,6 +155,7 @@ final class CanvasNSView: NSView {
         if let id = textSession?.layerID, animating || !selection.contains(id) || scene.layer(id) == nil {
             endTextEditing()
         }
+        validatePathSession()
         layoutWorld()
     }
 
@@ -294,7 +297,9 @@ final class CanvasNSView: NSView {
         guard let scene, let controller else { return }
         var outlines: [[CGPoint]] = []
         let endBox = actionEndBox()
-        for id in selection {
+        // While a shape's points are showing, they stand in for its box.
+        let editingPoints = isEditingPoints ? pathSession?.layerID : nil
+        for id in selection where id != editingPoints {
             if let endBox, id == controller.canvasAction?.targetLayerID {
                 outlines.append(endBox.box)
                 continue
@@ -310,7 +315,7 @@ final class CanvasNSView: NSView {
         // to set its end.
         if let endBox, actionKindOnCanvas != .rotate {
             handles = CanvasHandles.positions(for: endBox.box, isLine: endBox.isLine)
-        } else if selection.count == 1, let id = selection.first, !controller.isLocked(id), !animating,
+        } else if selection.count == 1, let id = selection.first, id != editingPoints, !controller.isLocked(id), !animating,
            let corners = scene.worldCorners(of: id), let layer = scene.layer(id),
            let world = scene.worldTransform(of: id) {
             let view = corners.map(compositionToView)
@@ -328,7 +333,7 @@ final class CanvasNSView: NSView {
         // A selected layer under the pointer gets the wash too, inside its
         // selection outline, so every layer answers the pointer.
         var hover: [CGPoint]?
-        if let hovered, drag == nil, let corners = scene.worldCorners(of: hovered) {
+        if let hovered, drag == nil, hovered != editingPoints, let corners = scene.worldCorners(of: hovered) {
             hover = corners.map(compositionToView)
         }
 
@@ -344,6 +349,7 @@ final class CanvasNSView: NSView {
         let marks = snapMarks()
         overlay.updateSnap(lines: marks.lines, gaps: marks.gaps)
         updateTextOverlay()
+        overlay.updatePath(pathSession == nil ? nil : pathMarks())
     }
 
     /// The kind of the action the canvas is editing, in Animate.
@@ -491,6 +497,12 @@ final class CanvasNSView: NSView {
         // it ends the typing and carries on as a click.
         if textMouseDown(event, at: point) { return }
 
+        // The pen, and a shape's points while they show, come before layers.
+        if pathMouseDown(event, at: point, viewPoint: viewPoint) {
+            redrawOverlay()
+            return
+        }
+
         if tool.isShape, !animating {
             snapTargets = targets(excluding: [])
             drag = .create(CanvasDrag.Create(tool: tool, start: snapped(point, event), layerID: nil))
@@ -555,6 +567,10 @@ final class CanvasNSView: NSView {
                       !controller.isLocked(hit) {
                 // And on text, it starts typing where it was clicked.
                 return beginTextEditing(hit, selectAll: false, at: point)
+            } else if event.clickCount == 2, !animating, let layer = controller.project.layer(withID: hit),
+                      PathEditing.canEditPoints(layer), !controller.isLocked(hit) {
+                // And on a shape, it shows its points.
+                return beginPathEditing(hit)
             }
             var moving = controller.topmost(controller.selectedLayers).filter { !controller.isLocked($0.id) }
             let sources = Set(moving.map(\.id))
@@ -685,6 +701,9 @@ final class CanvasNSView: NSView {
             if let edited = editedAction(edit, pointer: point, shift: shift) {
                 controller.update(.updateActions([edited]))
             }
+
+        case .path(let edit):
+            pathMouseDragged(edit, point: point, viewPoint: viewPoint, event: event)
         }
         redrawOverlay()
     }
@@ -722,6 +741,8 @@ final class CanvasNSView: NSView {
             controller.end()
         case .marquee:
             break
+        case .path(let edit):
+            pathMouseUp(edit, event: event)
         case .pan:
             (spaceHeld ? Cursors.hand : Cursors.arrow).set()
         }
@@ -731,18 +752,18 @@ final class CanvasNSView: NSView {
     // MARK: Snapping
 
     /// How near counts as lined up: a few screen points at any zoom.
-    private var snapReach: Double { 6 / zoom }
+    var snapReach: Double { 6 / zoom }
 
-    private var frameBox: Box { Box(origin: .zero, size: scene?.size ?? Size2(0, 0)) }
+    var frameBox: Box { Box(origin: .zero, size: scene?.size ?? Size2(0, 0)) }
 
     /// Snapping is on, and Command is not held to set it aside for a moment.
-    private func snapping(_ event: NSEvent) -> Bool {
+    func snapping(_ event: NSEvent) -> Bool {
         controller?.editor.snaps == true && !event.modifierFlags.contains(.command)
     }
 
     /// The boxes of every drawn layer except those in `moving` and anything
     /// inside them. Groups are left out: their layers are there instead.
-    private func targets(excluding moving: Set<UUID>) -> [Box] {
+    func targets(excluding moving: Set<UUID>) -> [Box] {
         guard let scene, let project else { return [] }
         snap = nil
         return scene.layers.compactMap { layer in
@@ -753,7 +774,7 @@ final class CanvasNSView: NSView {
     }
 
     /// A point being drawn to, pulled onto a guide when one is near.
-    private func snapped(_ point: Vec2, _ event: NSEvent, shaping box: Box? = nil) -> Vec2 {
+    func snapped(_ point: Vec2, _ event: NSEvent, shaping box: Box? = nil) -> Vec2 {
         snap = nil
         guard snapping(event) else { return point }
         let result = Snapping.point(point, box: box ?? Box(around: [point])!, targets: snapTargets, frame: frameBox,
@@ -972,7 +993,8 @@ final class CanvasNSView: NSView {
 
     override func resetCursorRects() {
         discardCursorRects()
-        addCursorRect(bounds, cursor: spaceHeld ? Cursors.hand : tool == .text ? .iBeam : tool.isShape ? Cursors.crosshair : Cursors.arrow)
+        addCursorRect(bounds, cursor: spaceHeld ? Cursors.hand : tool == .text ? .iBeam : tool.isShape ? Cursors.crosshair
+                                      : tool == .pen && !animating ? Cursors.pen : Cursors.arrow)
         // While typing, the text being edited takes the I-beam.
         if let id = textSession?.layerID, let corners = scene?.worldCorners(of: id) {
             let points = corners.map(compositionToView)
@@ -991,7 +1013,9 @@ final class CanvasNSView: NSView {
             setHover(nil)
             return
         }
-        guard !tool.isShape, tool != .text, !spaceHeld else { return }
+        guard !spaceHeld else { return }
+        if pathMouseMoved(viewPoint, event: event) { return }
+        guard !tool.isShape, tool != .text else { return }
         setHover(layer(at: viewToComposition(viewPoint), deep: event.modifierFlags.contains(.command)))
         updateCursor(at: viewPoint)
     }
@@ -1000,7 +1024,7 @@ final class CanvasNSView: NSView {
         setHover(nil)
     }
 
-    private func setHover(_ id: UUID?) {
+    func setHover(_ id: UUID?) {
         guard let editor = controller?.editor, ownHover != id else { return }
         let previous = ownHover
         ownHover = id
@@ -1096,6 +1120,7 @@ final class CanvasNSView: NSView {
     override func keyDown(with event: NSEvent) {
         guard let controller else { return super.keyDown(with: event) }
         if textKeyDown(event) { return }
+        if pathKeyDown(event) { return }
         // Return on one selected text layer starts typing into it.
         if event.keyCode == 36, !animating, selection.count == 1, let id = selection.first,
            controller.project.layer(withID: id)?.isText == true, !controller.isLocked(id) {

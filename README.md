@@ -38,6 +38,7 @@ Name.emotion/
 |---|---|
 | V | Select |
 | R, O, L, Y, S | Rectangle, ellipse, line, polygon, star |
+| P | Pen (see Paths below) |
 | Drag | Draw. Shift: square, circle or 45° line. Option: from the centre. A click makes a standard size. |
 | Click, Shift-click, drag on empty canvas | Select, add to the selection, marquee |
 | ⌘-click, double-click | Reach a layer inside a group |
@@ -59,6 +60,14 @@ Name.emotion/
 | ⌘/ | Every shortcut, on one card |
 
 One layer aligns with the composition; several align with each other. The same commands are in the Arrange menu and in a row of buttons at the top of the inspector.
+
+## Paths
+
+Pick the Pen (P) and click to place points; click and drag to pull out curve handles as you place one (Option pulls only the handle leading on, Shift keeps to 45°). Click the first point to close the shape, which then takes the usual grey fill; Escape or Return leaves it open, drawn as a line. With the pen, clicking the end of an open path carries it on, and clicking a shape's outline adds a point there. A path finished with only one point is taken away, since it draws nothing.
+
+Double-click a shape, or press Return with it selected, to edit its points, as in Figma: click, Shift-click or drag a box to pick points; drag points, handles or a segment (snapping to guides and to the other points); ⌘-click a point to switch it between sharp and smooth, ⌘-drag to pull out new handles, Option-drag a handle to move it alone; arrows nudge; ⌫ deletes points and joins the gap. Escape, Return or a click away finishes. Rectangles, ellipses, lines, polygons and stars become paths at the first change. A path fills its layer's box, so resizing stretches it.
+
+In Animate, the Path action (under Shape) morphs a path to a new shape. Select its bar and the end shape's points show on the canvas; drag them, their handles or segments to set it, and the playhead goes to the end to show it. The end keeps the design's points, so they can be moved but not added or taken away; the inspector's × puts the end back to the start.
 
 ## Text
 
@@ -148,4 +157,4 @@ Export Current Frame… (Shift-⌘E) saves a PNG of what the canvas shows: the f
 
 ## Status
 
-Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then all 8 redesign milestones and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, MP4, MOV and PNG export, Style and Blur actions, text layers with Text and Shape actions, and pictures, video and sound with Play bars. After those: masks; snapping and alignment; hover, cursors and timeline polish; exporting part of the scene; the ⌘/ shortcuts card; presets made of actions; and a performance pass. Everything from the original brief that is still wanted is built; the pen tool, animatable volume and custom export sizes were dropped. eMotion is for internal use only, never the App Store. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.
+Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then all 8 redesign milestones and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, MP4, MOV and PNG export, Style and Blur actions, text layers with Text and Shape actions, and pictures, video and sound with Play bars. After those: masks; snapping and alignment; hover, cursors and timeline polish; exporting part of the scene; the ⌘/ shortcuts card; presets made of actions; and a performance pass. Then the pen tool with point editing and the Path action. Animatable volume and a custom export size, brought back on 27 September 2026, are next. eMotion is for internal use only, never the App Store. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.

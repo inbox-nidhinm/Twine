@@ -37,6 +37,8 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `savepanel PATH`, `waitexport` | Fills and closes a save panel, waits for an export |
 | `import PATH`, `save` | Imports media, saves |
 | `actions`, `spec`, `text` | Logs every action, the selected actions' specs, the selected text layer |
+| `path`, `path xy` | Logs the selected shape's points, style and box, and whether its points are showing or being drawn; `xy` adds each point's and handle's place in the window, to click on |
+| `add KIND` | Adds an action by its kind's name (`move`, `path`, `volume`...), as the Add Action menu does |
 | `cursor` | Logs which of the app's pointers is current |
 | `perfplay S`, `perfscrub N`, `perfdrag N`, `perfdragat X Y N`, `perfselect N` | Timings (`PERF` lines): playback frame rate, seek, canvas drag, drag at a point, select |
 | `clicksample X Y`, `addsample move` | Samples the playhead after a click, or after adding an action |

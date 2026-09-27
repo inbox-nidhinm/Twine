@@ -36,6 +36,7 @@ public enum ActionFactory {
             kinds += [.shadow, .layerBlur, .backgroundBlur]
             if case .ellipse = shape.geometry { kinds.append(.arc) }
             if case .star = shape.geometry { kinds.append(.star) }
+            if case .path = shape.geometry { kinds.append(.path) }
             return kinds
         case .text:
             // A text box is always the size of its words, so it has nothing
@@ -132,6 +133,11 @@ public enum ActionFactory {
             var star = state.star ?? StarShape(points: 5, innerRadius: 0.4)
             star.points += 3
             spec = .star(StarAction(end: star))
+        case .path:
+            // Sharp corners rounded off, or round points made sharp, for a
+            // shape plain to see; the canvas then sets it point by point.
+            let path = state.path ?? PathEditing.path(of: layer) ?? BezierPath()
+            spec = .path(PathAction(end: PathEditing.reshapedForNewAction(path)))
         case .play:
             spec = .play(PlayAction(trimStart: 0))
             playing = true

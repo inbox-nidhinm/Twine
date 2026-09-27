@@ -1,6 +1,7 @@
 import AppKit
 import MotionModel
 import MotionEditing
+import MotionEvaluation
 
 // Test driver for the separate test copy of the app. Installed into the app
 // by Tools/SelfTest/install-hook.sh and taken out again by remove-hook.sh;
@@ -165,6 +166,9 @@ enum SelfTest {
                         log("SAMPLE \(k * 40)ms time=\(String(format: "%.3f", controller.editor.time))")
                     }
                 }
+            case "add":
+                // Adds an action of a kind, by name, as the Add Action menu does.
+                if let kind = ActionKind(rawValue: parts[1]) { controller.addAction(kind) } else { log("unknown kind \(parts[1])") }
             case "addsample":
                 controller.addAction(parts[1] == "rotate" ? .rotate : .move)
                 for k in 0..<8 {
@@ -343,7 +347,8 @@ enum SelfTest {
                 let names: [(String, NSCursor)] = [("arrow", Cursors.arrow), ("crosshair", Cursors.crosshair), ("hand", Cursors.hand),
                     ("grabbed", Cursors.handGrabbed), ("h", Cursors.resizeHorizontal), ("v", Cursors.resizeVertical),
                     ("nwse", Cursors.resizeNWSE), ("nesw", Cursors.resizeNESW), ("rTL", Cursors.rotateTopLeft),
-                    ("rTR", Cursors.rotateTopRight), ("rBL", Cursors.rotateBottomLeft), ("rBR", Cursors.rotateBottomRight)]
+                    ("rTR", Cursors.rotateTopRight), ("rBL", Cursors.rotateBottomLeft), ("rBR", Cursors.rotateBottomRight),
+                    ("pen", Cursors.pen), ("penAdd", Cursors.penAdd), ("penMove", Cursors.penMove), ("penConnect", Cursors.penConnect)]
                 log("CURSOR " + (names.first { $0.1 === NSCursor.current }?.0 ?? "other") + " size=\(Cursors.arrow.image.size)")
             case "spacedown":
                 let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
@@ -396,6 +401,43 @@ enum SelfTest {
                     let c = controller.canvas
                     log("TEXT \(t.text.debugDescription) name=\(controller.selectedLayers.first!.name) editing=\(c?.isEditingText ?? false) sel=\(c?.textSession.map { "\($0.text.selection)" } ?? "-") undo=\(controller.store.undoManager.undoActionName)")
                 } else { log("TEXT none") }
+            case "path":
+                // The selected shape's points and style, and what the canvas
+                // is doing with them; with "xy", each point's place in the
+                // window, in the steps' coordinates, to click on.
+                guard let layer = controller.selectedLayers.first, case .shape(let shape) = layer.content else { log("PATH none"); break }
+                let c = controller.canvas
+                let session = c?.pathSession
+                func f(_ v: Double) -> String { String(format: "%.1f", v) }
+                var line = "PATH \(layer.name) "
+                if case .path(let p) = shape.geometry {
+                    line += p.subpaths.map { sub in
+                        (sub.isClosed ? "closed[" : "open[") + sub.points.map { pt in
+                            "\(f(pt.position.x)),\(f(pt.position.y))" + (pt.inHandle == .zero && pt.outHandle == .zero ? ""
+                                : " i\(f(pt.inHandle.x)),\(f(pt.inHandle.y)) o\(f(pt.outHandle.x)),\(f(pt.outHandle.y))")
+                        }.joined(separator: "; ") + "]"
+                    }.joined(separator: " ")
+                } else {
+                    line += "geometry=\(shape.geometry)".replacingOccurrences(of: "MotionModel.", with: "")
+                }
+                line += " size=\(f(layer.size.width)),\(f(layer.size.height)) pos=\(f(layer.transform.position.x)),\(f(layer.transform.position.y))"
+                line += " anchor=\(f(layer.transform.anchor.x)),\(f(layer.transform.anchor.y)) fills=\(shape.fills.count) strokes=\(shape.strokes.count)"
+                line += " editing=\(c?.isEditingPoints ?? false) drawing=\(session?.drawingFrom.map { "\($0.subpath).\($0.index)" } ?? "-")"
+                line += " picked=\(session?.selected.sorted().map { "\($0.subpath).\($0.index)" } ?? []) undo=\(controller.store.undoManager.undoActionName)"
+                if parts.count > 1, parts[1] == "xy", let c, let s = session, let path = c.sessionPath(s), let t = c.pathTransform(s) {
+                    let h = window.contentView!.bounds.height
+                    func xy(_ p: Vec2) -> String {
+                        let v = c.convert(c.compositionToView(t.apply(p)), to: nil)
+                        return "\(Int(v.x.rounded())),\(Int((h - v.y).rounded()))"
+                    }
+                    line += " xy=" + PathEditing.refs(in: path).map { ref -> String in
+                        let p = PathEditing.point(ref, in: path)!
+                        return "\(ref.subpath).\(ref.index)@\(xy(p.position))"
+                            + (p.inHandle == .zero ? "" : " in@\(xy(p.position + p.inHandle))")
+                            + (p.outHandle == .zero ? "" : " out@\(xy(p.position + p.outHandle))")
+                    }.joined(separator: " ")
+                }
+                log(line)
             case "import":
                 controller.importMedia(parts.dropFirst().map { URL(fileURLWithPath: $0) })
             case "save":

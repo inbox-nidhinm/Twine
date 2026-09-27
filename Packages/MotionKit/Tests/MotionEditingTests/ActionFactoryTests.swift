@@ -32,7 +32,8 @@ import MotionEvaluation
         let ellipse = LayerFactory.shape(.ellipse, in: Box(minX: 0, minY: 0, maxX: 100, maxY: 100), name: "E")
         let star = LayerFactory.shape(.star, in: Box(minX: 0, minY: 0, maxX: 100, maxY: 100), name: "S")
         let video = Layer(name: "V", content: .video(VideoContent(mediaID: UUID())), size: Size2(10, 10), position: .zero)
-        let layers = [stroked, text, ellipse, star, video]
+        let pen = PathEditing.reshaped(star, to: PathEditing.path(of: star)!).layer
+        let layers = [stroked, text, ellipse, star, video, pen]
         // Between them, every kind is offered somewhere.
         #expect(Set(layers.flatMap { ActionFactory.kinds(for: $0) }) == Set(ActionKind.allCases))
         for layer in layers {

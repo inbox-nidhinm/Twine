@@ -7,8 +7,8 @@ import ObjectiveC
 ///
 /// The arrow replaces the system's everywhere in the app: panels, timeline,
 /// home and canvas alike, so the pointer never changes style as it moves.
-/// Text fields keep the I-beam. The resize, turn and hand pointers are used
-/// wherever those things happen.
+/// Text fields keep the I-beam. The resize, turn, hand and pen pointers are
+/// used wherever those things happen.
 enum Cursors {
     /// Makes the app's arrow the one every part of the app gets when it asks
     /// for the arrow, SwiftUI and AppKit included, by swapping what
@@ -38,6 +38,14 @@ enum Cursors {
     static let rotateTopRight = make("cursor-rotate-top-right", fallback: .crosshair)
     static let rotateBottomLeft = make("cursor-rotate-bottom-left", fallback: .crosshair)
     static let rotateBottomRight = make("cursor-rotate-bottom-right", fallback: .crosshair)
+    /// The pen, with its nib at the hot spot: plain for placing a point, and
+    /// with a mark for adding a point on a segment, moving a point, and
+    /// joining onto an end.
+    static let pen = make("cursor-pen", hotSpot: penTip, fallback: .crosshair)
+    static let penAdd = make("cursor-pen-add", hotSpot: penTip, fallback: .crosshair)
+    static let penMove = make("cursor-pen-move", hotSpot: penTip, fallback: .crosshair)
+    static let penConnect = make("cursor-pen-connect", hotSpot: penTip, fallback: .crosshair)
+    private static let penTip = CGPoint(x: 11, y: 10)
 
     /// The resize pointer for a handle lying in `direction` from the middle
     /// of its box, on screen, so a turned layer gets arrows that follow it.

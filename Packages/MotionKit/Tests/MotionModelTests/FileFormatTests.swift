@@ -84,6 +84,11 @@ func kitchenSinkProject() -> Project {
         Action(target: group.id, start: 1, duration: 1, spec: .layerBlur(LayerBlurAction(initial: 2, end: 10))),
         Action(target: text.id, start: 1, duration: 1, spec: .letterSpacing(LetterSpacingAction(initial: 0, end: 4))),
         Action(target: text.id, start: 1, duration: 1, spec: .lineHeight(LineHeightAction(end: 90))),
+        Action(target: rect.id, start: 1, duration: 1, spec: .path(PathAction(
+            initial: BezierPath(subpaths: [Subpath(points: [PathPoint(Vec2(0, 0)), PathPoint(Vec2(5, 5), outHandle: Vec2(1, 0))],
+                                                   isClosed: false)]),
+            end: BezierPath(subpaths: [Subpath(points: [PathPoint(Vec2(0, 0), inHandle: Vec2(-2, 1)), PathPoint(Vec2(9, 3))],
+                                               isClosed: true)])))),
         Action(target: text.id, start: 1, duration: 1, spec: .counter(CounterAction(from: 1, to: 9, step: 2, transition: .slide))),
         Action(target: text.id, start: 1, duration: 1, spec: .changeText(ChangeTextAction(
             text: "Bye", transitionOut: .scale, transitionIn: .none, overlaps: true))),

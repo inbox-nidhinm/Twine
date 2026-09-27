@@ -203,9 +203,14 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, at t: Dou
 }
 
 /// The shape with its actions applied: the first fill's paint, the first
-/// stroke's width, paint and trim, and a rectangle's corners.
+/// stroke's width, paint and trim, a rectangle's corners, and a pen path's
+/// points. A pen path fills the layer's box as every other shape does: its
+/// designed points' bounds are stretched onto the box, and a Path action's
+/// points go the same way, so resizing stretches either.
 private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState) -> ResolvedShape {
     var shape = shape
+    var designBounds: Box?
+    if case .path(let p) = shape.geometry { designBounds = p.bounds }
     if let fill = state.fill, !shape.fills.isEmpty { shape.fills[0].paint = fill }
     if !shape.strokes.isEmpty {
         if let look = state.stroke {
@@ -222,16 +227,13 @@ private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState) -> R
     if let star = state.star, case .star = shape.geometry {
         shape.geometry = .star(points: star.points, innerRadius: star.innerRadius, cornerRadius: star.cornerRadius)
     }
+    if let points = state.path, case .path = shape.geometry { shape.geometry = .path(points) }
 
     let path: BezierPath
-    switch shape.geometry {
-    case .rectangle(let radii): path = ShapePaths.rectangle(size, radii: radii)
-    case .ellipse(let arc): path = ShapePaths.ellipse(size, arc: arc)
-    case .line: path = ShapePaths.line(size)
-    case .polygon(let sides): path = ShapePaths.polygon(size, sides: sides)
-    case .star(let points, let inner, let corner):
-        path = ShapePaths.star(size, points: points, innerRadius: inner, cornerRadius: corner)
-    case .path(let p): path = p
+    if case .path(let p) = shape.geometry {
+        path = p.fitted(from: designBounds, to: size)
+    } else {
+        path = shape.geometry.bezierPath(size: size)
     }
     let closed = shape.geometry.isClosed
 
@@ -260,5 +262,80 @@ private func resolve(_ paint: Paint, size: Size2) -> ResolvedPaint {
         let center = px(g.start), edge = px(g.end)
         return .radial(stops: g.stops.sorted { $0.position < $1.position },
                        center: center, radius: hypot(edge.x - center.x, edge.y - center.y))
+    }
+}
+
+extension ShapeGeometry {
+    /// The shape as a bezier path filling a box of `size`, in the layer's own
+    /// pixel space. A pen path is its own points, whatever the size.
+    public func bezierPath(size: Size2) -> BezierPath {
+        switch self {
+        case .rectangle(let radii): return ShapePaths.rectangle(size, radii: radii)
+        case .ellipse(let arc): return ShapePaths.ellipse(size, arc: arc)
+        case .line: return ShapePaths.line(size)
+        case .polygon(let sides): return ShapePaths.polygon(size, sides: sides)
+        case .star(let points, let inner, let corner):
+            return ShapePaths.star(size, points: points, innerRadius: inner, cornerRadius: corner)
+        case .path(let p): return p.fitted(from: p.bounds, to: size)
+        }
+    }
+}
+
+extension BezierPath {
+    /// The points carried from `box` onto a box of `size` at the origin,
+    /// stretching on each axis: how a pen path fills its layer. An axis the
+    /// box has no extent on is only moved. Kept as it is when it already
+    /// fits, which an edited path always does.
+    public func fitted(from box: Box?, to size: Size2) -> BezierPath {
+        guard let box else { return self }
+        let sx = box.width > 1e-9 ? size.width / box.width : 1
+        let sy = box.height > 1e-9 ? size.height / box.height : 1
+        let ox = box.minX, oy = box.minY
+        guard abs(sx - 1) > 1e-12 || abs(sy - 1) > 1e-12 || ox != 0 || oy != 0 else { return self }
+        func point(_ v: Vec2) -> Vec2 { Vec2((v.x - ox) * sx, (v.y - oy) * sy) }
+        func vector(_ v: Vec2) -> Vec2 { Vec2(v.x * sx, v.y * sy) }
+        return BezierPath(subpaths: subpaths.map { sub in
+            Subpath(points: sub.points.map { PathPoint(point($0.position), inHandle: vector($0.inHandle), outHandle: vector($0.outHandle)) },
+                    isClosed: sub.isClosed)
+        })
+    }
+
+    /// The box the curves themselves fill, not their handles, as Figma
+    /// measures a vector. Nil for a path with no points.
+    public var bounds: Box? {
+        var box: Box?
+        func add(_ p: Vec2) { box = box?.including(p) ?? Box(minX: p.x, minY: p.y, maxX: p.x, maxY: p.y) }
+        for sub in subpaths {
+            sub.points.forEach { add($0.position) }
+            guard sub.points.count > 1 else { continue }
+            let count = sub.isClosed ? sub.points.count : sub.points.count - 1
+            for i in 0..<count {
+                let a = sub.points[i], b = sub.points[(i + 1) % sub.points.count]
+                guard a.outHandle != .zero || b.inHandle != .zero else { continue }
+                let p0 = a.position, c1 = a.position + a.outHandle, c2 = b.position + b.inHandle, p1 = b.position
+                for t in Self.turns(p0.x, c1.x, c2.x, p1.x) + Self.turns(p0.y, c1.y, c2.y, p1.y) {
+                    let q = 1 - t
+                    let wa = q * q * q, wb = 3 * q * q * t, wc = 3 * q * t * t, wd = t * t * t
+                    add(Vec2(wa * p0.x + wb * c1.x + wc * c2.x + wd * p1.x, wa * p0.y + wb * c1.y + wc * c2.y + wd * p1.y))
+                }
+            }
+        }
+        return box
+    }
+
+    /// Where a cubic bezier on one axis turns, strictly between its ends.
+    private static func turns(_ a: Double, _ b: Double, _ c: Double, _ d: Double) -> [Double] {
+        // The derivative, as qa·t² + qb·t + qc.
+        let qa = 3 * (-a + 3 * b - 3 * c + d), qb = 6 * (a - 2 * b + c), qc = 3 * (b - a)
+        let roots: [Double]
+        if abs(qa) < 1e-12 {
+            roots = abs(qb) < 1e-12 ? [] : [-qc / qb]
+        } else {
+            let disc = qb * qb - 4 * qa * qc
+            guard disc >= 0 else { return [] }
+            let r = sqrt(disc)
+            roots = [(-qb + r) / (2 * qa), (-qb - r) / (2 * qa)]
+        }
+        return roots.filter { $0 > 0 && $0 < 1 }
     }
 }

@@ -71,8 +71,17 @@ struct ShortcutsCard: View {
                 s("Select", "V"),
                 s("Rectangle, ellipse, line", "R", "O", "L"),
                 s("Polygon, star", "Y", "S"),
+                s("Pen", "P"),
                 s("Text", "T"),
                 s("Type into a text layer", "Return"),
+            ]),
+            Group(title: "Points", items: [
+                s("Edit a shape's points", "Return"),
+                s("Finish a path, stop editing", "Esc"),
+                s("Sharp or smooth point", "⌘", "click"),
+                s("Pull out handles", "⌘", "drag"),
+                s("Move one handle alone", "⌥", "drag"),
+                s("Delete points", "⌫"),
             ]),
             Group(title: "View", items: [
                 s("Pan", "Space", "drag"),

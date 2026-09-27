@@ -190,3 +190,39 @@ private func gradient(_ colors: [RGBA], radial: Bool = false) -> Paint {
         }
     }
 }
+
+@Suite struct PathActionTests {
+    private let triangle = BezierPath(subpaths: [Subpath(points: [PathPoint(Vec2(0, 0)), PathPoint(Vec2(100, 0)),
+                                                                  PathPoint(Vec2(0, 100))], isClosed: true)])
+
+    private func pen() -> Layer {
+        Layer(name: "Pen", content: .shape(ShapeContent(geometry: .path(triangle), fills: [Fill(paint: .solid(.white))])),
+              size: Size2(100, 100), position: Vec2(500, 500))
+    }
+
+    @Test func aPathMorphsPointByPoint() {
+        let layer = pen()
+        var end = triangle
+        end.subpaths[0].points[1].position = Vec2(200, 0)
+        let a = action(layer, .path(PathAction(end: end)))
+        #expect(shape(resolved(layer, [a], at: 0))?.path == triangle)
+        #expect(shape(resolved(layer, [a], at: 2))?.path.subpaths[0].points[1].position == Vec2(150, 0))
+        #expect(shape(resolved(layer, [a], at: 5))?.path == end)
+    }
+
+    @Test func aPathWithOtherPointsHoldsUntilTheEnd() {
+        let layer = pen()
+        let square = BezierPath(subpaths: [Subpath(points: [Vec2(0, 0), Vec2(1, 0), Vec2(1, 1), Vec2(0, 1)].map { PathPoint($0) },
+                                                   isClosed: true)])
+        let a = action(layer, .path(PathAction(end: square)))
+        #expect(shape(resolved(layer, [a], at: 2))?.path == triangle)
+        #expect(shape(resolved(layer, [a], at: 3))?.path == square)
+    }
+
+    @Test func resizeStretchesAPenPath() {
+        let layer = pen()
+        let a = action(layer, .resize(ResizeAction(end: Size2(200, 50))))
+        let p = shape(resolved(layer, [a], at: 5))?.path
+        #expect(p?.subpaths[0].points.map(\.position) == [Vec2(0, 0), Vec2(200, 0), Vec2(0, 50)])
+    }
+}

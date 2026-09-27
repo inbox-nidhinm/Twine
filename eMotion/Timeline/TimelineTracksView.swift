@@ -722,6 +722,7 @@ extension ActionKind {
         case .changeText: return .changeText
         case .arc: return .arc
         case .star: return .star
+        case .path: return .pen
         case .play: return .play
         }
     }

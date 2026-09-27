@@ -70,6 +70,7 @@ public enum ActionSpec: Sendable, Equatable {
     case changeText(ChangeTextAction)
     case arc(ArcAction)
     case star(StarAction)
+    case path(PathAction)
     case play(PlayAction)
 
     public var kind: ActionKind {
@@ -93,6 +94,7 @@ public enum ActionSpec: Sendable, Equatable {
         case .changeText: return .changeText
         case .arc: return .arc
         case .star: return .star
+        case .path: return .path
         case .play: return .play
         }
     }
@@ -103,7 +105,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     case color, stroke, trim, cornerRadius, shadow
     case layerBlur, backgroundBlur
     case letterSpacing, lineHeight, counter, changeText
-    case arc, star
+    case arc, star, path
     case play
 
     public var defaultName: String {
@@ -127,6 +129,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .changeText: return "Change Text"
         case .arc: return "Arc"
         case .star: return "Star"
+        case .path: return "Path"
         case .play: return "Play"
         }
     }
@@ -138,7 +141,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .color, .stroke, .trim, .cornerRadius, .shadow: return .style
         case .layerBlur, .backgroundBlur: return .blur
         case .letterSpacing, .lineHeight, .counter, .changeText: return .text
-        case .arc, .star: return .shape
+        case .arc, .star, .path: return .shape
         case .play: return .media
         }
     }
@@ -465,6 +468,19 @@ public struct StarAction: Codable, Sendable, Equatable {
     }
 }
 
+/// A pen path's shape: its points and handles, in the layer's own pixel
+/// space. It blends point by point, so the end keeps the design's points,
+/// only moved; a path with other points holds rather than morphing.
+public struct PathAction: Codable, Sendable, Equatable {
+    public var initial: BezierPath?
+    public var end: BezierPath
+
+    public init(initial: BezierPath? = nil, end: BezierPath) {
+        self.initial = initial
+        self.end = end
+    }
+}
+
 /// Plays a video or audio layer's media: from `trimStart` seconds into the
 /// file, for the action's duration, starting at the action's start. Before
 /// it, a video shows the frame it will start on; after it, the frame it
@@ -481,7 +497,7 @@ extension ActionSpec: Codable {
     private enum CodingKeys: String, CodingKey {
         case type, move, scale, rotate, opacity, resize, visibility
         case color, stroke, trim, cornerRadius, shadow, layerBlur, backgroundBlur
-        case letterSpacing, lineHeight, counter, changeText, arc, star, play
+        case letterSpacing, lineHeight, counter, changeText, arc, star, path, play
     }
 
     public init(from decoder: Decoder) throws {
@@ -506,6 +522,7 @@ extension ActionSpec: Codable {
         case .changeText: self = .changeText(try c.decode(ChangeTextAction.self, forKey: .changeText))
         case .arc: self = .arc(try c.decode(ArcAction.self, forKey: .arc))
         case .star: self = .star(try c.decode(StarAction.self, forKey: .star))
+        case .path: self = .path(try c.decode(PathAction.self, forKey: .path))
         case .play: self = .play(try c.decode(PlayAction.self, forKey: .play))
         }
     }
@@ -533,6 +550,7 @@ extension ActionSpec: Codable {
         case .changeText(let v): try c.encode(v, forKey: .changeText)
         case .arc(let v): try c.encode(v, forKey: .arc)
         case .star(let v): try c.encode(v, forKey: .star)
+        case .path(let v): try c.encode(v, forKey: .path)
         case .play(let v): try c.encode(v, forKey: .play)
         }
     }

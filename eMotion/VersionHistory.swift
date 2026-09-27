@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "Pen tool and point editing", changes: [
+            "The Pen (P) is back in the toolbar. Click to place points, drag to pull out curve handles, and click the first point to close the shape; Escape or Return leaves it open, as a line. The pointer shows when a click will add a point to a line, move a point, or join onto an end.",
+            "Double-click a shape, or press Return, to edit its points as in Figma: pick them by clicking or with a box, drag points, handles or segments, ⌘-click to make a point sharp or smooth, ⌘-drag to pull out handles, Option-drag to move one handle alone, and Delete to take points out. Rectangles, ellipses, lines, polygons and stars turn into paths when their points change.",
+            "A new Path action, under Shape in Animate, morphs a path into a new shape: select it and drag the end shape's points on the canvas.",
+            "Resizing a path stretches it, in Design and with a Resize action.",
+        ]),
         .init(date: "26 September 2026", title: "Pointers on the timeline", changes: [
             "The timeline's top edge shows the up-and-down arrows, and the scene's end on the ruler the sideways arrows, reliably now: the window's SwiftUI had been putting its arrow back over them.",
             "The playhead's pill is a handle: the open hand over it, the closed hand while it is held, and it drags from where it was grabbed instead of jumping to the pointer.",

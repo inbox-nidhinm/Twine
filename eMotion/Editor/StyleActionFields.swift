@@ -26,6 +26,7 @@ struct StyleValueFields: View {
         case .changeText(let c): changeText(c)
         case .arc(let a): arc(a)
         case .star(let s): star(s)
+        case .path(let p): path(p)
         case .play(let p): play(p)
         default: EmptyView()
         }
@@ -401,6 +402,23 @@ struct StyleValueFields: View {
         .help("The hole in the middle, as a share of the ellipse")
     }
 
+    /// The end shape is set on the canvas, point by point; here it can go
+    /// back to the shape it starts from.
+    @ViewBuilder private func path(_ v: PathAction) -> some View {
+        let count = v.end.subpaths.reduce(0) { $0 + $1.points.count }
+        LabeledRow(label: "To") {
+            Text(count == 1 ? "1 point" : "\(count) points")
+                .font(ThemeFont.label)
+                .foregroundStyle(Theme.textTertiary)
+            Spacer(minLength: 0)
+            IconButton(icon: .close, help: "Put the end back to the shape it starts from") {
+                editing("Reset Path", Self.path { a, st in
+                    if let from = a.initial ?? st?.path { a.end = from }
+                })
+            }
+        }
+    }
+
     @ViewBuilder private func star(_ v: StarAction) -> some View {
         let from = inherited?.star ?? v.end
         sectionLabel("From") {
@@ -515,6 +533,9 @@ struct StyleValueFields: View {
     }
     private static func star(_ change: @escaping Change<StarAction>) -> (inout Action, LayerState?) -> Void {
         { a, st in if case .star(var v) = a.spec { change(&v, st); a.spec = .star(v) } }
+    }
+    private static func path(_ change: @escaping Change<PathAction>) -> (inout Action, LayerState?) -> Void {
+        { a, st in if case .path(var v) = a.spec { change(&v, st); a.spec = .path(v) } }
     }
 
     /// Applies `change` to every selected action as one undo step.

@@ -7,7 +7,7 @@ import MotionModel
 public enum Channel: String, Hashable, Sendable, CaseIterable {
     case position, scale, rotation, opacity, size, visibility
     case fill, stroke, trim, cornerRadius, shadow, layerBlur, backgroundBlur
-    case letterSpacing, lineHeight, text, arc, star
+    case letterSpacing, lineHeight, text, arc, star, path
     case media
 }
 
@@ -32,6 +32,7 @@ extension ActionKind {
         case .counter, .changeText: return .text
         case .arc: return .arc
         case .star: return .star
+        case .path: return .path
         case .play: return .media
         }
     }
@@ -115,6 +116,8 @@ public struct LayerState: Sendable, Equatable {
     public var arc: EllipseArc?
     /// A star's shape, nil for any other layer.
     public var star: StarShape?
+    /// A pen path's points, nil for any other layer.
+    public var path: BezierPath?
     /// Video and audio only: where in the file the layer is, in seconds.
     public var sourceTime: Double?
 
@@ -135,6 +138,7 @@ public struct LayerState: Sendable, Equatable {
             case .ellipse(let a): arc = a
             case .star(let points, let inner, let corner):
                 star = StarShape(points: points, innerRadius: inner, cornerRadius: corner)
+            case .path(let p): path = p
             default: break
             }
         }
@@ -235,6 +239,7 @@ public struct ActionTracks: Sendable {
         if let shown = state.text { state.text = Self.shownText(design: shown.text, list(.text), at: time) }
         if let arc = state.arc { state.arc = walk(arc, list(.arc).compactMap(Self.arcStep), at: time) }
         if let star = state.star { state.star = walk(star, list(.star).compactMap(Self.starStep), at: time) }
+        if let path = state.path { state.path = walk(path, list(.path).compactMap(Self.pathStep), at: time) }
         if state.sourceTime != nil { state.sourceTime = Self.sourceTime(list(.media), at: time) }
         return state
     }
@@ -322,6 +327,11 @@ public struct ActionTracks: Sendable {
 
     private static func starStep(_ a: Action) -> Step<StarShape>? {
         guard case .star(let v) = a.spec else { return nil }
+        return Step(a, initial: v.initial, target: { _ in v.end })
+    }
+
+    private static func pathStep(_ a: Action) -> Step<BezierPath>? {
+        guard case .path(let v) = a.spec else { return nil }
         return Step(a, initial: v.initial, target: { _ in v.end })
     }
 

@@ -4,7 +4,8 @@ import Theme
 
 /// The selection, drawn over the canvas in view points so its lines stay one
 /// point thick at any zoom: outlines, the resize handles, the anchor, the
-/// hover outline, the marquee, and a selected Move's path with its handles.
+/// hover outline, the marquee, a selected Move's path with its handles, and
+/// the points of a path being drawn or edited.
 ///
 /// Not tied to the main actor, like `CALayer` itself; the canvas only ever
 /// touches it from the main thread.
@@ -32,6 +33,14 @@ nonisolated final class CanvasOverlay: CALayer {
     private let guides = CAShapeLayer()
     private let gapLines = CAShapeLayer()
     private var gapLabels: [CATextLayer] = []
+    /// Editing points: the path's line, the segment following the pen, the
+    /// handles on their arms, and the points, selected ones filled.
+    private let pathLine = CAShapeLayer()
+    private let pathRubber = CAShapeLayer()
+    private let pathArms = CAShapeLayer()
+    private let pathHandles = CAShapeLayer()
+    private let pathPoints = CAShapeLayer()
+    private let pathSelected = CAShapeLayer()
 
     private static let accent = NSColor(Theme.accent).cgColor
 
@@ -51,7 +60,8 @@ nonisolated final class CanvasOverlay: CALayer {
         anchorPoint = .zero
         actions = Self.none
         for l in [textSelection, hoverEdge, hover, outlines, union, marquee, motion, motionArms, anchor, handles, motionStart, motionEnd,
-                  motionHandles, textMarked, caret, guides, gapLines] {
+                  motionHandles, textMarked, caret, guides, gapLines,
+                  pathLine, pathRubber, pathArms, pathHandles, pathPoints, pathSelected] {
             l.anchorPoint = .zero
             l.actions = Self.none
             l.contentsScale = 2
@@ -100,6 +110,23 @@ nonisolated final class CanvasOverlay: CALayer {
         textMarked.strokeColor = Self.accent
         textMarked.lineWidth = 1.5
         caret.fillColor = Self.accent
+        for l in [pathLine, pathRubber] {
+            l.fillColor = nil
+            l.strokeColor = Self.accent
+            l.lineWidth = 1
+        }
+        pathArms.fillColor = nil
+        pathArms.strokeColor = NSColor(Theme.accent).withAlphaComponent(0.7).cgColor
+        pathArms.lineWidth = 1
+        pathHandles.fillColor = CGColor(gray: 1, alpha: 1)
+        pathHandles.strokeColor = Self.accent
+        pathHandles.lineWidth = 1
+        pathPoints.fillColor = CGColor(gray: 1, alpha: 1)
+        pathPoints.strokeColor = Self.accent
+        pathPoints.lineWidth = 1.5
+        pathSelected.fillColor = Self.accent
+        pathSelected.strokeColor = CGColor(gray: 1, alpha: 1)
+        pathSelected.lineWidth = 1.5
         for l in [guides, gapLines] {
             l.fillColor = nil
             l.strokeColor = Self.guide
@@ -188,6 +215,50 @@ nonisolated final class CanvasOverlay: CALayer {
         CATransaction.setDisableActions(true)
         caret.isHidden = !visible
         CATransaction.commit()
+    }
+
+    /// A path's points being drawn or edited, all in view points.
+    struct PathMarks {
+        var outline: CGPath?
+        var points: [CGPoint] = []
+        var selected: [CGPoint] = []
+        /// Each shown handle, from its point.
+        var arms: [(point: CGPoint, handle: CGPoint)] = []
+        /// The segment the pen would add, from the last point to the pointer.
+        var rubber: CGPath?
+    }
+
+    /// How big a path's point and handle dots are drawn, as radii.
+    static let pathPointRadius: CGFloat = 4
+    static let pathHandleRadius: CGFloat = 3
+
+    func updatePath(_ marks: PathMarks?) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        guard let marks else {
+            for l in [pathLine, pathRubber, pathArms, pathHandles, pathPoints, pathSelected] { l.path = nil }
+            return
+        }
+        pathLine.path = marks.outline
+        pathRubber.path = marks.rubber
+        let arms = CGMutablePath(), handles = CGMutablePath()
+        let h = Self.pathHandleRadius
+        for arm in marks.arms {
+            arms.move(to: arm.point)
+            arms.addLine(to: arm.handle)
+            handles.addEllipse(in: CGRect(x: arm.handle.x - h, y: arm.handle.y - h, width: h * 2, height: h * 2))
+        }
+        pathArms.path = arms
+        pathHandles.path = handles
+        func dots(_ points: [CGPoint]) -> CGPath {
+            let path = CGMutablePath()
+            let r = Self.pathPointRadius
+            for p in points { path.addEllipse(in: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)) }
+            return path
+        }
+        pathPoints.path = dots(marks.points)
+        pathSelected.path = dots(marks.selected)
     }
 
     /// A Move's path in view points: the dashed route, a hollow dot where it

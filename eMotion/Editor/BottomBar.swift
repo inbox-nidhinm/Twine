@@ -19,6 +19,7 @@ struct ToolBar: View {
                 tool(editor.lastShape)
                 shapeChevron
             }
+            tool(.pen)
             tool(.text)
         }
         .padding(Theme.trayPad)
@@ -28,8 +29,7 @@ struct ToolBar: View {
     }
 
     private func tool(_ tool: Tool) -> some View {
-        BarButton(icon: tool.icon, help: tool.isAvailable ? "\(tool.title) (\(tool.key))" : "\(tool.title) (coming soon)",
-                  isOn: editor.tool == tool, disabled: !tool.isAvailable,
+        BarButton(icon: tool.icon, help: "\(tool.title) (\(tool.key))", isOn: editor.tool == tool,
                   size: Theme.modeButton, iconBox: Theme.icon, hoverFill: Theme.panelHover) {
             pick(tool)
         }
