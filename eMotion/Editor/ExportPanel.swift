@@ -10,7 +10,7 @@ import Theme
 /// Export, as a panel over the whole window: the settings down the left, and
 /// on the right a preview of exactly what will be written, which plays at
 /// the export's frame rate with its sound. Exporting sends the player up and
-/// out and brings a counter up from below, its digits rolling on as the
+/// out and brings a counter up from below, its digits stepping up as the
 /// frames are written; when it ends they trade places back, and the button
 /// offers to export again. Closing the panel (the cross, or Escape) stops an
 /// export in flight.
@@ -27,7 +27,7 @@ struct ExportPanel: View {
     /// where it got to.
     @State private var percent = 0
     /// Follows the export, but lets go a moment after it ends, so the last
-    /// digits finish rolling before the counter leaves.
+    /// digits finish stepping before the counter leaves.
     @State private var showsCounter = false
     /// Whether the size is typed as a percentage rather than picked.
     @State private var typesSize = false
@@ -205,7 +205,7 @@ struct ExportPanel: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .offset(y: showsCounter ? -height : 0)
 
-                Odometer(value: percent, size: height * Theme.exportCounterShare)
+                StepCounter(value: percent, size: height * Theme.exportCounterShare)
                     .padding(.trailing, Theme.panelPad * 4)
                     .padding(.bottom, Theme.panelPad * 2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
@@ -549,10 +549,12 @@ final class ExportPreviewView: NSView {
 
 // MARK: - The counter
 
-/// The export's progress as a big number and a percent sign, each digit
-/// rolling up to the next like an odometer's: the ones roll quickly, the
-/// tens slowly, and a new digit rises in from below.
-private struct Odometer: View {
+/// The export's progress as a big number and a percent sign. Each digit
+/// that changes steps up once: the old one rises out of its window as the
+/// new one rises in from below, however far the number jumped, so fast
+/// progress reads as calm steps rather than spinning digits. A new place
+/// (10, 100) rises in from below too.
+private struct StepCounter: View {
     let value: Int
     let size: CGFloat
 
@@ -560,30 +562,28 @@ private struct Odometer: View {
         let places = value >= 100 ? [2, 1, 0] : value >= 10 ? [1, 0] : [0]
         HStack(alignment: .center, spacing: 0) {
             ForEach(places, id: \.self) { place in
-                DigitColumn(count: value / Int(pow(10, Double(place))), limit: 100 / Int(pow(10, Double(place))), size: size)
+                DigitStep(digit: value / Int(pow(10, Double(place))) % 10, size: size)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             Text("%")
                 .font(ThemeFont.display(size))
                 .foregroundStyle(Theme.textPrimary)
                 .offset(y: ThemeFont.displayFigures(size).nudge)
-                .frame(height: DigitColumn.window(size))
+                .frame(height: DigitStep.window(size))
         }
         .animation(Theme.counterEase, value: places.count)
         .fixedSize()
     }
 }
 
-/// One place of the counter. `count` is how many times it has turned over
-/// in all (the tens place at 57 has turned five times), so it only ever
-/// rolls upward, through a strip of digits, showing `count % 10`.
-private struct DigitColumn: View {
-    let count: Int
-    let limit: Int
+/// One place of the counter: its digit, which steps up to the next when it
+/// changes, the two fading at the window's top and bottom edges.
+private struct DigitStep: View {
+    let digit: Int
     let size: CGFloat
 
     /// Each digit's window: the figures' height with room above and below,
-    /// where rolling digits fade in and out.
+    /// where stepping digits fade in and out.
     static func window(_ size: CGFloat) -> CGFloat { ThemeFont.displayFigures(size).height * Theme.counterWindow }
 
     /// Opaque in the middle, fading to nothing at the top and bottom edges.
@@ -597,20 +597,17 @@ private struct DigitColumn: View {
 
     var body: some View {
         let height = Self.window(size)
-        let nudge = ThemeFont.displayFigures(size).nudge
-        VStack(spacing: 0) {
-            ForEach(0...max(limit, 1), id: \.self) { n in
-                Text("\(n % 10)")
-                    .font(ThemeFont.display(size))
-                    .foregroundStyle(Theme.textPrimary)
-                    .fixedSize()
-                    .offset(y: nudge)
-                    .frame(width: ThemeFont.displayDigitWidth(size), height: height)
-            }
+        ZStack {
+            Text("\(digit)")
+                .font(ThemeFont.display(size))
+                .foregroundStyle(Theme.textPrimary)
+                .fixedSize()
+                .offset(y: ThemeFont.displayFigures(size).nudge)
+                .id(digit)
+                .transition(.asymmetric(insertion: .move(edge: .bottom), removal: .move(edge: .top)))
         }
-        .offset(y: -CGFloat(count) * height)
-        .animation(Theme.counterEase, value: count)
-        .frame(height: height, alignment: .top)
+        .frame(width: ThemeFont.displayDigitWidth(size), height: height)
+        .animation(Theme.counterEase, value: digit)
         .clipped()
         .mask(Self.feather)
     }

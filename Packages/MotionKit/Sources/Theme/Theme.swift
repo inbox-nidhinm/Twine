@@ -166,10 +166,10 @@ public enum Theme {
     /// Each counter digit's window, as a multiple of the figures' height: room
     /// above and below for the fade, so a digit at rest is never touched by it.
     public static let counterWindow: CGFloat = 1.5
-    /// How much of the window at its top and bottom fades out, so a rolling
+    /// How much of the window at its top and bottom fades out, so a stepping
     /// digit melts away rather than being cut off.
     public static let counterFeather: CGFloat = 0.17
-    /// How each digit of the counter rolls on, on the same curve.
+    /// How each digit of the counter steps up to the next, on the same curve.
     public static let counterEase = Animation.timingCurve(0.5, 0, 0, 1, duration: 0.4)
     /// The panel appearing and going.
     public static let exportFade = Animation.timingCurve(0.5, 0, 0, 1, duration: 0.35)
@@ -205,8 +205,8 @@ public enum ThemeFont {
         return .custom(displayFace, size: size)
     }
 
-    /// The widest digit of the display face at `size`, so a column of
-    /// rolling digits keeps one width whichever digit shows.
+    /// The widest digit of the display face at `size`, so a counter's
+    /// digit keeps one width whichever digit shows.
     public static func displayDigitWidth(_ size: CGFloat) -> CGFloat {
         _ = registered
         guard let font = NSFont(name: displayFace, size: size) else { return size * 0.62 }
@@ -215,7 +215,7 @@ public enum ThemeFont {
 
     /// How tall the display face's figures stand at `size`, and how far to
     /// move a line of them down so the figures, not the line, sit centred in
-    /// a box: for rolling digits clipped close to the figures.
+    /// a box: for counter digits clipped close to the figures.
     public static func displayFigures(_ size: CGFloat) -> (height: CGFloat, nudge: CGFloat) {
         _ = registered
         guard let font = NSFont(name: displayFace, size: size) else { return (size * 0.72, 0) }
