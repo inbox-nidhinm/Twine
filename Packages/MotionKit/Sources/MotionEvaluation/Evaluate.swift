@@ -268,7 +268,7 @@ private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState, pict
                        trimStart: min(max(stroke.trimStart, 0), 1),
                        trimEnd: min(max(stroke.trimEnd, 0), 1))
     }
-    return ResolvedShape(path: path, isClosed: closed, fills: fills, strokes: strokes)
+    return ResolvedShape(path: path, isClosed: closed, fillRule: shape.fillRule, fills: fills, strokes: strokes)
 }
 
 private func resolve(_ paint: Paint, size: Size2, pictures: [UUID: Size2]) -> ResolvedPaint {

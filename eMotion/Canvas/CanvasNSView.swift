@@ -456,7 +456,9 @@ final class CanvasNSView: NSView {
         if case .shape(let s) = resolved.content { outline = s } else { outline = resolved.frame }
         if let shape = outline {
             let path = shape.path.cgPath
-            if shape.isClosed && (!shape.fills.isEmpty || shape.strokes.isEmpty) && path.contains(local) { return true }
+            if shape.isClosed && (!shape.fills.isEmpty || shape.strokes.isEmpty) && path.contains(local, using: shape.fillRule.cg) {
+                return true
+            }
             let width = (shape.strokes.map(\.width).max() ?? 0) + tolerance * 2
             return path.copy(strokingWithWidth: width, lineCap: .round, lineJoin: .round, miterLimit: 10).contains(local)
         }

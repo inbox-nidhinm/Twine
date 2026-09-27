@@ -325,14 +325,14 @@ private final class Node {
         switch layer.content {
         case .shape(let shape):
             updateShape(shape, size: layer.size, media: media)
-            updateBackdrop(layer.backgroundBlur, path: shape.path.cgPath, size: layer.size)
+            updateBackdrop(layer.backgroundBlur, shape: shape, size: layer.size)
             updateInnerShadows(layer.innerShadows, shape: shape, strength: layer.innerShadows.isEmpty ? 1 : Self.strength(shape),
                                size: layer.size)
             arrange(fills: shape.fills.count, middle: nil)
         case .group:
             if let frame = layer.frame {
                 updateShape(frame, size: layer.size, media: media)
-                updateBackdrop(layer.backgroundBlur, path: frame.path.cgPath, size: layer.size)
+                updateBackdrop(layer.backgroundBlur, shape: frame, size: layer.size)
                 updateInnerShadows(layer.innerShadows, shape: frame, strength: layer.innerShadows.isEmpty ? 1 : Self.strength(frame),
                                    size: layer.size)
                 arrange(fills: frame.fills.count, middle: children)
@@ -397,7 +397,7 @@ private final class Node {
     /// drawn instead.
     private static func outline(of layer: ResolvedLayer) -> CGPath? {
         guard let shape = layer.look, !shape.fills.isEmpty || !shape.strokes.isEmpty else { return nil }
-        let path = shape.path.cgPath
+        let path = shape.area
         var covered: CGPath? = shape.isClosed && !shape.fills.isEmpty ? path : nil
         for stroke in shape.strokes where stroke.width > 0 {
             let dashed = stroke.dashPattern.isEmpty ? path
@@ -442,13 +442,13 @@ private final class Node {
         while innerShadowLayers.count > list.count { innerShadowLayers.removeLast().holder.removeFromSuperlayer() }
         while innerShadowLayers.count < list.count { innerShadowLayers.append(InnerShadowLayer(scale: scale)) }
         guard let shape, !list.isEmpty else { return }
-        let path = shape.path.cgPath
+        let path = shape.area
         for (layer, shadow) in zip(innerShadowLayers, list) {
             layer.update(shadow, path: path, strength: strength, bounds: CGRect(origin: .zero, size: size.cg))
         }
     }
 
-    private func updateBackdrop(_ blur: BackgroundBlur?, path: CGPath, size: Size2) {
+    private func updateBackdrop(_ blur: BackgroundBlur?, shape: ResolvedShape, size: Size2) {
         backdropShown = false
         guard let blur else { return }
         if backdrop == nil {
@@ -465,7 +465,7 @@ private final class Node {
         backdropShown = true
         backdrop.frame = CGRect(origin: .zero, size: size.cg)
         backdropMask.frame = backdrop.bounds
-        backdropMask.path = path
+        backdropMask.path = shape.area
         backdrop.opacity = Float(blur.blend)
         if blur.radius != backdropRadius {
             backdropRadius = blur.radius
@@ -616,10 +616,11 @@ private final class Node {
         let path = shape.path.cgPath
         let bounds = CGRect(origin: .zero, size: size.cg)
         for (i, fill) in shape.fills.enumerated() {
-            paintLayers[i].update(paint: fill, stroke: nil, path: path, bounds: bounds, media: media)
+            paintLayers[i].update(paint: fill, stroke: nil, path: path, rule: shape.fillRule.ca, bounds: bounds, media: media)
         }
         for (i, stroke) in shape.strokes.enumerated() {
-            paintLayers[shape.fills.count + i].update(paint: stroke.paint, stroke: stroke, path: path, bounds: bounds, media: media)
+            paintLayers[shape.fills.count + i].update(paint: stroke.paint, stroke: stroke, path: path, rule: shape.fillRule.ca,
+                                                      bounds: bounds, media: media)
         }
     }
 }
@@ -703,10 +704,12 @@ private final class PaintLayers {
         gradient?.contentsScale = scale
     }
 
-    func update(paint: ResolvedPaint, stroke: ResolvedStroke?, path: CGPath, bounds: CGRect, media: MediaProvider?) {
+    func update(paint: ResolvedPaint, stroke: ResolvedStroke?, path: CGPath, rule: CAShapeLayerFillRule,
+                bounds: CGRect, media: MediaProvider?) {
         root.frame = bounds
         shape.frame = bounds
         shape.path = path
+        shape.fillRule = rule
 
         if case .image(let image) = paint {
             updatePicture(image, bounds: bounds, media: media)
@@ -732,7 +735,7 @@ private final class PaintLayers {
             if doubled {
                 alignmentMask.frame = bounds
                 if stroke.alignment == .inside {
-                    alignmentMask.fillRule = .nonZero
+                    alignmentMask.fillRule = rule
                     alignmentMask.path = path
                 } else {
                     // Everything except the shape: a rectangle well beyond the
@@ -972,6 +975,21 @@ enum Blending {
 }
 
 // MARK: - Conversions
+
+extension ResolvedShape {
+    /// What the shape covers as a path that is inside by winding round:
+    /// an even-odd path, holes and all, turned into one that needs no
+    /// rule, for cutting and joining with others.
+    var area: CGPath {
+        let cg = path.cgPath
+        return fillRule == .evenOdd ? cg.normalized(using: .evenOdd) : cg
+    }
+}
+
+extension FillRule {
+    var ca: CAShapeLayerFillRule { self == .evenOdd ? .evenOdd : .nonZero }
+    public var cg: CGPathFillRule { self == .evenOdd ? .evenOdd : .winding }
+}
 
 extension ResolvedPaint {
     var isImage: Bool {

@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "SVG import", changes: [
+            "Import an SVG file (File > Import, or drop it on the canvas) and it comes in as layers you can edit, in a frame named after the file: shapes, groups, colours, gradients, strokes, clip paths and masks, pictures inside it, and holes in shapes.",
+            "Rectangles and circles stay rectangles and ellipses where they can, with their corners, so they resize and animate as ones drawn in Twine do; other outlines become paths whose points can be edited.",
+            "Figma's exported shadows and blurs come in as Twine's own effects. Text comes in as a sharp picture of itself, in its place, as does anything else Twine cannot edit.",
+            "An SVG larger than the composition is shrunk to fit.",
+        ]),
         .init(date: "27 September 2026", title: "Blend modes and shadows", changes: [
             "Every layer has a blend mode, under Opacity in Design: Figma's full list, from Multiply and Screen to Overlay, Difference and Luminosity. A group or frame left at Normal lets what is inside it blend through, as Figma's Pass Through does.",
             "Inner shadows, from the Effects menu on shapes and frames: a shadow cast inward from the edge, with its offset, blur, spread and colour.",

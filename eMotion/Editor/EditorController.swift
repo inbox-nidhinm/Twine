@@ -4,6 +4,7 @@ import MotionModel
 import MotionEditing
 import MotionEvaluation
 import MotionRendering
+import MotionImport
 
 /// Everything the editor can do to a project, in one place: the canvas, the
 /// panels and the menus all call in here, and this is what turns their
@@ -282,6 +283,11 @@ final class EditorController {
     /// will not open, are skipped with a beep.
     func importMedia(_ urls: [URL], at point: Vec2? = nil) {
         guard let document else { return }
+        // SVG files are drawings to take apart, not pictures.
+        let drawings = urls.filter { $0.pathExtension.lowercased() == "svg" }
+        let urls = urls.filter { $0.pathExtension.lowercased() != "svg" }
+        for (i, url) in drawings.enumerated() { importSVG(url, at: point.map { Vec2($0.x + Double(i) * 20, $0.y + Double(i) * 20) }) }
+        guard !urls.isEmpty else { return }
         Task { @MainActor in
             var commands: [EditorCommand] = []
             var added: [UUID] = []
@@ -420,6 +426,31 @@ final class EditorController {
     func preview(of mediaID: UUID) -> CGImage? {
         guard let asset = project.media.first(where: { $0.id == mediaID }) else { return nil }
         return asset.kind == .video ? media.videoFrame(mediaID, at: 0) : media.image(mediaID)
+    }
+
+    /// An SVG file as editable layers in a frame, centred on `point` (or the
+    /// composition), shrunk to fit the composition if it is larger. Its
+    /// pictures, embedded or drawn from its text, come into the project too.
+    /// One undo step.
+    func importSVG(_ url: URL, at point: Vec2? = nil) {
+        guard let document else { return }
+        let composition = project.composition
+        let center = point ?? Vec2(Double(composition.width) / 2, Double(composition.height) / 2)
+        let name = url.deletingPathExtension().lastPathComponent
+        Task { @MainActor in
+            guard let data = try? Data(contentsOf: url),
+                  let read = try? SVGImport.read(data, name: name, center: center, fitting: composition.size) else {
+                return NSSound.beep()
+            }
+            let result = read.reusing(project.media)
+            var commands: [EditorCommand] = []
+            for item in result.media {
+                do { try await document.stage(item.data, as: item.asset.fileName) } catch { return NSSound.beep() }
+                commands.append(.addMedia(item.asset))
+            }
+            commands.append(.insertLayers([result.layer], parentID: nil, index: nil))
+            if perform(.batch(commands, name: "Import SVG")) { select([result.layer.id]) }
+        }
     }
 
     // MARK: Actions

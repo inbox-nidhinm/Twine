@@ -4,11 +4,34 @@ public struct ShapeContent: Codable, Sendable, Equatable {
     public var geometry: ShapeGeometry
     public var fills: [Fill]
     public var strokes: [Stroke]
+    /// Which parts of a path that crosses itself, or has shapes inside
+    /// shapes, are inside it.
+    public var fillRule: FillRule
 
-    public init(geometry: ShapeGeometry, fills: [Fill] = [], strokes: [Stroke] = []) {
+    public init(geometry: ShapeGeometry, fills: [Fill] = [], strokes: [Stroke] = [], fillRule: FillRule = .nonZero) {
         self.geometry = geometry
         self.fills = fills
         self.strokes = strokes
+        self.fillRule = fillRule
+    }
+
+    private enum CodingKeys: String, CodingKey { case geometry, fills, strokes, fillRule }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        geometry = try c.decode(ShapeGeometry.self, forKey: .geometry)
+        fills = try c.decode([Fill].self, forKey: .fills)
+        strokes = try c.decode([Stroke].self, forKey: .strokes)
+        // Arrived with SVG import; everything before was non-zero.
+        fillRule = try c.decodeIfPresent(FillRule.self, forKey: .fillRule) ?? .nonZero
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(geometry, forKey: .geometry)
+        try c.encode(fills, forKey: .fills)
+        try c.encode(strokes, forKey: .strokes)
+        if fillRule != .nonZero { try c.encode(fillRule, forKey: .fillRule) }
     }
 
     /// Where the first picture is among the fills, if there is one: the
@@ -16,6 +39,13 @@ public struct ShapeContent: Codable, Sendable, Equatable {
     public var pictureIndex: Int? {
         fills.firstIndex { $0.paint.isImage }
     }
+}
+
+/// SVG's and Figma's two ways of deciding what is inside a path: non-zero
+/// fills everything a path winds round; even-odd leaves every other
+/// enclosed part empty, so a shape inside another cuts a hole.
+public enum FillRule: String, Codable, Sendable {
+    case nonZero, evenOdd
 }
 
 /// What a shape is. Every kind except `path` is drawn to fill the layer's

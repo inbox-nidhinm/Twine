@@ -154,6 +154,7 @@ public struct ResolvedShape: Sendable, Equatable {
     /// In the layer's own pixel space.
     public var path: BezierPath
     public var isClosed: Bool
+    public var fillRule: FillRule
     /// Only the fills that are switched on, bottom first.
     public var fills: [ResolvedPaint]
     public var strokes: [ResolvedStroke]

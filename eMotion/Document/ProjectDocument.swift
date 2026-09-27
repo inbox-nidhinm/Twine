@@ -131,6 +131,18 @@ final class ProjectDocument: NSDocument {
         stagedMedia[fileName] = target
     }
 
+    /// Writes `data` aside under `fileName`, as `stage` copies a file: for
+    /// pictures that come inside another file, such as an SVG's.
+    func stage(_ data: Data, as fileName: String) async throws {
+        let folder = stagingFolder
+        let target = folder.appendingPathComponent(fileName)
+        try await Task.detached(priority: .userInitiated) {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try data.write(to: target, options: .atomic)
+        }.value
+        stagedMedia[fileName] = target
+    }
+
     // MARK: Saving soon
 
     /// macOS autosaves in its own time, which can be fifteen seconds or more

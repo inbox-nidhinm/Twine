@@ -14,6 +14,7 @@ let package = Package(
         .library(name: "MotionEvaluation", targets: ["MotionEvaluation"]),
         .library(name: "MotionRendering", targets: ["MotionRendering"]),
         .library(name: "MotionExport", targets: ["MotionExport"]),
+        .library(name: "MotionImport", targets: ["MotionImport"]),
         .library(name: "Theme", targets: ["Theme"]),
     ],
     targets: [
@@ -32,6 +33,10 @@ let package = Package(
         // the offscreen renderer, and writes a movie or a still. Never tied to
         // a clock, so an export is the same every time.
         .target(name: "MotionExport", dependencies: ["MotionModel", "MotionEvaluation", "MotionRendering"]),
+        // Reads SVG files into editable layers, and draws the parts it cannot
+        // make editable (text, mostly) as pictures, with the system's own SVG
+        // drawing, which is why it alone may use AppKit.
+        .target(name: "MotionImport", dependencies: ["MotionModel", "MotionEvaluation", "MotionEditing"]),
         // Tokens from the Flip Design System in Figma, the grain, the fonts,
         // and the icon set. Copied rather than processed, because any
         // re-encoding of the grain would undo how it was packed.
@@ -42,5 +47,6 @@ let package = Package(
         .testTarget(name: "MotionEvaluationTests", dependencies: ["MotionEvaluation"]),
         .testTarget(name: "MotionRenderingTests", dependencies: ["MotionRendering"]),
         .testTarget(name: "MotionExportTests", dependencies: ["MotionExport", "MotionRendering"]),
+        .testTarget(name: "MotionImportTests", dependencies: ["MotionImport", "MotionEditing", "MotionRendering"]),
     ]
 )
