@@ -1,0 +1,830 @@
+{
+  "formatVersion" : 2,
+  "project" : {
+    "actions" : [
+      {
+        "duration" : 1,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "93AE0103-ACB9-4B52-9B2E-616EC4547E81",
+        "isEnabled" : true,
+        "name" : "Corner Radius",
+        "rowOrder" : 0,
+        "spec" : {
+          "cornerRadius" : {
+            "end" : {
+              "bottomLeft" : 48,
+              "bottomRight" : 48,
+              "topLeft" : 48,
+              "topRight" : 48
+            },
+            "isLinked" : true
+          },
+          "type" : "cornerRadius"
+        },
+        "start" : 0.5,
+        "targetLayerID" : "722097DD-F0AC-471A-8F4B-709F7E944C35"
+      },
+      {
+        "duration" : 1,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "744409E5-81AC-404C-85E2-8E2336C7B75E",
+        "isEnabled" : true,
+        "name" : "Background Blur",
+        "rowOrder" : 1,
+        "spec" : {
+          "backgroundBlur" : {
+            "end" : {
+              "blend" : 1,
+              "radius" : 40
+            }
+          },
+          "type" : "backgroundBlur"
+        },
+        "start" : 0.5,
+        "targetLayerID" : "722097DD-F0AC-471A-8F4B-709F7E944C35"
+      },
+      {
+        "duration" : 1,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "B9EF8297-9012-49A9-9CB4-59FC1E71C1AC",
+        "isEnabled" : true,
+        "name" : "Shadow",
+        "rowOrder" : 2,
+        "spec" : {
+          "shadow" : {
+            "end" : {
+              "blur" : 60,
+              "color" : {
+                "a" : 1,
+                "b" : 0,
+                "g" : 0,
+                "r" : 0
+              },
+              "offset" : {
+                "x" : 0,
+                "y" : 24
+              },
+              "opacity" : 0.4,
+              "spread" : 0
+            }
+          },
+          "type" : "shadow"
+        },
+        "start" : 1,
+        "targetLayerID" : "722097DD-F0AC-471A-8F4B-709F7E944C35"
+      },
+      {
+        "duration" : 1,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "A5B4F13A-6723-4384-ACA7-90E474E5E8C7",
+        "isEnabled" : true,
+        "name" : "Colour",
+        "rowOrder" : 0,
+        "spec" : {
+          "color" : {
+            "end" : {
+              "gradient" : {
+                "end" : {
+                  "x" : 1,
+                  "y" : 0.5
+                },
+                "start" : {
+                  "x" : 0,
+                  "y" : 0.5
+                },
+                "stops" : [
+                  {
+                    "color" : {
+                      "a" : 1,
+                      "b" : 0.5411764705882353,
+                      "g" : 0.3607843137254902,
+                      "r" : 1
+                    },
+                    "position" : 0
+                  },
+                  {
+                    "color" : {
+                      "a" : 1,
+                      "b" : 0.30196078431372547,
+                      "g" : 0.788235294117647,
+                      "r" : 1
+                    },
+                    "position" : 1
+                  }
+                ]
+              },
+              "type" : "linearGradient"
+            }
+          },
+          "type" : "color"
+        },
+        "start" : 0.5,
+        "targetLayerID" : "3364F6BE-161D-4873-88E0-6F8DE9490172"
+      },
+      {
+        "duration" : 1,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "6939CCBA-D7EB-4CC3-B8EE-4E4891D71B2F",
+        "isEnabled" : true,
+        "name" : "Layer Blur",
+        "rowOrder" : 1,
+        "spec" : {
+          "layerBlur" : {
+            "end" : 24
+          },
+          "type" : "layerBlur"
+        },
+        "start" : 2,
+        "targetLayerID" : "3364F6BE-161D-4873-88E0-6F8DE9490172"
+      },
+      {
+        "duration" : 1,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "E952AE23-7CD8-4A6F-A2B4-E0826641C84E",
+        "isEnabled" : true,
+        "name" : "Trim",
+        "rowOrder" : 0,
+        "spec" : {
+          "trim" : {
+            "end" : {
+              "end" : 1,
+              "start" : 0
+            },
+            "initial" : {
+              "end" : 0,
+              "start" : 0
+            }
+          },
+          "type" : "trim"
+        },
+        "start" : 0.5,
+        "targetLayerID" : "D74492BA-45B0-49F5-8608-A4CA58DAA695"
+      },
+      {
+        "duration" : 1,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "3C5EAADF-8A50-44E1-AFE8-B0CEE8276355",
+        "isEnabled" : true,
+        "name" : "Stroke",
+        "rowOrder" : 1,
+        "spec" : {
+          "stroke" : {
+            "end" : {
+              "paint" : {
+                "color" : {
+                  "a" : 1,
+                  "b" : 0.5411764705882353,
+                  "g" : 0.3607843137254902,
+                  "r" : 1
+                },
+                "type" : "solid"
+              },
+              "width" : 24
+            }
+          },
+          "type" : "stroke"
+        },
+        "start" : 2,
+        "targetLayerID" : "D74492BA-45B0-49F5-8608-A4CA58DAA695"
+      }
+    ],
+    "composition" : {
+      "background" : {
+        "color" : {
+          "a" : 1,
+          "b" : 1,
+          "g" : 1,
+          "r" : 1
+        },
+        "isTransparent" : false
+      },
+      "duration" : 5,
+      "frameRate" : {
+        "frames" : 60,
+        "seconds" : 1
+      },
+      "height" : 1080,
+      "width" : 1920
+    },
+    "layers" : [
+      {
+        "content" : {
+          "shape" : {
+            "fills" : [
+              {
+                "id" : "D642610D-781C-41DF-8954-057E8FF1E2C8",
+                "isEnabled" : true,
+                "paint" : {
+                  "color" : {
+                    "a" : 1,
+                    "b" : 0.5411764705882353,
+                    "g" : 0.3607843137254902,
+                    "r" : 1
+                  },
+                  "type" : "solid"
+                }
+              }
+            ],
+            "geometry" : {
+              "cornerRadii" : {
+                "bottomLeft" : 0,
+                "bottomRight" : 0,
+                "topLeft" : 0,
+                "topRight" : 0
+              },
+              "type" : "rectangle"
+            },
+            "strokes" : [
+
+            ]
+          },
+          "type" : "shape"
+        },
+        "effects" : [
+
+        ],
+        "id" : "43396137-51CD-4F1E-A61C-1B5C7A22947F",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Bar 1",
+        "opacity" : 1,
+        "size" : {
+          "height" : 1080,
+          "width" : 80
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 40,
+            "y" : 540
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 240,
+            "y" : 540
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      },
+      {
+        "content" : {
+          "shape" : {
+            "fills" : [
+              {
+                "id" : "33CA1E81-2ABA-47C7-8603-61D08EC7F58C",
+                "isEnabled" : true,
+                "paint" : {
+                  "color" : {
+                    "a" : 1,
+                    "b" : 0.30196078431372547,
+                    "g" : 0.788235294117647,
+                    "r" : 1
+                  },
+                  "type" : "solid"
+                }
+              }
+            ],
+            "geometry" : {
+              "cornerRadii" : {
+                "bottomLeft" : 0,
+                "bottomRight" : 0,
+                "topLeft" : 0,
+                "topRight" : 0
+              },
+              "type" : "rectangle"
+            },
+            "strokes" : [
+
+            ]
+          },
+          "type" : "shape"
+        },
+        "effects" : [
+
+        ],
+        "id" : "355D33D8-3FAC-4AF3-A5AA-698D3B98F0B1",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Bar 2",
+        "opacity" : 1,
+        "size" : {
+          "height" : 1080,
+          "width" : 80
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 40,
+            "y" : 540
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 370,
+            "y" : 540
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      },
+      {
+        "content" : {
+          "shape" : {
+            "fills" : [
+              {
+                "id" : "50FB579E-2545-4A0A-A86F-5B2792AC4FD9",
+                "isEnabled" : true,
+                "paint" : {
+                  "color" : {
+                    "a" : 1,
+                    "b" : 0.6274509803921569,
+                    "g" : 0.8509803921568627,
+                    "r" : 0.2980392156862745
+                  },
+                  "type" : "solid"
+                }
+              }
+            ],
+            "geometry" : {
+              "cornerRadii" : {
+                "bottomLeft" : 0,
+                "bottomRight" : 0,
+                "topLeft" : 0,
+                "topRight" : 0
+              },
+              "type" : "rectangle"
+            },
+            "strokes" : [
+
+            ]
+          },
+          "type" : "shape"
+        },
+        "effects" : [
+
+        ],
+        "id" : "860D09A6-643A-4B8E-AAF8-1990BCFD30D0",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Bar 3",
+        "opacity" : 1,
+        "size" : {
+          "height" : 1080,
+          "width" : 80
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 40,
+            "y" : 540
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 500,
+            "y" : 540
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      },
+      {
+        "content" : {
+          "shape" : {
+            "fills" : [
+              {
+                "id" : "F7F7B63C-916B-480F-9562-0A53DE223B45",
+                "isEnabled" : true,
+                "paint" : {
+                  "color" : {
+                    "a" : 1,
+                    "b" : 0.9372549019607843,
+                    "g" : 0.6235294117647059,
+                    "r" : 0.2980392156862745
+                  },
+                  "type" : "solid"
+                }
+              }
+            ],
+            "geometry" : {
+              "cornerRadii" : {
+                "bottomLeft" : 0,
+                "bottomRight" : 0,
+                "topLeft" : 0,
+                "topRight" : 0
+              },
+              "type" : "rectangle"
+            },
+            "strokes" : [
+
+            ]
+          },
+          "type" : "shape"
+        },
+        "effects" : [
+
+        ],
+        "id" : "4A15BBBF-AD97-4350-B94D-AD4B6362CF99",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Bar 4",
+        "opacity" : 1,
+        "size" : {
+          "height" : 1080,
+          "width" : 80
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 40,
+            "y" : 540
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 630,
+            "y" : 540
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      },
+      {
+        "content" : {
+          "shape" : {
+            "fills" : [
+              {
+                "id" : "B83A519C-0781-4E8A-B40C-AEDB045AE5AF",
+                "isEnabled" : true,
+                "paint" : {
+                  "color" : {
+                    "a" : 1,
+                    "b" : 1,
+                    "g" : 0.4235294117647059,
+                    "r" : 0.6078431372549019
+                  },
+                  "type" : "solid"
+                }
+              }
+            ],
+            "geometry" : {
+              "cornerRadii" : {
+                "bottomLeft" : 0,
+                "bottomRight" : 0,
+                "topLeft" : 0,
+                "topRight" : 0
+              },
+              "type" : "rectangle"
+            },
+            "strokes" : [
+
+            ]
+          },
+          "type" : "shape"
+        },
+        "effects" : [
+
+        ],
+        "id" : "D5DEAA25-4FE3-4433-981A-DCC2BBC40534",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Bar 5",
+        "opacity" : 1,
+        "size" : {
+          "height" : 1080,
+          "width" : 80
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 40,
+            "y" : 540
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 760,
+            "y" : 540
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      },
+      {
+        "content" : {
+          "shape" : {
+            "fills" : [
+              {
+                "id" : "75347938-EEAA-4F9F-9877-EA3061DC0E57",
+                "isEnabled" : true,
+                "paint" : {
+                  "color" : {
+                    "a" : 1,
+                    "b" : 0.11764705882352941,
+                    "g" : 0.11764705882352941,
+                    "r" : 0.11764705882352941
+                  },
+                  "type" : "solid"
+                }
+              }
+            ],
+            "geometry" : {
+              "cornerRadii" : {
+                "bottomLeft" : 0,
+                "bottomRight" : 0,
+                "topLeft" : 0,
+                "topRight" : 0
+              },
+              "type" : "rectangle"
+            },
+            "strokes" : [
+
+            ]
+          },
+          "type" : "shape"
+        },
+        "effects" : [
+
+        ],
+        "id" : "BBBA502A-10CC-4354-8D05-0CD7656ECAD8",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Bar 6",
+        "opacity" : 1,
+        "size" : {
+          "height" : 1080,
+          "width" : 80
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 40,
+            "y" : 540
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 890,
+            "y" : 540
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      },
+      {
+        "content" : {
+          "shape" : {
+            "fills" : [
+              {
+                "id" : "C5139225-F232-4477-90D2-81B60183C625",
+                "isEnabled" : true,
+                "paint" : {
+                  "color" : {
+                    "a" : 0.25,
+                    "b" : 1,
+                    "g" : 1,
+                    "r" : 1
+                  },
+                  "type" : "solid"
+                }
+              }
+            ],
+            "geometry" : {
+              "cornerRadii" : {
+                "bottomLeft" : 0,
+                "bottomRight" : 0,
+                "topLeft" : 0,
+                "topRight" : 0
+              },
+              "type" : "rectangle"
+            },
+            "strokes" : [
+              {
+                "alignment" : "center",
+                "cap" : "butt",
+                "dashOffset" : 0,
+                "dashPattern" : [
+
+                ],
+                "id" : "A5A0818A-CF8D-42F4-AEFA-7EF48843C789",
+                "isEnabled" : true,
+                "join" : "miter",
+                "paint" : {
+                  "color" : {
+                    "a" : 0.8,
+                    "b" : 1,
+                    "g" : 1,
+                    "r" : 1
+                  },
+                  "type" : "solid"
+                },
+                "trimEnd" : 1,
+                "trimStart" : 0,
+                "width" : 2
+              }
+            ]
+          },
+          "type" : "shape"
+        },
+        "effects" : [
+
+        ],
+        "id" : "722097DD-F0AC-471A-8F4B-709F7E944C35",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Card",
+        "opacity" : 1,
+        "size" : {
+          "height" : 360,
+          "width" : 520
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 260,
+            "y" : 180
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 560,
+            "y" : 540
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      },
+      {
+        "content" : {
+          "shape" : {
+            "fills" : [
+              {
+                "id" : "B2BD2275-8B6A-45C5-8FD8-192C404E7345",
+                "isEnabled" : true,
+                "paint" : {
+                  "color" : {
+                    "a" : 1,
+                    "b" : 0.9372549019607843,
+                    "g" : 0.6235294117647059,
+                    "r" : 0.2980392156862745
+                  },
+                  "type" : "solid"
+                }
+              }
+            ],
+            "geometry" : {
+              "type" : "ellipse"
+            },
+            "strokes" : [
+
+            ]
+          },
+          "type" : "shape"
+        },
+        "effects" : [
+
+        ],
+        "id" : "3364F6BE-161D-4873-88E0-6F8DE9490172",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Blob",
+        "opacity" : 1,
+        "size" : {
+          "height" : 260,
+          "width" : 260
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 130,
+            "y" : 130
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 1450,
+            "y" : 300
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      },
+      {
+        "content" : {
+          "shape" : {
+            "fills" : [
+
+            ],
+            "geometry" : {
+              "type" : "ellipse"
+            },
+            "strokes" : [
+              {
+                "alignment" : "center",
+                "cap" : "round",
+                "dashOffset" : 0,
+                "dashPattern" : [
+
+                ],
+                "id" : "D39C4D06-368A-4AD1-9223-FBE231500F9A",
+                "isEnabled" : true,
+                "join" : "miter",
+                "paint" : {
+                  "color" : {
+                    "a" : 1,
+                    "b" : 0.11764705882352941,
+                    "g" : 0.11764705882352941,
+                    "r" : 0.11764705882352941
+                  },
+                  "type" : "solid"
+                },
+                "trimEnd" : 1,
+                "trimStart" : 0,
+                "width" : 10
+              }
+            ]
+          },
+          "type" : "shape"
+        },
+        "effects" : [
+
+        ],
+        "id" : "D74492BA-45B0-49F5-8608-A4CA58DAA695",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Ring",
+        "opacity" : 1,
+        "size" : {
+          "height" : 300,
+          "width" : 300
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 150,
+            "y" : 150
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 1450,
+            "y" : 760
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      }
+    ],
+    "media" : [
+
+    ]
+  }
+}

@@ -1,0 +1,57 @@
+# Testing in the running app
+
+A kit for checking changes in the real app without touching the copy the user has open: a separate test copy of the app, a driver that runs a script of clicks, keys and checks inside it, sample projects, and profiling helpers. Nothing here is built into the app unless the hook is installed.
+
+## The loop
+
+```bash
+Tools/SelfTest/install-hook.sh              # puts SelfTest.swift into the app
+Tools/SelfTest/make-test-app.sh             # builds build/eMotionTest.app (debug; pass release to measure speed)
+Tools/SelfTest/run.sh Actions t1 "wait 1;key m;seek 1;shot a"
+Tools/SelfTest/remove-hook.sh               # always, before committing
+```
+
+`run.sh PROJECT NAME "steps"` copies the project first (from `Projects/`, or any `.emotion` path, which is never changed), opens it in the test copy in the background, runs the steps, and prints the state after each one: selection with positions, actions, mode, tool, time, export, menu, hover, first responder. Screenshots from `shot X` go to `$EMOTION_TEST_OUT/NAME/X.png` (default a folder in `$TMPDIR`), the log to `NAME.log`. Screenshots come out at 1× or 2×; scale to 1440 wide (`ffmpeg -vf "scale=1440:-1,crop=w:h:x:y"`) to read coordinates, which are window points from the top-left.
+
+Projects: `Actions` (two layers with Move, Rotate, Opacity, Scale, Hide), `Blank`, `Mask` (stripes and a spot), `Style` (bars, card, blob, ring with style and blur actions), `Text`. The heavy performance scene is made by the benchmark: `cd Packages/MotionKit && EMOTION_BENCH=1 EMOTION_BENCH_OUT=/path/document.json swift test -c release --filter PerformanceTests`, then put that `document.json` in a `Name.emotion` folder.
+
+## Steps
+
+Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `cmd+`, `opt+`, `ctrl+`, `dbl+` (double-click), combined with commas, as in `ctrl,opt+keycode 4`.
+
+| Step | Does |
+|---|---|
+| `shot NAME` | Waits for a screenshot of the window |
+| `wait S` | Waits S seconds after this step (the default is half a second) |
+| `seek T` | Moves the playhead |
+| `click X Y`, `rclick X Y` | A click or right-click |
+| `drag X1 Y1 X2 Y2` | A drag in ten steps |
+| `down X Y`, `to X Y`, `up X Y` | A held drag, a step at a time, for screenshots mid-drag |
+| `open X Y`, `pick X Y` | Clicks until the app's menu opens, or closes |
+| `key K` | `space`, `enter`, `del`, `left`, `right`, `comma`, `stop`, `esc`, or a letter |
+| `keycode N`, `type TEXT`, `clear` | A key by code (Option changes characters), typing, deleting a field |
+| `spacedown`, `spaceup` | Holds and releases Space |
+| `menukey C` | ⌘C through the main menu |
+| `hover X Y`, `rhover X Y`, `chover X Y` | Pointer moves handed straight to the timeline tracks, the ruler or the canvas (`chover` logs `HOVER`) |
+| `call NAME` | `duplicate`, `shortcuts`, `copy`, `paste`, `undo`, `focuscanvas`, `copyeasing`, `pasteeasing`, `exportmovie`, `exportframe`, `staggermenu` |
+| `savepanel PATH`, `waitexport` | Fills and closes a save panel, waits for an export |
+| `import PATH`, `save` | Imports media, saves |
+| `actions`, `spec`, `text` | Logs every action, the selected actions' specs, the selected text layer |
+| `cursor` | Logs which of the app's pointers is current |
+| `perfplay S`, `perfscrub N`, `perfdrag N`, `perfdragat X Y N`, `perfselect N` | Timings (`PERF` lines): playback frame rate, seek, canvas drag, drag at a point, select |
+| `clicksample X Y`, `addsample move` | Samples the playhead after a click, or after adding an action |
+
+## Profiling
+
+`profile.sh PROJECT NAME "steps" DELAY SECONDS` samples the test copy while a script runs and ranks the app's own functions on the main thread. Use a release test copy.
+
+## What fools a test
+
+- Posted `mouseMoved` events never reach tracking areas: use `hover`, `rhover`, `chover`, which call the view directly.
+- The pointer after a cursor-rect refresh follows the real mouse, which is elsewhere during a test, so `cursor` readings taken after one mean nothing. Readings straight after a `mouseMoved` are good.
+- Menu shortcuts and responder-chain actions do not reach a window that is not active, and the test copy never is. Call the command through `call`, or say it was not checked.
+- SwiftUI reads modifier keys from the real keyboard: a posted Shift-click in the layers panel is a plain click. Shift-click on the canvas instead.
+- Build points the right way up. `hitTest` takes the superview's coordinates; see CLAUDE.md. A hook that makes the same mistake as the app passes when it should fail.
+- The save panel ignores `directoryURL` once shown and puts the file in its last folder (the test copy's `NSOSPLastRootDirectory`). Check where it went before looking anywhere else, and never let a test file land in the user's folders.
+- `pkill -f` with the app's name in your own command line kills your own shell: the scripts use `pkill -x`.
+- After changing a MotionKit struct's stored properties, clean builds (`swift package clean`, delete `build/DerivedData`) before trusting a crash.

@@ -17,6 +17,14 @@ The original brief is `docs/brief.md`. The project is now working through a Jitt
 - **Never drive the copy of the app the user is using.** For scripted tests make a copy of `build/eMotion.app` with its own bundle id (`com.nidhin.emotion.selftest`) and point it at a throwaway project in the scratchpad.
 - When driving the running app to verify, the user is often working in other apps. Launch with `open -g`, use accessibility presses (`click button N of ...`) rather than synthetic keys or clicks, and never type unless eMotion is frontmost. Setting a SwiftUI text field's value through accessibility does not reach its binding.
 
+## Where things stand
+
+As of 27 September 2026 (build 32): every redesign milestone and everything still wanted from the original brief is built: actions and presets, Design and Animate, the timeline, text, media, masks, snapping and alignment, export (with a frame range), the shortcuts card, custom cursors, and a performance pass. Dropped by the user: the pen tool, animatable volume, custom export sizes. eMotion is internal only and will never go to the App Store, so private Apple APIs (CAFilter, CABackdropLayer, the destOut filter, swapping `NSCursor.arrow`) are fine and the question is not to be raised again. Nothing is queued; ask the user what is next. Not verified by hand, because tests cannot move the real mouse: pointers during drags on the ruler and the timeline's top edge, and hover on layers panel rows lighting up the canvas.
+
+## Testing in the app
+
+`Tools/SelfTest/` holds the kit: install the driver with `install-hook.sh`, build the separate test copy with `make-test-app.sh`, drive it with `run.sh PROJECT NAME "steps"`, profile with `profile.sh`, and always `remove-hook.sh` before committing (`eMotion/App/SelfTest.swift` is git-ignored as a guard). Its README lists every step and the ways a test can fool you. Unit tests stay in the packages (`./test.sh`); the kit is for what only the running app shows.
+
 ## Layers of the code
 
 | Where | What | May import |

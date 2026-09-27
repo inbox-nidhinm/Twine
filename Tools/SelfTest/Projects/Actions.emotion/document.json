@@ -1,0 +1,260 @@
+{
+  "formatVersion" : 2,
+  "project" : {
+    "actions" : [
+      {
+        "duration" : 1,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "2912CA0F-EF85-495E-9FC8-6EFEE37DA466",
+        "isEnabled" : true,
+        "name" : "Move",
+        "rowOrder" : 0,
+        "spec" : {
+          "move" : {
+            "end" : {
+              "x" : 900,
+              "y" : 0
+            },
+            "mode" : "by"
+          },
+          "type" : "move"
+        },
+        "start" : 0.5,
+        "targetLayerID" : "2BFC9DF8-6B0E-4573-ABB2-6E41EA92C4F9"
+      },
+      {
+        "duration" : 1,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "E5817FF8-9CD5-472C-93F6-BE909784B655",
+        "isEnabled" : true,
+        "name" : "Rotate",
+        "rowOrder" : 1,
+        "spec" : {
+          "rotate" : {
+            "end" : 180,
+            "mode" : "by"
+          },
+          "type" : "rotate"
+        },
+        "start" : 0.5,
+        "targetLayerID" : "2BFC9DF8-6B0E-4573-ABB2-6E41EA92C4F9"
+      },
+      {
+        "duration" : 0.5,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "F13C5F5C-ED06-4F94-B370-B4ABB2D8BE88",
+        "isEnabled" : true,
+        "name" : "Opacity",
+        "rowOrder" : 2,
+        "spec" : {
+          "opacity" : {
+            "end" : 0.3
+          },
+          "type" : "opacity"
+        },
+        "start" : 2,
+        "targetLayerID" : "2BFC9DF8-6B0E-4573-ABB2-6E41EA92C4F9"
+      },
+      {
+        "duration" : 0.6,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "8A9DC2B2-9C7E-4A88-A874-D6F442E0B18F",
+        "isEnabled" : true,
+        "name" : "Scale",
+        "rowOrder" : 0,
+        "spec" : {
+          "scale" : {
+            "end" : {
+              "x" : 1.5,
+              "y" : 1.5
+            },
+            "isLinked" : true,
+            "mode" : "to"
+          },
+          "type" : "scale"
+        },
+        "start" : 1,
+        "targetLayerID" : "8764A706-B958-4088-822F-CBAE4824A360"
+      },
+      {
+        "duration" : 0,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "3932E219-C9E4-427E-951B-844C2CC969F4",
+        "isEnabled" : true,
+        "name" : "Hide",
+        "rowOrder" : 1,
+        "spec" : {
+          "type" : "visibility",
+          "visibility" : {
+            "isVisible" : false
+          }
+        },
+        "start" : 3,
+        "targetLayerID" : "8764A706-B958-4088-822F-CBAE4824A360"
+      }
+    ],
+    "composition" : {
+      "background" : {
+        "color" : {
+          "a" : 1,
+          "b" : 1,
+          "g" : 1,
+          "r" : 1
+        },
+        "isTransparent" : false
+      },
+      "duration" : 5,
+      "frameRate" : {
+        "frames" : 60,
+        "seconds" : 1
+      },
+      "height" : 1080,
+      "width" : 1920
+    },
+    "layers" : [
+      {
+        "content" : {
+          "shape" : {
+            "fills" : [
+              {
+                "id" : "B22FDA51-3235-46EE-9016-0AE5D71612F2",
+                "isEnabled" : true,
+                "paint" : {
+                  "color" : {
+                    "a" : 1,
+                    "b" : 0.9372549019607843,
+                    "g" : 0.6235294117647059,
+                    "r" : 0.2980392156862745
+                  },
+                  "type" : "solid"
+                }
+              }
+            ],
+            "geometry" : {
+              "cornerRadii" : {
+                "bottomLeft" : 24,
+                "bottomRight" : 24,
+                "topLeft" : 24,
+                "topRight" : 24
+              },
+              "type" : "rectangle"
+            },
+            "strokes" : [
+
+            ]
+          },
+          "type" : "shape"
+        },
+        "effects" : [
+
+        ],
+        "id" : "2BFC9DF8-6B0E-4573-ABB2-6E41EA92C4F9",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Square",
+        "opacity" : 1,
+        "size" : {
+          "height" : 240,
+          "width" : 240
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 120,
+            "y" : 120
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 400,
+            "y" : 540
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      },
+      {
+        "content" : {
+          "shape" : {
+            "fills" : [
+              {
+                "id" : "DA604CA1-7419-4D0E-B6DB-7CA17BBA8D2A",
+                "isEnabled" : true,
+                "paint" : {
+                  "color" : {
+                    "a" : 1,
+                    "b" : 0.11764705882352941,
+                    "g" : 0.11764705882352941,
+                    "r" : 0.11764705882352941
+                  },
+                  "type" : "solid"
+                }
+              }
+            ],
+            "geometry" : {
+              "type" : "ellipse"
+            },
+            "strokes" : [
+
+            ]
+          },
+          "type" : "shape"
+        },
+        "effects" : [
+
+        ],
+        "id" : "8764A706-B958-4088-822F-CBAE4824A360",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Dot",
+        "opacity" : 1,
+        "size" : {
+          "height" : 120,
+          "width" : 120
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 60,
+            "y" : 60
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 1500,
+            "y" : 540
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      }
+    ],
+    "media" : [
+
+    ]
+  }
+}

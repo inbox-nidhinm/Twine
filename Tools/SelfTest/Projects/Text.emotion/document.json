@@ -1,0 +1,487 @@
+{
+  "formatVersion" : 2,
+  "project" : {
+    "actions" : [
+      {
+        "duration" : 2,
+        "easing" : {
+          "intensity" : 0,
+          "preset" : "none",
+          "type" : "preset"
+        },
+        "id" : "511EBA85-A665-4B27-B14E-D82383DA5BD3",
+        "isEnabled" : true,
+        "name" : "Counter",
+        "rowOrder" : 0,
+        "spec" : {
+          "counter" : {
+            "step" : 1,
+            "to" : 1250,
+            "transition" : "none"
+          },
+          "type" : "counter"
+        },
+        "start" : 0.5,
+        "targetLayerID" : "CA6C4E70-B5DE-44DD-B4E5-40ADEBCF3C0D"
+      },
+      {
+        "duration" : 2,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "6D5300FD-CABF-4FB1-A70E-ED781297E76C",
+        "isEnabled" : true,
+        "name" : "Counter",
+        "rowOrder" : 0,
+        "spec" : {
+          "counter" : {
+            "step" : 0.01,
+            "to" : 98765.4,
+            "transition" : "slide"
+          },
+          "type" : "counter"
+        },
+        "start" : 0.5,
+        "targetLayerID" : "B97F9E10-DB98-40C3-860F-63661DA7921B"
+      },
+      {
+        "duration" : 1,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "E71907E4-31E5-4BEE-A2FD-5CDD04BD893B",
+        "isEnabled" : true,
+        "name" : "Change Text",
+        "rowOrder" : 0,
+        "spec" : {
+          "changeText" : {
+            "overlaps" : false,
+            "text" : "Goodbye",
+            "transitionIn" : "slide",
+            "transitionOut" : "slide"
+          },
+          "type" : "changeText"
+        },
+        "start" : 1,
+        "targetLayerID" : "72D240D8-8322-4646-8CF4-30D9A29C1B56"
+      },
+      {
+        "duration" : 1.5,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "F546EFD0-29B7-41F5-A930-5993E49ED980",
+        "isEnabled" : true,
+        "name" : "Letter Spacing",
+        "rowOrder" : 0,
+        "spec" : {
+          "letterSpacing" : {
+            "end" : 40
+          },
+          "type" : "letterSpacing"
+        },
+        "start" : 0.5,
+        "targetLayerID" : "FE7DF761-72C4-420B-BFB9-9C256C8EC8C8"
+      },
+      {
+        "duration" : 1.5,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "1E7A78DB-E439-4188-B174-0D15D240DA29",
+        "isEnabled" : true,
+        "name" : "Arc",
+        "rowOrder" : 0,
+        "spec" : {
+          "arc" : {
+            "end" : {
+              "end" : 270,
+              "innerRadius" : 0.6,
+              "start" : -90
+            },
+            "initial" : {
+              "end" : -90,
+              "innerRadius" : 0.6,
+              "start" : -90
+            }
+          },
+          "type" : "arc"
+        },
+        "start" : 0.5,
+        "targetLayerID" : "F7489A07-F8BF-4A47-B110-3D67B36E4EB9"
+      },
+      {
+        "duration" : 1.5,
+        "easing" : {
+          "intensity" : 0.5,
+          "preset" : "smooth",
+          "type" : "preset"
+        },
+        "id" : "7A6FA3B1-7C93-477B-A495-807B624EDFE7",
+        "isEnabled" : true,
+        "name" : "Star",
+        "rowOrder" : 0,
+        "spec" : {
+          "star" : {
+            "end" : {
+              "cornerRadius" : 20,
+              "innerRadius" : 0.7,
+              "points" : 9
+            }
+          },
+          "type" : "star"
+        },
+        "start" : 0.5,
+        "targetLayerID" : "07F9F2D0-1006-4B66-85E2-859F3FADFD97"
+      }
+    ],
+    "composition" : {
+      "background" : {
+        "color" : {
+          "a" : 1,
+          "b" : 1,
+          "g" : 1,
+          "r" : 1
+        },
+        "isTransparent" : false
+      },
+      "duration" : 5,
+      "frameRate" : {
+        "frames" : 60,
+        "seconds" : 1
+      },
+      "height" : 1080,
+      "width" : 1920
+    },
+    "layers" : [
+      {
+        "content" : {
+          "text" : {
+            "alignment" : "left",
+            "color" : {
+              "a" : 1,
+              "b" : 0.11764705882352941,
+              "g" : 0.11764705882352941,
+              "r" : 0.11764705882352941
+            },
+            "fontFamily" : "SF Pro",
+            "fontSize" : 72,
+            "fontWeight" : 600,
+            "letterSpacing" : 0,
+            "sizing" : "autoWidth",
+            "text" : "Users: 0"
+          },
+          "type" : "text"
+        },
+        "effects" : [
+
+        ],
+        "id" : "CA6C4E70-B5DE-44DD-B4E5-40ADEBCF3C0D",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Users: 0",
+        "opacity" : 1,
+        "size" : {
+          "height" : 84.796875,
+          "width" : 264
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 5,
+            "y" : 5
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 480,
+            "y" : 200
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      },
+      {
+        "content" : {
+          "text" : {
+            "alignment" : "left",
+            "color" : {
+              "a" : 1,
+              "b" : 0.11764705882352941,
+              "g" : 0.11764705882352941,
+              "r" : 0.11764705882352941
+            },
+            "fontFamily" : "SF Pro",
+            "fontSize" : 72,
+            "fontWeight" : 600,
+            "letterSpacing" : 0,
+            "sizing" : "autoWidth",
+            "text" : "$1,200.50"
+          },
+          "type" : "text"
+        },
+        "effects" : [
+
+        ],
+        "id" : "B97F9E10-DB98-40C3-860F-63661DA7921B",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "$1,200.50",
+        "opacity" : 1,
+        "size" : {
+          "height" : 84.796875,
+          "width" : 338
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 5,
+            "y" : 5
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 480,
+            "y" : 380
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      },
+      {
+        "content" : {
+          "text" : {
+            "alignment" : "center",
+            "color" : {
+              "a" : 1,
+              "b" : 0.11764705882352941,
+              "g" : 0.11764705882352941,
+              "r" : 0.11764705882352941
+            },
+            "fontFamily" : "SF Pro",
+            "fontSize" : 96,
+            "fontWeight" : 600,
+            "letterSpacing" : 0,
+            "sizing" : "autoWidth",
+            "text" : "Hello"
+          },
+          "type" : "text"
+        },
+        "effects" : [
+
+        ],
+        "id" : "72D240D8-8322-4646-8CF4-30D9A29C1B56",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Hello",
+        "opacity" : 1,
+        "size" : {
+          "height" : 113.0625,
+          "width" : 219
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 109.5,
+            "y" : 5
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 480,
+            "y" : 580
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      },
+      {
+        "content" : {
+          "text" : {
+            "alignment" : "left",
+            "color" : {
+              "a" : 1,
+              "b" : 0.11764705882352941,
+              "g" : 0.11764705882352941,
+              "r" : 0.11764705882352941
+            },
+            "fontFamily" : "SF Pro",
+            "fontSize" : 56,
+            "fontWeight" : 800,
+            "letterSpacing" : 0,
+            "sizing" : "autoWidth",
+            "text" : "SPACING"
+          },
+          "type" : "text"
+        },
+        "effects" : [
+
+        ],
+        "id" : "FE7DF761-72C4-420B-BFB9-9C256C8EC8C8",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "SPACING",
+        "opacity" : 1,
+        "size" : {
+          "height" : 65.953125,
+          "width" : 254
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 5,
+            "y" : 5
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 480,
+            "y" : 800
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      },
+      {
+        "content" : {
+          "shape" : {
+            "fills" : [
+              {
+                "id" : "767B4ADB-DAB3-4C91-8FD9-436C5823AFBD",
+                "isEnabled" : true,
+                "paint" : {
+                  "color" : {
+                    "a" : 1,
+                    "b" : 0.9372549019607843,
+                    "g" : 0.6235294117647059,
+                    "r" : 0.2980392156862745
+                  },
+                  "type" : "solid"
+                }
+              }
+            ],
+            "geometry" : {
+              "arc" : {
+                "end" : 270,
+                "innerRadius" : 0.6,
+                "start" : -90
+              },
+              "type" : "ellipse"
+            },
+            "strokes" : [
+
+            ]
+          },
+          "type" : "shape"
+        },
+        "effects" : [
+
+        ],
+        "id" : "F7489A07-F8BF-4A47-B110-3D67B36E4EB9",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Donut",
+        "opacity" : 1,
+        "size" : {
+          "height" : 260,
+          "width" : 260
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 130,
+            "y" : 130
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 1400,
+            "y" : 300
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      },
+      {
+        "content" : {
+          "shape" : {
+            "fills" : [
+              {
+                "id" : "6B44162A-3DC4-4A4F-A7DA-B3CF1831447B",
+                "isEnabled" : true,
+                "paint" : {
+                  "color" : {
+                    "a" : 1,
+                    "b" : 0.30196078431372547,
+                    "g" : 0.788235294117647,
+                    "r" : 1
+                  },
+                  "type" : "solid"
+                }
+              }
+            ],
+            "geometry" : {
+              "innerRadius" : 0.45,
+              "points" : 5,
+              "type" : "star"
+            },
+            "strokes" : [
+
+            ]
+          },
+          "type" : "shape"
+        },
+        "effects" : [
+
+        ],
+        "id" : "07F9F2D0-1006-4B66-85E2-859F3FADFD97",
+        "isLocked" : false,
+        "isSoloed" : false,
+        "isVisible" : true,
+        "name" : "Star",
+        "opacity" : 1,
+        "size" : {
+          "height" : 300,
+          "width" : 300
+        },
+        "transform" : {
+          "anchor" : {
+            "x" : 150,
+            "y" : 150
+          },
+          "isScaleLinked" : true,
+          "position" : {
+            "x" : 1400,
+            "y" : 760
+          },
+          "rotation" : 0,
+          "scale" : {
+            "x" : 1,
+            "y" : 1
+          }
+        }
+      }
+    ],
+    "media" : [
+
+    ]
+  }
+}
