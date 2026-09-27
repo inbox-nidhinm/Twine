@@ -626,7 +626,11 @@ final class EditorController {
     func deleteSelectedActions() {
         let ids = Set(selectedActions.map(\.id))
         guard !ids.isEmpty else { return }
-        if perform(.deleteActions(ids)) { editor.selectedActions = [] }
+        // A sound or video goes with its last Play bar.
+        if perform(MediaPlays.deleting(ids, in: project)) {
+            editor.selectedActions = []
+            editor.selection = editor.selection.filter { project.layer(withID: $0) != nil }
+        }
     }
 
     /// Copies straight after the originals, selected.

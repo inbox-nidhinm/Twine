@@ -18,6 +18,7 @@ struct CanvasView: NSViewRepresentable {
 
     func updateNSView(_ view: CanvasNSView, context: Context) {
         let menus = self.menus
+        view.menus = menus
         view.dismissTransients = {
             guard menus.isOpen else { return false }
             menus.dismiss()

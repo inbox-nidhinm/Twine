@@ -41,7 +41,9 @@ final class ProjectDocument: NSDocument {
         guard fileWrapper.isDirectory,
               let data = fileWrapper.fileWrappers?[ProjectFormat.documentFileName]?.regularFileContents
         else { throw ProjectFileError.missingDocument }
-        let project = try ProjectFormat.decode(data)
+        // A sound or video that lost its Play bar gets one back, so it shows
+        // in the timeline; the file changes only when next saved.
+        let project = MediaPlays.withPlayBars(try ProjectFormat.decode(data))
         package = fileWrapper
         MainActor.assumeIsolated {
             if let store {

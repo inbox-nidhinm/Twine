@@ -693,6 +693,8 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         let flags = event.modifierFlags.intersection([.command, .control, .option])
         let step = event.modifierFlags.contains(.shift) ? 10 : 1
         switch event.keyCode {
+        case 51 where flags.contains(.command):                      // ⌘⌫ ungroups groups and frames
+            controller.ungroupSelection()
         case 51, 117:                                                // delete, forward delete
             controller.deleteSelection()
         case 53:                                                     // escape

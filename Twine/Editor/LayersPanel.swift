@@ -312,20 +312,28 @@ private struct LayerRow: View {
 
     private func menu() -> [MenuEntry] {
         if !selected { controller.select([layer.id]) }
+        return controller.layerMenu(for: layer)
+    }
+}
+
+extension EditorController {
+    /// What a right-click on a layer offers, in the layers panel and on the
+    /// canvas alike. The layer is selected first.
+    func layerMenu(for layer: Layer) -> [MenuEntry] {
         var entries: [MenuEntry] = [
-            .item("Rename") { editor.renaming = layer.id },
-            .item("Duplicate") { controller.duplicateSelection() },
-            .item("Group Selection") { controller.groupSelection() },
-            .item("Frame Selection") { controller.frameSelection() },
+            .item("Rename") { self.editor.renaming = layer.id },
+            .item("Duplicate") { self.duplicateSelection() },
+            .item("Group Selection") { self.groupSelection() },
+            .item("Frame Selection") { self.frameSelection() },
         ]
-        if layer.isGroup { entries.append(.item("Ungroup") { controller.ungroupSelection() }) }
+        if layer.isGroup { entries.append(.item("Ungroup") { self.ungroupSelection() }) }
         entries += [
             .separator,
-            .item(layer.isSoloed ? "Unsolo" : "Solo") { controller.perform(.setSoloed([layer.id], !layer.isSoloed)) },
-            .item(layer.isLocked ? "Unlock" : "Lock") { controller.perform(.setLocked([layer.id], !layer.isLocked)) },
-            .item(layer.isVisible ? "Hide" : "Show") { controller.perform(.setVisible([layer.id], !layer.isVisible)) },
+            .item(layer.isSoloed ? "Unsolo" : "Solo") { self.perform(.setSoloed([layer.id], !layer.isSoloed)) },
+            .item(layer.isLocked ? "Unlock" : "Lock") { self.perform(.setLocked([layer.id], !layer.isLocked)) },
+            .item(layer.isVisible ? "Hide" : "Show") { self.perform(.setVisible([layer.id], !layer.isVisible)) },
             .separator,
-            .item("Delete") { controller.deleteSelection() },
+            .item("Delete") { self.deleteSelection() },
         ]
         return entries
     }

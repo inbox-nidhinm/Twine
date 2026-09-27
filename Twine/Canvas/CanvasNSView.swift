@@ -21,6 +21,8 @@ final class CanvasNSView: NSView {
     /// away, such as an open menu, in which case the click does nothing else,
     /// the way a click outside a system menu only closes it.
     var dismissTransients: () -> Bool = { false }
+    /// For the right-click menu.
+    var menus: MenuHost?
 
     /// What the floating panels cover, so fitting lands in the visible area.
     var insets = NSEdgeInsets() {
@@ -530,6 +532,8 @@ final class CanvasNSView: NSView {
     // MARK: Mouse
 
     override func mouseDown(with event: NSEvent) {
+        // A Control-click is a right-click.
+        if event.modifierFlags.contains(.control) { return rightMouseDown(with: event) }
         window?.makeFirstResponder(self)
         controller?.editor.focus = .canvas
         if dismissTransients() { return }
@@ -1198,6 +1202,31 @@ final class CanvasNSView: NSView {
         (spaceHeld ? Cursors.hand : Cursors.arrow).set()
     }
 
+    // MARK: Right-click
+
+    /// The layers panel's menu, for the layer under the pointer, which is
+    /// selected first unless it already is (so a selection of several keeps
+    /// together). Over nothing, it deselects and offers Paste.
+    override func rightMouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
+        controller?.editor.focus = .canvas
+        _ = dismissTransients()
+        guard let controller, let menus, drag == nil, !isEditingText, let content = window?.contentView else { return }
+        let point = viewToComposition(convert(event.locationInWindow, from: nil))
+        let inContent = content.convert(event.locationInWindow, from: nil)
+        // The menu's space has its origin at the top-left.
+        let origin = CGPoint(x: inContent.x, y: content.isFlipped ? inContent.y : content.bounds.height - inContent.y)
+        if let id = layer(at: point, deep: event.modifierFlags.contains(.command)),
+           let layer = controller.project.layer(withID: id) {
+            if !selection.contains(id) { controller.select([id]) }
+            menus.show(controller.layerMenu(for: layer), at: origin)
+        } else {
+            controller.deselectAll()
+            guard controller.canPaste else { return }
+            menus.show([.item("Paste") { controller.paste() }], at: origin)
+        }
+    }
+
     // MARK: Keyboard
 
     override func keyDown(with event: NSEvent) {
@@ -1227,9 +1256,13 @@ final class CanvasNSView: NSView {
         if !animating, AlignKeys.handle(event, controller) { return }
         let step = event.modifierFlags.contains(.shift) ? 10.0 : 1.0
         switch event.keyCode {
+        case 51 where event.modifierFlags.contains(.command):         // ⌘⌫ ungroups groups and frames
+            controller.ungroupSelection()
         case 51, 117: controller.deleteSelection()                   // delete, forward delete
         case 53:                                                     // escape
-            if controller.editor.showShortcuts {
+            if dismissTransients() {
+                // An open menu closes first.
+            } else if controller.editor.showShortcuts {
                 controller.editor.showShortcuts = false
             } else if drag != nil {
                 controller.cancel()

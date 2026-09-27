@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Right-click on the canvas", changes: [
+            "Right-click (or Control-click) a layer on the canvas for the same menu as the layers panel: rename, duplicate, group, frame, ungroup, solo, lock, hide and delete. Right-click empty canvas to paste. Escape closes the menu.",
+            "⌘⌫ ungroups groups and frames, as in Figma, alongside ⇧⌘G. It no longer deletes the selection.",
+            "A sound or video and its Play bar go together: deleting the last Play bar in the timeline deletes the layer too, and a project with a sound or video missing its bar gets one back when it opens.",
+        ]),
         .init(date: "28 September 2026", title: "Twine everywhere", changes: [
             "The old name is gone: the projects folder is now Twine Creations in Documents, moved there with everything in it the first time this build opens, and settings carry over.",
             "Projects ending in .emotion are no longer opened; none were left.",
