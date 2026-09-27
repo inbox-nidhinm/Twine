@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "Plain selection", changes: [
+            "A selected layer shows only its box and handles: the light wash that came over it under the pointer is gone. Layers that are not selected still light up under the pointer.",
+        ]),
         .init(date: "27 September 2026", title: "Paste from Figma", changes: [
             "A Twine plugin for Figma (in the FigmaPlugin folder): select a frame or layers, press Copy, then paste in Twine with ⌘V.",
             "Frames, groups, shapes, vectors, pictures, gradients, strokes, shadows, blurs, blend modes and masks come in as editable Twine layers. Text in one style comes in as Twine text; anything Twine cannot hold comes in as a sharp picture Figma drew.",

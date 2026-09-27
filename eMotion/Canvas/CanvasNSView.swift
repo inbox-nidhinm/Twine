@@ -336,10 +336,11 @@ final class CanvasNSView: NSView {
             }
         }
 
-        // A selected layer under the pointer gets the wash too, inside its
-        // selection outline, so every layer answers the pointer.
+        // A selected layer shows only its box: no wash under the pointer,
+        // as the user asked.
         var hover: [CGPoint]?
-        if let hovered, drag == nil, hovered != editingPoints, let corners = scene.worldCorners(of: hovered) {
+        if let hovered, drag == nil, hovered != editingPoints, !selection.contains(hovered),
+           let corners = scene.worldCorners(of: hovered) {
             hover = corners.map(compositionToView)
         }
 
