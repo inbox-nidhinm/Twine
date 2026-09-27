@@ -163,6 +163,12 @@ public enum Theme {
     public static let exportCounterShare: CGFloat = 0.36
     /// How the player and the counter trade places: cubic-bezier(0.5, 0, 0, 1).
     public static let exportEase = Animation.timingCurve(0.5, 0, 0, 1, duration: 0.8)
+    /// Each counter digit's window, as a multiple of the figures' height: room
+    /// above and below for the fade, so a digit at rest is never touched by it.
+    public static let counterWindow: CGFloat = 1.5
+    /// How much of the window at its top and bottom fades out, so a rolling
+    /// digit melts away rather than being cut off.
+    public static let counterFeather: CGFloat = 0.17
     /// How each digit of the counter rolls on, on the same curve.
     public static let counterEase = Animation.timingCurve(0.5, 0, 0, 1, duration: 0.4)
     /// The panel appearing and going.

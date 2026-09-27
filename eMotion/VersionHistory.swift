@@ -25,6 +25,7 @@ enum VersionHistory {
     static let builds: [Build] = [
         .init(date: "27 September 2026", title: "Export panel lined up", changes: [
             "The export panel's settings column is now as wide as the layers panel, so its edge lines up with it.",
+            "The counter's digits fade softly in and out as they roll, instead of being cut off at a hard edge.",
         ]),
         .init(date: "27 September 2026", title: "A new export panel", changes: [
             "Export is a blue button at the foot of the right panel, in Design and Animate. It opens a panel over the whole window: the settings on the left, and on the right a preview of exactly what will be exported, which plays with its sound (Space plays and pauses).",

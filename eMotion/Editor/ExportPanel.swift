@@ -582,9 +582,18 @@ private struct DigitColumn: View {
     let limit: Int
     let size: CGFloat
 
-    /// Each digit's window: the figures' height with a little room, so a
-    /// rolling digit shows only a sliver of its neighbours.
-    static func window(_ size: CGFloat) -> CGFloat { ThemeFont.displayFigures(size).height * 1.25 }
+    /// Each digit's window: the figures' height with room above and below,
+    /// where rolling digits fade in and out.
+    static func window(_ size: CGFloat) -> CGFloat { ThemeFont.displayFigures(size).height * Theme.counterWindow }
+
+    /// Opaque in the middle, fading to nothing at the top and bottom edges.
+    /// (A mask only reads its colours' opacity.)
+    private static let feather = LinearGradient(stops: [
+        .init(color: .clear, location: 0),
+        .init(color: .black, location: Theme.counterFeather),
+        .init(color: .black, location: 1 - Theme.counterFeather),
+        .init(color: .clear, location: 1),
+    ], startPoint: .top, endPoint: .bottom)
 
     var body: some View {
         let height = Self.window(size)
@@ -603,5 +612,6 @@ private struct DigitColumn: View {
         .animation(Theme.counterEase, value: count)
         .frame(height: height, alignment: .top)
         .clipped()
+        .mask(Self.feather)
     }
 }
