@@ -4,17 +4,22 @@ import MotionModel
 import Theme
 
 /// What the app opens onto: every project in `eMotion Creations`, as a shelf,
-/// with its folders down the sidebar. Cards drag onto a folder, or onto All
-/// Projects to come out of one.
+/// with its folders down the sidebar, laid out as re-Flip's home screen is.
+/// Cards drag onto a folder, or onto All Projects to come out of one.
 struct HomeView: View {
     @Bindable var library: Library
 
     @Environment(MenuHost.self) private var menus
     @State private var hovered: URL?
+    /// The sidebar row under the pointer, by its title (folder names are
+    /// unique on disk, and none can be called All Projects).
+    @State private var hoveredRow: String?
     @State private var renaming: URL?
     @State private var draft = ""
     @FocusState private var renameFocused: Bool
-    /// The folder being named in the sidebar.
+    /// The New Folder row, turned into a field for the new folder's name.
+    @State private var addingFolder = false
+    /// The folder being renamed in the sidebar.
     @State private var renamingFolder: URL?
     @State private var folderDraft = ""
     @FocusState private var folderFocused: Bool
@@ -28,9 +33,13 @@ struct HomeView: View {
     /// Where the rule under both titles lands from the top of the window.
     /// Shared, so the wordmark and the shelf title sit on one line.
     private let titleBlock: CGFloat = 94
+    /// re-Flip's card: 158 wide, a square thumbnail inset 5, the name and
+    /// date inset 12 under it, and 12 of foot.
     private let card: CGFloat = 158
     private let cardPad: CGFloat = 5
     private let cardFoot: CGFloat = 12
+    private let captionInset: CGFloat = 12
+    private let thumbRadius: CGFloat = 6
     private let gutter: CGFloat = 24
     private let margin: CGFloat = 18
 
@@ -65,20 +74,40 @@ struct HomeView: View {
                 .padding(.horizontal, Theme.panelPad)
                 .padding(.bottom, 12)
                 .frame(height: titleBlock - Theme.floatInset, alignment: .bottomLeading)
-            PanelDivider()
-            sidebarRow("All Projects", selected: library.selectedFolder == nil) { library.selectedFolder = nil }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Rectangle().fill(Theme.border)
+                .frame(height: 1)
+                .padding(.horizontal, Theme.panelPad)
+                .padding(.bottom, Theme.rowGap)
+
+            sidebarRow("All Projects", on: library.selectedFolder == nil) { library.selectedFolder = nil }
                 .background(dropHighlight(Creations.folder.standardizedFileURL))
                 .dropDestination(for: URL.self) { urls, _ in drop(urls, into: nil) } isTargeted: {
                     target(Creations.folder.standardizedFileURL, $0)
                 }
-                .padding(.top, Theme.rowGap * 2)
-            foldersSection
+            ForEach(library.folders) { folder in folderRow(folder) }
+
+            // Under the folders: a dim row that turns into the new one's name.
+            if addingFolder {
+                nameField(placeholder: "Folder name", onSubmit: endNewFolder, onCancel: {
+                    folderDraft = ""
+                    addingFolder = false
+                })
+            } else {
+                sidebarRow("New Folder", dim: true) {
+                    folderDraft = ""
+                    renamingFolder = nil
+                    addingFolder = true
+                }
+            }
+
             Spacer(minLength: 0)
-            PanelDivider()
-            sidebarRow("Version History", trailing: "Build \(VersionHistory.version)", selected: false) {
+
+            sidebarRow("Version History", trailing: "Build \(VersionHistory.version)") {
                 library.showVersionHistory = true
             }
-            .padding(.vertical, Theme.rowGap * 2)
+            .padding(.bottom, Theme.rowGap)
         }
         .frame(width: sidebar)
         .frame(maxHeight: .infinity)
@@ -86,58 +115,75 @@ struct HomeView: View {
         .padding(Theme.floatInset)
     }
 
-    private func sidebarRow(_ title: String, icon: Icon? = nil, trailing: String? = nil, selected: Bool,
+    /// One line in the sidebar, at the layer row's measurements: 32 tall, the
+    /// fill inset 4 with a 4 pt corner, the words 12 in.
+    private func sidebarRow(_ title: String, trailing: String? = nil, dim: Bool = false, on: Bool = false,
                             action: @escaping () -> Void) -> some View {
-        SidebarRow(title: title, icon: icon, trailing: trailing, selected: selected, action: action)
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Text(title)
+                    .font(ThemeFont.label)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                if let trailing {
+                    Text(trailing)
+                        .font(ThemeFont.caption)
+                        .foregroundStyle(Theme.textTertiary)
+                }
+            }
+            .foregroundStyle(on ? Theme.textPrimary : dim ? Theme.textTertiary : Theme.textSecondary)
+            .padding(.leading, Theme.panelPad)
+            .padding(.trailing, 6)
+            .frame(height: Theme.listRow)
+            .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
+                .fill(on ? Theme.rowSelected : hoveredRow == title ? Theme.rowHover : .clear)
+                .padding(.horizontal, Theme.rowGap))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { inside in
+            if inside { hoveredRow = title } else if hoveredRow == title { hoveredRow = nil }
+        }
+    }
+
+    /// A field in a row's place, the same size, for naming a folder.
+    private func nameField(placeholder: String, onSubmit: @escaping () -> Void, onCancel: @escaping () -> Void) -> some View {
+        TextField(placeholder, text: $folderDraft)
+            .textFieldStyle(.plain)
+            .font(ThemeFont.label)
+            .foregroundStyle(Theme.textPrimary)
+            .focused($folderFocused)
+            .padding(.leading, Theme.panelPad)
+            .padding(.trailing, 6)
+            .frame(height: Theme.listRow)
+            .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
+                .fill(Theme.panelRaised)
+                .padding(.horizontal, Theme.rowGap))
+            .onAppear { DispatchQueue.main.async { folderFocused = true } }
+            .onSubmit(onSubmit)
+            // Clicking away keeps what was typed.
+            .onChange(of: folderFocused) { _, now in if !now { onSubmit() } }
+            .onExitCommand(perform: onCancel)
+    }
+
+    /// Makes the folder if a name was typed; an empty field costs nothing.
+    private func endNewFolder() {
+        guard addingFolder else { return }
+        addingFolder = false
+        let name = folderDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        folderDraft = ""
+        guard !name.isEmpty, let url = library.newFolder(named: name) else { return }
+        library.selectedFolder = url
     }
 
     // MARK: Folders
 
-    private var foldersSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                Text("Folders")
-                    .font(ThemeFont.labelStrong)
-                    .foregroundStyle(Theme.textSecondary)
-                Spacer(minLength: 0)
-                IconButton(icon: .plus, help: "New Folder") {
-                    if let url = library.newFolder() {
-                        library.selectedFolder = url
-                        folderDraft = url.lastPathComponent
-                        renamingFolder = url
-                    }
-                }
-            }
-            .padding(.leading, Theme.panelPad)
-            .padding(.trailing, Theme.panelPad - 6)
-            .frame(height: Theme.listRow)
-            .padding(.top, Theme.rowGap * 2)
-            ForEach(library.folders) { folder in folderRow(folder) }
-        }
-    }
-
     @ViewBuilder private func folderRow(_ folder: Library.Folder) -> some View {
         if renamingFolder == folder.url {
-            HStack(spacing: 6) {
-                IconView(.folder, size: 16)
-                    .foregroundStyle(Theme.textSecondary)
-                TextField("", text: $folderDraft)
-                    .textFieldStyle(.plain)
-                    .font(ThemeFont.label)
-                    .foregroundStyle(Theme.textPrimary)
-                    .focused($folderFocused)
-                    .onAppear { DispatchQueue.main.async { folderFocused = true } }
-                    .onSubmit { commitFolderRename(folder) }
-                    .onExitCommand { renamingFolder = nil }
-                    .onChange(of: folderFocused) { _, now in if !now, renamingFolder == folder.url { commitFolderRename(folder) } }
-            }
-            .padding(.horizontal, Theme.panelPad - 4)
-            .frame(height: Theme.listRow)
-            .background(RoundedRectangle(cornerRadius: Theme.radiusRow).fill(Theme.rowSelected))
-            .padding(.horizontal, 4)
+            nameField(placeholder: "Folder name", onSubmit: { commitFolderRename(folder) },
+                      onCancel: { renamingFolder = nil })
         } else {
-            sidebarRow(folder.name, icon: .folder, trailing: "\(library.count(in: folder))",
-                       selected: library.selectedFolder == folder.url) {
+            sidebarRow(folder.name, on: library.selectedFolder == folder.url) {
                 library.selectedFolder = folder.url
             }
             .background(dropHighlight(folder.url))
@@ -145,20 +191,26 @@ struct HomeView: View {
                 target(folder.url, $0)
             }
             .rightClickMenu {
-                [
+                let n = library.count(in: folder)
+                return [
                     .item("Rename") {
+                        addingFolder = false
                         folderDraft = folder.name
                         renamingFolder = folder.url
                     },
                     .item("Show in Finder") { library.reveal(folder) },
                     .separator,
-                    .item("Move to Trash") { library.moveToTrash(folder) },
+                    // The count says what goes with it, before the click.
+                    .item(n > 0 ? "Move Folder to Trash  (\(n) project\(n == 1 ? "" : "s"))" : "Move Folder to Trash") {
+                        library.moveToTrash(folder)
+                    },
                 ]
             }
         }
     }
 
     private func commitFolderRename(_ folder: Library.Folder) {
+        guard renamingFolder == folder.url else { return }
         renamingFolder = nil
         library.rename(folder, to: folderDraft)
     }
@@ -168,7 +220,7 @@ struct HomeView: View {
         RoundedRectangle(cornerRadius: Theme.radiusRow)
             .strokeBorder(Theme.accent, lineWidth: 1.5)
             .background(RoundedRectangle(cornerRadius: Theme.radiusRow).fill(Theme.rowCurrent))
-            .padding(.horizontal, 4)
+            .padding(.horizontal, Theme.rowGap)
             .opacity(dropTarget == url ? 1 : 0)
     }
 
@@ -191,20 +243,23 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .bottom) {
                 Text(library.folders.first { $0.url == library.selectedFolder }?.name ?? "All Projects")
-                    .displayTitle(24)
+                    .displayTitle(21)
                     .foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 0)
                 PanelButton(title: "New Project", icon: .plus) { library.newProject() }
                     .fixedSize()
                     .help("New Project (⌘N)")
             }
-            .padding(.horizontal, margin)
+            .padding(.leading, margin)
+            // Wider than the title's own inset: a filled control that close to
+            // the edge reads as though it is about to fall off it.
+            .padding(.trailing, margin + 10)
             .padding(.bottom, 12)
             .frame(height: titleBlock, alignment: .bottom)
             .contentShape(Rectangle())
             .gesture(WindowDragGesture())
 
-            Rectangle().fill(Theme.border).frame(height: 1).padding(.horizontal, margin)
+            Rectangle().fill(Theme.border).frame(height: 1)
 
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: card, maximum: card), spacing: gutter,
@@ -219,19 +274,24 @@ struct HomeView: View {
     }
 
     private func projectCard(_ item: Library.Item) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let lit = hovered == item.url || renaming == item.url
+        return VStack(alignment: .leading, spacing: 0) {
             ProjectThumbnail(item: item)
-                .frame(height: (card - cardPad * 2) * 0.625)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.radiusWell - 2))
-                .overlay(RoundedRectangle(cornerRadius: Theme.radiusWell - 2).strokeBorder(Theme.edge, lineWidth: 1))
+                .frame(width: card - cardPad * 2, height: card - cardPad * 2)
+                .background(RoundedRectangle(cornerRadius: thumbRadius).fill(Theme.panelRaised))
+                .clipShape(RoundedRectangle(cornerRadius: thumbRadius))
 
-            VStack(alignment: .leading, spacing: 2) {
+            Group {
                 if renaming == item.url {
                     TextField("", text: $draft)
                         .textFieldStyle(.plain)
                         .font(ThemeFont.label)
                         .foregroundStyle(Theme.textPrimary)
                         .focused($renameFocused)
+                        .padding(.horizontal, 6)
+                        .frame(height: Theme.panelRow - 2)
+                        .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+                        .padding(.top, 8)
                         .onAppear { DispatchQueue.main.async { renameFocused = true } }
                         .onSubmit { commitRename(item) }
                         .onExitCommand { renaming = nil }
@@ -241,23 +301,24 @@ struct HomeView: View {
                         .font(ThemeFont.label)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
+                        .padding(.top, 10)
+                    // The date only; in All Projects, after the folder it is in.
+                    Text([library.selectedFolder == nil ? item.folder?.lastPathComponent : nil,
+                          item.modified.formatted(date: .abbreviated, time: .omitted)].compactMap { $0 }.joined(separator: " · "))
+                        .font(ThemeFont.caption)
+                        .foregroundStyle(Theme.textTertiary)
+                        .lineLimit(1)
+                        .padding(.top, 3)
                 }
-                // In All Projects a card says which folder it is in.
-                Text([library.selectedFolder == nil ? item.folder?.lastPathComponent : nil,
-                      item.modified.formatted(date: .abbreviated, time: .shortened)].compactMap { $0 }.joined(separator: " · "))
-                    .font(ThemeFont.caption)
-                    .foregroundStyle(Theme.textTertiary)
-                    .lineLimit(1)
             }
-            .padding(.horizontal, 3)
-            .padding(.top, 8)
+            .padding(.horizontal, captionInset)
         }
-        .padding(cardPad)
-        .padding(.bottom, cardFoot - cardPad)
-        .frame(width: card)
-        .background(RoundedRectangle(cornerRadius: Theme.radiusWell)
-            .fill(hovered == item.url ? Theme.panelRaised : Theme.panel))
-        .overlay(RoundedRectangle(cornerRadius: Theme.radiusWell).strokeBorder(Theme.border, lineWidth: 1))
+        .padding(.horizontal, cardPad)
+        .padding(.top, cardPad)
+        .padding(.bottom, cardFoot)
+        .frame(width: card, alignment: .leading)
+        // The sidebar's own colour under the pointer, and nothing otherwise.
+        .background(RoundedRectangle(cornerRadius: Theme.radiusPanel).fill(lit ? Theme.panel : .clear))
         .contentShape(Rectangle())
         .onHover { hovered = $0 ? item.url : (hovered == item.url ? nil : hovered) }
         .onTapGesture { if renaming != item.url { library.open(item) } }
@@ -297,53 +358,14 @@ struct HomeView: View {
     }
 }
 
-private struct SidebarRow: View {
-    let title: String
-    var icon: Icon? = nil
-    let trailing: String?
-    let selected: Bool
-    let action: () -> Void
-
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                if let icon {
-                    IconView(icon, size: 16)
-                        .foregroundStyle(selected ? Theme.textPrimary : Theme.textSecondary)
-                }
-                Text(title)
-                    .font(ThemeFont.label)
-                    .foregroundStyle(selected ? Theme.textPrimary : Theme.textSecondary)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                if let trailing {
-                    Text(trailing)
-                        .font(ThemeFont.caption)
-                        .foregroundStyle(Theme.textTertiary)
-                }
-            }
-            .padding(.horizontal, Theme.panelPad - 4)
-            .frame(height: Theme.listRow)
-            .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
-                .fill(selected ? Theme.rowSelected : hovering ? Theme.rowHover : .clear))
-            .padding(.horizontal, 4)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-    }
-}
-
 /// The saved thumbnail when there is one; otherwise the composition's shape
-/// and ground, so an empty project still looks like its own frame.
+/// and ground, so an empty project still looks like its own frame. Fitted
+/// inside the card's square, on the raised grey, as re-Flip's are.
 private struct ProjectThumbnail: View {
     let item: Library.Item
 
     var body: some View {
         ZStack {
-            Theme.canvas
             if let thumbnail = item.thumbnail {
                 Image(nsImage: thumbnail).resizable().scaledToFit()
             } else if let composition = item.composition {
@@ -355,7 +377,6 @@ private struct ProjectThumbnail: View {
                     }
                 }
                 .aspectRatio(CGFloat(composition.width) / CGFloat(composition.height), contentMode: .fit)
-                .padding(10)
             }
         }
     }

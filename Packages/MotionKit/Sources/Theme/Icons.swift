@@ -47,7 +47,6 @@ public enum Icon: String, CaseIterable, Sendable {
     case solo
     case unlock
     case video
-    case folder
     case home
     case jumpEnd
     case jumpStart
@@ -298,10 +297,6 @@ public enum Icon: String, CaseIterable, Sendable {
         case .video: return [   // Layers/video.svg
             "M4 7 H15 V17 H4 Z",
             "M15 10.5 L20 7.5 V16.5 L15 13.5"
-        ]
-        case .folder: return [   // Panels/folder.svg
-            "M3.5 7 C3.5 6.172 4.172 5.5 5 5.5 H9.379 C9.777 5.5 10.158 5.658 10.439 5.939 L11.561 7.061 C11.842 7.342 12.223 7.5 12.621 7.5 H19 C19.828 7.5 20.5 8.172 20.5 9 V17 C20.5 17.828 19.828 18.5 19 18.5 H5 C4.172 18.5 3.5 17.828 3.5 17 Z",
-            "M3.5 10.5 H20.5"
         ]
         case .home: return [   // Panels/home.svg
             "M4 10.5 L12 4 L20 10.5 V19 C20 19.552 19.552 20 19 20 H15 V14 H9 V20 H5 C4.448 20 4 19.552 4 19 Z"

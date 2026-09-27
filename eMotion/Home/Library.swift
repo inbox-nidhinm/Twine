@@ -76,18 +76,19 @@ final class Library {
 
     // MARK: Folders
 
-    /// A new folder, `Untitled Folder` or the next free number, which it
-    /// returns so the sidebar can start naming it.
+    /// A new folder called `name`, returned so the sidebar can show it. A
+    /// name already taken, or one that would read as a project, beeps.
     @discardableResult
-    func newFolder() -> URL? {
-        let fm = FileManager.default
-        var n = 1
-        var url: URL
-        repeat {
-            url = Creations.folder.appendingPathComponent(n == 1 ? "Untitled Folder" : "Untitled Folder \(n)", isDirectory: true)
-            n += 1
-        } while fm.fileExists(atPath: url.path)
-        do { try fm.createDirectory(at: url, withIntermediateDirectories: false) } catch { NSApp.presentError(error); return nil }
+    func newFolder(named name: String) -> URL? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("/"),
+              !ProjectFormat.readableExtensions.contains((trimmed as NSString).pathExtension) else { NSSound.beep(); return nil }
+        let url = Creations.folder.appendingPathComponent(trimmed, isDirectory: true)
+        guard !FileManager.default.fileExists(atPath: url.path) else { NSSound.beep(); return nil }
+        do { try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false) } catch {
+            NSApp.presentError(error)
+            return nil
+        }
         refresh()
         return url.standardizedFileURL
     }
