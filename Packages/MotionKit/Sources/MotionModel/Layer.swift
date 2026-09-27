@@ -24,6 +24,10 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
     /// that Figma's effect stack can be carried over whole.
     public var effects: [Effect]
     public var mask: MaskReference?
+    /// How the layer mixes with what is behind it. A group or frame left
+    /// at Normal lets its children blend with what is behind it too, as
+    /// Figma's Pass Through does.
+    public var blendMode: BlendMode
     public var content: LayerContent
 
     public init(id: UUID = UUID(), name: String, content: LayerContent, size: Size2, position: Vec2) {
@@ -37,7 +41,46 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
         self.opacity = 1
         self.effects = []
         self.mask = nil
+        self.blendMode = .normal
         self.content = content
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, isVisible, isLocked, isSoloed, transform, size, opacity, effects, mask, blendMode, content
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        isVisible = try c.decode(Bool.self, forKey: .isVisible)
+        isLocked = try c.decode(Bool.self, forKey: .isLocked)
+        isSoloed = try c.decode(Bool.self, forKey: .isSoloed)
+        transform = try c.decode(Transform.self, forKey: .transform)
+        size = try c.decode(Size2.self, forKey: .size)
+        opacity = try c.decode(Double.self, forKey: .opacity)
+        effects = try c.decode([Effect].self, forKey: .effects)
+        mask = try c.decodeIfPresent(MaskReference.self, forKey: .mask)
+        // Blend modes arrived after the first files.
+        blendMode = try c.decodeIfPresent(BlendMode.self, forKey: .blendMode) ?? .normal
+        content = try c.decode(LayerContent.self, forKey: .content)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(isVisible, forKey: .isVisible)
+        try c.encode(isLocked, forKey: .isLocked)
+        try c.encode(isSoloed, forKey: .isSoloed)
+        try c.encode(transform, forKey: .transform)
+        try c.encode(size, forKey: .size)
+        try c.encode(opacity, forKey: .opacity)
+        try c.encode(effects, forKey: .effects)
+        try c.encodeIfPresent(mask, forKey: .mask)
+        // Left out at Normal, so files without blending read as before.
+        if blendMode != .normal { try c.encode(blendMode, forKey: .blendMode) }
+        try c.encode(content, forKey: .content)
     }
 
     /// A group or a frame: anything with children.
@@ -314,18 +357,22 @@ public struct Effect: Codable, Sendable, Equatable, Identifiable {
 
 public enum EffectKind: Sendable, Equatable {
     case dropShadow(DropShadow)
+    /// A shadow cast inward from the shape's edge, inside its fill. Shapes
+    /// and frames only.
+    case innerShadow(DropShadow)
     case layerBlur(LayerBlur)
     case backgroundBlur(BackgroundBlur)
 }
 
 extension EffectKind: Codable {
-    private enum Kind: String, Codable { case dropShadow, layerBlur, backgroundBlur }
+    private enum Kind: String, Codable { case dropShadow, innerShadow, layerBlur, backgroundBlur }
     private enum CodingKeys: String, CodingKey { case type, shadow, blur }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         switch try c.decode(Kind.self, forKey: .type) {
         case .dropShadow: self = .dropShadow(try c.decode(DropShadow.self, forKey: .shadow))
+        case .innerShadow: self = .innerShadow(try c.decode(DropShadow.self, forKey: .shadow))
         case .layerBlur: self = .layerBlur(try c.decode(LayerBlur.self, forKey: .blur))
         case .backgroundBlur: self = .backgroundBlur(try c.decode(BackgroundBlur.self, forKey: .blur))
         }
@@ -335,6 +382,7 @@ extension EffectKind: Codable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         switch self {
         case .dropShadow(let v): try c.encode(Kind.dropShadow, forKey: .type); try c.encode(v, forKey: .shadow)
+        case .innerShadow(let v): try c.encode(Kind.innerShadow, forKey: .type); try c.encode(v, forKey: .shadow)
         case .layerBlur(let v): try c.encode(Kind.layerBlur, forKey: .type); try c.encode(v, forKey: .blur)
         case .backgroundBlur(let v): try c.encode(Kind.backgroundBlur, forKey: .type); try c.encode(v, forKey: .blur)
         }
@@ -426,4 +474,49 @@ extension Layer {
         case .text: return []
         }
     }
+}
+
+/// Figma's blend modes, by the names its menu shows. Linear Burn and
+/// Linear Dodge are Figma's Plus Darker and Plus Lighter.
+public enum BlendMode: String, Codable, Sendable, CaseIterable {
+    case normal
+    case darken, multiply, linearBurn, colorBurn
+    case lighten, screen, linearDodge, colorDodge
+    case overlay, softLight, hardLight
+    case difference, exclusion
+    case hue, saturation, color, luminosity
+
+    public var title: String {
+        switch self {
+        case .normal: return "Normal"
+        case .darken: return "Darken"
+        case .multiply: return "Multiply"
+        case .linearBurn: return "Linear Burn"
+        case .colorBurn: return "Colour Burn"
+        case .lighten: return "Lighten"
+        case .screen: return "Screen"
+        case .linearDodge: return "Linear Dodge"
+        case .colorDodge: return "Colour Dodge"
+        case .overlay: return "Overlay"
+        case .softLight: return "Soft Light"
+        case .hardLight: return "Hard Light"
+        case .difference: return "Difference"
+        case .exclusion: return "Exclusion"
+        case .hue: return "Hue"
+        case .saturation: return "Saturation"
+        case .color: return "Colour"
+        case .luminosity: return "Luminosity"
+        }
+    }
+
+    /// Figma's menu groups them: darkening, lightening, contrast, comparing,
+    /// and by component.
+    public static let groups: [[BlendMode]] = [
+        [.normal],
+        [.darken, .multiply, .linearBurn, .colorBurn],
+        [.lighten, .screen, .linearDodge, .colorDodge],
+        [.overlay, .softLight, .hardLight],
+        [.difference, .exclusion],
+        [.hue, .saturation, .color, .luminosity],
+    ]
 }

@@ -310,3 +310,142 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
         #expect(pixel(open, 58, 40).b > 250, "without clipping the child shows whole")
     }
 }
+
+/// Blend modes as the W3C's compositing spec defines them, which Figma
+/// follows: `b` is what is behind, `s` the layer, each 0 to 1 in sRGB.
+private enum BlendMaths {
+    static func separable(_ mode: BlendMode, _ b: Double, _ s: Double) -> Double {
+        switch mode {
+        case .darken: return min(b, s)
+        case .multiply: return b * s
+        case .linearBurn: return max(0, b + s - 1)
+        case .colorBurn: return b == 1 ? 1 : s == 0 ? 0 : 1 - min(1, (1 - b) / s)
+        case .lighten: return max(b, s)
+        case .screen: return b + s - b * s
+        case .linearDodge: return min(1, b + s)
+        case .colorDodge: return b == 0 ? 0 : s == 1 ? 1 : min(1, b / (1 - s))
+        case .overlay: return separable(.hardLight, s, b)
+        case .hardLight: return s <= 0.5 ? b * 2 * s : separable(.screen, b, 2 * s - 1)
+        case .softLight:
+            if s <= 0.5 { return b - (1 - 2 * s) * b * (1 - b) }
+            let d = b <= 0.25 ? ((16 * b - 12) * b + 4) * b : b.squareRoot()
+            return b + (2 * s - 1) * (d - b)
+        case .difference: return abs(b - s)
+        case .exclusion: return b + s - 2 * b * s
+        default: return s
+        }
+    }
+
+    typealias C = (Double, Double, Double)
+    static func lum(_ c: C) -> Double { 0.3 * c.0 + 0.59 * c.1 + 0.11 * c.2 }
+    static func clip(_ c: C) -> C {
+        let l = lum(c), n = min(c.0, c.1, c.2), x = max(c.0, c.1, c.2)
+        var r = c
+        if n < 0 { r = (l + (r.0 - l) * l / (l - n), l + (r.1 - l) * l / (l - n), l + (r.2 - l) * l / (l - n)) }
+        if x > 1 { r = (l + (r.0 - l) * (1 - l) / (x - l), l + (r.1 - l) * (1 - l) / (x - l), l + (r.2 - l) * (1 - l) / (x - l)) }
+        return r
+    }
+    static func setLum(_ c: C, _ l: Double) -> C { let d = l - lum(c); return clip((c.0 + d, c.1 + d, c.2 + d)) }
+    static func sat(_ c: C) -> Double { max(c.0, c.1, c.2) - min(c.0, c.1, c.2) }
+    static func setSat(_ c: C, _ s: Double) -> C {
+        var v = [c.0, c.1, c.2]
+        let order = v.indices.sorted { v[$0] < v[$1] }
+        let (lo, mid, hi) = (order[0], order[1], order[2])
+        if v[hi] > v[lo] {
+            v[mid] = (v[mid] - v[lo]) * s / (v[hi] - v[lo])
+            v[hi] = s
+        } else {
+            v[mid] = 0; v[hi] = 0
+        }
+        v[lo] = 0
+        return (v[0], v[1], v[2])
+    }
+
+    static func blend(_ mode: BlendMode, _ b: C, _ s: C) -> C {
+        switch mode {
+        case .hue: return setLum(setSat(s, sat(b)), lum(b))
+        case .saturation: return setLum(setSat(b, sat(s)), lum(b))
+        case .color: return setLum(s, lum(b))
+        case .luminosity: return setLum(b, lum(s))
+        default: return (separable(mode, b.0, s.0), separable(mode, b.1, s.1), separable(mode, b.2, s.2))
+        }
+    }
+}
+
+@Suite(.serialized) struct BlendRenderingTests {
+    @Test func everyBlendModeMatchesFigmas() throws {
+        let behind = RGBA(0.2, 0.4, 0.8), top = RGBA(0.8, 0.6, 0.2)
+        var off: [String] = []
+        for mode in BlendMode.allCases where mode != .normal {
+            var over = shape(fill: top, at: Vec2(16, 16), size: Size2(32, 32))
+            over.blendMode = mode
+            let project = Project(composition: Composition(width: 64, height: 64, background: Background(color: .white)),
+                                  layers: [shape(fill: behind, at: Vec2(0, 0), size: Size2(64, 64)), over])
+            let p = pixel(try render(project), 32, 32)
+            let want = BlendMaths.blend(mode, (behind.r, behind.g, behind.b), (top.r, top.g, top.b))
+            let got = (Double(p.r) / 255, Double(p.g) / 255, Double(p.b) / 255)
+            let error = max(abs(got.0 - want.0), abs(got.1 - want.1), abs(got.2 - want.2))
+            // Core Animation's Soft Light is Pegtop's formula, a little
+            // darker than the W3C's in dark colours (here 75 against 88 in
+            // red), and Core Image's through Core Animation is further off.
+            if error > (mode == .softLight ? 0.06 : 0.03) {
+                off.append("\(mode.rawValue): got \(p.r),\(p.g),\(p.b) want \(Int(want.0 * 255)),\(Int(want.1 * 255)),\(Int(want.2 * 255))")
+            }
+        }
+        #expect(off.isEmpty, "\(off.joined(separator: "; "))")
+    }
+}
+
+@Suite(.serialized) struct ShadowRenderingTests {
+    private func effects(_ layer: Layer, _ kinds: [EffectKind]) -> Layer {
+        var l = layer
+        l.effects = kinds.map { Effect(kind: $0) }
+        return l
+    }
+
+    @Test func aShapeCastsEveryShadow() throws {
+        let square = effects(shape(at: Vec2(22, 22), size: Size2(20, 20)), [
+            .dropShadow(DropShadow(color: RGBA(0, 0, 1), offset: Vec2(10, 0), blur: 0, opacity: 1)),
+            .dropShadow(DropShadow(color: RGBA(0, 1, 0), offset: Vec2(0, 10), blur: 0, opacity: 1)),
+        ])
+        let image = try render(Project(composition: transparentComposition(), layers: [square]))
+        let right = pixel(image, 47, 30), below = pixel(image, 30, 47)
+        #expect(right.b > 250 && right.a > 250, "the first shadow, to the right")
+        #expect(below.g > 250 && below.a > 250, "the second, below")
+        #expect(pixel(image, 47, 47).a == 0, "neither reaches the corner")
+        #expect(pixel(image, 30, 30).r > 250, "the square over both")
+    }
+
+    @Test func aShadowNeverShowsThroughASeeThroughFill() throws {
+        let glass = effects(shape(fill: RGBA(1, 0, 0, 0.5), at: Vec2(22, 22), size: Size2(20, 20)), [
+            .dropShadow(DropShadow(color: .black, offset: Vec2(4, 4), blur: 0, opacity: 1)),
+        ])
+        let image = try render(Project(composition: transparentComposition(), layers: [glass]))
+        let inside = pixel(image, 38, 38)
+        #expect(inside.r > 250 && abs(inside.a - 128) < 8, "just the fill, with no shadow under it")
+        let outside = pixel(image, 44, 44)
+        #expect(outside.r < 5 && abs(outside.a - 128) < 12, "outside, as faint as the fill")
+    }
+
+    @Test func anInnerShadowFallsInsideTheWayItIsOffset() throws {
+        let card = effects(shape(fill: .white, at: Vec2(12, 12), size: Size2(40, 40)), [
+            .innerShadow(DropShadow(color: .black, offset: Vec2(0, 6), blur: 0, opacity: 1)),
+        ])
+        let image = try render(Project(composition: transparentComposition(), layers: [card]))
+        let top = pixel(image, 32, 14), bottom = pixel(image, 32, 50)
+        #expect(top.r < 5 && top.a > 250, "dark along the top edge, inside")
+        #expect(bottom.r > 250, "the bottom stays white")
+        #expect(pixel(image, 32, 8).a == 0, "nothing outside the shape")
+    }
+
+    @Test func anInnerShadowsSpreadFillsABandAllRound() throws {
+        let card = effects(shape(fill: .white, at: Vec2(12, 12), size: Size2(40, 40)), [
+            .innerShadow(DropShadow(color: RGBA(0, 0, 1), offset: .zero, blur: 0, opacity: 1, spread: 4)),
+        ])
+        let image = try render(Project(composition: transparentComposition(), layers: [card]))
+        for (x, y) in [(14, 32), (50, 32), (32, 14), (32, 50)] {
+            #expect(pixel(image, x, y).b > 250 && pixel(image, x, y).r < 5, "the band at \(x),\(y)")
+        }
+        #expect(pixel(image, 32, 32).r > 250, "the middle stays white")
+    }
+}

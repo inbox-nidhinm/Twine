@@ -167,16 +167,31 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
         if let look = layer.look { frame = resolve(look, size: size, state: state, pictures: pictures) }
     }
 
-    // One shadow per layer is what Core Animation draws. Figma allows
-    // several; the first one switched on wins until a renderer can do more,
-    // and that is the one the Shadow action drives. The same goes for the
-    // background blur. Layer blurs add up, the first carrying its action.
-    var shadow: ResolvedShadow?
-    let s = state.shadow
-    if s.opacity > 0 && s.color.a > 0 {
-        shadow = ResolvedShadow(color: s.color, offset: s.offset, blur: max(s.blur, 0),
-                                opacity: min(max(s.opacity, 0), 1), spread: s.spread)
+    // Every drop shadow switched on, in order; the first carries the
+    // Shadow action, which on a layer designed without one is the only one.
+    // Inner shadows fall inside an outline, so only shapes and frames have
+    // them. The first background blur counts, as in Figma; layer blurs add
+    // up, the first carrying its action.
+    func shown(_ s: DropShadow) -> ResolvedShadow? {
+        guard s.opacity > 0, s.color.a > 0 else { return nil }
+        return ResolvedShadow(color: s.color, offset: s.offset, blur: max(s.blur, 0),
+                              opacity: min(max(s.opacity, 0), 1), spread: s.spread)
     }
+    var shadows: [ResolvedShadow] = []
+    var innerShadows: [ResolvedShadow] = []
+    var drivenShadow = false
+    for effect in layer.effects where effect.isEnabled {
+        switch effect.kind {
+        case .dropShadow(let s):
+            if drivenShadow { shown(s).map { shadows.append($0) } } else { shown(state.shadow).map { shadows.append($0) } }
+            drivenShadow = true
+        case .innerShadow(let s):
+            if layer.look != nil { shown(s).map { innerShadows.append($0) } }
+        case .layerBlur, .backgroundBlur:
+            break
+        }
+    }
+    if !drivenShadow { shown(state.shadow).map { shadows.append($0) } }
     var blur = max(state.layerBlur, 0)
     let blurs = layer.effects.filter(\.isEnabled).compactMap { effect -> Double? in
         if case .layerBlur(let b) = effect.kind { return b.radius }
@@ -198,7 +213,8 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
                          position: state.position, anchor: anchor,
                          scale: state.scale, rotation: state.rotation,
                          opacity: min(max(state.opacity, 0), 1),
-                         content: content, shadow: shadow, blur: blur, backgroundBlur: backgroundBlur,
+                         content: content, shadows: shadows, innerShadows: innerShadows, blendMode: layer.blendMode,
+                         blur: blur, backgroundBlur: backgroundBlur,
                          clipsContent: clips, frame: frame,
                          // Filled in once every layer is resolved, since a
                          // mask can sit anywhere in the tree.

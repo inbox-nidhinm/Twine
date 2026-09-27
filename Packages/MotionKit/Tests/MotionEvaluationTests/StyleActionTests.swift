@@ -271,3 +271,35 @@ private func gradient(_ colors: [RGBA], radial: Bool = false) -> Paint {
         #expect(abs(c.volume(at: 3.01) - 0.2) < 1e-6)
     }
 }
+
+@Suite struct ShadowListTests {
+    private func square(_ effects: [EffectKind]) -> Layer {
+        var l = Layer(name: "S", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero), fills: [Fill(paint: .color(.white))])),
+                      size: Size2(10, 10), position: .zero)
+        l.effects = effects.map { Effect(kind: $0) }
+        return l
+    }
+
+    @Test func everyShadowResolvesAndTheActionDrivesTheFirst() {
+        let a = DropShadow(color: .black, offset: Vec2(1, 1), blur: 2, opacity: 0.5)
+        let b = DropShadow(color: RGBA(1, 0, 0), offset: Vec2(0, 8), blur: 16, opacity: 0.2)
+        let layer = square([.dropShadow(a), .innerShadow(a), .dropShadow(b)])
+        let action = Action(target: layer.id, start: 0, duration: 1, easing: .linear,
+                            spec: .shadow(ShadowAction(end: DropShadow(color: .black, offset: Vec2(9, 9), blur: 2, opacity: 0.5))))
+        let resolved = evaluate(Project(layers: [layer], actions: [action]), at: 1).layers[0]
+        #expect(resolved.shadows.map(\.offset) == [Vec2(9, 9), Vec2(0, 8)])
+        #expect(resolved.innerShadows.map(\.offset) == [Vec2(1, 1)])
+    }
+
+    @Test func textHasNoInnerShadows() {
+        var text = Layer(name: "T", content: .text(TextContent(text: "Hi")), size: Size2(10, 10), position: .zero)
+        text.effects = [Effect(kind: .innerShadow(DropShadow()))]
+        #expect(evaluateDesign(Project(layers: [text])).layers[0].innerShadows.isEmpty)
+    }
+
+    @Test func blendModesReachTheScene() {
+        var layer = square([])
+        layer.blendMode = .screen
+        #expect(evaluateDesign(Project(layers: [layer])).layers[0].blendMode == .screen)
+    }
+}

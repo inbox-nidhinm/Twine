@@ -523,6 +523,14 @@ enum SelfTest {
             case "turn":
                 guard let id = controller.selection.first else { log("TURN none"); break }
                 controller.turnPicture(id)
+            case "blend":
+                guard let mode = BlendMode(rawValue: parts[1]) else { log("BLEND unknown"); break }
+                controller.editSelection { $0.blendMode = mode }
+            case "effect":
+                // Adds a drop or inner shadow, as the Effects menu does, with
+                // an offset and colour to see: effect inner|drop DX DY BLUR HEX.
+                let shadow = DropShadow(color: RGBA(hex: parts[5]) ?? .black, offset: Vec2(n[0], n[1]), blur: n[2], opacity: 1)
+                controller.editSelection { $0.effects.append(Effect(kind: parts[1] == "inner" ? .innerShadow(shadow) : .dropShadow(shadow))) }
             case "tree":
                 // Every layer, indented under its parent, with its kind, box,
                 // place in its parent and clipping.

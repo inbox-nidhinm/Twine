@@ -46,6 +46,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `home`, `openfile PATH` | Turns the window to the home screen, as the Home button does; opens a project in the window, as the Finder does (never point it at a real project) |
 | `replace PATH`, `fillpicture PATH` | Replace in the inspector, or Image as the fill, with the file handed in rather than chosen in the panel |
 | `mode M`, `turn` | The selected picture's mode (`fill`, `fit`, `crop`, which starts cropping, `tile`) and a quarter turn |
+| `blend M`, `effect inner\|drop DX DY BLUR HEX` | Sets the selection's blend mode (`multiply`, `screen`...); adds a shadow, as the Effects menu does |
 | `tree` | Logs every layer under its parent: kind (frame, group, picture...), place, size, scale, clipping, fills and strokes, then the selection and the last undo |
 | `picture` | Logs the selected picture or video: file, mode, crop, turns, actions, whether it is being cropped, and while cropping the picture's and the box's corners in the window, to drag |
 | `offers` | Logs what Add Action and Add Preset offer for the selection |

@@ -164,6 +164,8 @@ public struct LayerState: Sendable, Equatable {
         for effect in layer.effects.reversed() where effect.isEnabled {
             switch effect.kind {
             case .dropShadow(let s): shadow = s
+            // Inner shadows are drawn as designed; no action changes them.
+            case .innerShadow: break
             case .layerBlur(let b): layerBlur = b.radius
             case .backgroundBlur(let b): backgroundBlur = b
             }

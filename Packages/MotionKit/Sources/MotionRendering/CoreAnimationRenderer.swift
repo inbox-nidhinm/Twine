@@ -148,6 +148,7 @@ private final class MaskNode {
 
     init(scale: CGFloat) {
         node = Node(scale: scale)
+        node.ignoresBlend = true
         root.anchorPoint = .zero
         root.actions = Node.noActions
         root.addSublayer(node.container)
@@ -220,6 +221,26 @@ private final class Node {
     private var backdrop: CALayer?
     private let backdropMask = CAShapeLayer()
     private var backdropRadius = 0.0
+    private var backdropShown = false
+    /// A shape's or frame's drop shadows, each a layer that draws only its
+    /// shadow, from the outline, with the shape itself cut out of it; and
+    /// its inner shadows, over its fills.
+    private var shadowLayers: [ShadowLayer] = []
+    /// The outline shadows were last cast from, and the look it came from,
+    /// so a layer that only moves or fades never works it out again.
+    /// The sublayers `arrange` last set, and what they were made of.
+    private var arranged: [CALayer] = []
+    private var arrangedShape: [Int] = []
+    /// Counts the times the fills and strokes are built afresh, which
+    /// changes the layers without changing their number.
+    private var rebuilds = 0
+    private var outlineLook: ResolvedShape?
+    private var outlinePath: CGPath?
+    private var innerShadowLayers: [InnerShadowLayer] = []
+    /// A mask's own node leaves its compositing to the mask, whatever the
+    /// mask layer's blend mode.
+    var ignoresBlend = false
+    private var blend: BlendMode = .normal
     /// A text layer's words: the current text, and the previous one while a
     /// Counter or Change Text moves from one to the other.
     private var textLayers: [CALayer] = []
@@ -268,15 +289,29 @@ private final class Node {
         container.transform = layer.transform.caTransform
         container.opacity = Float(layer.opacity)
 
+        if !ignoresBlend, layer.blendMode != blend {
+            blend = layer.blendMode
+            container.compositingFilter = Blending.filter(for: blend)
+        }
+
+        // A shape or frame that draws something casts every shadow from its
+        // outline, worked out only when there is a shadow to cast. Anything
+        // else casts its first shadow from all it draws.
+        let fromOutline = layer.look.map { !$0.fills.isEmpty || !$0.strokes.isEmpty } ?? false
+        let outline = fromOutline && !layer.shadows.isEmpty ? cachedOutline(layer) : nil
+        updateShadowLayers(outline == nil ? [] : layer.shadows, outline: outline,
+                           strength: outline == nil ? 1 : layer.look.map(Self.strength) ?? 1)
+
         // Blur amounts arrive as Figma measures them, twice the Gaussian's
         // standard deviation. Core Animation's shadow radius is the standard
         // deviation, as is the blur filter's radius.
-        if let shadow = layer.shadow {
+        if !fromOutline, let shadow = layer.shadow {
             container.shadowColor = shadow.color.cgColor
             container.shadowOffset = CGSize(width: shadow.offset.x, height: shadow.offset.y)
             container.shadowRadius = shadow.blur / 2
             container.shadowOpacity = Float(shadow.opacity)
-            container.shadowPath = spreadPath(layer, by: shadow.spread)
+            // Text, video and groups have no outline to spread.
+            container.shadowPath = nil
         } else {
             container.shadowOpacity = 0
             container.shadowPath = nil
@@ -291,17 +326,21 @@ private final class Node {
         case .shape(let shape):
             updateShape(shape, size: layer.size, media: media)
             updateBackdrop(layer.backgroundBlur, path: shape.path.cgPath, size: layer.size)
+            updateInnerShadows(layer.innerShadows, shape: shape, strength: layer.innerShadows.isEmpty ? 1 : Self.strength(shape),
+                               size: layer.size)
+            arrange(fills: shape.fills.count, middle: nil)
         case .group:
             if let frame = layer.frame {
-                // Built afresh when the holder is not in place yet, as for a
-                // frame with no fills or strokes, whose signature is empty.
-                if children.superlayer !== container { signature = ["-"] }
-                updateShape(frame, size: layer.size, media: media, around: children)
+                updateShape(frame, size: layer.size, media: media)
                 updateBackdrop(layer.backgroundBlur, path: frame.path.cgPath, size: layer.size)
+                updateInnerShadows(layer.innerShadows, shape: frame, strength: layer.innerShadows.isEmpty ? 1 : Self.strength(frame),
+                                   size: layer.size)
+                arrange(fills: frame.fills.count, middle: children)
             } else {
                 if !signature.isEmpty { clearPaint() }
-                backdrop?.removeFromSuperlayer()
-                if container.sublayers?.count != 1 || children.superlayer !== container { container.sublayers = [children] }
+                backdropShown = false
+                updateInnerShadows([], shape: nil, strength: 1, size: layer.size)
+                arrange(fills: 0, middle: children)
             }
             updateClip(layer)
         case .text(let text):
@@ -320,23 +359,98 @@ private final class Node {
         }
     }
 
-    /// The shadow's outline grown by `spread`, or shrunk for a negative one.
-    /// Nil leaves Core Animation to shadow whatever the layer draws, which
-    /// is what a spread of 0 and every non-shape layer want.
-    private func spreadPath(_ layer: ResolvedLayer, by spread: Double) -> CGPath? {
-        let outline: ResolvedShape?
-        if case .shape(let s) = layer.content { outline = s } else { outline = layer.frame }
-        guard spread != 0, let shape = outline, shape.isClosed else { return nil }
+    /// The layer's own sublayers in drawing order: drop shadows, the
+    /// frosted backdrop, fills, inner shadows, a frame's children, strokes.
+    /// Only touches the tree when that order changed.
+    private func arrange(fills: Int, middle: CALayer?) {
+        // What is built, in counts: when none of it changed since the last
+        // time, neither did the order, which is most frames.
+        let shape = [paintLayers.count, fills, shadowLayers.count, innerShadowLayers.count, backdropShown ? 1 : 0,
+                     middle == nil ? 0 : 1, rebuilds]
+        if shape == arrangedShape { return }
+        arrangedShape = shape
+        let roots = paintLayers.map(\.root)
+        var wanted: [CALayer] = shadowLayers.map(\.layer)
+        if backdropShown, let backdrop { wanted.append(backdrop) }
+        wanted += roots.prefix(fills)
+        wanted += innerShadowLayers.map(\.holder)
+        if let middle { wanted.append(middle) }
+        wanted += roots.dropFirst(fills)
+        // Compared with what was last set rather than read back, which
+        // copies the list out of Core Animation every frame.
+        if arranged.count != wanted.count || !zip(arranged, wanted).allSatisfy({ $0 === $1 }) {
+            container.sublayers = wanted
+            arranged = wanted
+        }
+    }
+
+    private func cachedOutline(_ layer: ResolvedLayer) -> CGPath? {
+        if let look = layer.look, look == outlineLook, let outlinePath { return outlinePath }
+        outlineLook = layer.look
+        outlinePath = Self.outline(of: layer)
+        return outlinePath
+    }
+
+    /// What a shape or frame covers, fills and strokes together, to cast its
+    /// shadows from. Nil for anything else, and for a shape or frame that
+    /// draws nothing, whose shadows (a frame's children's) come from what is
+    /// drawn instead.
+    private static func outline(of layer: ResolvedLayer) -> CGPath? {
+        guard let shape = layer.look, !shape.fills.isEmpty || !shape.strokes.isEmpty else { return nil }
         let path = shape.path.cgPath
-        let band = path.copy(strokingWithWidth: abs(spread) * 2, lineCap: .round, lineJoin: .round, miterLimit: 10)
-        return spread > 0 ? path.union(band) : path.subtracting(band)
+        var covered: CGPath? = shape.isClosed && !shape.fills.isEmpty ? path : nil
+        for stroke in shape.strokes where stroke.width > 0 {
+            let dashed = stroke.dashPattern.isEmpty ? path
+                : path.copy(dashingWithPhase: stroke.dashOffset, lengths: stroke.dashPattern.map { CGFloat($0) })
+            let doubled = stroke.alignment != .center
+            var band = dashed.copy(strokingWithWidth: stroke.width * (doubled ? 2 : 1), lineCap: stroke.cap.cg,
+                                   lineJoin: stroke.join.cg, miterLimit: 10)
+            if stroke.alignment == .inside { band = band.intersection(path) }
+            if stroke.alignment == .outside { band = band.subtracting(path) }
+            covered = covered.map { $0.union(band) } ?? band
+        }
+        return covered
+    }
+
+    /// How strongly a shape's shadows show: as strongly as its most solid
+    /// fill, so a see-through card casts a faint shadow, as in Figma, even
+    /// with a solid edge (the fill covers far more); a shape with only
+    /// strokes, as its most solid stroke.
+    private static func strength(_ shape: ResolvedShape) -> Double {
+        let paints = shape.fills.isEmpty ? shape.strokes.map(\.paint) : shape.fills
+        return paints.map { paint -> Double in
+            switch paint {
+            case .solid(let c): return c.a
+            case .linear(let stops, _, _), .radial(let stops, _, _): return stops.map(\.color.a).max() ?? 0
+            case .image(let image): return image.opacity
+            }
+        }.max() ?? 1
+    }
+
+    private func updateShadowLayers(_ shadows: [ResolvedShadow], outline: CGPath?, strength: Double) {
+        while shadowLayers.count > shadows.count { shadowLayers.removeLast().layer.removeFromSuperlayer() }
+        while shadowLayers.count < shadows.count { shadowLayers.append(ShadowLayer(scale: scale)) }
+        guard let outline else { return }
+        let bounds = container.bounds
+        for (layer, shadow) in zip(shadowLayers, shadows) {
+            layer.update(shadow, outline: outline, strength: strength, bounds: bounds)
+        }
+    }
+
+    private func updateInnerShadows(_ shadows: [ResolvedShadow], shape: ResolvedShape?, strength: Double, size: Size2) {
+        let list = shape?.isClosed == true ? shadows : []
+        while innerShadowLayers.count > list.count { innerShadowLayers.removeLast().holder.removeFromSuperlayer() }
+        while innerShadowLayers.count < list.count { innerShadowLayers.append(InnerShadowLayer(scale: scale)) }
+        guard let shape, !list.isEmpty else { return }
+        let path = shape.path.cgPath
+        for (layer, shadow) in zip(innerShadowLayers, list) {
+            layer.update(shadow, path: path, strength: strength, bounds: CGRect(origin: .zero, size: size.cg))
+        }
     }
 
     private func updateBackdrop(_ blur: BackgroundBlur?, path: CGPath, size: Size2) {
-        guard let blur else {
-            backdrop?.removeFromSuperlayer()
-            return
-        }
+        backdropShown = false
+        guard let blur else { return }
         if backdrop == nil {
             guard let made = Blur.makeBackdrop() else { return }
             made.anchorPoint = .zero
@@ -348,7 +462,7 @@ private final class Node {
             backdrop = made
         }
         guard let backdrop else { return }
-        if container.sublayers?.first !== backdrop { container.insertSublayer(backdrop, at: 0) }
+        backdropShown = true
         backdrop.frame = CGRect(origin: .zero, size: size.cg)
         backdropMask.frame = backdrop.bounds
         backdropMask.path = path
@@ -489,18 +603,15 @@ private final class Node {
         }
     }
 
-    /// `around` goes between the fills and the strokes: a frame's children.
-    private func updateShape(_ shape: ResolvedShape, size: Size2, media: MediaProvider?, around middle: CALayer? = nil) {
+    private func updateShape(_ shape: ResolvedShape, size: Size2, media: MediaProvider?) {
         let wanted = shape.fills.map { "fill-" + $0.kind } + shape.strokes.map { "stroke-" + $0.paint.kind + "-" + $0.alignment.rawValue }
         if wanted != signature {
             clearPaint()
             paintLayers = shape.fills.map { PaintLayers(paint: $0, stroke: nil, scale: scale, flipsContents: flipsContents) }
                 + shape.strokes.map { PaintLayers(paint: $0.paint, stroke: $0, scale: scale, flipsContents: flipsContents) }
-            // The backdrop, if any, goes back underneath in `updateBackdrop`.
-            let roots = paintLayers.map(\.root)
-            container.sublayers = Array(roots.prefix(shape.fills.count)) + (middle.map { [$0] } ?? [])
-                + Array(roots.dropFirst(shape.fills.count))
+            // Put in place, with everything else the layer draws, by `arrange`.
             signature = wanted
+            rebuilds += 1
         }
         let path = shape.path.cgPath
         let bounds = CGRect(origin: .zero, size: size.cg)
@@ -703,6 +814,163 @@ extension PaintLayers {
     }
 }
 
+// MARK: - Shadows
+
+/// One drop shadow of a shape or frame: a layer drawing nothing but its
+/// shadow, cast from the outline, with the outline itself cut out, so it
+/// never shows through a see-through fill, as in Figma.
+private final class ShadowLayer {
+    let layer = CALayer()
+    private let knockout = CAShapeLayer()
+
+    init(scale: CGFloat) {
+        for l in [layer, knockout] {
+            l.anchorPoint = .zero
+            l.actions = Node.noActions
+            l.contentsScale = scale
+        }
+        knockout.fillRule = .evenOdd
+        knockout.fillColor = CGColor(gray: 0, alpha: 1)
+        layer.mask = knockout
+    }
+
+    private var drawn: (ResolvedShadow, CGPath, Double, CGRect)?
+
+    func update(_ shadow: ResolvedShadow, outline: CGPath, strength: Double, bounds: CGRect) {
+        // A layer that only moves keeps its shadow as it is.
+        if let d = drawn, d.0 == shadow, d.1 === outline, d.2 == strength, d.3 == bounds { return }
+        drawn = (shadow, outline, strength, bounds)
+        layer.frame = bounds
+        layer.shadowPath = Shadows.spread(outline, by: shadow.spread)
+        layer.shadowColor = shadow.color.cgColor
+        layer.shadowOffset = CGSize(width: shadow.offset.x, height: shadow.offset.y)
+        layer.shadowRadius = shadow.blur / 2
+        layer.shadowOpacity = Float(shadow.opacity * min(max(strength, 0), 1))
+        knockout.frame = CGRect(origin: .zero, size: bounds.size)
+        let cover = CGMutablePath()
+        cover.addRect(Shadows.reach(of: outline, shadow))
+        cover.addPath(outline)
+        knockout.path = cover
+    }
+}
+
+/// One inner shadow: inside the outline, a sheet with the outline (shrunk
+/// by any spread) cut out of it, casting its shadow inward.
+private final class InnerShadowLayer {
+    let holder = CALayer()
+    private let clip = CAShapeLayer()
+    private let caster = CAShapeLayer()
+
+    init(scale: CGFloat) {
+        for l in [holder, clip, caster] {
+            l.anchorPoint = .zero
+            l.actions = Node.noActions
+            l.contentsScale = scale
+        }
+        clip.fillColor = CGColor(gray: 0, alpha: 1)
+        holder.mask = clip
+        caster.fillRule = .evenOdd
+        holder.addSublayer(caster)
+    }
+
+    func update(_ shadow: ResolvedShadow, path: CGPath, strength: Double, bounds: CGRect) {
+        holder.frame = bounds
+        clip.frame = holder.bounds
+        clip.path = path
+        caster.frame = holder.bounds
+        // The colour's own alpha and the opacity go on the holder, so the
+        // band a spread leaves and the shadow match.
+        holder.opacity = Float(shadow.color.a * shadow.opacity * min(max(strength, 0), 1))
+        var solid = shadow.color
+        solid.a = 1
+        let hole = Shadows.spread(path, by: -shadow.spread)
+        let sheet = CGMutablePath()
+        sheet.addRect(Shadows.reach(of: path, shadow))
+        sheet.addPath(hole)
+        caster.path = sheet
+        caster.fillColor = solid.cgColor
+        caster.shadowColor = solid.cgColor
+        caster.shadowOpacity = 1
+        caster.shadowOffset = CGSize(width: shadow.offset.x, height: shadow.offset.y)
+        caster.shadowRadius = shadow.blur / 2
+    }
+}
+
+private enum Shadows {
+    /// An outline grown by `spread`, or shrunk for a negative one.
+    static func spread(_ path: CGPath, by spread: Double) -> CGPath {
+        guard spread != 0 else { return path }
+        let band = path.copy(strokingWithWidth: abs(spread) * 2, lineCap: .round, lineJoin: .round, miterLimit: 10)
+        return spread > 0 ? path.union(band) : path.subtracting(band)
+    }
+
+    /// Well past everywhere a shadow of the outline can reach.
+    static func reach(of path: CGPath, _ shadow: ResolvedShadow) -> CGRect {
+        let far = abs(shadow.offset.x) + abs(shadow.offset.y) + shadow.blur * 2 + abs(shadow.spread) + 16
+        return path.boundingBoxOfPath.insetBy(dx: -far, dy: -far)
+    }
+}
+
+/// Figma's blend modes as Core Animation compositing filters: its own
+/// private ones where it has them, looked up by name as the blur is, and
+/// otherwise Core Image's.
+enum Blending {
+    static func filter(for mode: BlendMode) -> Any? {
+        guard mode != .normal else { return nil }
+        if let name = coreAnimationName(mode), let type = NSClassFromString("CAFilter") as? NSObject.Type,
+           let made = type.perform(NSSelectorFromString("filterWithType:"), with: name)?.takeUnretainedValue() {
+            return made
+        }
+        return CIFilter(name: coreImageName(mode))
+    }
+
+    static func coreAnimationName(_ mode: BlendMode) -> String? {
+        switch mode {
+        case .normal: return nil
+        case .darken: return "darkenBlendMode"
+        case .multiply: return "multiplyBlendMode"
+        case .linearBurn: return "plusD"
+        case .colorBurn: return "colorBurnBlendMode"
+        case .lighten: return "lightenBlendMode"
+        case .screen: return "screenBlendMode"
+        case .linearDodge: return "plusL"
+        case .colorDodge: return "colorDodgeBlendMode"
+        case .overlay: return "overlayBlendMode"
+        case .softLight: return "softLightBlendMode"
+        case .hardLight: return "hardLightBlendMode"
+        case .difference: return "differenceBlendMode"
+        case .exclusion: return "exclusionBlendMode"
+        case .hue: return "hueBlendMode"
+        case .saturation: return "saturationBlendMode"
+        case .color: return "colorBlendMode"
+        case .luminosity: return "luminosityBlendMode"
+        }
+    }
+
+    static func coreImageName(_ mode: BlendMode) -> String {
+        switch mode {
+        case .normal: return "CISourceOverCompositing"
+        case .darken: return "CIDarkenBlendMode"
+        case .multiply: return "CIMultiplyBlendMode"
+        case .linearBurn: return "CILinearBurnBlendMode"
+        case .colorBurn: return "CIColorBurnBlendMode"
+        case .lighten: return "CILightenBlendMode"
+        case .screen: return "CIScreenBlendMode"
+        case .linearDodge: return "CILinearDodgeBlendMode"
+        case .colorDodge: return "CIColorDodgeBlendMode"
+        case .overlay: return "CIOverlayBlendMode"
+        case .softLight: return "CISoftLightBlendMode"
+        case .hardLight: return "CIHardLightBlendMode"
+        case .difference: return "CIDifferenceBlendMode"
+        case .exclusion: return "CIExclusionBlendMode"
+        case .hue: return "CIHueBlendMode"
+        case .saturation: return "CISaturationBlendMode"
+        case .color: return "CIColorBlendMode"
+        case .luminosity: return "CILuminosityBlendMode"
+        }
+    }
+}
+
 // MARK: - Conversions
 
 extension ResolvedPaint {
@@ -747,7 +1015,25 @@ extension LineCap {
     }
 }
 
+extension LineCap {
+    var cg: CGLineCap {
+        switch self {
+        case .butt: return .butt
+        case .round: return .round
+        case .square: return .square
+        }
+    }
+}
+
 extension LineJoin {
+    var cg: CGLineJoin {
+        switch self {
+        case .miter: return .miter
+        case .round: return .round
+        case .bevel: return .bevel
+        }
+    }
+
     var ca: CAShapeLayerLineJoin {
         switch self {
         case .miter: return .miter

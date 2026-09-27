@@ -104,7 +104,12 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
     public var rotation: Double
     public var opacity: Double
     public var content: ResolvedContent
-    public var shadow: ResolvedShadow?
+    /// Drop shadows, bottom first. The first is the one the Shadow action
+    /// drives.
+    public var shadows: [ResolvedShadow]
+    /// Shapes and frames only: shadows inside the outline, over the fills.
+    public var innerShadows: [ResolvedShadow]
+    public var blendMode: BlendMode
     /// Pixels, as Figma measures blur (twice the Gaussian's standard
     /// deviation); 0 is none.
     public var blur: Double
@@ -121,6 +126,15 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
     /// has no mask, or its mask is switched off or hidden, which (as in
     /// Figma) shows the layer whole.
     public var mask: ResolvedMask?
+
+    /// A shape's fills, strokes and outline, or a frame's.
+    public var look: ResolvedShape? {
+        if case .shape(let s) = content { return s }
+        return frame
+    }
+
+    /// The first drop shadow, the one the Shadow action drives.
+    public var shadow: ResolvedShadow? { shadows.first }
 
     /// From the layer's own space into its parent's.
     public var transform: Affine {

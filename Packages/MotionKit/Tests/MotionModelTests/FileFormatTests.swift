@@ -18,7 +18,9 @@ func kitchenSinkProject() -> Project {
         strokes: [Stroke(paint: .color(.black), width: 3, alignment: .inside, cap: .round, join: .bevel,
                          dashPattern: [4, 2], dashOffset: 1)])),
         size: Size2(200, 100), position: Vec2(300, 200))
+    rect.blendMode = .colorDodge
     rect.effects = [Effect(kind: .dropShadow(DropShadow(spread: 3))), Effect(isEnabled: false, kind: .layerBlur(LayerBlur(radius: 12))),
+                    Effect(kind: .innerShadow(DropShadow(color: .white, offset: Vec2(0, -2), blur: 3, opacity: 0.4, spread: 1))),
                     Effect(kind: .backgroundBlur(BackgroundBlur(radius: 20, blend: 0.6)))]
 
     let ellipse = Layer(name: "Ellipse", content: .shape(ShapeContent(
@@ -183,6 +185,15 @@ func kitchenSinkProject() -> Project {
             if case ProjectFileError.unreadable = error { return true }
             return false
         }
+    }
+
+    @Test func layersSavedBeforeBlendModesStillOpenAsNormal() throws {
+        var layer = Layer(name: "L", content: .shape(ShapeContent(geometry: .line)), size: Size2(1, 1), position: .zero)
+        let data = try JSONEncoder().encode(layer)
+        #expect(!String(data: data, encoding: .utf8)!.contains("blendMode"), "Normal is left out")
+        #expect(try JSONDecoder().decode(Layer.self, from: data).blendMode == .normal)
+        layer.blendMode = .multiply
+        #expect(try JSONDecoder().decode(Layer.self, from: JSONEncoder().encode(layer)) == layer)
     }
 
     @Test func videoSavedBeforeFitStillOpens() throws {

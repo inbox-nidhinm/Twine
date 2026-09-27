@@ -75,6 +75,20 @@ struct LayerInspector: View {
 
     private var t: Transform { layer.transform }
 
+    /// Figma's blend modes, in its groups.
+    private func blendEntries() -> [MenuEntry] {
+        var entries: [MenuEntry] = []
+        for (i, group) in BlendMode.groups.enumerated() {
+            if i > 0 { entries.append(.separator) }
+            entries += group.map { mode in
+                .item(mode.title, checked: mode == layer.blendMode) {
+                    controller.edit(layer.id) { $0.blendMode = mode }
+                }
+            }
+        }
+        return entries
+    }
+
     // MARK: Transform
 
     private var transformSection: some View {
@@ -112,6 +126,9 @@ struct LayerInspector: View {
                 }
                 .help("The point the layer turns and scales about, in pixels from its top-left")
                 opacity
+                MenuRow(label: "Blend", value: layer.blendMode.title, entries: blendEntries)
+                    .help(layer.isGroup ? "How the layer mixes with what is behind it. At Normal, what is inside a group or frame blends through it, as Figma's Pass Through does."
+                                        : "How the layer mixes with what is behind it")
             }
             .padding(.horizontal, Theme.panelPad)
         }
@@ -800,11 +817,13 @@ private struct EffectsSection: View {
         VStack(alignment: .leading, spacing: 8) {
             HeaderRow(title: "Effects") {
                 IconButton(icon: .plus, help: "Add a shadow or a blur") {
-                    var entries: [MenuEntry] = [
-                        .item("Drop Shadow") { add(.dropShadow(DropShadow())) },
-                        .item("Layer Blur") { add(.layerBlur(LayerBlur())) },
-                    ]
-                    // It follows a shape's outline, so only shapes have one.
+                    var entries: [MenuEntry] = [.item("Drop Shadow") { add(.dropShadow(DropShadow())) }]
+                    // These follow a shape's outline, so only shapes and
+                    // frames have them.
+                    if layer.look != nil {
+                        entries.append(.item("Inner Shadow") { add(.innerShadow(DropShadow(offset: Vec2(0, 4), blur: 4))) })
+                    }
+                    entries.append(.item("Layer Blur") { add(.layerBlur(LayerBlur())) })
                     if layer.look != nil {
                         entries.append(.item("Background Blur") { add(.backgroundBlur(BackgroundBlur())) })
                     }
@@ -835,7 +854,7 @@ private struct EffectsSection: View {
                 }
             }
             switch effect.kind {
-            case .dropShadow(let s):
+            case .dropShadow(let s), .innerShadow(let s):
                 HStack(spacing: 8) {
                     ColorWell(color: s.color, size: Theme.control, title: "Shadow",
                               onChange: { c in controller.update([withShadow(index) { $0.color = c }]) },
@@ -918,11 +937,19 @@ private struct EffectsSection: View {
         }
     }
 
+    /// The layer with the drop or inner shadow at `index` changed.
     private func withShadow(_ index: Int, _ change: (inout DropShadow) -> Void) -> Layer {
         var l = layer
-        if l.effects.indices.contains(index), case .dropShadow(var s) = l.effects[index].kind {
+        guard l.effects.indices.contains(index) else { return l }
+        switch l.effects[index].kind {
+        case .dropShadow(var s):
             change(&s)
             l.effects[index].kind = .dropShadow(s)
+        case .innerShadow(var s):
+            change(&s)
+            l.effects[index].kind = .innerShadow(s)
+        default:
+            break
         }
         return l
     }
@@ -932,6 +959,7 @@ extension Effect {
     var title: String {
         switch kind {
         case .dropShadow: return "Drop Shadow"
+        case .innerShadow: return "Inner Shadow"
         case .layerBlur: return "Layer Blur"
         case .backgroundBlur: return "Background Blur"
         }

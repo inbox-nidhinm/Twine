@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "Blend modes and shadows", changes: [
+            "Every layer has a blend mode, under Opacity in Design: Figma's full list, from Multiply and Screen to Overlay, Difference and Luminosity. A group or frame left at Normal lets what is inside it blend through, as Figma's Pass Through does.",
+            "Inner shadows, from the Effects menu on shapes and frames: a shadow cast inward from the edge, with its offset, blur, spread and colour.",
+            "Shapes and frames draw every drop shadow they have, not only the first, as Figma cards often stack two. Their shadows never show through a see-through fill, and are as faint as the fill is, as in Figma.",
+            "Exported frames are about a fifth quicker to draw.",
+        ]),
         .init(date: "27 September 2026", title: "Frames", changes: [
             "Frames, as in Figma: the Frame tool (F) draws a white frame that clips what spills over its edges, and takes in the layers it is drawn around. Arrange > Frame Selection (⌥⌘G) puts the selection in a frame.",
             "A frame has its own fill, stroke, corner radius, shadows and blurs, with its fill behind what it holds and its stroke in front. It clips to its rounded corners, and resizing it changes its size rather than stretching what is inside.",
