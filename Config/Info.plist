@@ -12,7 +12,7 @@
     <array>
         <dict>
             <key>CFBundleTypeName</key>
-            <string>eMotion Project</string>
+            <string>Twine Project</string>
             <key>CFBundleTypeRole</key>
             <string>Editor</string>
             <key>LSHandlerRank</key>
@@ -33,7 +33,7 @@
             <key>UTTypeIdentifier</key>
             <string>com.nidhin.emotion.project</string>
             <key>UTTypeDescription</key>
-            <string>eMotion Project</string>
+            <string>Twine Project</string>
             <key>UTTypeConformsTo</key>
             <array>
                 <string>com.apple.package</string>

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Builds eMotion and puts a double-clickable copy at build/eMotion.app.
+# Builds Twine (the eMotion project) and puts a double-clickable copy at
+# build/Twine.app.
 #
 #     ./make-app.sh            Release build
 #     ./make-app.sh debug      Debug build
@@ -31,6 +32,6 @@ fi
 # Warnings are treated as failures of the milestone, so they are always shown.
 grep -E "warning:" "$LOG" | grep -v "appintentsmetadataprocessor" | sort -u || true
 
-rm -rf build/eMotion.app
-cp -R "build/DerivedData/Build/Products/$CONFIG/eMotion.app" build/eMotion.app
-echo "built build/eMotion.app (build $VERSION, $CONFIG)"
+rm -rf build/Twine.app
+cp -R "build/DerivedData/Build/Products/$CONFIG/Twine.app" build/Twine.app
+echo "built build/Twine.app (build $VERSION, $CONFIG)"

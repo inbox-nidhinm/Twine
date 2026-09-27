@@ -36,8 +36,8 @@ enum MainMenu {
     }
 
     private static func appMenu() -> NSMenu {
-        let menu = NSMenu(title: "eMotion")
-        menu.addItem(item("About eMotion", #selector(NSApplication.orderFrontStandardAboutPanel(_:))))
+        let menu = NSMenu(title: "Twine")
+        menu.addItem(item("About Twine", #selector(NSApplication.orderFrontStandardAboutPanel(_:))))
         menu.addItem(item("Version History", #selector(AppDelegate.showVersionHistory(_:))))
         menu.addItem(.separator())
         let services = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")
@@ -45,11 +45,11 @@ enum MainMenu {
         NSApp.servicesMenu = services.submenu
         menu.addItem(services)
         menu.addItem(.separator())
-        menu.addItem(item("Hide eMotion", #selector(NSApplication.hide(_:)), "h"))
+        menu.addItem(item("Hide Twine", #selector(NSApplication.hide(_:)), "h"))
         menu.addItem(item("Hide Others", #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option]))
         menu.addItem(item("Show All", #selector(NSApplication.unhideAllApplications(_:))))
         menu.addItem(.separator())
-        menu.addItem(item("Quit eMotion", #selector(NSApplication.terminate(_:)), "q"))
+        menu.addItem(item("Quit Twine", #selector(NSApplication.terminate(_:)), "q"))
         return menu
     }
 

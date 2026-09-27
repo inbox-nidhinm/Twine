@@ -24,7 +24,7 @@ for l in lines[start+1:end]:
     if not any(s[1]==(sym,mod) for s in stack): incl[(sym,mod)]+=count
     stack.append((depth,(sym,mod)))
 print('main thread samples',total)
-want=sys.argv[2] if len(sys.argv)>2 else 'eMotion'
+want=sys.argv[2] if len(sys.argv)>2 else 'Twine'
 for (sym,mod),c in incl.most_common(400):
     if any(w in mod for w in want.split(',')):
         print(f'{c:6d} {100*c/total:5.1f}% {mod[:14]:14s} {sym}')

@@ -1,5 +1,7 @@
 # eMotion: notes for working on it
 
+The app is called **Twine** (renamed by the user on 27 September 2026): its display and product name, menus, home screen, Finder kind ("Twine Project") and `build/Twine.app` (test copy `build/TwineTest.app`). Everything behind the scenes still says eMotion, on purpose: the repo and folder, the Xcode project and target, the bundle id `com.nidhin.emotion` (which keeps saved settings), the `.emotion` file extension and its type id (which keep projects opening), and the `~/Documents/eMotion Creations` folder where projects live.
+
 The original brief is `docs/brief.md`. The project is now working through a Jitter-style redesign: `docs/redesign.md` (the brief) and `docs/redesign-decisions.md` (answers, which win where they differ). Read both before a milestone. This file is the map and the rules.
 
 ## Rules
@@ -14,7 +16,7 @@ The original brief is `docs/brief.md`. The project is now working through a Jitt
 - **Posted events do not reliably reach SwiftUI gestures.** `onTapGesture` and `DragGesture` sometimes ignore events sent through `window.sendEvent` for a whole session, while real `Button`s always respond. Make clickable controls real buttons; for drags in SwiftUI views (the curve editor), set the value from the hook and say the drag itself was not exercised.
 - **The save panel runs in another process.** A test hook can fill it in (`directoryURL` is ignored once it is up; set `NSNavLastRootDirectory` in the test copy's defaults instead) and close it with `window.endSheet(panel, returnCode: .OK)`; `panel.ok(nil)` throws. Errors are presented as sheets on the window (`presentError(_:modalFor:...)`) so they show in window captures.
 - **`hitTest` takes a point in the view's superview's coordinates.** For the window's content view that is the frame view, which runs upward, while the content view runs downward, so `content.hitTest(content.convert(p, from: nil))` mirrors the point top to bottom. Use `ChromelessWindow.viewUnder(_:)`. A test hook that builds its points the same wrong way passes anyway: that is how canvas hover shipped broken over the top of the canvas in Animate.
-- **Never drive the copy of the app the user is using.** For scripted tests make a copy of `build/eMotion.app` with its own bundle id (`com.nidhin.emotion.selftest`) and point it at a throwaway project in the scratchpad.
+- **Never drive the copy of the app the user is using.** For scripted tests make a copy of `build/Twine.app` with its own bundle id (`com.nidhin.emotion.selftest`) and point it at a throwaway project in the scratchpad.
 - When driving the running app to verify, the user is often working in other apps. Launch with `open -g`, use accessibility presses (`click button N of ...`) rather than synthetic keys or clicks, and never type unless eMotion is frontmost. Setting a SwiftUI text field's value through accessibility does not reach its binding.
 
 ## Where things stand
@@ -100,4 +102,4 @@ Placeholder SVGs in `Icons/`, 24x24, stroked, `M L H V C Z` only. Regenerate aft
 python3 Tools/svg_to_swift.py --icons Icons --out Packages/MotionKit/Sources/Theme/Icons.swift
 ```
 
-The app icon is a placeholder drawn by `Tools/make-placeholder-icon.swift`.
+The app icon is the designer's artwork, `Artwork/AppIcon.png` (a full-bleed square), set into the macOS icon grid (an 824 pt rounded square in a 1024 pt canvas, with a soft shadow) by `swift Tools/make-app-icon.swift Artwork/AppIcon.png eMotion/Resources/AppIcon.icns`.

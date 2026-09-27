@@ -11,7 +11,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
 
     private init() {
         let window = makeChromelessWindow(size: NSSize(width: 1180, height: 760), minSize: NSSize(width: 820, height: 560))
-        window.title = "eMotion"
+        window.title = "Twine"
         super.init(window: window)
         window.contentView = NSHostingView(rootView: HomeView(library: library).environment(menus))
         window.delegate = self

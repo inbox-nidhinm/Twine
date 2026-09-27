@@ -1,21 +1,27 @@
-// Draws eMotion's placeholder app icon and writes it as an .icns.
+// Makes the app icon from the designer's artwork and writes it as an .icns.
 //
-//     swift Tools/make-placeholder-icon.swift eMotion/Resources/AppIcon.icns
+//     swift Tools/make-app-icon.swift Artwork/AppIcon.png eMotion/Resources/AppIcon.icns
 //
-// A stand-in until the real artwork exists: the macOS icon grid (an 824pt
-// rounded square inside a 1024pt canvas), filled with the accent, carrying a
-// dot with two fading echoes behind it, which is about as literal as "motion"
-// gets. Replace the drawing, not the pipeline, when the real icon arrives.
+// The artwork is a full-bleed square. It is set into the macOS icon grid, an
+// 824 pt rounded square inside a 1024 pt canvas, with the soft shadow Mac
+// icons carry, so it sits in the Dock and Finder like every other app.
 import AppKit
 import CoreGraphics
 import Foundation
+import ImageIO
 
 let args = CommandLine.arguments
-guard args.count >= 2 else {
-    FileHandle.standardError.write(Data("usage: make-placeholder-icon.swift <output.icns>\n".utf8))
+guard args.count >= 3 else {
+    FileHandle.standardError.write(Data("usage: make-app-icon.swift <artwork.png> <output.icns>\n".utf8))
     exit(1)
 }
-let output = URL(fileURLWithPath: args[1])
+let artworkURL = URL(fileURLWithPath: args[1])
+let output = URL(fileURLWithPath: args[2])
+guard let source = CGImageSourceCreateWithURL(artworkURL as CFURL, nil),
+      let artwork = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+    FileHandle.standardError.write(Data("cannot read \(artworkURL.path)\n".utf8))
+    exit(1)
+}
 
 func context(_ size: Int) -> CGContext {
     CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
@@ -25,34 +31,24 @@ func context(_ size: Int) -> CGContext {
 
 let canvas: CGFloat = 1024
 let ctx = context(Int(canvas))
+ctx.interpolationQuality = .high
 let tile = CGRect(x: 100, y: 100, width: 824, height: 824)
 let shape = CGPath(roundedRect: tile, cornerWidth: 185, cornerHeight: 185, transform: nil)
 
-// The tile, with the soft drop shadow macOS icons carry.
+// The tile's shadow, cast by a filled tile drawn under the artwork.
 ctx.saveGState()
 ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 28, color: CGColor(gray: 0, alpha: 0.35))
 ctx.addPath(shape)
-ctx.setFillColor(CGColor(srgbRed: 0x4C / 255, green: 0x9F / 255, blue: 0xEF / 255, alpha: 1))
+ctx.setFillColor(CGColor(gray: 0, alpha: 1))
 ctx.fillPath()
 ctx.restoreGState()
 
-// Lighter at the top, as if lit from above.
+// The artwork, filling the tile and clipped to its corners.
 ctx.saveGState()
 ctx.addPath(shape)
 ctx.clip()
-let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
-                          colors: [CGColor(srgbRed: 0.55, green: 0.78, blue: 1, alpha: 1),
-                                   CGColor(srgbRed: 0.18, green: 0.47, blue: 0.86, alpha: 1)] as CFArray,
-                          locations: [0, 1])!
-ctx.drawLinearGradient(gradient, start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 100), options: [])
+ctx.draw(artwork, in: tile)
 ctx.restoreGState()
-
-// A dot in motion: the dot, and two echoes trailing to its left.
-let y: CGFloat = 512
-for (x, radius, alpha) in [(330.0, 70.0, 0.28), (450.0, 92.0, 0.55), (610.0, 128.0, 1.0)] {
-    ctx.setFillColor(CGColor(gray: 1, alpha: alpha))
-    ctx.fillEllipse(in: CGRect(x: x - radius, y: y - radius, width: radius * 2, height: radius * 2))
-}
 
 guard let master = ctx.makeImage() else { exit(1) }
 

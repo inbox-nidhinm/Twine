@@ -8,7 +8,7 @@
 # $OUT/NAME.sample.txt and prints the ranking.
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUTROOT=${EMOTION_TEST_OUT:-${TMPDIR%/}/emotion-selftest}
-N="eMotion""Test"
+N="Twine""Test"
 pkill -x "$N"; sleep 2
 $HERE/run.sh $1 $2 "$3" >/dev/null 2>&1 &
 sleep 4
@@ -17,4 +17,4 @@ sleep $4
 sample $P $5 -mayDie -file $OUTROOT/$2.sample.txt >/dev/null 2>&1
 wait
 grep PERF $OUTROOT/$2.log
-python3 $HERE/hot.py $OUTROOT/$2.sample.txt eMotionTest | head -40
+python3 $HERE/hot.py $OUTROOT/$2.sample.txt TwineTest | head -40

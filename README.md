@@ -1,12 +1,12 @@
-# eMotion
+# Twine
 
-A native macOS app for motion design, in the spirit of Jitter, in Flip's design language.
+A native macOS app for motion design (the project and its code are still called eMotion), in the spirit of Jitter, in Flip's design language.
 
 ## Running it
 
 ```bash
 ./make-app.sh
-open build/eMotion.app
+open build/Twine.app
 ```
 
 `./make-app.sh debug` makes a debug build. `./test.sh` runs the unit tests. The project also opens in Xcode (`eMotion.xcodeproj`), where Run works as usual.

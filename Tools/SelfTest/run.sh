@@ -9,13 +9,13 @@
 # log in $OUT/NAME.log, where OUT is $EMOTION_TEST_OUT or a folder in $TMPDIR.
 # Prints the state after every step.
 HERE="$(cd "$(dirname "$0")" && pwd)"
-APP="$HERE/../../build/eMotionTest.app"
+APP="$HERE/../../build/TwineTest.app"
 OUTROOT=${EMOTION_TEST_OUT:-${TMPDIR%/}/emotion-selftest}
 PROJECT=$1; NAME=$2
 [[ -d $PROJECT ]] && SRC=$PROJECT || SRC=$HERE/Projects/$PROJECT.emotion
 FILE=$(basename $SRC)
 OUT=$OUTROOT/$NAME; LOG=$OUTROOT/$NAME.log
-N="eMotion""Test"
+N="Twine""Test"
 pkill -x "$N"; sleep 1.5
 mkdir -p $OUTROOT; rm -rf $OUT $OUTROOT/$FILE; mkdir -p $OUT
 cp -R $SRC $OUTROOT/$FILE

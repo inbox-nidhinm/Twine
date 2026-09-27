@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "Twine", changes: [
+            "The app is now called Twine, with a new icon: in the Dock, in Finder, in the menus and on the home screen.",
+            "Projects keep their .emotion ending and stay in the eMotion Creations folder, so everything made so far opens as before, and every setting is kept.",
+            "The export counter steps each digit up once as it changes, rather than rolling like an odometer.",
+        ]),
         .init(date: "27 September 2026", title: "Export panel lined up", changes: [
             "The export panel's settings column is now as wide as the layers panel, so its edge lines up with it.",
             "The counter's digits step up once each time they change, instead of rolling like an odometer, and fade softly in and out rather than being cut off at a hard edge.",

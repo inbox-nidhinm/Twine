@@ -50,7 +50,7 @@ struct HomeView: View {
 
     private var sidebarColumn: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("eMotion")
+            Text("Twine")
                 .displayTitle(24)
                 .foregroundStyle(Theme.textPrimary)
                 .padding(.horizontal, Theme.panelPad)
