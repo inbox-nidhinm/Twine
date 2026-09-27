@@ -31,12 +31,15 @@ public enum PresetCategory: String, Codable, Sendable, CaseIterable {
     case exit
     /// Draw the eye to it and leave it where it was.
     case emphasis
+    /// Bring a sound in or take it out.
+    case sound
 
     public var title: String {
         switch self {
         case .entrance: "Entrances"
         case .exit: "Exits"
         case .emphasis: "Emphasis"
+        case .sound: "Sound"
         }
     }
 }
@@ -74,6 +77,9 @@ public enum PresetEffect: Codable, Sendable, Equatable {
     case rotate(by: Double, entering: Bool)
     /// Layer blur, in Figma's pixels, from `from` (nil carries on) to `to`.
     case blur(from: Double?, to: Double)
+    /// Volume from `from` (nil carries on) to `to` (nil is the layer's own
+    /// level, at most 100%).
+    case volume(from: Double?, to: Double?)
 
     public var kind: ActionKind {
         switch self {
@@ -82,15 +88,17 @@ public enum PresetEffect: Codable, Sendable, Equatable {
         case .scale: .scale
         case .rotate: .rotate
         case .blur: .layerBlur
+        case .volume: .volume
         }
     }
 }
 
 public enum Presets {
     /// The presets that suit every one of `layers`: those whose every step
-    /// is an action they can all take.
-    public static func available(for layers: [Layer]) -> [Preset] {
-        let kinds = Set(ActionFactory.kinds(for: layers))
+    /// is an action they can all take. Sound presets only suit layers with
+    /// sound, which only `project` knows for a video.
+    public static func available(for layers: [Layer], in project: Project) -> [Preset] {
+        let kinds = Set(ActionFactory.kinds(for: layers, in: project))
         guard !kinds.isEmpty else { return [] }
         return library.filter { preset in preset.steps.allSatisfy { kinds.contains($0.effect.kind) } }
     }
@@ -123,10 +131,23 @@ public enum Presets {
                     : .rotate(RotateAction(mode: .by, end: by))
             case .blur(let from, let to):
                 spec = .layerBlur(LayerBlurAction(initial: from, end: to))
+            case .volume(let from, let to):
+                // A sound turned right down comes back to its own level, or
+                // all the way, as a faded-out layer does.
+                let own = min(state.volume.flatMap { $0 > 0.01 ? $0 : nil } ?? Self.designVolume(layer), 1)
+                spec = .volume(VolumeAction(initial: from, end: to ?? own))
             }
             return Action(target: layer.id, start: frameRate.snapped(begin + step.start),
                           duration: max(frameRate.snapped(step.duration), frameRate.frameDuration),
                           easing: step.easing, spec: spec)
+        }
+    }
+
+    private static func designVolume(_ layer: Layer) -> Double {
+        switch layer.content {
+        case .video(let v) where v.volume > 0.01: v.volume
+        case .audio(let a) where a.volume > 0.01: a.volume
+        default: 1
         }
     }
 
@@ -178,6 +199,10 @@ public enum Presets {
             PresetStep(.opacity(from: nil, to: 0), at: 0.2, for: 0.2),
         ]),
         Preset("blur-out", "Blur Out", .exit, [PresetStep(.blur(from: nil, to: 24), for: 0.5, easing: accelerate), fadeOut(0.5)]),
+
+        // Sound
+        Preset("fade-sound-in", "Fade Sound In", .sound, [PresetStep(.volume(from: 0, to: nil), for: 1)]),
+        Preset("fade-sound-out", "Fade Sound Out", .sound, [PresetStep(.volume(from: nil, to: 0), for: 1)]),
 
         // Emphasis
         Preset("pulse", "Pulse", .emphasis, [

@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import MotionModel
 import MotionEditing
+import MotionEvaluation
 import Theme
 
 /// The rows under the ruler, in a scroll view of their own so the ruler and
@@ -358,11 +359,21 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
     }
 
     /// A sound's loudness along its Play bar, for the part of the file it
-    /// plays, drawn faintly inside it.
+    /// plays, drawn faintly inside it. Volume actions shape it, so a fade
+    /// shows as the waveform tapering, against the loudest the layer gets.
     private func drawWaveform(_ action: Action, play: PlayAction, in rect: CGRect, selected: Bool, ctx: CGContext) {
         guard let controller, let asset = controller.asset(ofLayer: action.targetLayerID), asset.hasAudio,
               let peaks = controller.waveforms.peaks(for: asset.id, at: controller.document?.mediaURL(for: asset.id)),
               !peaks.isEmpty, action.duration > 0 else { return }
+        var level: ((Double) -> Double)?
+        let fades = controller.project.actions(on: action.targetLayerID).filter { $0.isEnabled && $0.spec.kind == .volume }
+        if !fades.isEmpty, let layer = controller.project.layer(withID: action.targetLayerID) {
+            let envelope = volumeEnvelope(of: layer, fades)
+            let design = LayerState(design: layer).volume ?? 1
+            let loudest = max(envelope.map(\.volume).max() ?? 0, design, 1e-6)
+            let curve = AudioClip(mediaID: asset.id, start: 0, sourceStart: 0, duration: 0, volume: design, envelope: envelope)
+            level = { time in min(max(curve.volume(at: time) / loudest, 0), 1) }
+        }
         ctx.saveGState()
         ctx.addPath(CGPath(roundedRect: rect.insetBy(dx: 1, dy: 2), cornerWidth: 5, cornerHeight: 5, transform: nil))
         ctx.clip()
@@ -374,7 +385,8 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
             let t = play.trimStart + Double(x - rect.minX) / rect.width * action.duration
             let i = Int(t * Waveforms.peaksPerSecond)
             if i >= 0, i < peaks.count {
-                let h = max(CGFloat(peaks[i]) * half, 0.5)
+                let scale = level.map { CGFloat($0(action.start + (t - play.trimStart))) } ?? 1
+                let h = max(CGFloat(peaks[i]) * half * scale, 0.5)
                 path.addRect(CGRect(x: x, y: mid - h, width: 1, height: h * 2))
             }
             x += 2
@@ -724,6 +736,7 @@ extension ActionKind {
         case .star: return .star
         case .path: return .pen
         case .play: return .play
+        case .volume: return .speaker
         }
     }
 }

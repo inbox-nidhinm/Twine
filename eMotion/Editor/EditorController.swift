@@ -324,27 +324,27 @@ final class EditorController {
     // MARK: Actions
 
     /// Kinds of action the selection can take together.
-    var availableActions: [ActionKind] { ActionFactory.kinds(for: selectedLayers) }
+    var availableActions: [ActionKind] { ActionFactory.kinds(for: selectedLayers, in: project) }
 
     /// Adds an action of `kind` to every selected layer, at the playhead, on
     /// new rows at the bottom of the timeline, and selects them.
     func addAction(_ kind: ActionKind) {
         let tracks = ActionTracks(project.actions)
-        let made = selectedLayers.filter { ActionFactory.kinds(for: $0).contains(kind) }.map { layer in
+        let made = selectedLayers.filter { ActionFactory.kinds(for: $0, in: project).contains(kind) }.map { layer in
             ActionFactory.make(kind, for: layer, at: editor.time, state: tracks.state(of: layer, at: editor.time),
                                frameRate: frameRate, rowOrder: 0, mediaLength: asset(ofLayer: layer.id)?.duration)
         }
         insertAndShow(made, name: made.first.map { "Add \($0.name)" } ?? "Add Action")
     }
 
-    var availablePresets: [Preset] { Presets.available(for: selectedLayers) }
+    var availablePresets: [Preset] { Presets.available(for: selectedLayers, in: project) }
 
     /// Applies a preset to every selected layer at the playhead: its actions
     /// go on new rows at the bottom, selected and played, as Add Action's do.
     func addPreset(_ preset: Preset) {
         let tracks = ActionTracks(project.actions)
         let layers = selectedLayers.filter { layer in
-            let kinds = Set(ActionFactory.kinds(for: layer))
+            let kinds = Set(ActionFactory.kinds(for: layer, in: project))
             return preset.steps.allSatisfy { kinds.contains($0.effect.kind) }
         }
         let made = layers.flatMap { layer in

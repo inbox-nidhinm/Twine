@@ -149,7 +149,7 @@ public enum ActionEditing {
             return actions.filter { project.layer(withID: $0.targetLayerID) != nil }.map { place($0, on: $0.targetLayerID) }
         }
         return targets.flatMap { layer in
-            let allowed = Set(ActionFactory.kinds(for: layer))
+            let allowed = Set(ActionFactory.kinds(for: layer, in: project))
             return actions.filter { allowed.contains($0.spec.kind) }.map { place($0, on: layer.id) }
         }
     }

@@ -109,7 +109,8 @@ final class AudioMixdown: @unchecked Sendable {
 }
 
 /// The composition's sound laid out for AVFoundation: each clip on its own
-/// track of a composition, at its time, with its volume in an audio mix.
+/// track of a composition, at its time, with its volume, or its fades as
+/// volume ramps, in an audio mix.
 /// Export reads it; the editor's preview plays it.
 public final class AudioComposition: @unchecked Sendable {
     public let composition: AVMutableComposition
@@ -142,7 +143,18 @@ public final class AudioComposition: @unchecked Sendable {
                 continue
             }
             let p = AVMutableAudioMixInputParameters(track: track)
-            p.setVolume(Float(clip.volume), at: .zero)
+            let points = clip.envelope
+            if let first = points.first {
+                // A fade is a run of straight ramps between the envelope's
+                // points; the level holds before the first and after the last.
+                if first.time > 0 { p.setVolume(Float(first.volume), at: .zero) }
+                for (a, b) in zip(points, points.dropFirst()) where b.time > a.time {
+                    p.setVolumeRamp(fromStartVolume: Float(a.volume), toEndVolume: Float(b.volume),
+                                    timeRange: CMTimeRange(start: time(a.time), end: time(b.time)))
+                }
+            } else {
+                p.setVolume(Float(clip.volume), at: .zero)
+            }
             parameters.append(p)
             tracks.append(track)
         }

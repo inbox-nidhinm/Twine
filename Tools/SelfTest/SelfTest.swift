@@ -169,6 +169,9 @@ enum SelfTest {
             case "add":
                 // Adds an action of a kind, by name, as the Add Action menu does.
                 if let kind = ActionKind(rawValue: parts[1]) { controller.addAction(kind) } else { log("unknown kind \(parts[1])") }
+            case "offers":
+                // What Add Action and Add Preset offer for the selection.
+                log("OFFERS actions=\(controller.availableActions.map(\.rawValue)) presets=\(controller.availablePresets.map(\.name))")
             case "addsample":
                 controller.addAction(parts[1] == "rotate" ? .rotate : .move)
                 for k in 0..<8 {

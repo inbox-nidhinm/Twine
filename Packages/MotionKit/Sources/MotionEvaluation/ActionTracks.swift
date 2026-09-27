@@ -8,7 +8,7 @@ public enum Channel: String, Hashable, Sendable, CaseIterable {
     case position, scale, rotation, opacity, size, visibility
     case fill, stroke, trim, cornerRadius, shadow, layerBlur, backgroundBlur
     case letterSpacing, lineHeight, text, arc, star, path
-    case media
+    case media, volume
 }
 
 extension ActionKind {
@@ -34,6 +34,7 @@ extension ActionKind {
         case .star: return .star
         case .path: return .path
         case .play: return .media
+        case .volume: return .volume
         }
     }
 }
@@ -120,6 +121,8 @@ public struct LayerState: Sendable, Equatable {
     public var path: BezierPath?
     /// Video and audio only: where in the file the layer is, in seconds.
     public var sourceTime: Double?
+    /// Video and audio only: the sound's level, 1 being the file's own.
+    public var volume: Double?
 
     /// The layer as it is designed, with no actions.
     public init(design layer: Layer) {
@@ -143,7 +146,8 @@ public struct LayerState: Sendable, Equatable {
             }
         }
         switch layer.content {
-        case .video, .audio: sourceTime = 0
+        case .video(let v): sourceTime = 0; volume = v.volume
+        case .audio(let a): sourceTime = 0; volume = a.volume
         default: break
         }
         if case .text(let t) = layer.content {
@@ -240,6 +244,7 @@ public struct ActionTracks: Sendable {
         if let arc = state.arc { state.arc = walk(arc, list(.arc).compactMap(Self.arcStep), at: time) }
         if let star = state.star { state.star = walk(star, list(.star).compactMap(Self.starStep), at: time) }
         if let path = state.path { state.path = walk(path, list(.path).compactMap(Self.pathStep), at: time) }
+        if let volume = state.volume { state.volume = walk(volume, list(.volume).compactMap(Self.volumeStep), at: time) }
         if state.sourceTime != nil { state.sourceTime = Self.sourceTime(list(.media), at: time) }
         return state
     }
@@ -332,6 +337,11 @@ public struct ActionTracks: Sendable {
 
     private static func pathStep(_ a: Action) -> Step<BezierPath>? {
         guard case .path(let v) = a.spec else { return nil }
+        return Step(a, initial: v.initial, target: { _ in v.end })
+    }
+
+    private static func volumeStep(_ a: Action) -> Step<Double>? {
+        guard case .volume(let v) = a.spec else { return nil }
         return Step(a, initial: v.initial, target: { _ in v.end })
     }
 

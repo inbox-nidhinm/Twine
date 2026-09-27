@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "Volume fades", changes: [
+            "A new Volume action, under Media in Animate, fades a video's or a sound's level to anywhere from 0% to 100%, following its easing. It is heard as the timeline plays and in exported movies.",
+            "Add Preset has Fade Sound In and Fade Sound Out, each a second long.",
+            "Volume, the sound presets and the Sound section in Design only appear for sounds and for video that has a sound track.",
+            "A Play bar's waveform tapers where the sound fades.",
+        ]),
         .init(date: "27 September 2026", title: "Pen tool and point editing", changes: [
             "The Pen (P) is back in the toolbar. Click to place points, drag to pull out curve handles, and click the first point to close the shape; Escape or Return leaves it open, as a line. The pointer shows when a click will add a point to a line, move a point, or join onto an end.",
             "Double-click a shape, or press Return, to edit its points as in Figma: pick them by clicking or with a box, drag points, handles or segments, ⌘-click to make a point sharp or smooth, ⌘-drag to pull out handles, Option-drag to move one handle alone, and Delete to take points out. Rectangles, ellipses, lines, polygons and stars turn into paths when their points change.",

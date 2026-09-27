@@ -35,9 +35,10 @@ import MotionEvaluation
         let pen = PathEditing.reshaped(star, to: PathEditing.path(of: star)!).layer
         let layers = [stroked, text, ellipse, star, video, pen]
         // Between them, every kind is offered somewhere.
-        #expect(Set(layers.flatMap { ActionFactory.kinds(for: $0) }) == Set(ActionKind.allCases))
+        #expect(Set(layers.flatMap { ActionFactory.kinds(for: $0, hasSound: true) }) == Set(ActionKind.allCases))
         for layer in layers {
-            for kind in ActionFactory.kinds(for: layer) {
+            // Volume is heard, not seen; it has a test of its own.
+            for kind in ActionFactory.kinds(for: layer) where kind != .volume {
                 let a = ActionFactory.make(kind, for: layer, at: 1, state: LayerState(design: layer),
                                            frameRate: .fps60, rowOrder: 0)
                 let p = Project(layers: [layer], actions: [a])
@@ -72,9 +73,21 @@ import MotionEvaluation
         #expect(ActionFactory.kinds(for: square) == [.move, .scale, .rotate, .opacity, .resize, .visibility,
                                                      .color, .cornerRadius, .shadow, .layerBlur, .backgroundBlur])
         #expect(!ActionFactory.kinds(for: group).contains(.resize))
-        #expect(ActionFactory.kinds(for: audio) == [.play])
-        #expect(ActionFactory.kinds(for: [square, group]) == ActionFactory.kinds(for: group))
-        #expect(ActionFactory.kinds(for: []).isEmpty)
+        #expect(ActionFactory.kinds(for: audio) == [.play, .volume])
+        let project = Project(layers: [square, group])
+        #expect(ActionFactory.kinds(for: [square, group], in: project) == ActionFactory.kinds(for: group))
+        #expect(ActionFactory.kinds(for: [], in: project).isEmpty)
+    }
+
+    @Test func aNewVolumeFadesOutOrIn() {
+        let sound = Layer(name: "A", content: .audio(AudioContent(mediaID: UUID())), size: Size2(0, 0), position: .zero)
+        var state = LayerState(design: sound)
+        let out = ActionFactory.make(.volume, for: sound, at: 0, state: state, frameRate: .fps60, rowOrder: 0)
+        #expect(out.spec == .volume(VolumeAction(end: 0)))
+        #expect(out.duration == 1)
+        state.volume = 0
+        let back = ActionFactory.make(.volume, for: sound, at: 0, state: state, frameRate: .fps60, rowOrder: 0)
+        #expect(back.spec == .volume(VolumeAction(end: 1)))
     }
 
     @Test func newRowsGoAfterEveryOther() {

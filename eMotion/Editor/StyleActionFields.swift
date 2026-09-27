@@ -28,6 +28,7 @@ struct StyleValueFields: View {
         case .star(let s): star(s)
         case .path(let p): path(p)
         case .play(let p): play(p)
+        case .volume(let v): volume(v)
         default: EmptyView()
         }
     }
@@ -490,6 +491,25 @@ struct StyleValueFields: View {
         .help("How far into the file it starts playing. Dragging the bar's left end on the timeline trims it too.")
     }
 
+    /// A fade, in percent of the file's own level, up to 100%.
+    @ViewBuilder private func volume(_ v: VolumeAction) -> some View {
+        LabeledRow(label: "From") {
+            OptionalField(value: v.initial.map { $0 * 100 }, placeholder: (inherited?.volume ?? 1) * 100,
+                          suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { x in
+                editing("Starting Volume", Self.volume { a, _ in a.initial = x.map { $0 / 100 } })
+            }
+            clearButton(v.initial != nil) { editing("Starting Volume", Self.volume { a, _ in a.initial = nil }) }
+        }
+        .help("The level it starts at. Set it to 0% to fade a sound in from nothing, before the action begins.")
+        LabeledRow(label: "To") {
+            UnitField(value: v.end * 100, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { x in
+                editing("Volume", Self.volume { a, _ in a.end = x / 100 })
+            }
+            spacer
+        }
+        .help("The level it ends at: 100% is the file's own")
+    }
+
     // MARK: Editing
 
     /// A change to one kind's values, given what the action would inherit.
@@ -533,6 +553,9 @@ struct StyleValueFields: View {
     }
     private static func star(_ change: @escaping Change<StarAction>) -> (inout Action, LayerState?) -> Void {
         { a, st in if case .star(var v) = a.spec { change(&v, st); a.spec = .star(v) } }
+    }
+    private static func volume(_ change: @escaping Change<VolumeAction>) -> (inout Action, LayerState?) -> Void {
+        { a, st in if case .volume(var v) = a.spec { change(&v, st); a.spec = .volume(v) } }
     }
     private static func path(_ change: @escaping Change<PathAction>) -> (inout Action, LayerState?) -> Void {
         { a, st in if case .path(var v) = a.spec { change(&v, st); a.spec = .path(v) } }

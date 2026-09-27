@@ -87,9 +87,34 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
 
     @Test func onlyPresetsALayerCanTakeAreOffered() {
         let sound = Layer(name: "Sound", content: .audio(AudioContent(mediaID: UUID())), size: Size2(0, 0), position: .zero)
-        #expect(Presets.available(for: [sound]).isEmpty)
-        #expect(Presets.available(for: [square()]).count == Presets.library.count)
-        #expect(Presets.available(for: [square(), sound]).isEmpty)
+        let project = Project(layers: [sound, square()])
+        let soundPresets = Presets.library.filter { $0.category == .sound }
+        #expect(soundPresets.count == 2)
+        // A sound takes only the sound presets, a shape everything else.
+        #expect(Presets.available(for: [sound], in: project) == soundPresets)
+        #expect(Presets.available(for: [square()], in: project).count == Presets.library.count - soundPresets.count)
+        #expect(Presets.available(for: [square(), sound], in: project).isEmpty)
+    }
+
+    @Test func soundPresetsSuitOnlyVideoWithSound() {
+        let silent = MediaAsset(kind: .video, fileName: "s.mov", originalName: "s.mov", contentHash: "s", duration: 2)
+        let loud = MediaAsset(kind: .video, fileName: "l.mov", originalName: "l.mov", contentHash: "l", duration: 2, hasAudio: true)
+        let a = Layer(name: "A", content: .video(VideoContent(mediaID: silent.id)), size: Size2(10, 10), position: .zero)
+        let b = Layer(name: "B", content: .video(VideoContent(mediaID: loud.id)), size: Size2(10, 10), position: .zero)
+        var project = Project(layers: [a, b])
+        project.media = [silent, loud]
+        #expect(!Presets.available(for: [a], in: project).contains { $0.category == .sound })
+        #expect(Presets.available(for: [b], in: project).contains { $0.id == "fade-sound-in" })
+        #expect(!ActionFactory.kinds(for: a, in: project).contains(.volume))
+        #expect(ActionFactory.kinds(for: b, in: project).contains(.volume))
+    }
+
+    @Test func fadingSoundInComesUpToItsOwnLevelAtMost100Percent() {
+        let sound = Layer(name: "Sound", content: .audio(AudioContent(mediaID: UUID(), volume: 1.5)), size: Size2(0, 0), position: .zero)
+        let fade = Presets.library.first { $0.id == "fade-sound-in" }!
+        let made = Presets.actions(fade, for: sound, at: 0, state: LayerState(design: sound), frameRate: .fps60)
+        #expect(made.first?.spec == .volume(VolumeAction(initial: 0, end: 1)))
+        #expect(made.first?.duration == 1)
     }
 
     @Test func stepsLandOnFrames() {

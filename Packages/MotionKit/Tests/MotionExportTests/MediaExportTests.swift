@@ -164,6 +164,30 @@ private func loudness(of url: URL) async throws -> [Double] {
         #expect(try await AVURLAsset(url: url).loadTracks(withMediaType: .audio).isEmpty)
     }
 
+    @Test func volumeFadesAreHeardInTheMovie() async throws {
+        let sound = try tone(seconds: 2)
+        defer { try? FileManager.default.removeItem(at: sound) }
+        let asset = MediaAsset(kind: .audio, fileName: "t.wav", originalName: "t.wav", contentHash: "v", duration: 2)
+        let layer = Layer(name: "Tone", content: .audio(AudioContent(mediaID: asset.id)), size: Size2(0, 0), position: .zero)
+        let play = Action(target: layer.id, start: 0, duration: 2, spec: .play(PlayAction()))
+        // Down to nothing, evenly, from 0.5 s to 1.5 s.
+        let fade = Action(target: layer.id, start: 0.5, duration: 1, easing: .linear, spec: .volume(VolumeAction(end: 0)))
+        let project = Project(composition: Composition(width: 64, height: 64, frameRate: .fps30, duration: 2),
+                              layers: [layer], actions: [play, fade], media: [asset])
+        for format in [ExportFormat.h264, .proRes422] {
+            let url = temporaryURL(format.fileExtension)
+            defer { try? FileManager.default.removeItem(at: url) }
+            try Exporter.export(project, settings: ExportSettings(format: format), to: url, media: [asset.id: sound])
+            let levels = try await loudness(of: url)
+            try #require(levels.count >= 18, "\(format)")
+            // A sine of amplitude 0.5 has a loudness of about 0.35.
+            let full = levels[2]
+            #expect(full > 0.3, "full before the fade, \(format)")
+            #expect(abs(levels[10] / full - 0.5) < 0.08, "half way through the fade, \(format): \(levels[10] / full)")
+            #expect(levels[17] < 0.01, "silent after it, \(format)")
+        }
+    }
+
     @Test func aRangeHoldsOnlyItsFrames() async throws {
         let url = temporaryURL("mov")
         defer { try? FileManager.default.removeItem(at: url) }

@@ -72,6 +72,7 @@ public enum ActionSpec: Sendable, Equatable {
     case star(StarAction)
     case path(PathAction)
     case play(PlayAction)
+    case volume(VolumeAction)
 
     public var kind: ActionKind {
         switch self {
@@ -96,6 +97,7 @@ public enum ActionSpec: Sendable, Equatable {
         case .star: return .star
         case .path: return .path
         case .play: return .play
+        case .volume: return .volume
         }
     }
 }
@@ -106,7 +108,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     case layerBlur, backgroundBlur
     case letterSpacing, lineHeight, counter, changeText
     case arc, star, path
-    case play
+    case play, volume
 
     public var defaultName: String {
         switch self {
@@ -131,6 +133,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .star: return "Star"
         case .path: return "Path"
         case .play: return "Play"
+        case .volume: return "Volume"
         }
     }
 
@@ -142,7 +145,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .layerBlur, .backgroundBlur: return .blur
         case .letterSpacing, .lineHeight, .counter, .changeText: return .text
         case .arc, .star, .path: return .shape
-        case .play: return .media
+        case .play, .volume: return .media
         }
     }
 }
@@ -493,11 +496,23 @@ public struct PlayAction: Codable, Sendable, Equatable {
     }
 }
 
+/// A video's or a sound's level, 0 to 1 (100%, the file's own), fading
+/// along the action's easing. Heard in preview and exports alike.
+public struct VolumeAction: Codable, Sendable, Equatable {
+    public var initial: Double?
+    public var end: Double
+
+    public init(initial: Double? = nil, end: Double) {
+        self.initial = initial
+        self.end = end
+    }
+}
+
 extension ActionSpec: Codable {
     private enum CodingKeys: String, CodingKey {
         case type, move, scale, rotate, opacity, resize, visibility
         case color, stroke, trim, cornerRadius, shadow, layerBlur, backgroundBlur
-        case letterSpacing, lineHeight, counter, changeText, arc, star, path, play
+        case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume
     }
 
     public init(from decoder: Decoder) throws {
@@ -524,6 +539,7 @@ extension ActionSpec: Codable {
         case .star: self = .star(try c.decode(StarAction.self, forKey: .star))
         case .path: self = .path(try c.decode(PathAction.self, forKey: .path))
         case .play: self = .play(try c.decode(PlayAction.self, forKey: .play))
+        case .volume: self = .volume(try c.decode(VolumeAction.self, forKey: .volume))
         }
     }
 
@@ -552,6 +568,7 @@ extension ActionSpec: Codable {
         case .star(let v): try c.encode(v, forKey: .star)
         case .path(let v): try c.encode(v, forKey: .path)
         case .play(let v): try c.encode(v, forKey: .play)
+        case .volume(let v): try c.encode(v, forKey: .volume)
         }
     }
 }

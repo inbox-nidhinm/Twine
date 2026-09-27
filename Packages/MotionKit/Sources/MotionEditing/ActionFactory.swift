@@ -9,6 +9,9 @@ public enum ActionFactory {
     public static let defaultDuration = 0.5
     /// How long a new Counter runs.
     public static let counterDuration = 2.0
+    /// How long a new Volume fade runs: a sound cut in half a second sounds
+    /// clipped.
+    public static let fadeDuration = 1.0
 
     private static func fontSize(of layer: Layer) -> Double {
         if case .text(let t) = layer.content { return t.fontSize }
@@ -19,13 +22,15 @@ public enum ActionFactory {
     /// nothing to move or fade; a group's size is its children's, so it
     /// scales rather than resizes. Style acts on what a shape has: Colour
     /// on its first fill, Stroke and Trim on its first stroke, Corner Radius
-    /// on a rectangle. Background blur follows a shape's outline.
-    public static func kinds(for layer: Layer) -> [ActionKind] {
+    /// on a rectangle. Background blur follows a shape's outline. Volume is
+    /// for layers with sound: always a sound, and a video when `hasSound`
+    /// says its file has a sound track (see `kinds(for:in:)`).
+    public static func kinds(for layer: Layer, hasSound: Bool = false) -> [ActionKind] {
         let transform: [ActionKind] = [.move, .scale, .rotate, .opacity, .resize, .visibility]
         switch layer.content {
         case .audio:
-            // Sound has nothing to move or fade; it only plays.
-            return [.play]
+            // Sound has nothing to move or fade; it plays, louder or softer.
+            return [.play, .volume]
         case .group:
             return transform.filter { $0 != .resize } + [.shadow, .layerBlur]
         case .shape(let shape):
@@ -46,15 +51,21 @@ public enum ActionFactory {
         case .image:
             return transform + [.shadow, .layerBlur]
         case .video:
-            return transform + [.shadow, .layerBlur, .play]
+            return transform + [.shadow, .layerBlur, .play] + (hasSound ? [.volume] : [])
         }
     }
 
+    /// The kinds for a layer in `project`, which knows whether a video's file
+    /// has sound.
+    public static func kinds(for layer: Layer, in project: Project) -> [ActionKind] {
+        kinds(for: layer, hasSound: project.hasSound(layer))
+    }
+
     /// Kinds offered for several layers at once: those every one of them takes.
-    public static func kinds(for layers: [Layer]) -> [ActionKind] {
+    public static func kinds(for layers: [Layer], in project: Project) -> [ActionKind] {
         guard let first = layers.first else { return [] }
-        return layers.dropFirst().reduce(kinds(for: first)) { shared, layer in
-            let allowed = Set(kinds(for: layer))
+        return layers.dropFirst().reduce(kinds(for: first, in: project)) { shared, layer in
+            let allowed = Set(kinds(for: layer, in: project))
             return shared.filter(allowed.contains)
         }
     }
@@ -141,10 +152,15 @@ public enum ActionFactory {
         case .play:
             spec = .play(PlayAction(trimStart: 0))
             playing = true
+        case .volume:
+            // Fades the sound out, or in to its own level when it is silent.
+            let level = state.volume ?? 1
+            spec = .volume(VolumeAction(end: level > 0.01 ? 0 : 1))
         }
         // Counting a hundred numbers in half a second is a blur; a counter
         // gets long enough to read.
         let length = kind == .visibility ? 0 : counting ? frameRate.snapped(counterDuration)
+            : kind == .volume ? frameRate.snapped(fadeDuration)
             : playing ? max(frameRate.snapped(mediaLength ?? defaultDuration), frameRate.frameDuration) : duration
         return Action(target: layer.id, start: start, duration: length,
                       name: name, rowOrder: rowOrder, spec: spec)
@@ -172,5 +188,17 @@ public enum ActionFactory {
     /// The row at the bottom of the timeline, after every other action.
     public static func nextRowOrder(in project: Project) -> Int {
         (project.actions.map(\.rowOrder).max() ?? -1) + 1
+    }
+}
+
+extension Project {
+    /// Whether a layer makes sound: a sound always, a video when its file
+    /// has a sound track.
+    public func hasSound(_ layer: Layer) -> Bool {
+        switch layer.content {
+        case .audio: return true
+        case .video(let v): return media.first { $0.id == v.mediaID }?.hasAudio ?? false
+        default: return false
+        }
     }
 }

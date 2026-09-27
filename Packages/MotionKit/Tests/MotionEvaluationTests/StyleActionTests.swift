@@ -226,3 +226,48 @@ private func gradient(_ colors: [RGBA], radial: Bool = false) -> Paint {
         #expect(p?.subpaths[0].points.map(\.position) == [Vec2(0, 0), Vec2(200, 0), Vec2(0, 50)])
     }
 }
+
+@Suite struct VolumeActionTests {
+    private let asset = MediaAsset(kind: .audio, fileName: "a.wav", originalName: "a.wav", contentHash: "a", duration: 10)
+
+    private func sound(volume: Double = 1) -> Layer {
+        Layer(name: "Sound", content: .audio(AudioContent(mediaID: asset.id, volume: volume)), size: Size2(0, 0), position: .zero)
+    }
+
+    private func clip(_ layer: Layer, _ actions: [Action]) -> AudioClip? {
+        let play = Action(target: layer.id, start: 0, duration: 10, spec: .play(PlayAction()))
+        return audioClips(Project(composition: Composition(width: 10, height: 10, frameRate: .fps30, duration: 10),
+                                  layers: [layer], actions: [play] + actions, media: [asset])).first
+    }
+
+    @Test func aFadeFollowsItsEasing() throws {
+        let layer = sound()
+        let fade = Action(target: layer.id, start: 2, duration: 2, easing: .preset(.slowDown, intensity: 0.6),
+                          spec: .volume(VolumeAction(end: 0)))
+        let c = try #require(clip(layer, [fade]))
+        #expect(c.volume(at: 1) == 1)
+        #expect(c.volume(at: 5) == 0)
+        // Slowing down, it has dropped well past half way by the middle.
+        let eased = 1 - Easing.preset(.slowDown, intensity: 0.6).progress(0.5)
+        #expect(abs(c.volume(at: 3) - eased) < 0.02)
+        #expect(c.volume(at: 3) < 0.4)
+    }
+
+    @Test func aSilentSoundFadingInIsStillHeard() throws {
+        let layer = sound(volume: 0)
+        let fadeIn = Action(target: layer.id, start: 1, duration: 1, easing: .linear, spec: .volume(VolumeAction(end: 1)))
+        let c = try #require(clip(layer, [fadeIn]))
+        #expect(c.volume(at: 0.5) == 0)
+        #expect(abs(c.volume(at: 1.5) - 0.5) < 0.02)
+        // With no fade it makes no sound at all, so no clip.
+        #expect(clip(layer, []) == nil)
+    }
+
+    @Test func anInstantChangeIsAStep() throws {
+        let layer = sound()
+        let cut = Action(target: layer.id, start: 3, duration: 0, spec: .volume(VolumeAction(end: 0.2)))
+        let c = try #require(clip(layer, [cut]))
+        #expect(abs(c.volume(at: 2.99) - 1) < 1e-6)
+        #expect(abs(c.volume(at: 3.01) - 0.2) < 1e-6)
+    }
+}

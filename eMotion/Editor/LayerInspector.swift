@@ -18,7 +18,8 @@ struct LayerInspector: View {
             // Sound has nowhere to be and nothing to show.
             if case .audio = layer.content {} else { transformSection }
             switch layer.content {
-            case .video(let v):
+            case .video(let v) where controller.project.hasSound(layer):
+                // Only a clip with a sound track has a sound to set.
                 PanelDivider()
                 SoundSection(layer: layer, volume: v.volume, isMuted: v.isMuted, controller: controller)
             case .audio(let a):
