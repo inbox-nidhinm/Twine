@@ -61,8 +61,8 @@ public func audioClips(_ project: Project) -> [AudioClip] {
     for layer in project.allLayers where layer.isVisible {
         let mediaID: UUID, volume: Double, muted: Bool
         switch layer.content {
-        case .audio(let a): (mediaID, volume, muted) = (a.mediaID, a.volume, a.isMuted)
-        case .video(let v): (mediaID, volume, muted) = (v.mediaID, v.volume, v.isMuted)
+        case .audio(let a): (mediaID, volume, muted) = (a.mediaID, min(a.volume, 1), a.isMuted)
+        case .video(let v): (mediaID, volume, muted) = (v.mediaID, min(v.volume, 1), v.isMuted)
         default: continue
         }
         let fades = (tracks[layer.id] ?? []).filter { $0.spec.kind == .volume }

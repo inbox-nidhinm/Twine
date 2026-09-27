@@ -307,10 +307,10 @@ private struct SoundSection: View {
                     controller.edit(layer.id) { l in l.content = Self.with(l.content) { $1.toggle() } }
                 }
             }
-            SliderRow(label: "Volume", value: volume * 100, range: 0...200, readout: { "\(Int($0.rounded()))%" },
+            SliderRow(label: "Volume", value: min(volume, 1) * 100, range: 0...100, readout: { "\(Int($0.rounded()))%" },
                       onChange: { v in
                           var l = layer
-                          l.content = Self.with(l.content) { level, _ in level = v / 100 }
+                          l.content = Self.with(l.content) { level, _ in level = min(max(v, 0), 100) / 100 }
                           controller.update([l])
                       },
                       onBegin: { controller.begin("Volume") },

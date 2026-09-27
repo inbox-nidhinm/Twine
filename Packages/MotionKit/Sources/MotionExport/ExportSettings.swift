@@ -81,13 +81,31 @@ public enum ExportQuality: String, Codable, Sendable, CaseIterable {
 /// starts where the last left off.
 public struct ExportSettings: Codable, Sendable, Equatable {
     public var format: ExportFormat
-    /// Output size as a multiple of the composition's: 0.5, 1 or 2.
+    /// Output size as a multiple of the composition's: 0.5, 1 and 2 are
+    /// offered, and any other can be typed. Held to 4K on export.
     public var scale: Double
     public var quality: ExportQuality
     /// Movies only: the composition's sound, when it has any.
     public var includesAudio: Bool
 
     public static let scales: [Double] = [0.5, 1, 2]
+    /// The largest an export can be: 4K UHD, either way round.
+    public static let maxLongSide = 3840
+    public static let maxShortSide = 2160
+    /// The smallest scale that can be typed.
+    public static let minScale = 0.01
+
+    /// The largest scale that keeps `composition` within 4K.
+    public static func largestScale(for composition: Composition) -> Double {
+        let long = Double(max(composition.width, composition.height, 1))
+        let short = Double(max(min(composition.width, composition.height), 1))
+        return min(Double(maxLongSide) / long, Double(maxShortSide) / short)
+    }
+
+    /// The scale an export uses: the one chosen, held to 4K.
+    public func effectiveScale(for composition: Composition) -> Double {
+        min(max(scale, Self.minScale), Self.largestScale(for: composition))
+    }
 
     public init(format: ExportFormat = .h264, scale: Double = 1, quality: ExportQuality = .high, includesAudio: Bool = true) {
         self.format = format
@@ -106,10 +124,12 @@ public struct ExportSettings: Codable, Sendable, Equatable {
         includesAudio = try c.decodeIfPresent(Bool.self, forKey: .includesAudio) ?? true
     }
 
-    /// The output's size in pixels. Movies are rounded to even numbers,
-    /// since H.264, HEVC and ProRes 422 store colour at half resolution and
-    /// cannot split an odd pixel.
+    /// The output's size in pixels, never past 4K. Movies are rounded to
+    /// even numbers, since H.264, HEVC and ProRes 422 store colour at half
+    /// resolution and cannot split an odd pixel; 4K's sides are even, so
+    /// rounding never takes a movie past it.
     public func pixelSize(of composition: Composition) -> (width: Int, height: Int) {
+        let scale = effectiveScale(for: composition)
         func side(_ length: Int) -> Int {
             let scaled = Double(length) * scale
             return format.isMovie ? max(2, Int((scaled / 2).rounded()) * 2) : max(1, Int(scaled.rounded()))

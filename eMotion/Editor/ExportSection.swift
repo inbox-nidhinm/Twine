@@ -26,6 +26,12 @@ struct ExportSection: View {
                               + "exports as its colour. HEVC with alpha, ProRes 4444 and PNG keep it. "
                               + "A PNG is the frame under the playhead, or in Design, the layout as designed.")
                     MenuRow(label: "Size", value: sizeTitle(settings.scale), entries: sizeEntries)
+                    UnitField(unit: "Scale", value: shownPercent, decimals: 1, suffix: "%",
+                              accepts: { $0 >= ExportSettings.minScale * 100 && $0 <= largestPercent + 1e-9 }) { v in
+                        session.settings.scale = v / 100
+                    }
+                    .help("Any size, as a share of the composition's, up to 4K (3840 × 2160 either way round). "
+                          + "Movies round to even numbers of pixels.")
                     if settings.format.isMovie {
                         MenuRow(label: "Range", value: session.range == nil ? "Whole scene" : "Part of the scene",
                                 entries: rangeEntries)
@@ -80,13 +86,22 @@ struct ExportSection: View {
         return "\(width) × \(height)"
     }
 
+    /// A size too big for 4K is offered greyed out, at the size it would be.
     private func sizeEntries() -> [MenuEntry] {
         ExportSettings.scales.map { scale in
-            MenuEntry.item("\(Int(scale * 100))%   \(sizeTitle(scale))", checked: scale == settings.scale) {
+            let fits = scale <= ExportSettings.largestScale(for: composition) + 1e-9
+            let title = fits ? sizeTitle(scale) : "\(Int((Double(composition.width) * scale).rounded())) × \(Int((Double(composition.height) * scale).rounded()))"
+            return MenuEntry.item("\(Int(scale * 100))%   \(title)", checked: abs(scale - settings.effectiveScale(for: composition)) < 1e-9,
+                                  disabled: !fits) {
                 session.settings.scale = scale
             }
         }
     }
+
+    /// The scale the export will use, as a percentage: past 4K, the largest.
+    private var shownPercent: Double { (settings.effectiveScale(for: composition) * 1000).rounded() / 10 }
+
+    private var largestPercent: Double { ExportSettings.largestScale(for: composition) * 100 }
 
     private func rangeEntries() -> [MenuEntry] {
         [

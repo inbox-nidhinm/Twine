@@ -146,8 +146,9 @@ public struct LayerState: Sendable, Equatable {
             }
         }
         switch layer.content {
-        case .video(let v): sourceTime = 0; volume = v.volume
-        case .audio(let a): sourceTime = 0; volume = a.volume
+        // Levels stop at the file's own; older projects could go higher.
+        case .video(let v): sourceTime = 0; volume = min(v.volume, 1)
+        case .audio(let a): sourceTime = 0; volume = min(a.volume, 1)
         default: break
         }
         if case .text(let t) = layer.content {

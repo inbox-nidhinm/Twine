@@ -148,19 +148,17 @@ private func pixel(_ buffer: CVPixelBuffer, _ x: Int, _ y: Int) -> (r: Int, g: I
         #expect(ground.b > 235 && ground.r < 20)
     }
 
-    @Test func refusesSizesTheCodecCannotEncode() throws {
+    @Test func anOversizedExportComesOutAt4K() async throws {
         let url = temporaryURL("mp4")
         defer { try? FileManager.default.removeItem(at: url) }
         var huge = project(transparent: false, duration: 0.1)
         huge.composition.width = 8000
         huge.composition.height = 8000
-        do {
-            try Exporter.export(huge, settings: ExportSettings(format: .h264, scale: 2), to: url)
-            Issue.record("a 16000 px H.264 export should not succeed")
-        } catch let error as ExportError {
-            #expect(error == .tooLarge(format: .h264, width: 16000, height: 16000))
-        }
-        #expect(!FileManager.default.fileExists(atPath: url.path))
+        // 16000 px square would be past any encoder; it is held to 4K's short side.
+        try Exporter.export(huge, settings: ExportSettings(format: .h264, scale: 2), to: url)
+        let track = try #require(try await AVURLAsset(url: url).loadTracks(withMediaType: .video).first)
+        let size = try await track.load(.naturalSize)
+        #expect(size == CGSize(width: 2160, height: 2160))
     }
 
     @Test func scalesTheOutput() async throws {
@@ -213,5 +211,38 @@ private func pixel(_ buffer: CVPixelBuffer, _ x: Int, _ y: Int) -> (r: Int, g: I
         func alpha(_ x: Int, _ y: Int) -> UInt8 { bytes[(y * 128 + x) * 4 + 3] }
         #expect(alpha(34, 40) == 0)
         #expect(alpha(38, 40) > 100)
+    }
+}
+
+@Suite struct ExportSizeTests {
+    private func comp(_ w: Int, _ h: Int) -> Composition { Composition(width: w, height: h, frameRate: .fps30, duration: 1) }
+
+    @Test func anyScaleCanBeTyped() {
+        let settings = ExportSettings(format: .png, scale: 1.5)
+        #expect(settings.pixelSize(of: comp(1920, 1080)) == (2880, 1620))
+        let third = ExportSettings(format: .png, scale: 1.0 / 3)
+        #expect(third.pixelSize(of: comp(1000, 500)) == (333, 167))
+    }
+
+    @Test func moviesStayEven() {
+        let movie = ExportSettings(format: .h264, scale: 1.0 / 3)
+        let (w, h) = movie.pixelSize(of: comp(1000, 500))
+        #expect(w % 2 == 0 && h % 2 == 0)
+        #expect(w == 334 && h == 166)
+        let odd = ExportSettings(format: .proRes422, scale: 0.37)
+        let size = odd.pixelSize(of: comp(1333, 777))
+        #expect(size.width % 2 == 0 && size.height % 2 == 0)
+    }
+
+    @Test func nothingGoesPast4K() {
+        let big = ExportSettings(format: .hevc, scale: 5)
+        #expect(big.pixelSize(of: comp(1920, 1080)) == (3840, 2160))
+        // Either way round.
+        #expect(big.pixelSize(of: comp(1080, 1920)) == (2160, 3840))
+        // A square is held by the short side.
+        #expect(big.pixelSize(of: comp(1000, 1000)) == (2160, 2160))
+        // A composition already past 4K is brought down to it at 100%.
+        #expect(ExportSettings(format: .png, scale: 1).pixelSize(of: comp(7680, 4320)) == (3840, 2160))
+        #expect(ExportSettings.largestScale(for: comp(1920, 1080)) == 2)
     }
 }

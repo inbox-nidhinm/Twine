@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "Any export size", changes: [
+            "Under the Size menu in Export, type any percentage of the composition, such as 150% or 33.3%, as well as picking 50%, 100% or 200%. Size shows the pixels it will be.",
+            "Exports never go past 4K (3840 × 2160, either way round): a size that would is greyed out in the menu, and a larger composition exports at 4K. Movies still round to even numbers of pixels.",
+            "The Volume slider in Design stops at 100%, the file's own level, as the Volume action does.",
+        ]),
         .init(date: "27 September 2026", title: "Volume fades", changes: [
             "A new Volume action, under Media in Animate, fades a video's or a sound's level to anywhere from 0% to 100%, following its easing. It is heard as the timeline plays and in exported movies.",
             "Add Preset has Fade Sound In and Fade Sound Out, each a second long.",

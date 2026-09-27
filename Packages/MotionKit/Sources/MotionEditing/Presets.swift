@@ -145,8 +145,8 @@ public enum Presets {
 
     private static func designVolume(_ layer: Layer) -> Double {
         switch layer.content {
-        case .video(let v) where v.volume > 0.01: v.volume
-        case .audio(let a) where a.volume > 0.01: a.volume
+        case .video(let v) where v.volume > 0.01: min(v.volume, 1)
+        case .audio(let a) where a.volume > 0.01: min(a.volume, 1)
         default: 1
         }
     }
