@@ -275,3 +275,38 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
         #expect(pixel(image, 44, 32).a == 0)
     }
 }
+
+@Suite(.serialized) struct FrameRenderingTests {
+    /// A 40 pixel red frame at (12, 12), rounded 12, with a blue square
+    /// hanging off its bottom-right and a green 4 pixel stroke inside its
+    /// edge.
+    private func frameProject(clips: Bool) -> Project {
+        let child = shape(fill: RGBA(0, 0, 1), at: Vec2(20, 20), size: Size2(40, 40))
+        var frame = Layer(name: "F", content: .group(GroupContent(children: [child], clipsContent: clips, frame: FrameStyle(
+            fills: [Fill(paint: .color(RGBA(1, 0, 0)))],
+            strokes: [Stroke(paint: .color(RGBA(0, 1, 0)), width: 4, alignment: .inside)],
+            cornerRadii: CornerRadii(all: 12)))),
+            size: Size2(40, 40), position: Vec2(12, 12))
+        frame.transform.anchor = .zero
+        return Project(composition: transparentComposition(), layers: [frame])
+    }
+
+    @Test func aFrameDrawsItsFillBehindItsChildrenAndItsStrokeInFront() throws {
+        let image = try render(frameProject(clips: true))
+        let fill = pixel(image, 22, 22)
+        #expect(fill.r > 250 && fill.b < 5, "the frame's own fill, where no child is")
+        let child = pixel(image, 40, 40)
+        #expect(child.b > 250 && child.r < 5, "the child over the fill")
+        let stroke = pixel(image, 40, 50)
+        #expect(stroke.g > 250 && stroke.b < 5, "the stroke over the child, inside the edge")
+    }
+
+    @Test func aFrameClipsToItsRoundedOutline() throws {
+        let clipped = try render(frameProject(clips: true))
+        #expect(pixel(clipped, 58, 40).a == 0, "the child outside the frame is cut off")
+        #expect(pixel(clipped, 50, 50).a == 0, "and so is its part in the rounded corner")
+        #expect(pixel(clipped, 13, 13).a == 0, "the frame's own corner is round")
+        let open = try render(frameProject(clips: false))
+        #expect(pixel(open, 58, 40).b > 250, "without clipping the child shows whole")
+    }
+}

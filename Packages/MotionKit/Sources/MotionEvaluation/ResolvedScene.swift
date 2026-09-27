@@ -78,9 +78,11 @@ public struct ResolvedScene: Sendable, Equatable {
     /// space: a turned layer's box is the one around its corners. A group's
     /// is the box around what is drawn inside it (clipped to its own box
     /// when it clips), since a group's own size is only where it was made.
+    /// A frame's is its own box.
     public func bounds(of id: UUID) -> Box? {
         guard let layer = layer(id) else { return nil }
-        guard layer.content == .group else { return worldCorners(of: id).flatMap { Box(around: $0) } }
+        // A frame's box is its own, as in Figma, whatever is inside it.
+        guard layer.content == .group, layer.frame == nil else { return worldCorners(of: id).flatMap { Box(around: $0) } }
         let inside = layers.filter { $0.parentID == id }.compactMap { bounds(of: $0.id) }
         guard let first = inside.first else { return nil }
         let all = inside.dropFirst().reduce(first) { $0.union($1) }
@@ -108,8 +110,13 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
     public var blur: Double
     /// Shapes only: blurs what is behind the layer, inside its outline.
     public var backgroundBlur: BackgroundBlur?
-    /// Groups only.
+    /// Groups only. A frame clips to its own outline, rounded corners and
+    /// all.
     public var clipsContent: Bool
+    /// A frame's own fills, strokes and outline, drawn behind its children
+    /// (the fills) and in front of them (the strokes). Nil for everything
+    /// else, plain groups included.
+    public var frame: ResolvedShape?
     /// Another layer whose alpha shows or hides this one. Nil when the layer
     /// has no mask, or its mask is switched off or hidden, which (as in
     /// Figma) shows the layer whole.

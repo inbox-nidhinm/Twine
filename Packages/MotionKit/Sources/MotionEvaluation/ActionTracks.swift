@@ -132,7 +132,7 @@ public struct LayerState: Sendable, Equatable {
         opacity = layer.opacity
         size = layer.size
         isShown = true
-        if case .shape(let shape) = layer.content {
+        if let shape = layer.look {
             fill = shape.fills.first?.paint
             stroke = shape.strokes.first.map { StrokeLook(width: $0.width, paint: $0.paint) }
             trim = shape.strokes.first.map { TrimRange(start: $0.trimStart, end: $0.trimEnd) }

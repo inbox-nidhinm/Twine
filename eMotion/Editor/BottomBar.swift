@@ -15,6 +15,7 @@ struct ToolBar: View {
     var body: some View {
         HStack(spacing: Theme.trayPad) {
             tool(.select)
+            tool(.frame)
             HStack(spacing: 0) {
                 tool(editor.lastShape)
                 shapeChevron

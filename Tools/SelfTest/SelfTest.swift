@@ -421,6 +421,8 @@ enum SelfTest {
                 case "exportmovie": (window.windowController as? EditorWindowController)?.exportFile(nil)
                 case "exportframe": (window.windowController as? EditorWindowController)?.exportFrame(nil)
                 case "staggermenu": (window.windowController as? EditorWindowController)?.staggerActions(nil)
+                case "frameselection": controller.frameSelection()
+                case "group": controller.groupSelection()
                 default: log("unknown call \(parts[1])")
                 }
             case "spec":
@@ -521,6 +523,21 @@ enum SelfTest {
             case "turn":
                 guard let id = controller.selection.first else { log("TURN none"); break }
                 controller.turnPicture(id)
+            case "tree":
+                // Every layer, indented under its parent, with its kind, box,
+                // place in its parent and clipping.
+                func walk(_ layers: [Layer], _ depth: Int) {
+                    for l in layers.reversed() {
+                        let kind = l.isFrame ? "frame" : l.isGroup ? "group" : l.picture != nil ? "picture" : "\(l.content)".prefix(5).description
+                        var clip = ""
+                        if case .group(let g) = l.content { clip = g.clipsContent ? " clips" : "" }
+                        let fills = l.look.map { " fills=\($0.fills.count) strokes=\($0.strokes.count)" } ?? ""
+                        log("TREE " + String(repeating: "  ", count: depth) + "\(l.name) \(kind) pos=\(Int(l.transform.position.x)),\(Int(l.transform.position.y)) size=\(Int(l.size.width))x\(Int(l.size.height)) scale=\(l.transform.scale.x)\(clip)\(fills)")
+                        walk(l.children, depth + 1)
+                    }
+                }
+                walk(controller.project.layers, 0)
+                log("TREE undo=\(controller.store.undoManager.undoActionName) sel=\(controller.selectedLayers.map(\.name))")
             case "picture":
                 // The selected layer's picture or video, and while cropping,
                 // where the picture's corners and the layer's are in the

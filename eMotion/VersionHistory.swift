@@ -23,6 +23,13 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "Frames", changes: [
+            "Frames, as in Figma: the Frame tool (F) draws a white frame that clips what spills over its edges, and takes in the layers it is drawn around. Arrange > Frame Selection (⌥⌘G) puts the selection in a frame.",
+            "A frame has its own fill, stroke, corner radius, shadows and blurs, with its fill behind what it holds and its stroke in front. It clips to its rounded corners, and resizing it changes its size rather than stretching what is inside.",
+            "Shapes, frames and text drawn inside a frame go into it. Frames take Colour, Stroke, Corner Radius and Resize actions, like rectangles.",
+            "Double-clicking goes one level into a group or frame at a time, and once inside, clicks and drags stay at that level: the selected layer, or one beside it, moves rather than the whole group.",
+            "Dragging layers into or out of a group or frame in the layers panel keeps them where they are on the canvas, with their actions. A group that clips keeps its shadow, and grouping a layer that masks another keeps the mask.",
+        ]),
         .init(date: "27 September 2026", title: "Pictures as fills", changes: [
             "A picture is now a fill, as in Figma: an imported picture is a rectangle filled with it, so it can have rounded corners, a stroke and shadows, and any shape can be filled with a picture by choosing Image under Fill.",
             "Choose how the picture fills its shape: Fill covers it, Fit shows the whole picture, Crop places it by hand, and Tile repeats it at a scale. The turn button beside the choice turns it a quarter at a time, and a picture has its own opacity.",

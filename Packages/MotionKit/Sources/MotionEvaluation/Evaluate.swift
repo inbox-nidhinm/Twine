@@ -132,6 +132,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
     var size = state.size
     let content: ResolvedContent
     var clips = false
+    var frame: ResolvedShape?
     // A text box is as big as its words, so it is measured here, and grows
     // from its anchor the way its alignment reads.
     var textAnchor: Vec2?
@@ -163,6 +164,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
     case .group(let group):
         content = .group
         clips = group.clipsContent
+        if let look = layer.look { frame = resolve(look, size: size, state: state, pictures: pictures) }
     }
 
     // One shadow per layer is what Core Animation draws. Figma allows
@@ -182,7 +184,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
     }
     blur += blurs.dropFirst().reduce(0) { $0 + max($1, 0) }
     var backgroundBlur: BackgroundBlur?
-    if case .shape = layer.content, state.backgroundBlur.radius > 0, state.backgroundBlur.blend > 0 {
+    if layer.look != nil, state.backgroundBlur.radius > 0, state.backgroundBlur.blend > 0 {
         backgroundBlur = state.backgroundBlur
     }
 
@@ -197,7 +199,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
                          scale: state.scale, rotation: state.rotation,
                          opacity: min(max(state.opacity, 0), 1),
                          content: content, shadow: shadow, blur: blur, backgroundBlur: backgroundBlur,
-                         clipsContent: clips,
+                         clipsContent: clips, frame: frame,
                          // Filled in once every layer is resolved, since a
                          // mask can sit anywhere in the tree.
                          mask: nil)

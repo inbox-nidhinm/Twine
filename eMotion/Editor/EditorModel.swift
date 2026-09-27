@@ -116,11 +116,12 @@ final class TimelineViewport {
 }
 
 enum Tool: String, CaseIterable {
-    case select, rectangle, ellipse, line, polygon, star, pen, text
+    case select, frame, rectangle, ellipse, line, polygon, star, pen, text
 
     var title: String {
         switch self {
         case .select: return "Select"
+        case .frame: return "Frame"
         case .rectangle: return "Rectangle"
         case .ellipse: return "Ellipse"
         case .line: return "Line"
@@ -134,6 +135,7 @@ enum Tool: String, CaseIterable {
     var icon: Icon {
         switch self {
         case .select: return .select
+        case .frame: return .frame
         case .rectangle: return .rectangle
         case .ellipse: return .ellipse
         case .line: return .line
@@ -148,6 +150,7 @@ enum Tool: String, CaseIterable {
     var key: String {
         switch self {
         case .select: return "V"
+        case .frame: return "F"
         case .rectangle: return "R"
         case .ellipse: return "O"
         case .line: return "L"
@@ -160,6 +163,8 @@ enum Tool: String, CaseIterable {
 
     static let shapes: [Tool] = [.rectangle, .ellipse, .line, .polygon, .star]
     var isShape: Bool { Self.shapes.contains(self) }
+    /// Draws a box by dragging: a shape or a frame.
+    var draws: Bool { isShape || self == .frame }
 
     /// The tool a letter picks, for the canvas's keyboard.
     static func forKey(_ key: String) -> Tool? {

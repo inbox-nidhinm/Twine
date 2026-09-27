@@ -422,22 +422,39 @@ final class CanvasNSView: NSView {
             }
         }
         for resolved in scene.layers.reversed() {
-            guard resolved.content != .group, !controller.isLocked(resolved.id),
+            // A plain group draws nothing of its own; a frame does.
+            guard resolved.content != .group || resolved.frame != nil, !controller.isLocked(resolved.id),
                   let world = scene.worldTransform(of: resolved.id), let inverse = world.inverted else { continue }
             let local = inverse.apply(point).cg
             // Scale the tolerance into the layer's space, so it is the same
             // few screen points whatever the layer's own scale.
             let localTolerance = tolerance / max(sqrt(abs(world.determinant)), 1e-6)
             guard hits(resolved, at: local, tolerance: localTolerance), shows(resolved, at: local, in: scene) else { continue }
-            return deep ? resolved.id : topLevel(of: resolved.id)
+            return deep ? resolved.id : inContext(resolved.id)
         }
         return nil
     }
 
+    /// Which of a layer and the groups and frames around it a click picks:
+    /// the outermost, as in Figma, unless the selection is already further
+    /// in. Once inside a group (by a double-click), a click stays at that
+    /// level: on the selected layer, on one beside it, or on what holds it.
+    private func inContext(_ id: UUID) -> UUID {
+        guard let project else { return id }
+        let chain = project.ancestors(of: id) + [id]
+        if let selected = chain.last(where: selection.contains) { return selected }
+        let holders = Set(selection.compactMap { project.location(of: $0)?.parentID })
+        if let i = chain.lastIndex(where: holders.contains), i + 1 < chain.count { return chain[i + 1] }
+        return topLevel(of: id)
+    }
+
     /// Whether a point in the layer's own space lands on what it draws: a
-    /// shape's fill or stroke, or anywhere in a text's or picture's box.
+    /// shape's or a frame's fill or stroke, or anywhere in a text's or
+    /// video's box.
     private func hits(_ resolved: ResolvedLayer, at local: CGPoint, tolerance: Double) -> Bool {
-        if case .shape(let shape) = resolved.content {
+        let outline: ResolvedShape?
+        if case .shape(let s) = resolved.content { outline = s } else { outline = resolved.frame }
+        if let shape = outline {
             let path = shape.path.cgPath
             if shape.isClosed && (!shape.fills.isEmpty || shape.strokes.isEmpty) && path.contains(local) { return true }
             let width = (shape.strokes.map(\.width).max() ?? 0) + tolerance * 2
@@ -447,7 +464,8 @@ final class CanvasNSView: NSView {
     }
 
     /// Whether the layer's mask, if it has one, lets it show at a point in
-    /// its own space. A group's mask is honoured by its children too.
+    /// its own space, and whether any group or frame it sits in that clips
+    /// lets it show there. A group's mask is honoured by its children too.
     private func shows(_ resolved: ResolvedLayer, at local: CGPoint, in scene: ResolvedScene) -> Bool {
         var layer: ResolvedLayer? = resolved
         var point = Vec2(Double(local.x), Double(local.y))
@@ -458,8 +476,24 @@ final class CanvasNSView: NSView {
             }
             point = current.transform.apply(point)
             layer = current.parentID.flatMap { scene.layer($0) }
+            if let parent = layer, parent.clipsContent {
+                let inside = parent.frame.map { $0.path.cgPath.contains(point.cg) }
+                    ?? CGRect(origin: .zero, size: parent.size.cg).contains(point.cg)
+                if !inside { return false }
+            }
         }
         return true
+    }
+
+    /// The innermost frame whose box a composition point is in, which a
+    /// layer drawn there goes into.
+    func frame(under point: Vec2) -> UUID? {
+        guard let scene, let controller else { return nil }
+        for resolved in scene.layers.reversed() where resolved.frame != nil && !controller.isLocked(resolved.id) {
+            guard let inverse = scene.worldTransform(of: resolved.id)?.inverted else { continue }
+            if CGRect(origin: .zero, size: resolved.size.cg).contains(inverse.apply(point).cg) { return resolved.id }
+        }
+        return nil
     }
 
     private func topLevel(of id: UUID) -> UUID {
@@ -519,9 +553,10 @@ final class CanvasNSView: NSView {
             return
         }
 
-        if tool.isShape, !animating {
+        if tool.draws, !animating {
             snapTargets = targets(excluding: [])
-            drag = .create(CanvasDrag.Create(tool: tool, start: snapped(point, event), layerID: nil))
+            drag = .create(CanvasDrag.Create(tool: tool, start: snapped(point, event), layerID: nil,
+                                             parentID: frame(under: point)))
             return
         }
 
@@ -529,7 +564,7 @@ final class CanvasNSView: NSView {
         // keyboard in its text box, then hands back the arrow.
         if tool == .text, !animating {
             controller.editor.tool = .select
-            if let id = controller.addText(at: point) { beginTextEditing(id, selectAll: true) }
+            if let id = controller.addText(at: point, in: frame(under: point)) { beginTextEditing(id, selectAll: true) }
             return
         }
 
@@ -558,7 +593,7 @@ final class CanvasNSView: NSView {
             if let handle = CanvasHandles.handle(at: viewPoint, box: view, isLine: isLine(resolved)) {
                 snapTargets = targets(excluding: [id])
                 drag = .resize(CanvasDrag.Resize(layer: layer, handle: handle, start: point))
-                controller.begin(layer.isGroup ? "Scale" : "Resize")
+                controller.begin(layer.isGroup && !layer.isFrame ? "Scale" : "Resize")
                 return
             }
             if CanvasHandles.isRotateZone(viewPoint, box: view) {
@@ -576,8 +611,11 @@ final class CanvasNSView: NSView {
                 controller.select([hit])
             }
             if event.clickCount == 2, controller.project.layer(withID: hit)?.isGroup == true,
-               let inner = layer(at: point, deep: true), inner != hit {
-                // A double-click goes into a group, as in Figma.
+               let deepest = layer(at: point, deep: true), deepest != hit {
+                // A double-click goes one level into a group or frame, as in
+                // Figma.
+                let chain = controller.project.ancestors(of: deepest) + [deepest]
+                let inner = chain.firstIndex(of: hit).map { chain[$0 + 1] } ?? deepest
                 controller.select([inner])
             } else if event.clickCount == 2, !animating, controller.project.layer(withID: hit)?.isText == true,
                       !controller.isLocked(hit) {
@@ -633,7 +671,8 @@ final class CanvasNSView: NSView {
             let reach = shift ? point : snapped(point, event, shaping: Box(around: [create.start, point]))
             let end = CanvasGeometry.constrainedEnd(create.start, reach, tool: create.tool, square: shift)
             let from = option && create.tool != .line ? Vec2(2 * create.start.x - end.x, 2 * create.start.y - end.y) : create.start
-            guard var layer = controller.makeShape(create.tool, from: from, to: end) else { return }
+            guard let made = controller.makeShape(create.tool, from: from, to: end) else { return }
+            var layer = Arrangement.placed(made, into: create.parentID, in: controller.project)
             if let id = create.layerID, let existing = controller.project.layer(withID: id) {
                 // Keep the first frame's id and name, so the shape is one
                 // layer being drawn rather than a new one every step.
@@ -641,7 +680,7 @@ final class CanvasNSView: NSView {
                 controller.update([layer])
             } else {
                 controller.begin("Add \(create.tool.title)")
-                controller.update(.insertLayers([layer], parentID: nil, index: nil))
+                controller.update(.insertLayers([layer], parentID: create.parentID, index: nil))
                 create.layerID = layer.id
                 controller.select([layer.id])
                 self.drag = .create(create)
@@ -747,11 +786,19 @@ final class CanvasNSView: NSView {
                     Vec2(create.start.x - size / 2, create.start.y - size / 2)
                 let end = create.tool == .line ? Vec2(create.start.x + size / 2, create.start.y) :
                     Vec2(create.start.x + size / 2, create.start.y + size / 2)
-                if let layer = controller.makeShape(create.tool, from: start, to: end),
-                   controller.perform(.insertLayers([layer], parentID: nil, index: nil)) {
-                    controller.select([layer.id])
+                if let made = controller.makeShape(create.tool, from: start, to: end) {
+                    let layer = Arrangement.placed(made, into: create.parentID, in: controller.project)
+                    let insert = EditorCommand.insertLayers([layer], parentID: create.parentID, index: nil)
+                    // A frame takes in the layers it lands around, as in Figma.
+                    let taking = layer.isFrame ? controller.enclosing(layer.id, after: insert) : nil
+                    if controller.perform(taking.map { .batch([insert, $0], name: "Add Frame") } ?? insert) {
+                        controller.select([layer.id])
+                    }
                 }
             } else {
+                if create.tool == .frame, let id = create.layerID, let taking = controller.enclosing(id) {
+                    controller.update(taking)
+                }
                 controller.end()
             }
             // Back to the arrow after drawing, as in Figma.
@@ -793,7 +840,7 @@ final class CanvasNSView: NSView {
         guard let scene, let project else { return [] }
         snap = nil
         return scene.layers.compactMap { layer in
-            guard layer.content != .group, !moving.contains(layer.id),
+            guard layer.content != .group || layer.frame != nil, !moving.contains(layer.id),
                   project.ancestors(of: layer.id).allSatisfy({ !moving.contains($0) }) else { return nil }
             return scene.bounds(of: layer.id)
         }
@@ -1019,7 +1066,7 @@ final class CanvasNSView: NSView {
 
     override func resetCursorRects() {
         discardCursorRects()
-        addCursorRect(bounds, cursor: spaceHeld ? Cursors.hand : tool == .text ? .iBeam : tool.isShape ? Cursors.crosshair
+        addCursorRect(bounds, cursor: spaceHeld ? Cursors.hand : tool == .text ? .iBeam : tool.draws ? Cursors.crosshair
                                       : tool == .pen && !animating ? Cursors.pen : Cursors.arrow)
         // While typing, the text being edited takes the I-beam.
         if let id = textSession?.layerID, let corners = scene?.worldCorners(of: id) {
@@ -1041,7 +1088,7 @@ final class CanvasNSView: NSView {
         }
         guard !spaceHeld else { return }
         if pathMouseMoved(viewPoint, event: event) { return }
-        guard !tool.isShape, tool != .text else { return }
+        guard !tool.draws, tool != .text else { return }
         setHover(layer(at: viewToComposition(viewPoint), deep: event.modifierFlags.contains(.command)))
         updateCursor(at: viewPoint)
     }

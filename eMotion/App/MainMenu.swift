@@ -96,6 +96,7 @@ enum MainMenu {
         menu.addItem(.separator())
         menu.addItem(item("Group", #selector(EditorWindowController.groupLayers(_:)), "g"))
         menu.addItem(item("Ungroup", #selector(EditorWindowController.ungroupLayers(_:)), "g", [.command, .shift]))
+        menu.addItem(item("Frame Selection", #selector(EditorWindowController.frameLayers(_:)), "g", [.command, .option]))
         menu.addItem(.separator())
         menu.addItem(item("Bring Forward", #selector(EditorWindowController.bringForward(_:)), "]"))
         menu.addItem(item("Send Backward", #selector(EditorWindowController.sendBackward(_:)), "["))

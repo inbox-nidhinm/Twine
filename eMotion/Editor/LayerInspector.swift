@@ -43,6 +43,7 @@ struct LayerInspector: View {
                 TextSection(layer: layer, text: text, controller: controller)
             }
             if case .group(let group) = layer.content {
+                if let look = layer.look { shapeSection(look.geometry) }
                 ToggleRow(label: "Clip content", isOn: group.clipsContent) {
                     controller.edit(layer.id) { l in
                         if case .group(var g) = l.content {
@@ -51,9 +52,16 @@ struct LayerInspector: View {
                         }
                     }
                 }
-                .help("Hides whatever lies outside the group's box.")
+                .help(layer.isFrame ? "Hides whatever lies outside the frame, round its corners too."
+                                    : "Hides whatever lies outside the group's box.")
                 .padding(.horizontal, Theme.panelPad)
                 .padding(.bottom, Theme.panelPad)
+                if layer.isFrame, let look = layer.look {
+                    PanelDivider()
+                    FillSection(layer: layer, shape: look, controller: controller)
+                    PanelDivider()
+                    StrokeSection(layer: layer, shape: look, controller: controller)
+                }
             }
             PanelDivider()
             EffectsSection(layer: layer, controller: controller)
@@ -82,7 +90,8 @@ struct LayerInspector: View {
                     }
                 }
                 .help("Where the anchor point sits, in pixels")
-                if !layer.isGroup {
+                // A group's size is only where it was made; a frame's is its own.
+                if !layer.isGroup || layer.isFrame {
                     HStack(spacing: 8) {
                         number("W", layer.size.width, accepts: { $0 >= 0 }) { l, v in resize(&l, width: v) }
                         number("H", layer.size.height, accepts: { $0 >= 0 }) { l, v in resize(&l, height: v) }
@@ -278,9 +287,9 @@ struct LayerInspector: View {
 
     private func setGeometry(_ geometry: ShapeGeometry) {
         controller.edit(layer.id) { l in
-            if case .shape(var s) = l.content {
+            if var s = l.look {
                 s.geometry = geometry
-                l.content = .shape(s)
+                l.look = s
             }
         }
     }
@@ -389,7 +398,7 @@ private struct FillSection: View {
     }
 
     private func editShape(_ change: (inout ShapeContent) -> Void) {
-        controller.edit(layer.id) { l in l.content = .shape(edited(change)) }
+        controller.edit(layer.id) { l in l.look = edited(change) }
     }
 
     private func edited(_ change: (inout ShapeContent) -> Void) -> ShapeContent {
@@ -401,7 +410,7 @@ private struct FillSection: View {
     /// For the colour well and hex field, which report whole layers.
     private func editedShape(_ change: (inout ShapeContent) -> Void) -> Layer {
         var l = layer
-        l.content = .shape(edited(change))
+        l.look = edited(change)
         return l
     }
 }
@@ -542,7 +551,7 @@ private struct StrokeSection: View {
                                     var l = layer
                                     var s = shape
                                     s.strokes[0].paint = paint
-                                    l.content = .shape(s)
+                                    l.look = s
                                     return l
                                 },
                                 toggle: { editShape { $0.strokes[0].isEnabled.toggle() } })
@@ -551,20 +560,23 @@ private struct StrokeSection: View {
                             editShape { $0.strokes[0].width = v }
                         }
                     }
-                    LabeledRow(label: "Trim start") {
-                        UnitField(value: stroke.trimStart * 100, decimals: 1, suffix: "%",
-                                  accepts: { $0 >= 0 && $0 <= 100 }) { v in
-                            editShape { $0.strokes[0].trimStart = v / 100 }
+                    // A frame's stroke has no ends to trim.
+                    if !layer.isFrame {
+                        LabeledRow(label: "Trim start") {
+                            UnitField(value: stroke.trimStart * 100, decimals: 1, suffix: "%",
+                                      accepts: { $0 >= 0 && $0 <= 100 }) { v in
+                                editShape { $0.strokes[0].trimStart = v / 100 }
+                            }
                         }
-                    }
-                    .help("How much of the path is left undrawn at its start. Animate it to draw a line on.")
-                    LabeledRow(label: "Trim end") {
-                        UnitField(value: stroke.trimEnd * 100, decimals: 1, suffix: "%",
-                                  accepts: { $0 >= 0 && $0 <= 100 }) { v in
-                            editShape { $0.strokes[0].trimEnd = v / 100 }
+                        .help("How much of the path is left undrawn at its start. Animate it to draw a line on.")
+                        LabeledRow(label: "Trim end") {
+                            UnitField(value: stroke.trimEnd * 100, decimals: 1, suffix: "%",
+                                      accepts: { $0 >= 0 && $0 <= 100 }) { v in
+                                editShape { $0.strokes[0].trimEnd = v / 100 }
+                            }
                         }
+                        .help("Where along the path the stroke stops")
                     }
-                    .help("Where along the path the stroke stops")
                     if shape.geometry.isClosed {
                         SegmentRow(selection: stroke.alignment, options: StrokeAlignment.allCases,
                                    title: { $0.rawValue.capitalized }) { a in
@@ -606,7 +618,7 @@ private struct StrokeSection: View {
     private func editShape(_ change: (inout ShapeContent) -> Void) {
         var s = shape
         change(&s)
-        controller.edit(layer.id) { l in l.content = .shape(s) }
+        controller.edit(layer.id) { l in l.look = s }
     }
 }
 
@@ -793,7 +805,7 @@ private struct EffectsSection: View {
                         .item("Layer Blur") { add(.layerBlur(LayerBlur())) },
                     ]
                     // It follows a shape's outline, so only shapes have one.
-                    if case .shape = layer.content {
+                    if layer.look != nil {
                         entries.append(.item("Background Blur") { add(.backgroundBlur(BackgroundBlur())) })
                     }
                     menus.show(entries, at: CGPoint(x: addFrame.maxX - Theme.menuMinWidth, y: addFrame.maxY + 4))

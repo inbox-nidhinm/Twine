@@ -391,10 +391,10 @@ final class EditorController {
     func fillWithPicture(_ id: UUID, from url: URL) {
         Task { @MainActor in
             guard let (asset, isNew) = await bringIn(url, as: .image),
-                  var layer = project.layer(withID: id), case .shape(var shape) = layer.content else { return }
+                  var layer = project.layer(withID: id), var shape = layer.look else { return }
             let paint = Paint.image(ImagePaint(mediaID: asset.id))
             if shape.fills.isEmpty { shape.fills = [Fill(paint: paint)] } else { shape.fills[0].paint = paint }
-            layer.content = .shape(shape)
+            layer.look = shape
             perform(.batch((isNew ? [.addMedia(asset)] : []) + [.updateLayers([layer])], name: "Image Fill"))
         }
     }
@@ -666,23 +666,57 @@ final class EditorController {
     /// A new text layer with its top-left at `point`, selected. Dark on a
     /// light background, light on dark.
     @discardableResult
-    func addText(at point: Vec2) -> UUID? {
+    /// A text layer at a composition point, inside `parentID` when given.
+    func addText(at point: Vec2, in parentID: UUID? = nil) -> UUID? {
+        // Dark on a light ground, light on a dark one: the frame it goes in,
+        // when that has a colour, or the composition's background.
         let background = project.composition.background
-        let light = background.isTransparent || (background.color.r + background.color.g + background.color.b) / 3 > 0.5
-        let layer = LayerFactory.text(at: point, name: LayerFactory.nextName("Text", in: project),
-                                      color: light ? LayerFactory.defaultStroke : .white)
-        guard perform(.insertLayers([layer], parentID: nil, index: nil)) else { return nil }
+        var ground: RGBA? = background.isTransparent ? nil : background.color
+        if let parentID, case .solid(let c)? = project.layer(withID: parentID)?.look?.fills.first?.paint { ground = c }
+        let light = ground.map { ($0.r + $0.g + $0.b) / 3 > 0.5 } ?? true
+        let made = LayerFactory.text(at: point, name: LayerFactory.nextName("Text", in: project),
+                                     color: light ? LayerFactory.defaultStroke : .white)
+        let layer = Arrangement.placed(made, into: parentID, in: project)
+        guard perform(.insertLayers([layer], parentID: parentID, index: nil)) else { return nil }
         select([layer.id])
         return layer.id
     }
 
     func makeShape(_ tool: Tool, from start: Vec2, to end: Vec2) -> Layer? {
+        if tool == .frame {
+            let box = Box(minX: min(start.x, end.x), minY: min(start.y, end.y),
+                          maxX: max(start.x, end.x), maxY: max(start.y, end.y))
+            return LayerFactory.frame(in: box, name: LayerFactory.nextName("Frame", in: project))
+        }
         guard let kind = tool.shapeKind else { return nil }
         let name = LayerFactory.nextName(kind.title, in: project)
         if kind == .line { return LayerFactory.line(from: start, to: end, name: name) }
         let box = Box(minX: min(start.x, end.x), minY: min(start.y, end.y),
                       maxX: max(start.x, end.x), maxY: max(start.y, end.y))
         return LayerFactory.shape(kind, in: box, name: name)
+    }
+
+    /// Moving the layers a new frame lies around into it, worked out after
+    /// `first` (the frame's own insertion, when it has not happened yet).
+    /// Nil when it lies around nothing.
+    func enclosing(_ frameID: UUID, after first: EditorCommand? = nil) -> EditorCommand? {
+        var p = project
+        if let first { try? first.apply(to: &p) }
+        return Arrangement.adopt(Arrangement.enclosed(by: frameID, in: p), into: frameID, in: p)
+    }
+
+    /// Puts the selection in a new frame around it, as Figma's Frame
+    /// Selection does.
+    func frameSelection() {
+        let ids = topmost(selectedLayers).map(\.id)
+        guard !ids.isEmpty else { return NSSound.beep() }
+        do {
+            let (command, frameID) = try Arrangement.group(ids, in: project, name: LayerFactory.nextName("Frame", in: project),
+                                                           asFrame: true)
+            if perform(command) { editor.selection = [frameID] }
+        } catch {
+            NSSound.beep()
+        }
     }
 
     // MARK: Arranging

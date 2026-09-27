@@ -12,9 +12,10 @@ import MotionEvaluation
 ///
 /// Layers are kept between frames and matched to the scene by layer id, so a
 /// frame only changes what moved. Every layer gets a container `CALayer`
-/// carrying its transform, opacity, shadow, blur and clipping; a group's
-/// children are that container's sublayers, which is what makes group opacity
-/// and group transforms apply to the children as one picture.
+/// carrying its transform, opacity, shadow, blur and mask; a group's
+/// children sit in a holder inside that container, which clips them and is
+/// what makes group opacity and group transforms apply to the children as
+/// one picture. A frame's fills go under the holder and its strokes over it.
 public final class CoreAnimationRenderer: SceneRenderer {
     /// The composition, `size` points across with its origin at the top-left.
     /// Put it in a layer whose coordinates run downward (a flipped view, or a
@@ -96,7 +97,7 @@ public final class CoreAnimationRenderer: SceneRenderer {
 
         Self.setSublayers(contentLayer, children[nil] ?? [])
         for resolved in scene.layers where resolved.content == .group {
-            if let node = nodes[resolved.id] { Self.setSublayers(node.container, children[resolved.id] ?? []) }
+            if let node = nodes[resolved.id] { Self.setSublayers(node.children, children[resolved.id] ?? []) }
         }
         updateMasks(scene)
     }
@@ -192,6 +193,11 @@ private final class Node {
     ]
 
     let container = CALayer()
+    /// A group's children, set by the renderer. Clipping happens here rather
+    /// than on the container, so a clipping group keeps its shadow, and a
+    /// frame clips to its own rounded outline.
+    let children = CALayer()
+    private let clipMask = CAShapeLayer()
     var flipsContents = false {
         didSet {
             last = nil
@@ -228,6 +234,11 @@ private final class Node {
         container.position = .zero
         container.allowsGroupOpacity = true
         container.actions = Self.noActions
+        for l in [children, clipMask] {
+            l.anchorPoint = .zero
+            l.actions = Self.noActions
+        }
+        clipMask.fillColor = CGColor(gray: 0, alpha: 1)
     }
 
     func setContentsScale(_ scale: CGFloat) {
@@ -245,6 +256,7 @@ private final class Node {
         switch layer.content {
         case .video: last = nil
         case .shape(let shape) where shape.fills.contains(where: \.isImage): last = nil
+        case .group where layer.frame?.fills.contains(where: \.isImage) == true: last = nil
         default:
             if layer == last { return }
             last = layer
@@ -255,7 +267,6 @@ private final class Node {
         // (a line) still turns about its real anchor.
         container.transform = layer.transform.caTransform
         container.opacity = Float(layer.opacity)
-        container.masksToBounds = layer.clipsContent
 
         // Blur amounts arrive as Figma measures them, twice the Gaussian's
         // standard deviation. Core Animation's shadow radius is the standard
@@ -281,8 +292,18 @@ private final class Node {
             updateShape(shape, size: layer.size, media: media)
             updateBackdrop(layer.backgroundBlur, path: shape.path.cgPath, size: layer.size)
         case .group:
-            // A group's sublayers are its children, set by the renderer.
-            if !signature.isEmpty { clearPaint() }
+            if let frame = layer.frame {
+                // Built afresh when the holder is not in place yet, as for a
+                // frame with no fills or strokes, whose signature is empty.
+                if children.superlayer !== container { signature = ["-"] }
+                updateShape(frame, size: layer.size, media: media, around: children)
+                updateBackdrop(layer.backgroundBlur, path: frame.path.cgPath, size: layer.size)
+            } else {
+                if !signature.isEmpty { clearPaint() }
+                backdrop?.removeFromSuperlayer()
+                if container.sublayers?.count != 1 || children.superlayer !== container { container.sublayers = [children] }
+            }
+            updateClip(layer)
         case .text(let text):
             if !signature.isEmpty { clearPaint() }
             updateText(text, size: layer.size)
@@ -303,7 +324,9 @@ private final class Node {
     /// Nil leaves Core Animation to shadow whatever the layer draws, which
     /// is what a spread of 0 and every non-shape layer want.
     private func spreadPath(_ layer: ResolvedLayer, by spread: Double) -> CGPath? {
-        guard spread != 0, case .shape(let shape) = layer.content, shape.isClosed else { return nil }
+        let outline: ResolvedShape?
+        if case .shape(let s) = layer.content { outline = s } else { outline = layer.frame }
+        guard spread != 0, let shape = outline, shape.isClosed else { return nil }
         let path = shape.path.cgPath
         let band = path.copy(strokingWithWidth: abs(spread) * 2, lineCap: .round, lineJoin: .round, miterLimit: 10)
         return spread > 0 ? path.union(band) : path.subtracting(band)
@@ -451,14 +474,32 @@ private final class Node {
         signature = []
     }
 
-    private func updateShape(_ shape: ResolvedShape, size: Size2, media: MediaProvider?) {
+    /// A group's holder sized to its box and clipped as it asks: to the box
+    /// for a group, to its outline for a frame.
+    private func updateClip(_ layer: ResolvedLayer) {
+        children.frame = CGRect(origin: .zero, size: layer.size.cg)
+        if layer.clipsContent, let frame = layer.frame {
+            children.masksToBounds = false
+            clipMask.frame = children.bounds
+            clipMask.path = frame.path.cgPath
+            if children.mask !== clipMask { children.mask = clipMask }
+        } else {
+            if children.mask != nil { children.mask = nil }
+            children.masksToBounds = layer.clipsContent
+        }
+    }
+
+    /// `around` goes between the fills and the strokes: a frame's children.
+    private func updateShape(_ shape: ResolvedShape, size: Size2, media: MediaProvider?, around middle: CALayer? = nil) {
         let wanted = shape.fills.map { "fill-" + $0.kind } + shape.strokes.map { "stroke-" + $0.paint.kind + "-" + $0.alignment.rawValue }
         if wanted != signature {
             clearPaint()
             paintLayers = shape.fills.map { PaintLayers(paint: $0, stroke: nil, scale: scale, flipsContents: flipsContents) }
                 + shape.strokes.map { PaintLayers(paint: $0.paint, stroke: $0, scale: scale, flipsContents: flipsContents) }
             // The backdrop, if any, goes back underneath in `updateBackdrop`.
-            container.sublayers = paintLayers.map(\.root)
+            let roots = paintLayers.map(\.root)
+            container.sublayers = Array(roots.prefix(shape.fills.count)) + (middle.map { [$0] } ?? [])
+                + Array(roots.dropFirst(shape.fills.count))
             signature = wanted
         }
         let path = shape.path.cgPath

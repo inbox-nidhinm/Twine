@@ -98,6 +98,14 @@ public enum LayerFactory {
               position: box.center)
     }
 
+    /// A new frame filling `box`, as Figma makes one: white, clipping what
+    /// spills over its edges, with its anchor at the centre.
+    public static func frame(in box: Box, name: String) -> Layer {
+        let style = FrameStyle(fills: [Fill(paint: .color(.white))])
+        return Layer(name: name, content: .group(GroupContent(children: [], clipsContent: true, frame: style)),
+                     size: Size2(max(box.width, 0), max(box.height, 0)), position: box.center)
+    }
+
     /// `Rectangle 3` when the project already has two rectangles, and so on.
     public static func nextName(_ base: String, in project: Project) -> String {
         let taken = project.allLayers.compactMap { layer -> Int? in

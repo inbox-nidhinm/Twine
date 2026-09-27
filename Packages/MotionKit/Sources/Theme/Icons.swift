@@ -71,6 +71,7 @@ public enum Icon: String, CaseIterable, Sendable {
     case keyframe
     case stopwatch
     case ellipse
+    case frame
     case line
     case pen
     case polygon
@@ -396,6 +397,12 @@ public enum Icon: String, CaseIterable, Sendable {
         ]
         case .ellipse: return [   // Tools/ellipse.svg
             "M12 4 C16.418 4 20 7.582 20 12 C20 16.418 16.418 20 12 20 C7.582 20 4 16.418 4 12 C4 7.582 7.582 4 12 4 Z"
+        ]
+        case .frame: return [   // Tools/frame.svg
+            "M8 4 V20",
+            "M16 4 V20",
+            "M4 8 H20",
+            "M4 16 H20"
         ]
         case .line: return [   // Tools/line.svg
             "M5 19 L19 5"

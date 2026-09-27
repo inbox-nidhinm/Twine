@@ -13,7 +13,7 @@ public enum PictureEditing {
     /// new picture's own shape. A layer still named after its old file takes
     /// the new file's name.
     public static func replacingPicture(_ layer: Layer, with asset: MediaAsset, old: MediaAsset?) -> Layer {
-        guard case .shape(var shape) = layer.content, let (index, paint) = layer.picture else { return layer }
+        guard var shape = layer.look, let (index, paint) = layer.picture else { return layer }
         var p = paint
         p.mediaID = asset.id
         if p.mode == .crop {
@@ -21,7 +21,7 @@ public enum PictureEditing {
         }
         shape.fills[index].paint = .image(p)
         var edited = layer
-        edited.content = .shape(shape)
+        edited.look = shape
         edited.name = renamed(layer.name, from: old, to: asset)
         return edited
     }
@@ -87,12 +87,12 @@ public enum PictureEditing {
     }
 
     public static func editingPicture(_ layer: Layer, _ change: (inout ImagePaint) -> Void) -> Layer {
-        guard case .shape(var shape) = layer.content, let (index, paint) = layer.picture else { return layer }
+        guard var shape = layer.look, let (index, paint) = layer.picture else { return layer }
         var p = paint
         change(&p)
         shape.fills[index].paint = .image(p)
         var edited = layer
-        edited.content = .shape(shape)
+        edited.look = shape
         return edited
     }
 

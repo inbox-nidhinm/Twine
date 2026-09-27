@@ -298,14 +298,16 @@ private struct LayerRow: View {
         let project = controller.project
         let moving = ids.filter { $0 != layer.id }
         guard !moving.isEmpty else { return false }
+        // Moved so they stay where they are on the canvas, whatever group or
+        // frame they leave or join.
         if edge == .into {
-            return controller.perform(.moveLayers(moving, parentID: layer.id, index: nil))
+            return controller.perform(Arrangement.move(moving, to: layer.id, index: nil, in: project))
         }
         guard let location = project.location(of: layer.id) else { return false }
         let siblings = (location.parentID.flatMap { project.layer(withID: $0)?.children } ?? project.layers)
             .filter { !moving.contains($0.id) }
         guard let at = siblings.firstIndex(where: { $0.id == layer.id }) else { return false }
-        return controller.perform(.moveLayers(moving, parentID: location.parentID, index: edge == .above ? at + 1 : at))
+        return controller.perform(Arrangement.move(moving, to: location.parentID, index: edge == .above ? at + 1 : at, in: project))
     }
 
     private func menu() -> [MenuEntry] {
@@ -314,6 +316,7 @@ private struct LayerRow: View {
             .item("Rename") { editor.renaming = layer.id },
             .item("Duplicate") { controller.duplicateSelection() },
             .item("Group Selection") { controller.groupSelection() },
+            .item("Frame Selection") { controller.frameSelection() },
         ]
         if layer.isGroup { entries.append(.item("Ungroup") { controller.ungroupSelection() }) }
         entries += [
@@ -347,7 +350,7 @@ extension Layer {
         case .text: return .text
         case .video: return .video
         case .audio: return .audio
-        case .group: return .group
+        case .group(let g): return g.frame == nil ? .group : .frame
         }
     }
 }

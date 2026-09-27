@@ -69,6 +69,7 @@ struct ShortcutsCard: View {
             Group(title: "Modes and tools", items: [
                 s("Design or Animate", "M"),
                 s("Select", "V"),
+                s("Frame", "F"),
                 s("Rectangle, ellipse, line", "R", "O", "L"),
                 s("Polygon, star", "Y", "S"),
                 s("Pen", "P"),
@@ -110,6 +111,7 @@ struct ShortcutsCard: View {
                 s("Align top, middles, bottom", "⌥W", "⌥V", "⌥S"),
                 s("Distribute across, down", "⌃⌥H", "⌃⌥V"),
                 s("Group, ungroup", "⌘G", "⇧⌘G"),
+                s("Frame selection", "⌥⌘G"),
                 s("Forward, backward", "⌘]", "⌘["),
                 s("To front, to back", "⌥⌘]", "⌥⌘["),
             ]),

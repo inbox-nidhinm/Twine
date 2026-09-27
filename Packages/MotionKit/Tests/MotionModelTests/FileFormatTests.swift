@@ -61,7 +61,11 @@ func kitchenSinkProject() -> Project {
                 Fill(paint: .image(ImagePaint(mediaID: image.id, mode: .tile, tileScale: 0.25)))])),
         size: Size2(640, 480), position: Vec2(320, 240))
 
-    var group = Layer(name: "Group", content: .group(GroupContent(children: [ellipse, star], clipsContent: true)),
+    let frame = Layer(name: "Frame", content: .group(GroupContent(children: [], clipsContent: true, frame: FrameStyle(
+        fills: [Fill(paint: .color(.white))], strokes: [Stroke(paint: .color(.black), width: 2)],
+        cornerRadii: CornerRadii(topLeft: 8, topRight: 8, bottomRight: 0, bottomLeft: 0)))),
+        size: Size2(300, 200), position: Vec2(150, 100))
+    var group = Layer(name: "Group", content: .group(GroupContent(children: [ellipse, star, frame], clipsContent: true)),
                       size: Size2(500, 500), position: Vec2(250, 250))
     group.isSoloed = true
 

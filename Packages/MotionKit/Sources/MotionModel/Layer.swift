@@ -40,9 +40,44 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
         self.content = content
     }
 
+    /// A group or a frame: anything with children.
     public var isGroup: Bool {
         if case .group = content { return true }
         return false
+    }
+
+    public var isFrame: Bool {
+        if case .group(let g) = content { return g.frame != nil }
+        return false
+    }
+
+    /// The fills, strokes and outline of a shape, or of a frame as a
+    /// rectangle: whatever has a look of its own. Setting it on a frame keeps
+    /// the rectangle's corners and drops any other outline.
+    public var look: ShapeContent? {
+        get {
+            switch content {
+            case .shape(let s): return s
+            case .group(let g):
+                guard let f = g.frame else { return nil }
+                return ShapeContent(geometry: .rectangle(cornerRadii: f.cornerRadii), fills: f.fills, strokes: f.strokes)
+            default: return nil
+            }
+        }
+        set {
+            guard let newValue else { return }
+            switch content {
+            case .shape: content = .shape(newValue)
+            case .group(var g):
+                guard var f = g.frame else { return }
+                f.fills = newValue.fills
+                f.strokes = newValue.strokes
+                if case .rectangle(let radii) = newValue.geometry { f.cornerRadii = radii }
+                g.frame = f
+                content = .group(g)
+            default: break
+            }
+        }
     }
 
     /// The children of a group, or nothing for any other layer.
@@ -213,13 +248,43 @@ public struct AudioContent: Codable, Sendable, Equatable {
 /// renderer gives every group a container layer of its own, which is what lets
 /// group opacity, group transforms and, later, group motion blur apply to the
 /// children as one picture.
+///
+/// A group with a `frame` is a frame, as in Figma: a box of its own with
+/// fills behind its children, strokes in front of them, rounded corners it
+/// clips to, and a size that resizing changes (a group scales instead).
 public struct GroupContent: Codable, Sendable, Equatable {
     public var children: [Layer]
     public var clipsContent: Bool
+    /// Nil for a plain group.
+    public var frame: FrameStyle?
 
-    public init(children: [Layer] = [], clipsContent: Bool = false) {
+    public init(children: [Layer] = [], clipsContent: Bool = false, frame: FrameStyle? = nil) {
         self.children = children
         self.clipsContent = clipsContent
+        self.frame = frame
+    }
+
+    private enum CodingKeys: String, CodingKey { case children, clipsContent, frame }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        children = try c.decode([Layer].self, forKey: .children)
+        clipsContent = try c.decode(Bool.self, forKey: .clipsContent)
+        // Frames arrived after the first files with groups.
+        frame = try c.decodeIfPresent(FrameStyle.self, forKey: .frame)
+    }
+}
+
+/// A frame's own look: what a rectangle has, in the frame's box.
+public struct FrameStyle: Codable, Sendable, Equatable {
+    public var fills: [Fill]
+    public var strokes: [Stroke]
+    public var cornerRadii: CornerRadii
+
+    public init(fills: [Fill] = [], strokes: [Stroke] = [], cornerRadii: CornerRadii = .zero) {
+        self.fills = fills
+        self.strokes = strokes
+        self.cornerRadii = cornerRadii
     }
 }
 
@@ -347,7 +412,7 @@ public struct BackgroundBlur: AnimatableValue {
 extension Layer {
     /// The first picture fill of a shape, with where it is among the fills.
     public var picture: (index: Int, paint: ImagePaint)? {
-        guard case .shape(let shape) = content, let i = shape.pictureIndex,
+        guard let shape = look, let i = shape.pictureIndex,
               let paint = shape.fills[i].paint.imagePaint else { return nil }
         return (i, paint)
     }
@@ -355,10 +420,10 @@ extension Layer {
     /// Every imported file the layer shows or plays.
     public var mediaIDs: [UUID] {
         switch content {
-        case .shape(let shape): return shape.fills.compactMap { $0.paint.imagePaint?.mediaID }
+        case .shape, .group: return look?.fills.compactMap { $0.paint.imagePaint?.mediaID } ?? []
         case .video(let v): return [v.mediaID]
         case .audio(let a): return [a.mediaID]
-        case .text, .group: return []
+        case .text: return []
         }
     }
 }

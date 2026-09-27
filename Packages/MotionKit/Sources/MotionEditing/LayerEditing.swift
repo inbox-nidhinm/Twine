@@ -8,7 +8,8 @@ extension Layer {
         return nil
     }
 
-    public var shapeGeometry: ShapeGeometry? { shapeContent?.geometry }
+    /// A shape's outline, or a frame's rectangle.
+    public var shapeGeometry: ShapeGeometry? { look?.geometry }
 
     /// The layer moved by `delta` in its parent's space. Its By moves travel
     /// with it on their own; To moves are absolute and are moved separately,

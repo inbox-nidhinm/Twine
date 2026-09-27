@@ -36,7 +36,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `spacedown`, `spaceup` | Holds and releases Space |
 | `menukey C` | ⌘C through the main menu |
 | `hover X Y`, `rhover X Y`, `chover X Y` | Pointer moves handed straight to the timeline tracks, the ruler or the canvas (`chover` logs `HOVER`) |
-| `call NAME` | `duplicate`, `shortcuts`, `copy`, `paste`, `undo`, `focuscanvas`, `copyeasing`, `pasteeasing`, `exportmovie` (opens the export panel; again, exports), `exportframe`, `staggermenu` |
+| `call NAME` | `duplicate`, `shortcuts`, `copy`, `paste`, `undo`, `focuscanvas`, `copyeasing`, `pasteeasing`, `exportmovie` (opens the export panel; again, exports), `exportframe`, `staggermenu`, `group`, `frameselection` |
 | `savepanel PATH`, `waitexport` | Fills and closes a save panel, waits for an export |
 | `import PATH`, `save` | Imports media, saves |
 | `actions`, `spec`, `text` | Logs every action, the selected actions' specs, the selected text layer |
@@ -46,6 +46,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `home`, `openfile PATH` | Turns the window to the home screen, as the Home button does; opens a project in the window, as the Finder does (never point it at a real project) |
 | `replace PATH`, `fillpicture PATH` | Replace in the inspector, or Image as the fill, with the file handed in rather than chosen in the panel |
 | `mode M`, `turn` | The selected picture's mode (`fill`, `fit`, `crop`, which starts cropping, `tile`) and a quarter turn |
+| `tree` | Logs every layer under its parent: kind (frame, group, picture...), place, size, scale, clipping, fills and strokes, then the selection and the last undo |
 | `picture` | Logs the selected picture or video: file, mode, crop, turns, actions, whether it is being cropped, and while cropping the picture's and the box's corners in the window, to drag |
 | `offers` | Logs what Add Action and Add Preset offer for the selection |
 | `add KIND` | Adds an action by its kind's name (`move`, `path`, `volume`...), as the Add Action menu does |

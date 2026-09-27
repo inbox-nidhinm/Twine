@@ -12,6 +12,9 @@ enum CanvasDrag {
         /// Nil until the pointer has moved, so a plain click can make a
         /// standard-size shape instead.
         var layerID: UUID?
+        /// The frame the press landed in, which the new layer goes into, as
+        /// in Figma. Nil for the top level.
+        var parentID: UUID? = nil
     }
 
     struct Move {
@@ -275,7 +278,7 @@ enum CanvasGeometry {
         let pinned = old.apply(fixedOld)
 
         var edited = layer
-        if layer.isGroup {
+        if layer.isGroup && !layer.isFrame {
             let newScale = Vec2(w > 0 ? scale.x * nw / w : scale.x, h > 0 ? scale.y * nh / h : scale.y)
             let turned = Affine.layer(position: .zero, anchor: .zero, scale: newScale, rotation: rotation)
             let offset = turned.applyToVector(Vec2(fixedOld.x - anchor.x, fixedOld.y - anchor.y))
