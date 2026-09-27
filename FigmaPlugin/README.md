@@ -10,6 +10,12 @@ A Figma plugin that copies the selected frames and layers so Twine can paste the
 
 It then appears under **Plugins > Development > Twine**.
 
+Changes to the plugin show the next time it is run: Figma reads these files from this folder each time, so there is nothing to add again. Only moving or renaming this folder means importing `manifest.json` once more (and removing the old entry under **Plugins > Development > Manage plugins in development**).
+
+## Its icon
+
+Figma has no icon setting for a plugin run from a folder, so a development plugin always shows Figma's plain plugin icon. An icon is set only when publishing (privately to an organisation, or to the Community), in the publish dialog, which asks for 128 by 128: `icon.png` here is the app icon at that size, made with `sips -z 128 128 Artwork/AppIcon.png --out FigmaPlugin/icon.png`.
+
 ## Using it
 
 Select a frame or some layers, run the plugin, and press **Copy**. In Twine, press ⌘V.
@@ -24,6 +30,7 @@ Select a frame or some layers, run the plugin, and press **Copy**. In Twine, pre
 
 - `code.js` reads the selection (Figma's plugin sandbox).
 - `ui.src.html` is the panel. After editing it, run `python3 build.py` here, which writes `ui.html` with PP Kyoto embedded (Figma wants the panel as one file). PP Kyoto is a paid font; keep this folder, like the rest of Twine, private.
+- `icon.png` is the icon to give Figma when publishing.
 - `test/run.js` runs `code.js` against a stand-in for Figma and writes `test/sample-payload.json`, which Twine's tests read, so the two halves are checked against each other: `node FigmaPlugin/test/run.js`.
 
 The copy is JSON on the clipboard, `{"format": "twine.figma", "version": 1, ...}`, read by `FigmaImport` in `Packages/MotionKit/Sources/MotionImport/FigmaImport.swift`.
