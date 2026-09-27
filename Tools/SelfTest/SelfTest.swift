@@ -17,9 +17,14 @@ final class Held {
 }
 
 enum SelfTest {
+    /// The script runs once, from the first project to open; later ones (a
+    /// second project, or one reopened from home) only show in the log.
+    nonisolated(unsafe) static var started = false
+
     static func run(window: NSWindow, controller: EditorController, menus: MenuHost) {
-        guard let script = ProcessInfo.processInfo.environment["EMOTION_SELFTEST"],
+        guard !started, let script = ProcessInfo.processInfo.environment["EMOTION_SELFTEST"],
               let shots = ProcessInfo.processInfo.environment["EMOTION_SHOTS"] else { return }
+        started = true
         let steps = script.split(separator: ";").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         let held = Held()
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { step(0) }
@@ -29,7 +34,10 @@ enum SelfTest {
             _ = e
             let fr = window.firstResponder.map { String(describing: type(of: $0)) } ?? "-"
             let p0 = controller.selectedLayers.first.map { String(format: "pos=%.1f,%.1f size=%.1f,%.1f", $0.transform.position.x, $0.transform.position.y, $0.size.width, $0.size.height) } ?? "pos=-"
-            return "hov=\(controller.editor.hoveredLayer.flatMap { controller.project.layer(withID: $0)?.name } ?? "-") " + p0 + " vstart=\(String(format: "%.3f", e.viewport.start)) pps=\(Int(e.viewport.pointsPerSecond)) layers=\(controller.project.allLayers.count) actions=\(controller.project.actions.map(\.name)) sel=\(controller.selectedLayers.map { "\($0.name)@\(Int($0.transform.position.x)),\(Int($0.transform.position.y))" }) mode=\(e.mode) tool=\(e.tool) time=\(String(format: "%.3f", e.time)) playing=\(e.isPlaying) export=\(e.exports.progress.map { String(format: "%.2f", $0) } ?? "-")/\(e.exports.finished?.lastPathComponent ?? "-") sheet=\(window.attachedSheet != nil) menu=\(menus.isOpen) fr=\(fr.prefix(40))"
+            let shown = MainWindow.window.windowController.map { String(describing: type(of: $0)).replacingOccurrences(of: "WindowController", with: "") } ?? "-"
+            let wins = NSApp.windows.filter { $0.isVisible && !($0 is NSPanel) }.count
+            let docs = NSDocumentController.shared.documents.map { $0.displayName ?? "?" }
+            return "window=\(shown) wins=\(wins) docs=\(docs) " + "hov=\(controller.editor.hoveredLayer.flatMap { controller.project.layer(withID: $0)?.name } ?? "-") " + p0 + " vstart=\(String(format: "%.3f", e.viewport.start)) pps=\(Int(e.viewport.pointsPerSecond)) layers=\(controller.project.allLayers.count) actions=\(controller.project.actions.map(\.name)) sel=\(controller.selectedLayers.map { "\($0.name)@\(Int($0.transform.position.x)),\(Int($0.transform.position.y))" }) mode=\(e.mode) tool=\(e.tool) time=\(String(format: "%.3f", e.time)) playing=\(e.isPlaying) export=\(e.exports.progress.map { String(format: "%.2f", $0) } ?? "-")/\(e.exports.finished?.lastPathComponent ?? "-") sheet=\(window.attachedSheet != nil) menu=\(menus.isOpen) fr=\(fr.prefix(40))"
         }
         func mouse(_ type: NSEvent.EventType, _ x: Double, _ y: Double) {
             let p = NSPoint(x: x, y: window.contentView!.bounds.height - y)
@@ -463,6 +471,14 @@ enum SelfTest {
                     }.joined(separator: " ")
                 }
                 log(line)
+            case "home":
+                // Home, as the layers panel's button does.
+                HomeWindowController.shared.showWindow(nil)
+            case "openfile":
+                // Opens a project in the one window, as a double-click in the Finder does.
+                NSDocumentController.shared.openDocument(withContentsOf: URL(fileURLWithPath: parts[1]), display: true) { _, _, error in
+                    if let error { log("OPEN error \(error.localizedDescription)") }
+                }
             case "import":
                 controller.importMedia(parts.dropFirst().map { URL(fileURLWithPath: $0) })
             case "save":

@@ -6,7 +6,7 @@ import MotionRendering
 import ImageIO
 import UniformTypeIdentifiers
 
-/// One open `.emotion` project.
+/// One open project (`.twine`, or `.emotion` from before the rename).
 ///
 /// Saving is autosave in place: macOS writes the package back a moment after
 /// each change and again on close and quit, keeps older versions for File >
@@ -159,6 +159,19 @@ final class ProjectDocument: NSDocument {
     override func close() {
         saveSoon?.invalidate()
         super.close()
+    }
+
+    /// Saves anything not yet saved, then closes: for when the window turns
+    /// to something else rather than closing, which would have saved itself.
+    func closeAfterSaving(then: @escaping () -> Void) {
+        guard hasUnautosavedChanges || isDocumentEdited else {
+            close()
+            return then()
+        }
+        autosave(withImplicitCancellability: false) { [weak self] _ in
+            self?.close()
+            then()
+        }
     }
 
     override func makeWindowControllers() {

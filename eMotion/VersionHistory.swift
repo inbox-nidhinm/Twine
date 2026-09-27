@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "One window", changes: [
+            "Twine is one window now. Opening a project turns the home screen into the editor, and the Home button (or ⇧⌘H) saves the project and turns it back, with a short fade either way.",
+            "One project is open at a time: opening another, from the home screen or the Finder, saves the first and takes its place. Closing the window quits Twine.",
+        ]),
         .init(date: "27 September 2026", title: "The .twine file", changes: [
             "New projects end in .twine, shown in Finder as Twine projects. Projects that still end in .emotion open and save just as before.",
         ]),

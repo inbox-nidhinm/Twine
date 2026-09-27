@@ -1,8 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// The home screen's window. There is one, shown at launch and whenever the
-/// last project closes, and put away whenever a project opens.
+/// The home screen, in the app's one window (`MainWindow`): shown at launch,
+/// and whenever Home is chosen, which saves and closes the project that was
+/// in the window.
 final class HomeWindowController: NSWindowController, NSWindowDelegate {
     static let shared = HomeWindowController()
 
@@ -10,22 +11,25 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
     private let menus = MenuHost()
 
     private init() {
-        let window = makeChromelessWindow(size: NSSize(width: 1180, height: 760), minSize: NSSize(width: 820, height: 560))
-        window.title = "Twine"
-        super.init(window: window)
-        window.contentView = NSHostingView(rootView: HomeView(library: library).environment(menus))
-        window.delegate = self
-        window.setFrameAutosaveName("Home")
+        super.init(window: nil)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not built from a nib") }
 
+    /// Turns the window into the home screen, closing any project in it. The
+    /// list refreshes again once that project has saved, for its thumbnail.
     override func showWindow(_ sender: Any?) {
+        if window !== MainWindow.window || MainWindow.window.windowController !== self {
+            let window = MainWindow.take { [weak self] in self?.library.refresh() }
+            self.window = window
+            window.windowController = self
+            window.delegate = self
+            window.title = "Twine"
+            MainWindow.present(NSHostingView(rootView: HomeView(library: library).environment(menus)), in: window)
+        }
         library.refresh()
         super.showWindow(sender)
-        (window as? ChromelessWindow)?.clearInitialFocus()
-        if let window { TrafficLights.retry(in: window) }
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
@@ -34,6 +38,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        guard window?.windowController === self else { return }
         menus.dismiss()
         library.showVersionHistory = false
     }

@@ -26,7 +26,7 @@ Name.twine/
 
 ## The interface
 
-- **Home** opens at launch and whenever the last project closes: every project, newest first. Right-click a card to rename, duplicate, show in Finder or move to Trash.
+- **One window.** Home opens at launch: every project, newest first. Right-click a card to rename, duplicate, show in Finder or move to Trash. Opening a project turns the window into its editor; the Home button (top right of the layers panel) or ⇧⌘H saves it and turns the window back into Home. One project is open at a time: opening another, even from the Finder, takes its place. Closing the window quits.
 - **The editor** is a full-bleed canvas with panels floating over it. The layers panel is on the left, with the project's name at its head (click it to rename). The inspector is on the right.
 - **Design and Animate** switch at the head of the inspector (⌥⌘1, ⌥⌘2). Design shows the tools along the bottom. Animate hides them and brings up the timeline.
 - With nothing selected, the inspector shows the composition: size, frame rate, duration, background colour and transparency. With a layer selected it shows the layer: transform, shape, fill, stroke and effects.

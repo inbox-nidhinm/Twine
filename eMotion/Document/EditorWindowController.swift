@@ -4,8 +4,9 @@ import SwiftUI
 import MotionEditing
 import MotionExport
 
-/// The window a project edits in. It sits in the responder chain, so the View
-/// menu's commands find the editor of whichever window is in front.
+/// A project's editor, in the app's one window (`MainWindow`), which it takes
+/// from the home screen or from the project before. It sits in the responder
+/// chain, so the View menu's commands find the editor.
 final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
     private let editor: EditorModel
     let controller: EditorController
@@ -15,14 +16,15 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         editor = document.editor
         controller = EditorController(store: store, editor: document.editor)
         controller.document = document
-        let window = makeChromelessWindow(size: NSSize(width: 1440, height: 920), minSize: NSSize(width: 980, height: 660))
+        let window = MainWindow.take { HomeWindowController.shared.library.refresh() }
         super.init(window: window)
+        window.windowController = self
 
         let root = EditorView(document: document, store: store, editor: editor, controller: controller)
             .environment(menus)
-        window.contentView = NSHostingView(rootView: root)
         window.delegate = self
-        shouldCascadeWindows = true
+        shouldCascadeWindows = false
+        MainWindow.present(NSHostingView(rootView: root), in: window)
         editor.exports.request = { [weak self] in self?.export($0) }
     }
 
@@ -31,22 +33,29 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     override func showWindow(_ sender: Any?) {
         super.showWindow(sender)
-        (window as? ChromelessWindow)?.clearInitialFocus()
         if let window { TrafficLights.retry(in: window) }
-        // The home screen gives way to the project, as it does in Flip.
-        HomeWindowController.shared.close()
+    }
+
+    /// Gives the window up to the home screen or another project: playback,
+    /// menus and any export stop, and the project closes once it has saved.
+    func leave(then: @escaping () -> Void) {
+        menus.dismiss()
+        controller.stop()
+        editor.exports.cancel()
+        let document = document as? ProjectDocument
+        window?.delegate = nil
+        window = nil
+        document?.removeWindowController(self)
+        if let document { document.closeAfterSaving(then: then) } else { then() }
     }
 
     // MARK: NSWindowDelegate
 
-    /// When the last project closes, the home screen comes back rather than
-    /// the app quitting under you. Done before the window goes, so there is
-    /// never a moment with no window at all.
+    /// Closing the window closes the project and, as it is the only window,
+    /// the app.
     func windowWillClose(_ notification: Notification) {
         menus.dismiss()
         editor.exports.cancel()
-        let others = NSApp.windows.filter { $0 !== window && $0.windowController is EditorWindowController && $0.isVisible }
-        if others.isEmpty { HomeWindowController.shared.showWindow(nil) }
     }
 
     // MARK: File menu

@@ -111,6 +111,9 @@ final class CanvasNSView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        // Out of the window (it turned to the home screen), the playback
+        // clock stops, or it would keep the canvas alive.
+        if window == nil { setClockRunning(false) }
         guard let window = window as? ChromelessWindow else { return }
         // The canvas is where the keyboard goes by default, so tool letters
         // and the delete key work without clicking it first.
