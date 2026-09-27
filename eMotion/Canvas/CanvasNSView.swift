@@ -68,6 +68,8 @@ final class CanvasNSView: NSView {
     var caretTimer: Timer?
     /// A shape's points shown for editing, or the pen drawing, when happening.
     var pathSession: PathSession?
+    /// A picture being cropped, when happening.
+    var cropSession: CropSession?
 
     /// Ticks with the display while playing, so playback advances in step
     /// with what is shown.
@@ -159,6 +161,7 @@ final class CanvasNSView: NSView {
             endTextEditing()
         }
         validatePathSession()
+        validateCropSession()
         layoutWorld()
     }
 
@@ -346,6 +349,9 @@ final class CanvasNSView: NSView {
             handles = []
             anchor = nil
         }
+        // While cropping, the handles crop, and the layer is not turned or
+        // moved about its anchor.
+        if isCropping { anchor = nil }
         overlay.update(outlines: outlines, union: union, handles: handles, anchor: anchor,
                        hover: textSession == nil ? hover : nil, hoverIsSelected: hovered.map(selection.contains) ?? false,
                        marquee: drag?.marqueeRect, motion: motionOverlay())
@@ -353,6 +359,7 @@ final class CanvasNSView: NSView {
         overlay.updateSnap(lines: marks.lines, gaps: marks.gaps)
         updateTextOverlay()
         overlay.updatePath(pathSession == nil ? nil : pathMarks())
+        overlay.updateCrop(isCropping ? cropMarks() : nil)
     }
 
     /// The kind of the action the canvas is editing, in Animate.
@@ -506,6 +513,12 @@ final class CanvasNSView: NSView {
             return
         }
 
+        // So does a picture being cropped.
+        if cropMouseDown(event, at: point, viewPoint: viewPoint) {
+            redrawOverlay()
+            return
+        }
+
         if tool.isShape, !animating {
             snapTargets = targets(excluding: [])
             drag = .create(CanvasDrag.Create(tool: tool, start: snapped(point, event), layerID: nil))
@@ -570,6 +583,11 @@ final class CanvasNSView: NSView {
                       !controller.isLocked(hit) {
                 // And on text, it starts typing where it was clicked.
                 return beginTextEditing(hit, selectAll: false, at: point)
+            } else if event.clickCount == 2, !animating, controller.project.layer(withID: hit)?.picture != nil,
+                      !controller.isLocked(hit) {
+                // And on a picture, it crops it, as in Figma.
+                controller.setPictureMode(hit, .crop)
+                return redrawOverlay()
             } else if event.clickCount == 2, !animating, let layer = controller.project.layer(withID: hit),
                       PathEditing.canEditPoints(layer), !controller.isLocked(hit) {
                 // And on a shape, it shows its points.
@@ -707,6 +725,9 @@ final class CanvasNSView: NSView {
 
         case .path(let edit):
             pathMouseDragged(edit, point: point, viewPoint: viewPoint, event: event)
+
+        case .crop(let edit):
+            cropMouseDragged(edit, point: point, event: event)
         }
         redrawOverlay()
     }
@@ -746,6 +767,8 @@ final class CanvasNSView: NSView {
             break
         case .path(let edit):
             pathMouseUp(edit, event: event)
+        case .crop(let edit):
+            cropMouseUp(edit)
         case .pan:
             (spaceHeld ? Cursors.hand : Cursors.arrow).set()
         }
@@ -966,7 +989,7 @@ final class CanvasNSView: NSView {
         return Vec2(layer.scale.x * rx, layer.scale.y * ry)
     }
 
-    private func parentInverse(of id: UUID) -> Affine? {
+    func parentInverse(of id: UUID) -> Affine? {
         guard let scene, let project else { return nil }
         guard let parent = project.location(of: id)?.parentID else { return .identity }
         return scene.worldTransform(of: parent)?.inverted
@@ -1037,6 +1060,13 @@ final class CanvasNSView: NSView {
     private func updateCursor(at viewPoint: CGPoint) {
         guard let scene, let controller, selection.count == 1, let id = selection.first, !controller.isLocked(id) else {
             return Cursors.arrow.set()
+        }
+        if isCropping {
+            if let corner = cropCursor(at: viewPoint) { return corner.set() }
+            // The layer's handles crop, and nothing turns.
+            guard let box = cropBoxCorners, CanvasHandles.handle(at: viewPoint, box: box, isLine: false) != nil else {
+                return Cursors.arrow.set()
+            }
         }
         let view: [CGPoint]
         let line: Bool
@@ -1125,6 +1155,7 @@ final class CanvasNSView: NSView {
         if ExportKeys.handle(event, controller) { return }
         if textKeyDown(event) { return }
         if pathKeyDown(event) { return }
+        if cropKeyDown(event) { return }
         // Return on one selected text layer starts typing into it.
         if event.keyCode == 36, !animating, selection.count == 1, let id = selection.first,
            controller.project.layer(withID: id)?.isText == true, !controller.isLocked(id) {

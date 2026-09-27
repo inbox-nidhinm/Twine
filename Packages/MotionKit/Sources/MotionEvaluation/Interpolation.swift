@@ -102,12 +102,14 @@ extension MotionModel.Gradient: Interpolatable {
 /// that colour alone, shaped like the other. Linear and radial gradients
 /// cannot become one another, so the kind changes half way while the stops
 /// and geometry blend throughout. Progress is kept to 0...1: a colour has
-/// nothing to overshoot into.
+/// nothing to overshoot into. A picture does not blend: it holds until the
+/// end, then gives way.
 extension Paint: Interpolatable {
     public static func interpolate(_ a: Paint, _ b: Paint, _ t: Double) -> Paint {
         let t = min(max(t, 0), 1)
         if t == 0 { return a }
         if t == 1 { return b }
+        if a.isImage || b.isImage { return a }
         if case .solid(let ca) = a, case .solid(let cb) = b { return .solid(.interpolate(ca, cb, t)) }
         let g = MotionModel.Gradient.interpolate(a.gradient(shapedLike: b), b.gradient(shapedLike: a), t)
         let radial: Bool
@@ -129,9 +131,11 @@ extension Paint: Interpolatable {
             case .linearGradient(var g), .radialGradient(var g):
                 g.stops = g.stops.map { GradientStop(position: $0.position, color: color) }
                 return g
-            case .solid:
+            case .solid, .image:
                 return MotionModel.Gradient(stops: [GradientStop(position: 0, color: color), GradientStop(position: 1, color: color)])
             }
+        case .image:
+            return MotionModel.Gradient(stops: [GradientStop(position: 0, color: .clear), GradientStop(position: 1, color: .clear)])
         }
     }
 }

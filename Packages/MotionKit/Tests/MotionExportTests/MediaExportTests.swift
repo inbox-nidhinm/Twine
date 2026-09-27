@@ -59,6 +59,61 @@ private func redPicture() throws -> URL {
     return url
 }
 
+/// A 20 by 20 picture in four colours, so which way up and which way round
+/// it is drawn shows: red top-left, green top-right, blue bottom-left and
+/// white bottom-right.
+private func quarteredPicture() throws -> URL {
+    let url = temporaryURL("png")
+    let context = CGContext(data: nil, width: 20, height: 20, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    // Core Graphics counts rows from the bottom.
+    for (x, y, color) in [(0, 10, (1.0, 0.0, 0.0)), (10, 10, (0.0, 1.0, 0.0)), (0, 0, (0.0, 0.0, 1.0)), (10, 0, (1.0, 1.0, 1.0))] {
+        context.setFillColor(CGColor(srgbRed: color.0, green: color.1, blue: color.2, alpha: 1))
+        context.fill(CGRect(x: x, y: y, width: 10, height: 10))
+    }
+    let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
+    CGImageDestinationAddImage(destination, context.makeImage()!, nil)
+    CGImageDestinationFinalize(destination)
+    return url
+}
+
+private func pictureShape(_ paint: ImagePaint) -> ShapeContent {
+    ShapeContent(geometry: .rectangle(cornerRadii: .zero), fills: [Fill(paint: .image(paint))])
+}
+
+/// A 64 by 64 still of one picture-filled square, 40 across with its
+/// top-left at the origin, as the colour names of the pixels asked for.
+private func pictureColours(_ paint: (UUID) -> ImagePaint, at points: [(Int, Int)],
+                            file: URL, pixels: (Int, Int)) throws -> [String] {
+    let asset = MediaAsset(kind: .image, fileName: "q.png", originalName: "q.png", contentHash: "q",
+                           pixelWidth: pixels.0, pixelHeight: pixels.1)
+    var layer = Layer(name: "Q", content: .shape(pictureShape(paint(asset.id))), size: Size2(40, 40), position: .zero)
+    layer.transform.anchor = .zero
+    let project = Project(composition: Composition(width: 64, height: 64, background: Background(isTransparent: true)),
+                          layers: [layer], media: [asset])
+    let url = temporaryURL("png")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try Exporter.export(project, settings: ExportSettings(format: .png), to: url, media: [asset.id: file])
+    let image = CGImageSourceCreateImageAtIndex(CGImageSourceCreateWithURL(url as CFURL, nil)!, 0, nil)!
+    return points.map { x, y in
+        var bytes = [UInt8](repeating: 0, count: 4)
+        let context = CGContext(data: &bytes, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.draw(image, in: CGRect(x: -x, y: y - 64 + 1, width: 64, height: 64))
+        let (r, g, b, a) = (bytes[0] > 128, bytes[1] > 128, bytes[2] > 128, bytes[3] > 128)
+        switch (r, g, b, a) {
+        case (_, _, _, false): return "clear"
+        case (true, false, false, _): return "red"
+        case (false, true, false, _): return "green"
+        case (false, false, true, _): return "blue"
+        case (true, true, true, _): return "white"
+        default: return "\(bytes)"
+        }
+    }
+}
+
 private func frames(of url: URL) async throws -> [CVPixelBuffer] {
     let asset = AVURLAsset(url: url)
     let track = try #require(try await asset.loadTracks(withMediaType: .video).first)
@@ -230,7 +285,7 @@ private func loudness(of url: URL) async throws -> [Double] {
         defer { try? FileManager.default.removeItem(at: picture) }
         let asset = MediaAsset(kind: .image, fileName: "r.png", originalName: "r.png", contentHash: "z",
                                pixelWidth: 20, pixelHeight: 10)
-        var layer = Layer(name: "Red", content: .image(ImageContent(mediaID: asset.id)), size: Size2(40, 20), position: .zero)
+        var layer = Layer(name: "Red", content: .shape(pictureShape(ImagePaint(mediaID: asset.id))), size: Size2(40, 20), position: .zero)
         layer.transform.anchor = .zero
         let project = Project(composition: Composition(width: 64, height: 64, background: Background(isTransparent: true)),
                               layers: [layer], media: [asset])
@@ -250,5 +305,52 @@ private func loudness(of url: URL) async throws -> [Double] {
         #expect(red.0 > 250 && red.1 < 5 && red.2 == 255)
         let missing = try pixel([:])
         #expect(missing.0 > 100 && missing.0 < 160 && missing.1 > 100 && missing.2 == 255)
+    }
+
+    // The corners of the 40 pixel square, then its middle row.
+    private let quarters = [(10, 10), (30, 10), (10, 30), (30, 30)]
+
+    @Test func aFilledPictureIsTheRightWayUpAndRound() throws {
+        let file = try quarteredPicture()
+        defer { try? FileManager.default.removeItem(at: file) }
+        #expect(try pictureColours({ ImagePaint(mediaID: $0) }, at: quarters, file: file, pixels: (20, 20))
+                == ["red", "green", "blue", "white"])
+    }
+
+    @Test func aTurnedPictureTurnsClockwise() throws {
+        let file = try quarteredPicture()
+        defer { try? FileManager.default.removeItem(at: file) }
+        #expect(try pictureColours({ ImagePaint(mediaID: $0, quarterTurns: 1) }, at: quarters, file: file, pixels: (20, 20))
+                == ["blue", "red", "white", "green"])
+    }
+
+    @Test func aFittedPictureLeavesTheRestOfTheBoxEmpty() throws {
+        let file = try redPicture()
+        defer { try? FileManager.default.removeItem(at: file) }
+        // 20 by 10 fits the 40 square as 40 by 20, from 10 to 30 down.
+        #expect(try pictureColours({ ImagePaint(mediaID: $0, mode: .fit) }, at: [(20, 5), (20, 20), (20, 35)],
+                                   file: file, pixels: (20, 10)) == ["clear", "red", "clear"])
+        // Filling, it covers the square and spills over the sides.
+        #expect(try pictureColours({ ImagePaint(mediaID: $0, mode: .fill) }, at: [(20, 5), (20, 20), (20, 35)],
+                                   file: file, pixels: (20, 10)) == ["red", "red", "red"])
+    }
+
+    @Test func aTiledPictureRepeatsAtItsScale() throws {
+        let file = try quarteredPicture()
+        defer { try? FileManager.default.removeItem(at: file) }
+        // Tiles of 10 pixels, each with 5 pixel quarters.
+        #expect(try pictureColours({ ImagePaint(mediaID: $0, mode: .tile, tileScale: 0.5) },
+                                   at: [(2, 2), (7, 2), (12, 2), (2, 7), (37, 37)], file: file, pixels: (20, 20))
+                == ["red", "green", "red", "blue", "white"])
+    }
+
+    @Test func aCroppedPictureShowsOnlyItsPart() throws {
+        let file = try quarteredPicture()
+        defer { try? FileManager.default.removeItem(at: file) }
+        // Twice the box's size and pulled up and left by a box: only the
+        // picture's bottom-right quarter shows.
+        let crop = ImageCrop(x: -1, y: -1, width: 2, height: 2)
+        #expect(try pictureColours({ ImagePaint(mediaID: $0, mode: .crop, crop: crop) }, at: [(3, 3), (36, 36), (45, 20)],
+                                   file: file, pixels: (20, 20)) == ["white", "white", "clear"])
     }
 }

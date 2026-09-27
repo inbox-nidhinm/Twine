@@ -39,6 +39,9 @@ struct PaintControls: View {
                         return paint.withGradient(gradient)
                     }
                 }
+            case .image:
+                // Pictures are chosen in Design, not blended to.
+                EmptyView()
             }
         }
     }
@@ -127,6 +130,10 @@ struct PaintSwatch: View {
             case .radialGradient(let g):
                 RadialGradient(stops: g.swiftUIStops, center: UnitPoint(x: g.start.x, y: g.start.y),
                                startRadius: 0, endRadius: size * hypot(g.end.x - g.start.x, g.end.y - g.start.y))
+            case .image:
+                Theme.panelRaised
+                IconView(.image, size: size * 0.6)
+                    .foregroundStyle(Theme.textSecondary)
             }
         }
         .frame(width: size, height: size)

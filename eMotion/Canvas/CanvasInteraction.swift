@@ -111,6 +111,30 @@ enum CanvasDrag {
         var began = false
     }
 
+    /// Cropping a picture: moving it inside its shape, scaling it by a
+    /// corner, or resizing the shape around it. Every step works from the
+    /// layer as it was when the press began.
+    struct CropEdit {
+        enum Part {
+            case move
+            /// One of the picture's corners, 0 top-left clockwise to 3.
+            case corner(Int)
+            /// One of the layer's own handles, numbered as `CanvasHandles`.
+            case box(Int)
+        }
+
+        let part: Part
+        let layer: Layer
+        /// Where the press began, in composition space.
+        let start: Vec2
+        /// From composition space into the layer's own.
+        let toLocal: Affine
+        /// From composition space into the layer's parent's.
+        let parentInverse: Affine
+        /// A continuous change was begun: the press has moved.
+        var began = false
+    }
+
     /// Panning the view: where the press was, and the pan then.
     struct Pan {
         let start: CGPoint
@@ -126,6 +150,7 @@ enum CanvasDrag {
     case marquee(Marquee)
     case action(ActionEdit)
     case path(PathEdit)
+    case crop(CropEdit)
 
     var marqueeRect: CGRect? {
         switch self {

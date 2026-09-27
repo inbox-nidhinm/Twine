@@ -124,9 +124,8 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
 public enum ResolvedContent: Sendable, Equatable {
     case shape(ResolvedShape)
     case text(ResolvedText)
-    case image(mediaID: UUID)
     /// `sourceTime` is the moment in the clip to show.
-    case video(mediaID: UUID, sourceTime: Double)
+    case video(mediaID: UUID, sourceTime: Double, fit: VideoFit)
     case group
 }
 
@@ -146,6 +145,21 @@ public enum ResolvedPaint: Sendable, Equatable {
     /// `center` and `radius` in pixels. The radius is the distance from the
     /// centre to the model's edge point.
     case radial(stops: [GradientStop], center: Vec2, radius: Double)
+    /// Held by reference, so the other paints stay small to copy.
+    indirect case image(ResolvedImage)
+}
+
+/// A picture fill, placed. Drawn inside the shape's outline only.
+public struct ResolvedImage: Sendable, Equatable {
+    public var mediaID: UUID
+    /// The whole picture's box in the layer's pixels, after its turns. For
+    /// a tiled picture, the first tile, repeated right and down from it
+    /// until the layer is covered.
+    public var frame: Box
+    /// Quarter turns clockwise, 0 to 3.
+    public var turns: Int
+    public var tiles: Bool
+    public var opacity: Double
 }
 
 public struct ResolvedStroke: Sendable, Equatable {

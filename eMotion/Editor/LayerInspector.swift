@@ -17,6 +17,10 @@ struct LayerInspector: View {
         VStack(alignment: .leading, spacing: 0) {
             // Sound has nowhere to be and nothing to show.
             if case .audio = layer.content {} else { transformSection }
+            if case .video(let v) = layer.content {
+                PanelDivider()
+                VideoSection(layer: layer, video: v, controller: controller)
+            }
             switch layer.content {
             case .video(let v) where controller.project.hasSound(layer):
                 // Only a clip with a sound track has a sound to set.
@@ -362,13 +366,21 @@ private struct FillSection: View {
             }
             if let fill = shape.fills.first {
                 VStack(alignment: .leading, spacing: 8) {
-                    SegmentRow(selection: fill.paint.kindName, options: ["Solid", "Linear", "Radial"], title: { $0 }) { kind in
-                        editShape { $0.fills[0].paint = fill.paint.converted(to: kind) }
+                    SegmentRow(selection: fill.paint.kindName, options: ["Solid", "Linear", "Radial", "Image"], title: { $0 }) { kind in
+                        if kind == "Image" {
+                            if !fill.paint.isImage { controller.fillWithPicture(layer.id) }
+                        } else {
+                            editShape { $0.fills[0].paint = fill.paint.converted(to: kind) }
+                        }
                     }
-                    PaintEditor(paint: fill.paint, isEnabled: fill.isEnabled, controller: controller, layer: layer,
-                                title: "Fill",
-                                change: { paint in editedShape { $0.fills[0].paint = paint } },
-                                toggle: { editShape { $0.fills[0].isEnabled.toggle() } })
+                    if let picture = fill.paint.imagePaint {
+                        PictureFields(layer: layer, paint: picture, controller: controller)
+                    } else {
+                        PaintEditor(paint: fill.paint, isEnabled: fill.isEnabled, controller: controller, layer: layer,
+                                    title: "Fill",
+                                    change: { paint in editedShape { $0.fills[0].paint = paint } },
+                                    toggle: { editShape { $0.fills[0].isEnabled.toggle() } })
+                    }
                 }
                 .padding(.horizontal, Theme.panelPad)
             }
@@ -391,6 +403,109 @@ private struct FillSection: View {
         var l = layer
         l.content = .shape(edited(change))
         return l
+    }
+}
+
+// MARK: - Pictures and video
+
+/// A picture fill: the picture, Replace, how it fills the shape, its turn,
+/// and for tiles, their size.
+private struct PictureFields: View {
+    let layer: Layer
+    let paint: MotionModel.ImagePaint
+    let controller: EditorController
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
+                PictureWell(image: controller.preview(of: paint.mediaID), turns: paint.turns)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 4) {
+                        MenuField(value: paint.mode.title, entries: {
+                            ImageScaleMode.allCases.map { mode in
+                                .item(mode.title, checked: mode == paint.mode) { controller.setPictureMode(layer.id, mode) }
+                            }
+                        })
+                        .help("Fill covers the shape, Fit shows the whole picture, Crop places it by hand on the canvas, and Tile repeats it")
+                        IconButton(icon: .rotate, help: "Turn the picture a quarter clockwise") { controller.turnPicture(layer.id) }
+                    }
+                    PanelButton(title: "Replace…") { controller.replaceMedia(of: layer.id) }
+                        .help("Choose another picture. The layer keeps its size, its place and its actions.")
+                }
+            }
+            if paint.mode == .tile {
+                LabeledRow(label: "Scale") {
+                    UnitField(value: paint.tileScale * 100, decimals: 1, suffix: "%", accepts: { $0 > 0 }) { v in
+                        edit("Tile Scale") { $0.tileScale = v / 100 }
+                    }
+                    .help("Each tile's size, as a share of the picture's own")
+                }
+            }
+            LabeledRow(label: "Opacity") {
+                UnitField(value: paint.opacity * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
+                    edit("Image Opacity") { $0.opacity = v / 100 }
+                }
+                .help("Opacity of the picture")
+            }
+        }
+    }
+
+    private func edit(_ name: String, _ change: (inout MotionModel.ImagePaint) -> Void) {
+        let edited = PictureEditing.editingPicture(layer, change)
+        controller.perform(.batch([.updateLayers([edited])], name: name))
+    }
+}
+
+/// A picture or a video's first frame, small, the way round it is shown.
+struct PictureWell: View {
+    let image: CGImage?
+    var turns = 0
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Theme.radiusControl)
+        ZStack {
+            Checkerboard(cell: Theme.pictureWell / 8)
+            if let image {
+                Image(decorative: image, scale: 1)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .rotationEffect(.degrees(Double(turns) * 90))
+            }
+        }
+        .frame(width: Theme.pictureWell, height: Theme.pictureWell)
+        .clipShape(shape)
+        .overlay(shape.strokeBorder(Theme.edge, lineWidth: 1))
+    }
+}
+
+/// A video's frames in its box, and Replace.
+private struct VideoSection: View {
+    let layer: Layer
+    let video: VideoContent
+    let controller: EditorController
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HeaderRow(title: "Video") {}
+            HStack(alignment: .top, spacing: 8) {
+                PictureWell(image: controller.preview(of: video.mediaID))
+                VStack(alignment: .leading, spacing: 6) {
+                    SegmentRow(selection: video.fit, options: VideoFit.allCases, title: { $0.title }) { fit in
+                        controller.edit(layer.id) { l in
+                            if case .video(var v) = l.content {
+                                v.fit = fit
+                                l.content = .video(v)
+                            }
+                        }
+                    }
+                    .help("Fill covers the layer's box, cropping what spills over; Fit shows the whole frame inside it")
+                    PanelButton(title: "Replace…") { controller.replaceMedia(of: layer.id) }
+                        .help("Choose another video. The layer keeps its size, its place and its actions.")
+                }
+            }
+            .padding(.horizontal, Theme.panelPad)
+        }
+        .padding(.bottom, Theme.panelPad)
     }
 }
 
@@ -527,6 +642,9 @@ private struct PaintEditor: View {
                     }
                 }
             }
+        case .image:
+            // Pictures have their own fields.
+            EmptyView()
         }
     }
 
@@ -559,6 +677,7 @@ extension Paint {
         case .solid: return "Solid"
         case .linearGradient: return "Linear"
         case .radialGradient: return "Radial"
+        case .image: return "Image"
         }
     }
 
@@ -567,6 +686,10 @@ extension Paint {
     /// becomes a solid of its first colour.
     func converted(to kind: String) -> Paint {
         switch (self, kind) {
+        case (.image, _):
+            // A picture has no colour to carry over, so it starts from the
+            // default grey.
+            return Paint.color(LayerFactory.defaultFill).converted(to: kind)
         case (.solid(let c), "Linear"), (.solid(let c), "Radial"):
             var clear = c
             clear.a = 0

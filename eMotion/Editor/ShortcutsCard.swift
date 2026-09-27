@@ -83,6 +83,10 @@ struct ShortcutsCard: View {
                 s("Move one handle alone", "⌥", "drag"),
                 s("Delete points", "⌫"),
             ]),
+            Group(title: "Pictures", items: [
+                s("Crop a picture", "double-click"),
+                s("Finish cropping", "Esc"),
+            ]),
             Group(title: "View", items: [
                 s("Pan", "Space", "drag"),
                 s("Zoom to fit, actual size", "⌘0", "⌥⌘0"),

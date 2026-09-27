@@ -29,6 +29,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks) -
     // A layer used as another's mask stops drawing on its own, and draws
     // only through the layers it masks.
     let maskSources = project.maskSourceIDs
+    let pictures = project.pictureSizes
     var out: [ResolvedLayer] = []
 
     func hasSoloedDescendant(_ layer: Layer) -> Bool {
@@ -43,7 +44,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks) -
             let state = tracks.state(of: layer, at: time)
             // Hidden by an action: the layer and everything inside it.
             guard state.isShown else { continue }
-            guard let resolved = resolve(layer, state: state, parent: parent, at: time) else { continue }
+            guard let resolved = resolve(layer, state: state, parent: parent, pictures: pictures) else { continue }
             out.append(resolved)
             if layer.isGroup { walk(layer.children, parent: layer.id, soloedAbove: soloed) }
         }
@@ -51,7 +52,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks) -
     walk(project.layers, parent: nil, soloedAbove: false)
 
     if !maskSources.isEmpty {
-        var world = WorldTransforms(project: project, tracks: tracks, time: time, known: out)
+        var world = WorldTransforms(project: project, tracks: tracks, time: time, pictures: pictures, known: out)
         var masks: [ResolvedLayer] = []
         for id in maskSources {
             guard let layer = world.resolved(id) else { continue }
@@ -95,12 +96,14 @@ private struct WorldTransforms {
     let project: Project
     let tracks: ActionTracks
     let time: Double
+    let pictures: [UUID: Size2]
     private var cache: [UUID: ResolvedLayer?] = [:]
 
-    init(project: Project, tracks: ActionTracks, time: Double, known: [ResolvedLayer]) {
+    init(project: Project, tracks: ActionTracks, time: Double, pictures: [UUID: Size2], known: [ResolvedLayer]) {
         self.project = project
         self.tracks = tracks
         self.time = time
+        self.pictures = pictures
         for layer in known { cache[layer.id] = layer }
     }
 
@@ -112,7 +115,7 @@ private struct WorldTransforms {
         let parent = project.location(of: id)?.parentID
         if let layer = project.layer(withID: id), layer.isVisible, parent.map({ resolved($0) != nil }) ?? true {
             let state = tracks.state(of: layer, at: time)
-            if state.isShown { result = resolve(layer, state: state, parent: parent, at: time) }
+            if state.isShown { result = resolve(layer, state: state, parent: parent, pictures: pictures) }
         }
         cache[id] = result
         return result
@@ -125,7 +128,7 @@ private struct WorldTransforms {
     }
 }
 
-private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, at t: Double) -> ResolvedLayer? {
+private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures: [UUID: Size2]) -> ResolvedLayer? {
     var size = state.size
     let content: ResolvedContent
     var clips = false
@@ -135,14 +138,14 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, at t: Dou
 
     switch layer.content {
     case .shape(let shape):
-        content = .shape(resolve(shape, size: size, state: state))
+        content = .shape(resolve(shape, size: size, state: state, pictures: pictures))
     case .text(let text):
         let shown = state.text ?? ShownText(text: text.text)
         var color = text.color
         switch state.fill {
         case .solid(let c): color = c
         case .linearGradient(let g), .radialGradient(let g): color = g.stops.first?.color ?? color
-        case nil: break
+        case .image, nil: break
         }
         let resolved = ResolvedText(text: shown.text, swap: shown.swap, fontFamily: text.fontFamily,
                                     fontWeight: text.fontWeight, fontSize: text.fontSize, color: color,
@@ -153,10 +156,8 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, at t: Dou
         size = TextLayout.size(of: shown.visible, style: resolved.style, width: width)
         textAnchor = TextLayout.anchor(layer.transform.anchor, from: layer.size, to: size, alignment: text.alignment)
         content = .text(resolved)
-    case .image(let image):
-        content = .image(mediaID: image.mediaID)
     case .video(let video):
-        content = .video(mediaID: video.mediaID, sourceTime: state.sourceTime ?? 0)
+        content = .video(mediaID: video.mediaID, sourceTime: state.sourceTime ?? 0, fit: video.fit)
     case .audio:
         return nil
     case .group(let group):
@@ -207,7 +208,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, at t: Dou
 /// points. A pen path fills the layer's box as every other shape does: its
 /// designed points' bounds are stretched onto the box, and a Path action's
 /// points go the same way, so resizing stretches either.
-private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState) -> ResolvedShape {
+private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState, pictures: [UUID: Size2]) -> ResolvedShape {
     var shape = shape
     var designBounds: Box?
     if case .path(let p) = shape.geometry { designBounds = p.bounds }
@@ -237,9 +238,11 @@ private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState) -> R
     }
     let closed = shape.geometry.isClosed
 
-    let fills = shape.fills.filter(\.isEnabled).map { resolve($0.paint, size: size) }
-    let strokes = shape.strokes.filter(\.isEnabled).map { stroke in
-        ResolvedStroke(paint: resolve(stroke.paint, size: size),
+    let fills = shape.fills.filter(\.isEnabled).map { resolve($0.paint, size: size, pictures: pictures) }
+    // A picture can only fill; a stroke with one is left for an importer to
+    // turn into a picture of its own.
+    let strokes = shape.strokes.filter { $0.isEnabled && !$0.paint.isImage }.map { stroke in
+        ResolvedStroke(paint: resolve(stroke.paint, size: size, pictures: pictures),
                        width: max(stroke.width, 0),
                        alignment: closed ? stroke.alignment : .center,
                        cap: stroke.cap, join: stroke.join,
@@ -250,7 +253,7 @@ private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState) -> R
     return ResolvedShape(path: path, isClosed: closed, fills: fills, strokes: strokes)
 }
 
-private func resolve(_ paint: Paint, size: Size2) -> ResolvedPaint {
+private func resolve(_ paint: Paint, size: Size2, pictures: [UUID: Size2]) -> ResolvedPaint {
     func px(_ unit: Vec2) -> Vec2 { Vec2(unit.x * size.width, unit.y * size.height) }
     switch paint {
     case .solid(let color):
@@ -262,6 +265,22 @@ private func resolve(_ paint: Paint, size: Size2) -> ResolvedPaint {
         let center = px(g.start), edge = px(g.end)
         return .radial(stops: g.stops.sorted { $0.position < $1.position },
                        center: center, radius: hypot(edge.x - center.x, edge.y - center.y))
+    case .image(let p):
+        return .image(ResolvedImage(mediaID: p.mediaID,
+                                    frame: ImagePlacement.frame(of: p, box: size, picture: pictures[p.mediaID]),
+                                    turns: p.turns, tiles: p.mode == .tile, opacity: min(max(p.opacity, 0), 1)))
+    }
+}
+
+extension Project {
+    /// Every picture's own size in pixels, by its id, for placing picture
+    /// fills.
+    public var pictureSizes: [UUID: Size2] {
+        var sizes: [UUID: Size2] = [:]
+        for asset in media where asset.kind == .image {
+            if let w = asset.pixelWidth, let h = asset.pixelHeight { sizes[asset.id] = Size2(Double(w), Double(h)) }
+        }
+        return sizes
     }
 }
 

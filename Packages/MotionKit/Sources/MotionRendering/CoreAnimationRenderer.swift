@@ -192,7 +192,13 @@ private final class Node {
     ]
 
     let container = CALayer()
-    var flipsContents = false { didSet { last = nil } }
+    var flipsContents = false {
+        didSet {
+            last = nil
+            // Picture fills are built the right way up for one or the other.
+            if !signature.isEmpty { clearPaint() }
+        }
+    }
     /// The layer as it was last drawn. A frame where it has not changed
     /// leaves it alone: in a busy scene most layers are still at any moment,
     /// and during a drag only one moves.
@@ -213,7 +219,7 @@ private final class Node {
     private var textLayers: [CALayer] = []
     private var textKeys: [TextImage.Key?] = [nil, nil]
     private var textImages: [TextImage?] = [nil, nil]
-    /// An image or video layer's picture.
+    /// A video layer's frame.
     private var mediaLayer: CALayer?
 
     init(scale: CGFloat) {
@@ -237,7 +243,8 @@ private final class Node {
         // Pictures and video may arrive from the media library after the
         // layer first asks, so they are always looked at again.
         switch layer.content {
-        case .image, .video: last = nil
+        case .video: last = nil
+        case .shape(let shape) where shape.fills.contains(where: \.isImage): last = nil
         default:
             if layer == last { return }
             last = layer
@@ -271,7 +278,7 @@ private final class Node {
 
         switch layer.content {
         case .shape(let shape):
-            updateShape(shape, size: layer.size)
+            updateShape(shape, size: layer.size, media: media)
             updateBackdrop(layer.backgroundBlur, path: shape.path.cgPath, size: layer.size)
         case .group:
             // A group's sublayers are its children, set by the renderer.
@@ -279,16 +286,13 @@ private final class Node {
         case .text(let text):
             if !signature.isEmpty { clearPaint() }
             updateText(text, size: layer.size)
-        case .image(let id):
+        case .video(let id, let time, let fit):
             if !signature.isEmpty { clearPaint() }
-            updateMedia(media?.image(id), size: layer.size)
-        case .video(let id, let time):
-            if !signature.isEmpty { clearPaint() }
-            updateMedia(media?.videoFrame(id, at: time), size: layer.size)
+            updateMedia(media?.videoFrame(id, at: time), size: layer.size, fit: fit)
         }
         if case .text = layer.content {} else if !textLayers.isEmpty { clearText() }
         switch layer.content {
-        case .image, .video: break
+        case .video: break
         default:
             mediaLayer?.removeFromSuperlayer()
             mediaLayer = nil
@@ -332,17 +336,20 @@ private final class Node {
         }
     }
 
-    /// The picture stretched to the layer's box, or a grey box where the file
-    /// is missing, so the layer can still be seen and picked.
-    private func updateMedia(_ image: CGImage?, size: Size2) {
+    /// The frame covering the layer's box or fitting inside it, centred, or
+    /// a grey box where the file is missing, so the layer can still be seen
+    /// and picked.
+    private func updateMedia(_ image: CGImage?, size: Size2, fit: VideoFit) {
         if mediaLayer == nil {
             let l = CALayer()
             l.actions = Self.noActions
-            l.contentsGravity = .resize
+            l.masksToBounds = true
             container.sublayers = [l]
             mediaLayer = l
         }
         guard let mediaLayer else { return }
+        let gravity: CALayerContentsGravity = fit == .fill ? .resizeAspectFill : .resizeAspect
+        if mediaLayer.contentsGravity != gravity { mediaLayer.contentsGravity = gravity }
         mediaLayer.transform = CATransform3DIdentity
         mediaLayer.frame = CGRect(origin: .zero, size: size.cg)
         mediaLayer.transform = flipsContents ? CATransform3DMakeScale(1, -1, 1) : CATransform3DIdentity
@@ -444,12 +451,12 @@ private final class Node {
         signature = []
     }
 
-    private func updateShape(_ shape: ResolvedShape, size: Size2) {
+    private func updateShape(_ shape: ResolvedShape, size: Size2, media: MediaProvider?) {
         let wanted = shape.fills.map { "fill-" + $0.kind } + shape.strokes.map { "stroke-" + $0.paint.kind + "-" + $0.alignment.rawValue }
         if wanted != signature {
             clearPaint()
-            paintLayers = shape.fills.map { PaintLayers(paint: $0, stroke: nil, scale: scale) }
-                + shape.strokes.map { PaintLayers(paint: $0.paint, stroke: $0, scale: scale) }
+            paintLayers = shape.fills.map { PaintLayers(paint: $0, stroke: nil, scale: scale, flipsContents: flipsContents) }
+                + shape.strokes.map { PaintLayers(paint: $0.paint, stroke: $0, scale: scale, flipsContents: flipsContents) }
             // The backdrop, if any, goes back underneath in `updateBackdrop`.
             container.sublayers = paintLayers.map(\.root)
             signature = wanted
@@ -457,10 +464,10 @@ private final class Node {
         let path = shape.path.cgPath
         let bounds = CGRect(origin: .zero, size: size.cg)
         for (i, fill) in shape.fills.enumerated() {
-            paintLayers[i].update(paint: fill, stroke: nil, path: path, bounds: bounds)
+            paintLayers[i].update(paint: fill, stroke: nil, path: path, bounds: bounds, media: media)
         }
         for (i, stroke) in shape.strokes.enumerated() {
-            paintLayers[shape.fills.count + i].update(paint: stroke.paint, stroke: stroke, path: path, bounds: bounds)
+            paintLayers[shape.fills.count + i].update(paint: stroke.paint, stroke: stroke, path: path, bounds: bounds, media: media)
         }
     }
 }
@@ -470,7 +477,9 @@ private final class Node {
 /// The layers that draw one fill or one stroke.
 ///
 /// A solid fill is one shape layer. A gradient is a gradient layer masked by
-/// the shape. A stroke sits inside a wrapper whose mask trims it to the inside
+/// the shape, and so is a picture: its holder, masked by the shape, carries
+/// the picture where the fill places it, or for a tiled one, a row of
+/// columns of it. A stroke sits inside a wrapper whose mask trims it to the inside
 /// or outside of the path, which is how Core Animation, which only strokes
 /// centred on the path, gets the other two alignments: the stroke is drawn at
 /// twice the width and half of it is masked away.
@@ -479,14 +488,49 @@ private final class PaintLayers {
     private let shape = CAShapeLayer()
     private var gradient: CAGradientLayer?
     private let alignmentMask = CAShapeLayer()
+    /// A picture fill: the holder masked by the shape, the picture, and for
+    /// a tiled one, the replicators that repeat it across and down.
+    private var holder: CALayer?
+    private var picture: CALayer?
+    private var across: CAReplicatorLayer?
+    private var down: CAReplicatorLayer?
+    private let flipsContents: Bool
 
-    init(paint: ResolvedPaint, stroke: ResolvedStroke?, scale: CGFloat) {
+    /// The most tiles drawn along either side, so a tiny tile cannot ask for
+    /// millions of copies.
+    private static let maxTiles = 256
+
+    init(paint: ResolvedPaint, stroke: ResolvedStroke?, scale: CGFloat, flipsContents: Bool) {
+        self.flipsContents = flipsContents
         for layer in [root, shape, alignmentMask] {
             layer.anchorPoint = .zero
             layer.actions = Node.noActions
         }
         if paint.kind == "solid" {
             root.addSublayer(shape)
+        } else if case .image(let image) = paint {
+            let h = CALayer(), p = CALayer()
+            for l in [h, p] { l.actions = Node.noActions }
+            h.anchorPoint = .zero
+            p.contentsGravity = .resize
+            h.mask = shape
+            if image.tiles {
+                let x = CAReplicatorLayer(), y = CAReplicatorLayer()
+                for l in [x, y] {
+                    l.anchorPoint = .zero
+                    l.actions = Node.noActions
+                }
+                y.addSublayer(p)
+                x.addSublayer(y)
+                h.addSublayer(x)
+                across = x
+                down = y
+            } else {
+                h.addSublayer(p)
+            }
+            root.addSublayer(h)
+            holder = h
+            picture = p
         } else {
             let g = CAGradientLayer()
             g.anchorPoint = .zero
@@ -507,10 +551,15 @@ private final class PaintLayers {
         gradient?.contentsScale = scale
     }
 
-    func update(paint: ResolvedPaint, stroke: ResolvedStroke?, path: CGPath, bounds: CGRect) {
+    func update(paint: ResolvedPaint, stroke: ResolvedStroke?, path: CGPath, bounds: CGRect, media: MediaProvider?) {
         root.frame = bounds
         shape.frame = bounds
         shape.path = path
+
+        if case .image(let image) = paint {
+            updatePicture(image, bounds: bounds, media: media)
+            return
+        }
 
         // The shape is either the visible paint (solid) or the gradient's mask,
         // in which case only its coverage matters and it is drawn in black.
@@ -573,20 +622,60 @@ private final class PaintLayers {
             gradient.locations = stops.map { NSNumber(value: $0.position) }
             gradient.startPoint = unit(center)
             gradient.endPoint = unit(Vec2(center.x + radius, center.y + radius))
-        case .solid:
+        case .solid, .image:
             break
         }
+    }
+}
+
+extension PaintLayers {
+    /// The picture where its fill places it, turned and (off screen) turned
+    /// over, inside the shape. A missing file shows grey, so the shape can
+    /// still be seen and picked.
+    private func updatePicture(_ image: ResolvedImage, bounds: CGRect, media: MediaProvider?) {
+        guard let holder, let picture else { return }
+        holder.frame = bounds
+        shape.fillColor = CGColor(gray: 0, alpha: 1)
+        shape.strokeColor = nil
+        holder.opacity = Float(image.opacity)
+        let cg = media?.image(image.mediaID)
+        if (picture.contents as AnyObject?) !== cg { picture.contents = cg }
+        holder.backgroundColor = cg == nil ? CGColor(gray: 0.5, alpha: 1) : nil
+
+        let frame = image.frame
+        let upright = image.turns % 2 == 1 ? CGSize(width: frame.height, height: frame.width)
+                                           : CGSize(width: frame.width, height: frame.height)
+        picture.transform = CATransform3DIdentity
+        picture.bounds = CGRect(origin: .zero, size: upright)
+        picture.position = CGPoint(x: frame.center.x, y: frame.center.y)
+        let turn = Affine.rotation(degrees: Double(image.turns) * 90).caTransform
+        picture.transform = flipsContents ? CATransform3DConcat(CATransform3DMakeScale(1, -1, 1), turn) : turn
+
+        guard let across, let down, frame.width > 0, frame.height > 0 else { return }
+        across.frame = bounds
+        down.frame = bounds
+        func count(_ length: Double, _ tile: Double) -> Int { min(max(Int((length / tile).rounded(.up)), 1), Self.maxTiles) }
+        across.instanceCount = count(bounds.width, frame.width)
+        down.instanceCount = count(bounds.height, frame.height)
+        across.instanceTransform = CATransform3DMakeTranslation(frame.width, 0, 0)
+        down.instanceTransform = CATransform3DMakeTranslation(0, frame.height, 0)
     }
 }
 
 // MARK: - Conversions
 
 extension ResolvedPaint {
+    var isImage: Bool {
+        if case .image = self { return true }
+        return false
+    }
+
     var kind: String {
         switch self {
         case .solid: return "solid"
         case .linear: return "linear"
         case .radial: return "radial"
+        case .image(let image): return image.tiles ? "tiles" : "image"
         }
     }
 }
@@ -595,7 +684,7 @@ extension Affine {
     /// The same transform as a Core Animation matrix. Core Animation multiplies
     /// row vectors, so `a`, `c`, `tx` produce x and `b`, `d`, `ty` produce y,
     /// matching `Affine.apply`.
-    var caTransform: CATransform3D {
+    public var caTransform: CATransform3D {
         var m = CATransform3DIdentity
         m.m11 = a
         m.m12 = b

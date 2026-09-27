@@ -10,6 +10,12 @@ public struct ShapeContent: Codable, Sendable, Equatable {
         self.fills = fills
         self.strokes = strokes
     }
+
+    /// Where the first picture is among the fills, if there is one: the
+    /// picture the inspector shows, Replace changes and crop moves.
+    public var pictureIndex: Int? {
+        fills.firstIndex { $0.paint.isImage }
+    }
 }
 
 /// What a shape is. Every kind except `path` is drawn to fill the layer's
@@ -27,6 +33,11 @@ public enum ShapeGeometry: Sendable, Equatable {
     case star(points: Int, innerRadius: Double, cornerRadius: Double)
     /// Drawn with the pen tool, in the layer's own pixel space.
     case path(BezierPath)
+
+    public var isRectangle: Bool {
+        if case .rectangle = self { return true }
+        return false
+    }
 
     public var isClosed: Bool {
         switch self {

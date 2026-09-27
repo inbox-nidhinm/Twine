@@ -87,22 +87,20 @@ public struct Transform: Codable, Sendable, Equatable {
 public enum LayerContent: Sendable, Equatable {
     case shape(ShapeContent)
     case text(TextContent)
-    case image(ImageContent)
     case video(VideoContent)
     case audio(AudioContent)
     case group(GroupContent)
 }
 
 extension LayerContent: Codable {
-    private enum Kind: String, Codable { case shape, text, image, video, audio, group }
-    private enum CodingKeys: String, CodingKey { case type, shape, text, image, video, audio, group }
+    private enum Kind: String, Codable { case shape, text, video, audio, group }
+    private enum CodingKeys: String, CodingKey { case type, shape, text, video, audio, group }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         switch try c.decode(Kind.self, forKey: .type) {
         case .shape: self = .shape(try c.decode(ShapeContent.self, forKey: .shape))
         case .text: self = .text(try c.decode(TextContent.self, forKey: .text))
-        case .image: self = .image(try c.decode(ImageContent.self, forKey: .image))
         case .video: self = .video(try c.decode(VideoContent.self, forKey: .video))
         case .audio: self = .audio(try c.decode(AudioContent.self, forKey: .audio))
         case .group: self = .group(try c.decode(GroupContent.self, forKey: .group))
@@ -114,7 +112,6 @@ extension LayerContent: Codable {
         switch self {
         case .shape(let v): try c.encode(Kind.shape, forKey: .type); try c.encode(v, forKey: .shape)
         case .text(let v): try c.encode(Kind.text, forKey: .type); try c.encode(v, forKey: .text)
-        case .image(let v): try c.encode(Kind.image, forKey: .type); try c.encode(v, forKey: .image)
         case .video(let v): try c.encode(Kind.video, forKey: .type); try c.encode(v, forKey: .video)
         case .audio(let v): try c.encode(Kind.audio, forKey: .type); try c.encode(v, forKey: .audio)
         case .group(let v): try c.encode(Kind.group, forKey: .type); try c.encode(v, forKey: .group)
@@ -161,27 +158,42 @@ public enum TextSizing: String, Codable, Sendable, CaseIterable {
     case autoWidth, fixedWidth
 }
 
-public struct ImageContent: Codable, Sendable, Equatable {
-    public var mediaID: UUID
-
-    public init(mediaID: UUID) {
-        self.mediaID = mediaID
-    }
-}
-
 /// A video clip. When it plays, and which part of the file, is set by its
-/// Play actions; the layer holds only what stays the same.
+/// Play actions; the layer holds only what stays the same. (Pictures are
+/// not layers of their own: a picture is a shape's fill, `Paint.image`.)
 public struct VideoContent: Codable, Sendable, Equatable {
     public var mediaID: UUID
     /// 1 is the clip's own level.
     public var volume: Double
     public var isMuted: Bool
+    /// How the frames sit in the layer's box when their shapes differ.
+    public var fit: VideoFit
 
-    public init(mediaID: UUID, volume: Double = 1, isMuted: Bool = false) {
+    public init(mediaID: UUID, volume: Double = 1, isMuted: Bool = false, fit: VideoFit = .fill) {
         self.mediaID = mediaID
         self.volume = volume
         self.isMuted = isMuted
+        self.fit = fit
     }
+
+    private enum CodingKeys: String, CodingKey { case mediaID, volume, isMuted, fit }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        mediaID = try c.decode(UUID.self, forKey: .mediaID)
+        volume = try c.decode(Double.self, forKey: .volume)
+        isMuted = try c.decode(Bool.self, forKey: .isMuted)
+        // Added with Replace Video, after the first files with video.
+        fit = try c.decodeIfPresent(VideoFit.self, forKey: .fit) ?? .fill
+    }
+}
+
+/// A video's frames in its layer's box: covering it, cropping what spills
+/// over, or shown whole inside it. Both centred.
+public enum VideoFit: String, Codable, Sendable, CaseIterable {
+    case fill, fit
+
+    public var title: String { self == .fill ? "Fill" : "Fit" }
 }
 
 /// A sound, played by its Play actions.
@@ -330,4 +342,23 @@ public struct BackgroundBlur: AnimatableValue {
     /// No blur, which is what a Background Blur action on a layer designed
     /// without one starts from.
     public static let noBlur = BackgroundBlur(radius: 0, blend: 1)
+}
+
+extension Layer {
+    /// The first picture fill of a shape, with where it is among the fills.
+    public var picture: (index: Int, paint: ImagePaint)? {
+        guard case .shape(let shape) = content, let i = shape.pictureIndex,
+              let paint = shape.fills[i].paint.imagePaint else { return nil }
+        return (i, paint)
+    }
+
+    /// Every imported file the layer shows or plays.
+    public var mediaIDs: [UUID] {
+        switch content {
+        case .shape(let shape): return shape.fills.compactMap { $0.paint.imagePaint?.mediaID }
+        case .video(let v): return [v.mediaID]
+        case .audio(let a): return [a.mediaID]
+        case .text, .group: return []
+        }
+    }
 }

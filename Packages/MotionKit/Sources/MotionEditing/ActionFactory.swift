@@ -35,7 +35,8 @@ public enum ActionFactory {
             return transform.filter { $0 != .resize } + [.shadow, .layerBlur]
         case .shape(let shape):
             var kinds = transform
-            if !shape.fills.isEmpty { kinds.append(.color) }
+            // A picture has no colour to change.
+            if let first = shape.fills.first, !first.paint.isImage { kinds.append(.color) }
             if !shape.strokes.isEmpty { kinds += [.stroke, .trim] }
             if case .rectangle = shape.geometry { kinds.append(.cornerRadius) }
             kinds += [.shadow, .layerBlur, .backgroundBlur]
@@ -48,8 +49,6 @@ public enum ActionFactory {
             // to resize.
             return transform.filter { $0 != .resize } + [.color, .shadow, .layerBlur,
                                                         .letterSpacing, .lineHeight, .counter, .changeText]
-        case .image:
-            return transform + [.shadow, .layerBlur]
         case .video:
             return transform + [.shadow, .layerBlur, .play] + (hasSound ? [.volume] : [])
         }
@@ -182,6 +181,8 @@ public enum ActionFactory {
             let colors = g.stops.map(\.color).reversed()
             g.stops = zip(g.stops, colors).map { GradientStop(position: $0.position, color: $1) }
             return paint.isRadialGradient ? .radialGradient(g) : .linearGradient(g)
+        case .image:
+            return .solid(RGBA(hex: "4C9FEF")!)
         }
     }
 

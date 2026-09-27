@@ -18,8 +18,10 @@ public enum ProjectFormat {
     /// change to the model would make an older file fail to decode or mean
     /// something different.
     ///
-    /// 2 replaced keyframes with actions (September 2026).
-    public static let currentVersion = 2
+    /// 2 replaced keyframes with actions (September 2026). 3 made pictures
+    /// fills on rectangles, as Figma has them, rather than layers of their
+    /// own (September 2026).
+    public static let currentVersion = 3
     /// Files older than this are refused with a plain message rather than
     /// migrated: nothing made before actions carries over meaningfully.
     public static let oldestReadableVersion = 2
@@ -117,8 +119,8 @@ public struct FormatMigrator: Sendable {
         self.steps = steps
     }
 
-    /// No migrations yet: version 2 is the oldest format still read.
-    public static let standard = FormatMigrator(steps: [:])
+    /// Version 2 is the oldest format still read.
+    public static let standard = FormatMigrator(steps: [2: PictureMigration.step])
 
     public func migrate(_ data: Data, from old: Int, to new: Int) throws -> Data {
         guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -130,5 +132,55 @@ public struct FormatMigrator: Sendable {
             object["formatVersion"] = version + 1
         }
         return try JSONSerialization.data(withJSONObject: object)
+    }
+}
+
+/// Format 2 to 3: every picture layer becomes a rectangle filled with its
+/// picture, keeping its id, name, box, transform, effects and mask, so its
+/// actions and anything masked by it carry on as before. A picture that
+/// filled its box keeps filling it; one stretched out of its own shape
+/// keeps its stretch, as a crop of the whole box.
+enum PictureMigration {
+    static let step: FormatMigrator.Step = { document in
+        guard var project = document["project"] as? [String: Any] else { return }
+        var sizes: [String: (Double, Double)] = [:]
+        for asset in project["media"] as? [[String: Any]] ?? [] {
+            if let id = asset["id"] as? String, let w = number(asset["pixelWidth"]), let h = number(asset["pixelHeight"]) {
+                sizes[id] = (w, h)
+            }
+        }
+        if let layers = project["layers"] as? [[String: Any]] {
+            project["layers"] = try layers.map { try convert($0, sizes: sizes) }
+        }
+        document["project"] = project
+    }
+
+    private static func number(_ value: Any?) -> Double? {
+        (value as? NSNumber)?.doubleValue
+    }
+
+    private static func convert(_ layer: [String: Any], sizes: [String: (Double, Double)]) throws -> [String: Any] {
+        guard var content = layer["content"] as? [String: Any], let type = content["type"] as? String else { return layer }
+        var layer = layer
+        if type == "group", var group = content["group"] as? [String: Any],
+           let children = group["children"] as? [[String: Any]] {
+            group["children"] = try children.map { try convert($0, sizes: sizes) }
+            content["group"] = group
+            layer["content"] = content
+            return layer
+        }
+        guard type == "image", let image = content["image"] as? [String: Any],
+              let idText = image["mediaID"] as? String, let mediaID = UUID(uuidString: idText) else { return layer }
+        var paint = ImagePaint(mediaID: mediaID)
+        let box = layer["size"] as? [String: Any]
+        if let w = number(box?["width"]), let h = number(box?["height"]), w > 0, h > 0,
+           let (pw, ph) = sizes[idText], pw > 0, ph > 0, abs(w / h - pw / ph) > 0.005 * (pw / ph) {
+            paint.mode = .crop
+        }
+        let shape = ShapeContent(geometry: .rectangle(cornerRadii: .zero), fills: [Fill(paint: .image(paint))])
+        let encoded = try JSONEncoder().encode(shape)
+        guard let object = try JSONSerialization.jsonObject(with: encoded) as? [String: Any] else { return layer }
+        layer["content"] = ["type": "shape", "shape": object]
+        return layer
     }
 }

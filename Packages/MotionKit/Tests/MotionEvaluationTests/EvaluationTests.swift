@@ -186,13 +186,13 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
         let clip = Layer(name: "Clip", content: .video(VideoContent(mediaID: UUID())), size: Size2(10, 10), position: .zero)
         let play = Action(target: clip.id, start: 1, duration: 2, spec: .play(PlayAction(trimStart: 2)))
         func source(at t: Double) -> Double? {
-            guard case .video(_, let s) = evaluate(Project(layers: [clip], actions: [play]), at: t).layers[0].content else { return nil }
+            guard case .video(_, let s, _) = evaluate(Project(layers: [clip], actions: [play]), at: t).layers[0].content else { return nil }
             return s
         }
         #expect(source(at: 0) == 2)      // waiting on its first frame
         #expect(source(at: 1.5) == 2.5)
         #expect(source(at: 5) == 4)      // resting on its last
-        guard case .video(_, let design) = evaluateDesign(Project(layers: [clip], actions: [play])).layers[0].content else { return }
+        guard case .video(_, let design, _) = evaluateDesign(Project(layers: [clip], actions: [play])).layers[0].content else { return }
         #expect(design == 0)
     }
 }

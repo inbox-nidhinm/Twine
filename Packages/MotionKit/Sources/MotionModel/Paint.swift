@@ -19,6 +19,10 @@ public enum Paint: AnimatableValue {
     case solid(RGBA)
     case linearGradient(Gradient)
     case radialGradient(Gradient)
+    /// A picture, as Figma paints one: every picture is a fill on a shape.
+    /// Held by reference, so every paint stays as small to copy as a
+    /// gradient: paints are copied in every layer's state on every frame.
+    indirect case image(ImagePaint)
 
     public static func color(_ color: RGBA) -> Paint { .solid(color) }
 
@@ -26,11 +30,21 @@ public enum Paint: AnimatableValue {
         if case .radialGradient = self { return true }
         return false
     }
+
+    public var isImage: Bool {
+        if case .image = self { return true }
+        return false
+    }
+
+    public var imagePaint: ImagePaint? {
+        if case .image(let p) = self { return p }
+        return nil
+    }
 }
 
 extension Paint: Codable {
-    private enum Kind: String, Codable { case solid, linearGradient, radialGradient }
-    private enum CodingKeys: String, CodingKey { case type, color, gradient }
+    private enum Kind: String, Codable { case solid, linearGradient, radialGradient, image }
+    private enum CodingKeys: String, CodingKey { case type, color, gradient, image }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -38,6 +52,7 @@ extension Paint: Codable {
         case .solid: self = .solid(try c.decode(RGBA.self, forKey: .color))
         case .linearGradient: self = .linearGradient(try c.decode(Gradient.self, forKey: .gradient))
         case .radialGradient: self = .radialGradient(try c.decode(Gradient.self, forKey: .gradient))
+        case .image: self = .image(try c.decode(ImagePaint.self, forKey: .image))
         }
     }
 
@@ -53,6 +68,79 @@ extension Paint: Codable {
         case .radialGradient(let gradient):
             try c.encode(Kind.radialGradient, forKey: .type)
             try c.encode(gradient, forKey: .gradient)
+        case .image(let image):
+            try c.encode(Kind.image, forKey: .type)
+            try c.encode(image, forKey: .image)
+        }
+    }
+}
+
+/// A picture filling a shape. Where it sits is worked out from the layer's
+/// box, so it follows the shape as it is resized.
+public struct ImagePaint: AnimatableValue, Hashable {
+    public var mediaID: UUID
+    public var mode: ImageScaleMode
+    /// Crop only: the whole picture's box, after its turns, as fractions of
+    /// the layer's box. A box larger than the layer shows part of the
+    /// picture; `ImageCrop.whole` stretches it to fit.
+    public var crop: ImageCrop
+    /// Quarter turns clockwise, 0 to 3, as Figma's rotate button makes.
+    public var quarterTurns: Int
+    /// Tile only: each tile's size as a multiple of the picture's own
+    /// pixels.
+    public var tileScale: Double
+    /// 0 to 1.
+    public var opacity: Double
+
+    public init(mediaID: UUID, mode: ImageScaleMode = .fill, crop: ImageCrop = .whole,
+                quarterTurns: Int = 0, tileScale: Double = 1, opacity: Double = 1) {
+        self.mediaID = mediaID
+        self.mode = mode
+        self.crop = crop
+        self.quarterTurns = quarterTurns
+        self.tileScale = tileScale
+        self.opacity = opacity
+    }
+
+    /// The turns kept to 0 through 3.
+    public var turns: Int { ((quarterTurns % 4) + 4) % 4 }
+}
+
+/// A rectangle in fractions of a layer's box: 0,0 is its top-left corner and
+/// a width of 1 its whole width.
+public struct ImageCrop: AnimatableValue, Hashable {
+    public var x: Double
+    public var y: Double
+    public var width: Double
+    public var height: Double
+
+    public init(x: Double, y: Double, width: Double, height: Double) {
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+    }
+
+    public static let whole = ImageCrop(x: 0, y: 0, width: 1, height: 1)
+}
+
+/// How a picture fills its shape, as Figma names the choices.
+public enum ImageScaleMode: String, Codable, Sendable, CaseIterable {
+    /// Covers the whole box, cropping what spills over, centred.
+    case fill
+    /// Shows the whole picture inside the box, centred.
+    case fit
+    /// Placed by hand: `ImagePaint.crop`.
+    case crop
+    /// Repeated from the top-left at the picture's own size, scaled.
+    case tile
+
+    public var title: String {
+        switch self {
+        case .fill: return "Fill"
+        case .fit: return "Fit"
+        case .crop: return "Crop"
+        case .tile: return "Tile"
         }
     }
 }

@@ -507,6 +507,49 @@ enum SelfTest {
                 }
             case "import":
                 controller.importMedia(parts.dropFirst().map { URL(fileURLWithPath: $0) })
+            case "replace":
+                // As Replace in the inspector, with the file handed in rather
+                // than chosen in the panel, which runs in another process.
+                guard let id = controller.selection.first else { log("REPLACE none"); break }
+                controller.replaceMedia(of: id, with: URL(fileURLWithPath: parts[1]))
+            case "fillpicture":
+                guard let id = controller.selection.first else { log("FILLPICTURE none"); break }
+                controller.fillWithPicture(id, from: URL(fileURLWithPath: parts[1]))
+            case "mode":
+                guard let id = controller.selection.first, let mode = ImageScaleMode(rawValue: parts[1]) else { log("MODE none"); break }
+                controller.setPictureMode(id, mode)
+            case "turn":
+                guard let id = controller.selection.first else { log("TURN none"); break }
+                controller.turnPicture(id)
+            case "picture":
+                // The selected layer's picture or video, and while cropping,
+                // where the picture's corners and the layer's are in the
+                // window, in the steps' coordinates, to drag.
+                guard let layer = controller.selectedLayers.first else { log("PICTURE none"); break }
+                func f(_ v: Double) -> String { String(format: "%.3f", v) }
+                var line = "PICTURE \(layer.name) size=\(Int(layer.size.width))x\(Int(layer.size.height))"
+                line += " pos=\(Int(layer.transform.position.x)),\(Int(layer.transform.position.y))"
+                if let (i, p) = layer.picture {
+                    let file = controller.project.media.first { $0.id == p.mediaID }?.originalName ?? "?"
+                    line += " fill=\(i) file=\(file) mode=\(p.mode.rawValue) turns=\(p.turns) opacity=\(f(p.opacity))"
+                    line += " crop=\(f(p.crop.x)),\(f(p.crop.y)),\(f(p.crop.width)),\(f(p.crop.height)) tile=\(f(p.tileScale))"
+                } else if case .video(let v) = layer.content {
+                    let file = controller.project.media.first { $0.id == v.mediaID }?.originalName ?? "?"
+                    line += " video=\(file) fit=\(v.fit.rawValue)"
+                } else {
+                    line += " no picture"
+                }
+                line += " actions=\(controller.project.actions(on: layer.id).count) media=\(controller.project.media.count)"
+                line += " cropping=\(controller.canvas?.isCropping ?? false) undo=\(controller.store.undoManager.undoActionName)"
+                if let c = controller.canvas, let marks = c.cropMarks(), let box = c.cropBoxCorners {
+                    let h = window.contentView!.bounds.height
+                    func xy(_ p: CGPoint) -> String {
+                        let v = c.convert(p, to: nil)
+                        return "\(Int(v.x.rounded())),\(Int((h - v.y).rounded()))"
+                    }
+                    line += " picturexy=" + marks.corners.map(xy).joined(separator: " ") + " boxxy=" + box.map(xy).joined(separator: " ")
+                }
+                log(line)
             case "save":
                 (window.windowController?.document as? NSDocument)?.autosave(withImplicitCancellability: false) { _ in }
             case "waitexport":

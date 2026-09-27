@@ -44,6 +44,9 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `moveproject NAME FOLDER`, `showfolder FOLDER` | Moves a home screen project into a folder (`-` for out of one), as a drop does; shows a folder (`-` for All Projects) |
 | `library` | Logs the home screen's folders (with counts), which is showing, and every project with its folder |
 | `home`, `openfile PATH` | Turns the window to the home screen, as the Home button does; opens a project in the window, as the Finder does (never point it at a real project) |
+| `replace PATH`, `fillpicture PATH` | Replace in the inspector, or Image as the fill, with the file handed in rather than chosen in the panel |
+| `mode M`, `turn` | The selected picture's mode (`fill`, `fit`, `crop`, which starts cropping, `tile`) and a quarter turn |
+| `picture` | Logs the selected picture or video: file, mode, crop, turns, actions, whether it is being cropped, and while cropping the picture's and the box's corners in the window, to drag |
 | `offers` | Logs what Add Action and Add Preset offer for the selection |
 | `add KIND` | Adds an action by its kind's name (`move`, `path`, `volume`...), as the Add Action menu does |
 | `cursor` | Logs which of the app's pointers is current |

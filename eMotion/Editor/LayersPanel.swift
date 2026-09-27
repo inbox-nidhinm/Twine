@@ -331,6 +331,10 @@ private struct LayerRow: View {
 extension Layer {
     var icon: Icon {
         switch content {
+        case .shape(let shape) where shape.pictureIndex != nil && shape.geometry.isRectangle:
+            // A picture is a rectangle filled with it, but reads as a
+            // picture. Any other shape with one is still that shape.
+            return .image
         case .shape(let shape):
             switch shape.geometry {
             case .rectangle: return .rectangle
@@ -341,7 +345,6 @@ extension Layer {
             case .path: return .pen
             }
         case .text: return .text
-        case .image: return .image
         case .video: return .video
         case .audio: return .audio
         case .group: return .group

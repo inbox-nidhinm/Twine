@@ -48,13 +48,18 @@ func kitchenSinkProject() -> Project {
         alignment: .center, letterSpacing: -1.5, lineHeight: 80, sizing: .fixedWidth)),
         size: Size2(400, 200), position: Vec2(960, 540))
 
-    var video = Layer(name: "Clip", content: .video(VideoContent(mediaID: clip.id, volume: 0.5, isMuted: true)),
+    var video = Layer(name: "Clip", content: .video(VideoContent(mediaID: clip.id, volume: 0.5, isMuted: true, fit: .fit)),
                       size: Size2(1920, 1080), position: Vec2(960, 540))
     video.isLocked = true
     let audio = Layer(name: "Song", content: .audio(AudioContent(mediaID: song.id)),
                       size: Size2(0, 0), position: .zero)
-    let picture = Layer(name: "Photo", content: .image(ImageContent(mediaID: image.id)),
-                        size: Size2(640, 480), position: Vec2(320, 240))
+    let picture = Layer(name: "Photo", content: .shape(ShapeContent(
+        geometry: .rectangle(cornerRadii: CornerRadii(all: 12)),
+        fills: [Fill(paint: .image(ImagePaint(mediaID: image.id, mode: .crop,
+                                              crop: ImageCrop(x: -0.25, y: 0, width: 1.5, height: 1.125),
+                                              quarterTurns: 1, tileScale: 0.5, opacity: 0.75))),
+                Fill(paint: .image(ImagePaint(mediaID: image.id, mode: .tile, tileScale: 0.25)))])),
+        size: Size2(640, 480), position: Vec2(320, 240))
 
     var group = Layer(name: "Group", content: .group(GroupContent(children: [ellipse, star], clipsContent: true)),
                       size: Size2(500, 500), position: Vec2(250, 250))
@@ -176,10 +181,56 @@ func kitchenSinkProject() -> Project {
         }
     }
 
+    @Test func videoSavedBeforeFitStillOpens() throws {
+        let id = UUID()
+        let json = #"{"mediaID": "\#(id.uuidString)", "volume": 1, "isMuted": false}"#
+        #expect(try JSONDecoder().decode(VideoContent.self, from: Data(json.utf8)) == VideoContent(mediaID: id))
+    }
+
+    /// Format 2 had picture layers; format 3 has rectangles filled with the
+    /// picture. The layer keeps its id, so its actions and a layer it masks
+    /// carry on, and one inside a group is found too.
+    @Test func pictureLayersBecomeRectanglesFilledWithThePicture() throws {
+        let asset = MediaAsset(kind: .image, fileName: "p.png", originalName: "p.png", contentHash: "p",
+                               pixelWidth: 400, pixelHeight: 200)
+        let fitting = UUID(), stretched = UUID(), masked = UUID(), group = UUID()
+        func picture(_ id: UUID, _ w: Double, _ h: Double) -> String {
+            #"{"id": "\#(id.uuidString)", "name": "p", "isVisible": true, "isLocked": false, "isSoloed": false,"#
+            + #""transform": {"position": {"x": 0, "y": 0}, "anchor": {"x": 0, "y": 0}, "scale": {"x": 1, "y": 1}, "isScaleLinked": true, "rotation": 0},"#
+            + #""size": {"width": \#(w), "height": \#(h)}, "opacity": 1, "effects": [],"#
+            + #""content": {"type": "image", "image": {"mediaID": "\#(asset.id.uuidString)"}}}"#
+        }
+        let maskedLayer = #"{"id": "\#(masked.uuidString)", "name": "m", "isVisible": true, "isLocked": false, "isSoloed": false,"#
+            + #""transform": {"position": {"x": 0, "y": 0}, "anchor": {"x": 0, "y": 0}, "scale": {"x": 1, "y": 1}, "isScaleLinked": true, "rotation": 0},"#
+            + #""size": {"width": 10, "height": 10}, "opacity": 1, "effects": [], "mask": {"layerID": "\#(fitting.uuidString)", "isInverted": false},"#
+            + #""content": {"type": "shape", "shape": {"geometry": {"type": "line"}, "fills": [], "strokes": []}}}"#
+        let groupLayer = #"{"id": "\#(group.uuidString)", "name": "g", "isVisible": true, "isLocked": false, "isSoloed": false,"#
+            + #""transform": {"position": {"x": 0, "y": 0}, "anchor": {"x": 0, "y": 0}, "scale": {"x": 1, "y": 1}, "isScaleLinked": true, "rotation": 0},"#
+            + #""size": {"width": 10, "height": 10}, "opacity": 1, "effects": [],"#
+            + #""content": {"type": "group", "group": {"clipsContent": false, "children": [\#(picture(stretched, 100, 100))]}}}"#
+        let media = String(data: try JSONEncoder().encode([asset]), encoding: .utf8)!
+        let action = Action(target: fitting, start: 0, duration: 1, spec: .opacity(OpacityAction(end: 0)))
+        let actions = String(data: try JSONEncoder().encode([action]), encoding: .utf8)!
+        let composition = String(data: try JSONEncoder().encode(Composition()), encoding: .utf8)!
+        let json = #"{"formatVersion": 2, "project": {"composition": \#(composition), "media": \#(media), "actions": \#(actions),"#
+            + #""layers": [\#(picture(fitting, 200, 100)), \#(maskedLayer), \#(groupLayer)]}}"#
+
+        let project = try ProjectFormat.decode(Data(json.utf8))
+        let converted = try #require(project.layer(withID: fitting))
+        guard case .shape(let shape) = converted.content else { Issue.record("not a shape"); return }
+        #expect(shape.geometry == .rectangle(cornerRadii: .zero))
+        #expect(shape.fills.map(\.paint) == [.image(ImagePaint(mediaID: asset.id))])
+        #expect(shape.strokes.isEmpty)
+        // 100 by 100 is not the picture's shape, so its stretch is kept.
+        #expect(project.layer(withID: stretched)?.picture?.paint.mode == .crop)
+        #expect(project.layer(withID: stretched)?.picture?.paint.crop == .whole)
+        #expect(project.layer(withID: masked)?.mask?.layerID == fitting)
+        #expect(project.actions == [action])
+    }
+
     @Test func migrationsRunStepByStep() throws {
-        // No real migration exists yet (2 is the oldest readable format), so
-        // this proves the machinery with a made-up step: pretend version 2
-        // kept the composition at the top level and version 3 folded it in.
+        // Proves the machinery with a made-up step: pretend version 2 kept
+        // the composition at the top level and version 3 folded it in.
         let current = try JSONSerialization.jsonObject(with: ProjectFormat.encode(Project())) as! [String: Any]
         var project = current["project"] as! [String: Any]
         let composition = project.removeValue(forKey: "composition")!

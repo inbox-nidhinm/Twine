@@ -41,6 +41,13 @@ nonisolated final class CanvasOverlay: CALayer {
     private let pathHandles = CAShapeLayer()
     private let pathPoints = CAShapeLayer()
     private let pathSelected = CAShapeLayer()
+    /// Cropping a picture: the whole picture, faint, in a holder of its own
+    /// (the overlay sizes its sublayers to itself, and the picture has a
+    /// shape of its own), its outline, and the corners that scale it.
+    private let cropHolder = CALayer()
+    private let cropPicture = CALayer()
+    private let cropLine = CAShapeLayer()
+    private let cropHandles = CAShapeLayer()
 
     private static let accent = NSColor(Theme.accent).cgColor
 
@@ -59,8 +66,8 @@ nonisolated final class CanvasOverlay: CALayer {
     private func commonInit() {
         anchorPoint = .zero
         actions = Self.none
-        for l in [textSelection, hoverEdge, hover, outlines, union, marquee, motion, motionArms, anchor, handles, motionStart, motionEnd,
-                  motionHandles, textMarked, caret, guides, gapLines,
+        for l in [cropHolder, textSelection, hoverEdge, hover, cropLine, outlines, union, marquee, motion, motionArms, anchor, handles,
+                  cropHandles, motionStart, motionEnd, motionHandles, textMarked, caret, guides, gapLines,
                   pathLine, pathRubber, pathArms, pathHandles, pathPoints, pathSelected] {
             l.anchorPoint = .zero
             l.actions = Self.none
@@ -118,6 +125,18 @@ nonisolated final class CanvasOverlay: CALayer {
         pathArms.fillColor = nil
         pathArms.strokeColor = NSColor(Theme.accent).withAlphaComponent(0.7).cgColor
         pathArms.lineWidth = 1
+        cropPicture.anchorPoint = .zero
+        cropPicture.actions = Self.none.merging(["transform": NSNull(), "opacity": NSNull()]) { a, _ in a }
+        cropPicture.contentsGravity = .resize
+        cropPicture.opacity = Float(Self.cropPictureOpacity)
+        cropHolder.addSublayer(cropPicture)
+        cropLine.fillColor = nil
+        cropLine.strokeColor = Self.accent
+        cropLine.lineWidth = 1
+        cropLine.lineDashPattern = [4, 3]
+        cropHandles.fillColor = CGColor(gray: 1, alpha: 1)
+        cropHandles.strokeColor = Self.accent
+        cropHandles.lineWidth = 1
         pathHandles.fillColor = CGColor(gray: 1, alpha: 1)
         pathHandles.strokeColor = Self.accent
         pathHandles.lineWidth = 1
@@ -259,6 +278,47 @@ nonisolated final class CanvasOverlay: CALayer {
         }
         pathPoints.path = dots(marks.points)
         pathSelected.path = dots(marks.selected)
+    }
+
+    /// A picture being cropped, in view points.
+    struct CropMarks {
+        var image: CGImage?
+        /// The picture the way up it is stored, in its own pixels, and the
+        /// transform carrying those pixels onto the view.
+        var size: CGSize
+        var transform: CATransform3D
+        /// Its four corners, from its top-left clockwise.
+        var corners: [CGPoint]
+    }
+
+    /// How much of the picture outside the shape shows while cropping.
+    static let cropPictureOpacity = 0.35
+
+    func updateCrop(_ marks: CropMarks?) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        guard let marks else {
+            cropPicture.contents = nil
+            cropPicture.isHidden = true
+            cropLine.path = nil
+            cropHandles.path = nil
+            return
+        }
+        cropPicture.isHidden = false
+        if (cropPicture.contents as AnyObject?) !== marks.image { cropPicture.contents = marks.image }
+        cropPicture.transform = CATransform3DIdentity
+        cropPicture.bounds = CGRect(origin: .zero, size: marks.size)
+        cropPicture.position = .zero
+        cropPicture.transform = marks.transform
+        cropLine.path = polygons([marks.corners])
+        let squares = CGMutablePath()
+        let half = CanvasHandles.size / 2
+        for p in marks.corners {
+            squares.addRect(CGRect(x: (p.x - half).rounded() + 0.5, y: (p.y - half).rounded() + 0.5,
+                                   width: CanvasHandles.size - 1, height: CanvasHandles.size - 1))
+        }
+        cropHandles.path = squares
     }
 
     /// A Move's path in view points: the dashed route, a hollow dot where it

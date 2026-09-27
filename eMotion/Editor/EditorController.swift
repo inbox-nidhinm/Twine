@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 import MotionModel
 import MotionEditing
 import MotionEvaluation
@@ -26,11 +27,11 @@ final class EditorController {
         audio.follow(project, time: editor.time, playing: editor.isPlaying)
     }
 
-    /// The imported file a layer shows or plays, if it has one.
+    /// The imported file a layer plays, if it has one: its video or its
+    /// sound.
     func asset(ofLayer id: UUID) -> MediaAsset? {
         let mediaID: UUID
         switch project.layer(withID: id)?.content {
-        case .image(let c): mediaID = c.mediaID
         case .video(let c): mediaID = c.mediaID
         case .audio(let c): mediaID = c.mediaID
         default: return nil
@@ -319,6 +320,106 @@ final class EditorController {
             guard !commands.isEmpty, perform(.batch(commands, name: added.count == 1 ? "Import" : "Import Files")) else { return }
             select(added)
         }
+    }
+
+    // MARK: Pictures and video
+
+    /// Asks for one file of one of `types`, as a sheet on the window.
+    private func chooseFile(_ types: [UTType], then use: @escaping (URL) -> Void) {
+        guard let window = canvas?.window else { return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = types
+        panel.allowsMultipleSelection = false
+        panel.beginSheetModal(for: window) { [weak panel] response in
+            guard response == .OK, let url = panel?.url else { return }
+            use(url)
+        }
+    }
+
+    /// A file brought into the project, or the copy already there, with
+    /// whether it is new to the project. Nil, with a beep, for a file of
+    /// another kind than `kind` or one that will not open.
+    private func bringIn(_ url: URL, as kind: MediaKind) async -> (asset: MediaAsset, isNew: Bool)? {
+        guard let document, let described = await MediaImport.describe(url), described.kind == kind else {
+            NSSound.beep()
+            return nil
+        }
+        if let existing = project.media.first(where: { $0.contentHash == described.contentHash }) { return (existing, false) }
+        do { try await document.stage(url, as: described.fileName) } catch {
+            NSSound.beep()
+            return nil
+        }
+        return (described, true)
+    }
+
+    /// Swaps a picture's or a video's file for another chosen in a panel,
+    /// keeping the layer, its box and every action on it.
+    func replaceMedia(of id: UUID) {
+        guard let layer = project.layer(withID: id) else { return }
+        if case .video = layer.content {
+            chooseFile([.movie]) { [weak self] url in self?.replaceMedia(of: id, with: url) }
+        } else if layer.picture != nil {
+            chooseFile([.image]) { [weak self] url in self?.replaceMedia(of: id, with: url) }
+        }
+    }
+
+    func replaceMedia(of id: UUID, with url: URL) {
+        guard let layer = project.layer(withID: id) else { return }
+        let isVideo: Bool
+        if case .video = layer.content { isVideo = true } else if layer.picture != nil { isVideo = false } else { return }
+        let old = layer.mediaIDs.first.flatMap { m in project.media.first { $0.id == m } }
+        Task { @MainActor in
+            guard let (asset, isNew) = await bringIn(url, as: isVideo ? .video : .image),
+                  let current = project.layer(withID: id) else { return }
+            var commands: [EditorCommand] = isNew ? [.addMedia(asset)] : []
+            if isVideo {
+                let replaced = PictureEditing.replacingVideo(current, with: asset, old: old, actions: project.actions)
+                commands.append(.updateLayers([replaced.layer]))
+                if !replaced.actions.isEmpty { commands.append(.updateActions(replaced.actions)) }
+            } else {
+                commands.append(.updateLayers([PictureEditing.replacingPicture(current, with: asset, old: old)]))
+            }
+            perform(.batch(commands, name: isVideo ? "Replace Video" : "Replace Image"))
+        }
+    }
+
+    /// Fills a shape's first fill with a picture chosen in a panel.
+    func fillWithPicture(_ id: UUID) {
+        chooseFile([.image]) { [weak self] url in self?.fillWithPicture(id, from: url) }
+    }
+
+    func fillWithPicture(_ id: UUID, from url: URL) {
+        Task { @MainActor in
+            guard let (asset, isNew) = await bringIn(url, as: .image),
+                  var layer = project.layer(withID: id), case .shape(var shape) = layer.content else { return }
+            let paint = Paint.image(ImagePaint(mediaID: asset.id))
+            if shape.fills.isEmpty { shape.fills = [Fill(paint: paint)] } else { shape.fills[0].paint = paint }
+            layer.content = .shape(shape)
+            perform(.batch((isNew ? [.addMedia(asset)] : []) + [.updateLayers([layer])], name: "Image Fill"))
+        }
+    }
+
+    /// Changes how a layer's picture fills it. Crop starts cropping on the
+    /// canvas, with the picture where it was.
+    func setPictureMode(_ id: UUID, _ mode: ImageScaleMode) {
+        guard let layer = project.layer(withID: id), let picture = layer.picture else { return }
+        if picture.paint.mode != mode {
+            perform(.batch([.updateLayers([PictureEditing.settingMode(layer, to: mode, pictures: project.pictureSizes)])],
+                           name: "Image \(mode.title)"))
+        }
+        if mode == .crop { canvas?.beginCropping(id) }
+    }
+
+    /// Turns a layer's picture a quarter clockwise.
+    func turnPicture(_ id: UUID) {
+        guard let layer = project.layer(withID: id), layer.picture != nil else { return }
+        perform(.batch([.updateLayers([PictureEditing.turned(layer)])], name: "Turn Image"))
+    }
+
+    /// A layer's picture, or its video's first frame, for the inspector.
+    func preview(of mediaID: UUID) -> CGImage? {
+        guard let asset = project.media.first(where: { $0.id == mediaID }) else { return nil }
+        return asset.kind == .video ? media.videoFrame(mediaID, at: 0) : media.image(mediaID)
     }
 
     // MARK: Actions

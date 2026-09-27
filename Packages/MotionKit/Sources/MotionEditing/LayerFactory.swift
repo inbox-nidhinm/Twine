@@ -58,11 +58,13 @@ public enum LayerFactory {
 
     /// A layer for an imported file, centred on `center`. Pictures and video
     /// come in at their own size, shrunk to fit `fitting` if they are larger;
-    /// sound has no size and sits at the origin.
+    /// sound has no size and sits at the origin. A picture is a rectangle
+    /// filled with it, as in Figma, so it can be rounded, stroked and
+    /// cropped like any shape.
     public static func media(_ asset: MediaAsset, center: Vec2, fitting: Size2, name: String) -> Layer {
         let content: LayerContent
         switch asset.kind {
-        case .image: content = .image(ImageContent(mediaID: asset.id))
+        case .image: content = .shape(picture(asset.id))
         case .video: content = .video(VideoContent(mediaID: asset.id))
         case .audio: content = .audio(AudioContent(mediaID: asset.id))
         }
@@ -72,6 +74,11 @@ public enum LayerFactory {
         let scale = min(1, fitting.width / Double(w), fitting.height / Double(h))
         return Layer(name: name, content: content, size: Size2((Double(w) * scale).rounded(), (Double(h) * scale).rounded()),
                      position: center)
+    }
+
+    /// A square-cornered rectangle filled with a picture.
+    public static func picture(_ mediaID: UUID) -> ShapeContent {
+        ShapeContent(geometry: .rectangle(cornerRadii: .zero), fills: [Fill(paint: .image(ImagePaint(mediaID: mediaID)))])
     }
 
     /// A line from `start` to `end`: a box as long as the line and no taller,

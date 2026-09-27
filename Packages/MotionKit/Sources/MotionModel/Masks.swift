@@ -18,7 +18,7 @@ extension Project {
             guard !blocked.contains(layer.id), layer.mask?.layerID != id else { return false }
             switch layer.content {
             case .group, .audio: return false
-            case .shape, .text, .image, .video: return true
+            case .shape, .text, .video: return true
             }
         }
     }

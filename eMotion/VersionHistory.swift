@@ -23,6 +23,13 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "Pictures as fills", changes: [
+            "A picture is now a fill, as in Figma: an imported picture is a rectangle filled with it, so it can have rounded corners, a stroke and shadows, and any shape can be filled with a picture by choosing Image under Fill.",
+            "Choose how the picture fills its shape: Fill covers it, Fit shows the whole picture, Crop places it by hand, and Tile repeats it at a scale. The turn button beside the choice turns it a quarter at a time, and a picture has its own opacity.",
+            "Double-click a picture, or choose Crop, to crop it on the canvas: the rest of the picture shows faintly, drag it to move it, drag its corners to scale it, and drag the layer's handles to show more or less of it. Escape or a click away finishes.",
+            "Replace, under the picture in Design, swaps in another picture and keeps the layer, its size and every action on it. Videos have Replace too, and a Fill or Fit choice for a clip of another shape; a play that would run past a shorter clip's end starts earlier in it.",
+            "Pictures in older projects become picture-filled rectangles when opened, looking just as they did, with their actions and masks kept.",
+        ]),
         .init(date: "27 September 2026", title: "Home screen like re-Flip's", changes: [
             "The home screen now looks like re-Flip's: plain rows down the sidebar, and a dim New Folder row under the folders, which you click and type the new folder's name into.",
             "Project cards have a bigger thumbnail, keeping the picture's own shape with nothing filling its sides, sit on the background until the pointer is over them, and show the date without the time.",

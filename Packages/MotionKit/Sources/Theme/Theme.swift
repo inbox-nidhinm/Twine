@@ -103,6 +103,9 @@ public enum Theme {
     public static let barRow: CGFloat = 40
     /// Slider and toggle tracks.
     public static let track: CGFloat = 26
+    /// A picture's thumbnail in the inspector: as tall as two rows of
+    /// controls with the gap between them.
+    public static let pictureWell: CGFloat = panelRow + 4 + 6 + button
 
     // MARK: Radii (radius/*)
 
