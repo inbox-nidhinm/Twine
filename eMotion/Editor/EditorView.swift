@@ -1,6 +1,7 @@
 import SwiftUI
 import MotionModel
 import MotionEditing
+import MotionEvaluation
 import Theme
 
 /// One project window: the canvas full-bleed underneath, and everything else
@@ -44,7 +45,7 @@ struct EditorView: View {
 
             bottomSurface
 
-            if editor.exports.isExporting || editor.exports.finished != nil {
+            if (editor.exports.isExporting || editor.exports.finished != nil) && !editor.showExport {
                 ExportStatus(session: editor.exports)
                     .padding(Theme.floatInset)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -56,12 +57,19 @@ struct EditorView: View {
                     .transition(.opacity)
             }
 
+            if editor.showExport {
+                ExportPanel(title: document.name, session: editor.exports, controller: controller, editor: editor,
+                            hasSound: !audioClips(store.project).isEmpty)
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            }
+
             MenuLayer()
         }
         .animation(.easeOut(duration: 0.18), value: editor.showLayers)
         .animation(.easeOut(duration: 0.18), value: editor.showInspector)
         .animation(.easeOut(duration: 0.18), value: editor.mode)
         .animation(.easeOut(duration: 0.15), value: editor.showShortcuts)
+        .animation(Theme.exportFade, value: editor.showExport)
         .animation(.easeOut(duration: 0.18), value: editor.exports.isExporting || editor.exports.finished != nil)
         .ignoresSafeArea()
         .preferredColorScheme(.dark)

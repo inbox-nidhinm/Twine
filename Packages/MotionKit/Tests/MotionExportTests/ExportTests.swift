@@ -246,3 +246,28 @@ private func pixel(_ buffer: CVPixelBuffer, _ x: Int, _ y: Int) -> (r: Int, g: I
         #expect(ExportSettings.largestScale(for: comp(1920, 1080)) == 2)
     }
 }
+
+@Suite struct ExportRateTests {
+    @Test func aMovieCanBeMadeAtAnotherRate() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("eMotion-rate-\(UUID().uuidString).mp4")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let box = Layer(name: "B", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
+                                                                fills: [Fill(paint: .color(.white))])),
+                        size: Size2(10, 10), position: Vec2(32, 32))
+        let project = Project(composition: Composition(width: 64, height: 64, frameRate: .fps60, duration: 1), layers: [box])
+        try Exporter.export(project, settings: ExportSettings(format: .h264, frameRate: .fps24), to: url)
+        let track = try #require(try await AVURLAsset(url: url).loadTracks(withMediaType: .video).first)
+        let rate = try await track.load(.nominalFrameRate)
+        #expect(abs(Double(rate) - 24) < 0.1)
+        let duration = try await AVURLAsset(url: url).load(.duration).seconds
+        #expect(abs(duration - 1) < 0.05)
+    }
+
+    @Test func aChosenRateIsRemembered() throws {
+        let data = try JSONEncoder().encode(ExportSettings(format: .hevc, frameRate: .fps30))
+        #expect(try JSONDecoder().decode(ExportSettings.self, from: data).frameRate == .fps30)
+        // Settings saved before rates could be chosen still read.
+        let old = #"{"format":"h264","scale":1,"quality":"high"}"#
+        #expect(try JSONDecoder().decode(ExportSettings.self, from: Data(old.utf8)).frameRate == nil)
+    }
+}

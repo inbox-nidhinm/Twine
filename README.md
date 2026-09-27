@@ -142,7 +142,7 @@ Bars snap to the playhead, the scene's start and end, and other actions' starts 
 
 ## Exporting
 
-With nothing selected in Design, the Export section sits under Composition: pick a format, a size (50%, 100% or 200% from the menu, or any percentage typed under it, never past 4K: 3840 × 2160 either way round; movies round to even pixels), a range (the whole scene, or part of it from and to a time) and, for H.264 and HEVC, a quality, then Export… (⌘E) and choose where to save. The settings are remembered; the range is kept for the window.
+The blue Export button at the foot of the right panel (in Design and Animate), or ⌘E, opens the export panel over the whole window. On the left: the size (50%, 100% or 200%, or Custom… for any percentage, never past 4K: 3840 × 2160 either way round; movies round to even pixels), the format, the frame rate (the composition's, or 24, 25, 30, 50 or 60 fps), the range (the whole scene, or part of it from and to a time) and, when there is sound, Audio. On the right, a preview of exactly what will be written, which plays (Space) at the chosen rate, with its sound. Export asks where to save; the preview then rises out of the way and a counter rolls up to 100% from below, and when it is done they trade back and the button reads Export again, with Show in Finder under it. Cancel, the × or Escape stops an export in flight. Quality is always High. The settings are remembered; the range is kept for the window. File > Export Current Frame (⇧⌘E) still saves a PNG straight away.
 
 | Format | File | Transparency |
 |---|---|---|

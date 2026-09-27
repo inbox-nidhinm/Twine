@@ -1119,6 +1119,7 @@ final class CanvasNSView: NSView {
 
     override func keyDown(with event: NSEvent) {
         guard let controller else { return super.keyDown(with: event) }
+        if ExportKeys.handle(event, controller) { return }
         if textKeyDown(event) { return }
         if pathKeyDown(event) { return }
         // Return on one selected text layer starts typing into it.
@@ -1203,7 +1204,9 @@ final class CanvasNSView: NSView {
 
     // MARK: Transparency
 
-    private static let checkerColor: CGColor = {
+    /// The checkerboard behind a transparent composition, shared with the
+    /// export preview.
+    static let checkerColor: CGColor = {
         let cell = 8.0
         let image = NSImage(size: NSSize(width: cell * 2, height: cell * 2), flipped: false) { rect in
             NSColor(white: 0.42, alpha: 1).setFill()

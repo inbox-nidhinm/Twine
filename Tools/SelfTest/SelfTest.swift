@@ -255,6 +255,28 @@ enum SelfTest {
                     }
                 }
                 tick(); return
+            case "perfpreview":
+                // Plays the export panel's preview for n[0] seconds and reports
+                // how often its picture moved on.
+                guard let player = controller.editor.exportPlayer else { log("PERF preview: no panel"); break }
+                player.seek(0)
+                player.play()
+                var stamps: [CFTimeInterval] = []
+                var last = player.shownTime
+                let began = CACurrentMediaTime()
+                func sample() {
+                    if player.shownTime != last { stamps.append(CACurrentMediaTime()); last = player.shownTime }
+                    if CACurrentMediaTime() - began < n[0] {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.001) { sample() }
+                    } else {
+                        player.pause()
+                        let gaps = zip(stamps.dropFirst(), stamps).map { ($0 - $1) * 1000 }.sorted()
+                        log(String(format: "PERF preview fps=%.1f median=%.1fms worst=%.1fms", Double(stamps.count) / n[0],
+                                   gaps.isEmpty ? 0 : gaps[gaps.count / 2], gaps.last ?? 0))
+                        next()
+                    }
+                }
+                sample(); return
             case "perfscrub":
                 // Seeks through n[0] frames as fast as they draw, like a quick scrub.
                 let began = CACurrentMediaTime()

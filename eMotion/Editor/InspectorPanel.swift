@@ -8,14 +8,13 @@ import Theme
 
 /// The right panel. The Design and Animate switch sits at its head; below it,
 /// whatever the selection can have done to it. With nothing selected, that is
-/// the composition itself, and its export.
+/// the composition itself. The Export button sits at the foot, always.
 struct InspectorPanel: View {
     let store: ProjectStore
     @Bindable var editor: EditorModel
     let controller: EditorController
 
     @State private var compositionOpen = true
-    @State private var exportOpen = true
     @State private var customRate = false
 
     var body: some View {
@@ -36,6 +35,11 @@ struct InspectorPanel: View {
                     }
                 }
             }
+            // Last in the panel, in both modes, whatever is selected.
+            PanelDivider()
+            PrimaryButton(title: "Export") { controller.openExport() }
+                .padding(Theme.panelPad)
+                .help("Choose a format and size, see what will be exported, and export it. (⌘E)")
         }
     }
 
@@ -54,9 +58,6 @@ struct InspectorPanel: View {
             multipleSelection(selected)
         } else {
             compositionSection
-            PanelDivider()
-            ExportSection(session: editor.exports, composition: composition,
-                          hasSound: !audioClips(store.project).isEmpty, isOpen: $exportOpen)
             PanelDivider()
         }
     }

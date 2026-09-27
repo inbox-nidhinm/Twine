@@ -26,6 +26,12 @@ final class ExportSession {
     private(set) var progress: Double?
     /// The file just written, offered for a few seconds to show in Finder.
     private(set) var finished: URL?
+    /// The last file the export panel wrote, kept while the panel is up for
+    /// Export Again and Show in Finder.
+    private(set) var completed: URL?
+    /// The progress the last export reached, kept after it ends so the panel's
+    /// counter can leave showing where it got to.
+    private(set) var lastProgress: Double = 0
 
     var isExporting: Bool { progress != nil }
 
@@ -40,17 +46,21 @@ final class ExportSession {
 
     /// Asks where to save, then exports. `design` exports a still of the
     /// layout as designed rather than the frame at `time`, which is what the
-    /// canvas shows in Design mode.
+    /// canvas shows in Design mode. Quality is always High, as the user
+    /// asked; the setting stays in the file format for later.
     func begin(format: ExportFormat? = nil, project: Project, time: Double, design: Bool, name: String,
                media: [UUID: URL] = [:], window: NSWindow?) {
         guard !isExporting else { return }
         self.window = window
         var settings = settings
         if let format { settings.format = format }
+        settings.quality = .high
         var project = project
         if design && !settings.format.isMovie { project.actions = [] }
+        // The range's frames count at the rate the movie is made at.
+        let exported = settings.exported(project.composition)
         let frames = settings.format.isMovie
-            ? range.map { ExportTiming.frames(from: $0.lowerBound, to: $0.upperBound, in: project.composition) }
+            ? range.map { ExportTiming.frames(from: $0.lowerBound, to: $0.upperBound, in: exported) }
             : nil
 
         let panel = NSSavePanel()
@@ -68,11 +78,18 @@ final class ExportSession {
 
     func dismissFinished() { finished = nil }
 
+    /// The panel closing forgets its last file.
+    func forgetCompleted() {
+        completed = nil
+        finished = nil
+    }
+
     private func run(_ project: Project, settings: ExportSettings, time: Double, frames: Range<Int>?, to url: URL,
                      media: [UUID: URL]) {
         let job = ExportJob()
         self.job = job
         finished = nil
+        completed = nil
         progress = 0
         DispatchQueue.global(qos: .userInitiated).async {
             // Progress crosses to the main thread at most a hundred times.
@@ -95,9 +112,12 @@ final class ExportSession {
     private func end(_ ended: ExportJob, result: Result<Void, Error>, url: URL) {
         guard job === ended else { return }
         job = nil
+        lastProgress = progress ?? 0
         progress = nil
         switch result {
         case .success:
+            lastProgress = 1
+            completed = url
             finished = url
             finishedToken += 1
             let token = finishedToken

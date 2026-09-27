@@ -544,6 +544,22 @@ final class EditorController {
         update(.setComposition(composition))
     }
 
+    // MARK: Export
+
+    /// Brings up the export panel over the window, with playback stopped.
+    func openExport() {
+        stop()
+        editor.showExport = true
+    }
+
+    /// Puts the panel away, stopping an export still running.
+    func closeExport() {
+        editor.exportPlayer?.pause()
+        if editor.exports.isExporting { editor.exports.cancel() }
+        editor.exports.forgetCompleted()
+        editor.showExport = false
+    }
+
     // MARK: Making layers
 
     /// A new text layer with its top-left at `point`, selected. Dark on a

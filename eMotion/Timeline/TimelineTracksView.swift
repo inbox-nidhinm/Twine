@@ -689,6 +689,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
 
     override func keyDown(with event: NSEvent) {
         guard let controller else { return super.keyDown(with: event) }
+        if ExportKeys.handle(event, controller) { return }
         let flags = event.modifierFlags.intersection([.command, .control, .option])
         let step = event.modifierFlags.contains(.shift) ? 10 : 1
         switch event.keyCode {

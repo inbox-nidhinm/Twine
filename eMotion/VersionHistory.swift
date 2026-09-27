@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "A new export panel", changes: [
+            "Export is a blue button at the foot of the right panel, in Design and Animate. It opens a panel over the whole window: the settings on the left, and on the right a preview of exactly what will be exported, which plays with its sound (Space plays and pauses).",
+            "Choose the size (50%, 100%, 200% or any percentage, up to 4K), the format, a frame rate for the movie (the composition's own, or 24, 25, 30, 50 or 60 fps), the range, and whether to include sound. Quality is always High.",
+            "Exporting sends the preview up and out and brings a big percentage counter up from below, its digits rolling on like an odometer. When it finishes they trade places back, and the button offers Export again, with Show in Finder under it.",
+            "Cancel stops an export part way, as do the cross and Escape, which close the panel. Nothing half-written is left behind.",
+        ]),
         .init(date: "27 September 2026", title: "Any export size", changes: [
             "Under the Size menu in Export, type any percentage of the composition, such as 150% or 33.3%, as well as picking 50%, 100% or 200%. Size shows the pixels it will be.",
             "Exports never go past 4K (3840 × 2160, either way round): a size that would is greyed out in the menu, and a larger composition exports at 4K. Movies still round to even numbers of pixels.",

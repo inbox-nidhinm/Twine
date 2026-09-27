@@ -84,6 +84,32 @@ struct PanelButton: View {
     }
 }
 
+/// The one button that does a panel's main thing, filled with the accent:
+/// Export.
+struct PrimaryButton: View {
+    let title: String
+    var disabled: Bool = false
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(ThemeFont.labelStrong)
+                .foregroundStyle(Color.white.opacity(disabled ? 0.5 : 1))
+                .frame(maxWidth: .infinity)
+                .frame(height: Theme.primaryButton)
+                .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
+                    .fill(disabled ? Theme.accent.opacity(0.4) : hovering ? Theme.accentHover : Theme.accent))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .onHover { hovering = $0 }
+    }
+}
+
 /// A small square glyph button for panel headers and rows, which lights its
 /// ground only under the pointer.
 struct IconButton: View {

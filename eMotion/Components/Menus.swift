@@ -182,45 +182,58 @@ struct MenuRow: View {
     let entries: () -> [MenuEntry]
     var isEnabled = true
 
-    @Environment(MenuHost.self) private var menus
-    @State private var frame: CGRect = .zero
-    @State private var hovering = false
-
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
                 .lineLimit(1)
-            // A real button rather than a tap gesture, so a click always
-            // lands and accessibility can press it.
-            Button {
-                // Flush with the row's left edge and just under it, so the menu
-                // reads as having come out of the control.
-                menus.show(entries(), at: CGPoint(x: frame.minX, y: frame.maxY + 4))
-            } label: {
-                HStack(spacing: 6) {
-                    Text(value)
-                        .font(ThemeFont.label)
-                        .foregroundStyle(isEnabled ? Theme.textPrimary : Theme.textTertiary)
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                    IconView(.chevronDown, size: 13)
-                        .foregroundStyle(Theme.textTertiary)
-                }
-                .padding(.horizontal, 8)
-                .frame(height: Theme.panelRow + 4)
-                .frame(maxWidth: .infinity)
-                .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
-                    .fill(hovering && isEnabled ? Theme.panelHover : Theme.panelRaised))
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(!isEnabled)
-            .onHover { hovering = $0 }
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+            MenuField(value: value, entries: entries, isEnabled: isEnabled)
         }
         .padding(.vertical, 2)
+    }
+}
+
+/// The control of a `MenuRow` on its own, for choices sitting side by side
+/// under one name.
+struct MenuField: View {
+    /// What the control reads when shut: the choice in force.
+    let value: String
+    let entries: () -> [MenuEntry]
+    var isEnabled = true
+
+    @Environment(MenuHost.self) private var menus
+    @State private var frame: CGRect = .zero
+    @State private var hovering = false
+
+    var body: some View {
+        // A real button rather than a tap gesture, so a click always lands
+        // and accessibility can press it.
+        Button {
+            // Flush with the control's left edge and just under it, so the
+            // menu reads as having come out of it.
+            menus.show(entries(), at: CGPoint(x: frame.minX, y: frame.maxY + 4))
+        } label: {
+            HStack(spacing: 6) {
+                Text(value)
+                    .font(ThemeFont.label)
+                    .foregroundStyle(isEnabled ? Theme.textPrimary : Theme.textTertiary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                IconView(.chevronDown, size: 13)
+                    .foregroundStyle(Theme.textTertiary)
+            }
+            .padding(.horizontal, 8)
+            .frame(height: Theme.panelRow + 4)
+            .frame(maxWidth: .infinity)
+            .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
+                .fill(hovering && isEnabled ? Theme.panelHover : Theme.panelRaised))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .onHover { hovering = $0 }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
     }
 }
 

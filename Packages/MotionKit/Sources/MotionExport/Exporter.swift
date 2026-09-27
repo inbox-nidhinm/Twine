@@ -64,7 +64,8 @@ public final class ExportJob: Sendable {
 public enum Exporter {
     /// Writes `settings.format` to `url`. For a movie that is the whole
     /// composition, or only `frames` of it; for a PNG it is the frame at
-    /// `time`. `progress` is called
+    /// `time`. A movie is made at `settings.frameRate` when one is chosen,
+    /// and `frames` count at that rate. `progress` is called
     /// from the exporting thread after each frame, from 0 to 1.
     /// `media` locates each imported file by its id, for pictures, video
     /// frames and sound.
@@ -73,6 +74,7 @@ public enum Exporter {
                               media: [UUID: URL] = [:], job: ExportJob = ExportJob(),
                               progress: (Double) -> Void = { _ in }) throws {
         var project = project
+        project.composition = settings.exported(project.composition)
         if !settings.format.keepsTransparency {
             project.composition.background.isTransparent = false
         }

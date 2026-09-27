@@ -33,7 +33,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `spacedown`, `spaceup` | Holds and releases Space |
 | `menukey C` | ⌘C through the main menu |
 | `hover X Y`, `rhover X Y`, `chover X Y` | Pointer moves handed straight to the timeline tracks, the ruler or the canvas (`chover` logs `HOVER`) |
-| `call NAME` | `duplicate`, `shortcuts`, `copy`, `paste`, `undo`, `focuscanvas`, `copyeasing`, `pasteeasing`, `exportmovie`, `exportframe`, `staggermenu` |
+| `call NAME` | `duplicate`, `shortcuts`, `copy`, `paste`, `undo`, `focuscanvas`, `copyeasing`, `pasteeasing`, `exportmovie` (opens the export panel; again, exports), `exportframe`, `staggermenu` |
 | `savepanel PATH`, `waitexport` | Fills and closes a save panel, waits for an export |
 | `import PATH`, `save` | Imports media, saves |
 | `actions`, `spec`, `text` | Logs every action, the selected actions' specs, the selected text layer |
@@ -41,6 +41,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `offers` | Logs what Add Action and Add Preset offer for the selection |
 | `add KIND` | Adds an action by its kind's name (`move`, `path`, `volume`...), as the Add Action menu does |
 | `cursor` | Logs which of the app's pointers is current |
+| `perfpreview S` | The export panel's preview playing for S seconds (open the panel first with `call exportmovie`) |
 | `perfplay S`, `perfscrub N`, `perfdrag N`, `perfdragat X Y N`, `perfselect N` | Timings (`PERF` lines): playback frame rate, seek, canvas drag, drag at a point, select |
 | `clicksample X Y`, `addsample move` | Samples the playhead after a click, or after adding an action |
 

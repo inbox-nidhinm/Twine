@@ -87,6 +87,10 @@ public struct ExportSettings: Codable, Sendable, Equatable {
     public var quality: ExportQuality
     /// Movies only: the composition's sound, when it has any.
     public var includesAudio: Bool
+    /// Movies only: the rate to export at, nil for the composition's own.
+    /// A different rate samples the same scene more or less often; timing
+    /// stays exact.
+    public var frameRate: FrameRate?
 
     public static let scales: [Double] = [0.5, 1, 2]
     /// The largest an export can be: 4K UHD, either way round.
@@ -107,14 +111,27 @@ public struct ExportSettings: Codable, Sendable, Equatable {
         min(max(scale, Self.minScale), Self.largestScale(for: composition))
     }
 
-    public init(format: ExportFormat = .h264, scale: Double = 1, quality: ExportQuality = .high, includesAudio: Bool = true) {
+    /// The rates offered for export by name, besides the composition's own.
+    public static let frameRates: [FrameRate] = [.fps24, .fps25, .fps30, .fps50, .fps60]
+
+    public init(format: ExportFormat = .h264, scale: Double = 1, quality: ExportQuality = .high, includesAudio: Bool = true,
+                frameRate: FrameRate? = nil) {
         self.format = format
         self.scale = scale
         self.quality = quality
         self.includesAudio = includesAudio
+        self.frameRate = frameRate
     }
 
-    private enum CodingKeys: String, CodingKey { case format, scale, quality, includesAudio }
+    /// The composition as it is exported: at the chosen rate, if one is.
+    public func exported(_ composition: Composition) -> Composition {
+        guard format.isMovie, let frameRate else { return composition }
+        var c = composition
+        c.frameRate = frameRate
+        return c
+    }
+
+    private enum CodingKeys: String, CodingKey { case format, scale, quality, includesAudio, frameRate }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -122,6 +139,7 @@ public struct ExportSettings: Codable, Sendable, Equatable {
         scale = try c.decode(Double.self, forKey: .scale)
         quality = try c.decode(ExportQuality.self, forKey: .quality)
         includesAudio = try c.decodeIfPresent(Bool.self, forKey: .includesAudio) ?? true
+        frameRate = try c.decodeIfPresent(FrameRate.self, forKey: .frameRate)
     }
 
     /// The output's size in pixels, never past 4K. Movies are rounded to

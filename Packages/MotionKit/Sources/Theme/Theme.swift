@@ -145,6 +145,27 @@ public enum Theme {
 
     /// The bottom bar's full height: one bar row inside its padding.
     public static let barHeight: CGFloat = barRow + barPad * 2
+
+    // MARK: Export panel
+
+    /// The settings column down the panel's left.
+    public static let exportColumn: CGFloat = 280
+    /// The blue button that exports, in the panel and the inspector.
+    public static let primaryButton: CGFloat = 36
+    /// The preview's play button.
+    public static let previewButton: CGFloat = 40
+    /// The gap between the preview and its controls.
+    public static let previewGap: CGFloat = 24
+    /// The project's name at the head of the panel.
+    public static let exportTitle: CGFloat = 32
+    /// The counter's type size, as a share of the preview area's height.
+    public static let exportCounterShare: CGFloat = 0.36
+    /// How the player and the counter trade places: cubic-bezier(0.5, 0, 0, 1).
+    public static let exportEase = Animation.timingCurve(0.5, 0, 0, 1, duration: 0.8)
+    /// How each digit of the counter rolls on, on the same curve.
+    public static let counterEase = Animation.timingCurve(0.5, 0, 0, 1, duration: 0.4)
+    /// The panel appearing and going.
+    public static let exportFade = Animation.timingCurve(0.5, 0, 0, 1, duration: 0.35)
 }
 
 // MARK: - Type
@@ -165,7 +186,8 @@ public enum ThemeFont {
     /// Tiny numbers on tiles and markers.
     public static let micro = Font.system(size: 8, weight: .medium)
 
-    /// PP Kyoto Light, for the home screen's titles.
+    /// PP Kyoto Light, for the home screen's titles, and the export panel's
+    /// name and counter.
     ///
     /// Registered with the process at first use rather than through the
     /// Info.plist, because the font ships inside this package's resource
@@ -174,6 +196,28 @@ public enum ThemeFont {
     public static func display(_ size: CGFloat) -> Font {
         _ = registered
         return .custom(displayFace, size: size)
+    }
+
+    /// The widest digit of the display face at `size`, so a column of
+    /// rolling digits keeps one width whichever digit shows.
+    public static func displayDigitWidth(_ size: CGFloat) -> CGFloat {
+        _ = registered
+        guard let font = NSFont(name: displayFace, size: size) else { return size * 0.62 }
+        return (0...9).map { ("\($0)" as NSString).size(withAttributes: [.font: font]).width }.max() ?? size * 0.62
+    }
+
+    /// How tall the display face's figures stand at `size`, and how far to
+    /// move a line of them down so the figures, not the line, sit centred in
+    /// a box: for rolling digits clipped close to the figures.
+    public static func displayFigures(_ size: CGFloat) -> (height: CGFloat, nudge: CGFloat) {
+        _ = registered
+        guard let font = NSFont(name: displayFace, size: size) else { return (size * 0.72, 0) }
+        // Measured down from the top of a line's box, which runs from the
+        // ascender to the descender: the box's middle, and the middle of the
+        // figures, which stand from the baseline to the cap height.
+        let boxMiddle = (font.ascender - font.descender) / 2
+        let figureMiddle = font.ascender - font.capHeight / 2
+        return (font.capHeight, boxMiddle - figureMiddle)
     }
 
     /// The gap to add between lines so the display face sits on 130% leading.

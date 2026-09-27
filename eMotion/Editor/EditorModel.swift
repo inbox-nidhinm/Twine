@@ -34,6 +34,10 @@ final class EditorModel {
     var hoveredLayer: UUID?
     /// The keyboard shortcuts card is up (⌘/).
     var showShortcuts = false
+    /// The export panel covers the window.
+    var showExport = false
+    /// The export panel's preview player, while the panel is up, for Space.
+    var exportPlayer: ExportPreviewPlayer?
     /// The layer whose name is being edited in the layers panel.
     var renaming: UUID?
     /// Set to a text layer to put the keyboard in its text box in the

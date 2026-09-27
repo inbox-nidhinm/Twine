@@ -51,8 +51,10 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     // MARK: File menu
 
-    /// Exports in the format the Export section has chosen.
-    @objc func exportFile(_ sender: Any?) { export(nil) }
+    /// Brings up the export panel, or with it up, exports as it is set.
+    @objc func exportFile(_ sender: Any?) {
+        if editor.showExport { export(nil) } else { controller.openExport() }
+    }
     /// A PNG of what the canvas shows, whatever the Export section has chosen.
     @objc func exportFrame(_ sender: Any?) { export(.png) }
 
