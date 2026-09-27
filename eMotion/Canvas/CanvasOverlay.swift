@@ -79,11 +79,10 @@ nonisolated final class CanvasOverlay: CALayer {
             l.strokeColor = Self.accent
             l.lineWidth = 1
         }
-        // Monochrome, so it never reads as a selection: a faint wash over
-        // the layer's box inside a one-point white line with a dark edge.
+        // Monochrome, so it never reads as a selection: a one-point white
+        // line with a dark edge around the layer's box, and no wash over it.
         hover.lineWidth = 1
         hover.strokeColor = NSColor(Theme.canvasHover).withAlphaComponent(0.9).cgColor
-        hover.fillColor = NSColor(Theme.canvasHover).withAlphaComponent(0.12).cgColor
         hoverEdge.fillColor = nil
         hoverEdge.lineWidth = 3
         hoverEdge.strokeColor = NSColor(Theme.canvasHoverEdge).withAlphaComponent(0.45).cgColor
@@ -378,7 +377,7 @@ nonisolated final class CanvasOverlay: CALayer {
         outlines.path = polygons(boxes)
         union.path = unionBox.map { polygons([$0]) } ?? nil
         hover.path = hoverBox.map { polygons([$0]) } ?? nil
-        // A selected layer keeps its blue outline; it only takes the wash.
+        // A selected layer keeps only its blue outline.
         hover.strokeColor = hoverIsSelected ? nil : NSColor(Theme.canvasHover).withAlphaComponent(0.9).cgColor
         hoverEdge.path = hoverIsSelected ? nil : hover.path
         marquee.path = rect.map { CGPath(rect: $0.integral.insetBy(dx: 0.5, dy: 0.5), transform: nil) }

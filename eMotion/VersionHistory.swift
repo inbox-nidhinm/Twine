@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "Steady sound", changes: [
+            "The outline under the pointer on the canvas is just a line now, with no light wash over the layer.",
+            "Sound no longer stutters as playback starts: it starts exactly with the playhead instead of catching up in little jumps.",
+            "Sound comes back on the next loop when it ran out before the end of the scene, and no longer jumps on every frame after it ends.",
+        ]),
         .init(date: "27 September 2026", title: "Plain selection", changes: [
             "A selected layer shows only its box and handles: the light wash that came over it under the pointer is gone. Layers that are not selected still light up under the pointer.",
         ]),
