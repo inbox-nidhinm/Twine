@@ -148,8 +148,9 @@ public enum Theme {
 
     // MARK: Export panel
 
-    /// The settings column down the panel's left.
-    public static let exportColumn: CGFloat = 280
+    /// The settings column down the panel's left: the layers panel's width,
+    /// so its edge falls where the layers panel's does.
+    public static let exportColumn: CGFloat = panelWidth
     /// The blue button that exports, in the panel and the inspector.
     public static let primaryButton: CGFloat = 36
     /// The preview's play button.

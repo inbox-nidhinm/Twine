@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "Export panel lined up", changes: [
+            "The export panel's settings column is now as wide as the layers panel, so its edge lines up with it.",
+        ]),
         .init(date: "27 September 2026", title: "A new export panel", changes: [
             "Export is a blue button at the foot of the right panel, in Design and Animate. It opens a panel over the whole window: the settings on the left, and on the right a preview of exactly what will be exported, which plays with its sound (Space plays and pauses).",
             "Choose the size (50%, 100%, 200% or any percentage, up to 4K), the format, a frame rate for the movie (the composition's own, or 24, 25, 30, 50 or 60 fps), the range, and whether to include sound. Quality is always High.",
