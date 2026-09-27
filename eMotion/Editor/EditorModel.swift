@@ -34,6 +34,18 @@ final class EditorModel {
     var hoveredLayer: UUID?
     /// The keyboard shortcuts card is up (⌘/).
     var showShortcuts = false
+    /// A short note over the canvas, such as fonts a paste could not find.
+    /// Goes by itself after a few seconds.
+    var notice: String?
+    @ObservationIgnored private var noticeTimer: Timer?
+
+    func showNotice(_ text: String) {
+        notice = text
+        noticeTimer?.invalidate()
+        noticeTimer = Timer.scheduledTimer(withTimeInterval: 6, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.notice = nil }
+        }
+    }
     /// The export panel covers the window.
     var showExport = false
     /// The export panel's preview player, while the panel is up, for Space.

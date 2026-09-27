@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "Paste from Figma", changes: [
+            "A Twine plugin for Figma (in the FigmaPlugin folder): select a frame or layers, press Copy, then paste in Twine with ⌘V.",
+            "Frames, groups, shapes, vectors, pictures, gradients, strokes, shadows, blurs, blend modes and masks come in as editable Twine layers. Text in one style comes in as Twine text; anything Twine cannot hold comes in as a sharp picture Figma drew.",
+            "Pasted into an empty project, the composition takes the copy's size and it lines up exactly; into a project with layers, it comes in centred at its exact size.",
+            "A note over the canvas says which fonts are not installed (a stand-in shows until they are) and what had to be left out.",
+        ]),
         .init(date: "27 September 2026", title: "SVG import", changes: [
             "Import an SVG file (File > Import, or drop it on the canvas) and it comes in as layers you can edit, in a frame named after the file: shapes, groups, colours, gradients, strokes, clip paths and masks, pictures inside it, and holes in shapes.",
             "Rectangles and circles stay rectangles and ellipses where they can, with their corners, so they resize and animate as ones drawn in Twine do; other outlines become paths whose points can be edited.",

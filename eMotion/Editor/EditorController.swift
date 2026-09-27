@@ -453,6 +453,66 @@ final class EditorController {
         }
     }
 
+    /// Layers copied with the Twine plugin in Figma, at their exact size.
+    /// Into an empty project the composition takes their size and they line
+    /// up with it; otherwise they come in centred. Their pictures come too.
+    /// One undo step. Fonts this Mac lacks are named in a notice; the text
+    /// shows in a stand-in until they are installed.
+    func pasteFromFigma(_ text: String) {
+        guard let document else { return }
+        Task { @MainActor in
+            guard let read = try? FigmaImport.read(text) else { return NSSound.beep() }
+            var commands: [EditorCommand] = []
+            let offset: Vec2
+            if project.layers.isEmpty {
+                var composition = project.composition
+                composition.width = max(Int(read.bounds.width.rounded()), 1)
+                composition.height = max(Int(read.bounds.height.rounded()), 1)
+                commands.append(.setComposition(composition))
+                offset = Vec2(-read.bounds.minX, -read.bounds.minY)
+            } else {
+                // Whole pixels, so edges that were crisp in Figma stay so.
+                let c = project.composition
+                offset = Vec2((Double(c.width) / 2 - read.bounds.center.x).rounded(), (Double(c.height) / 2 - read.bounds.center.y).rounded())
+            }
+            for item in read.media where !project.media.contains(where: { $0.contentHash == item.asset.contentHash }) {
+                do { try await document.stage(item.data, as: item.asset.fileName) } catch { return NSSound.beep() }
+                commands.append(.addMedia(item.asset))
+            }
+            let layers = read.layers.map { $0.translated(by: offset) }.map { reusingKnownPictures($0, from: read.media) }
+            commands.append(.insertLayers(layers, parentID: nil, index: nil))
+            guard perform(.batch(commands, name: "Paste from Figma")) else { return }
+            select(layers.map(\.id))
+            var notes: [String] = []
+            if !read.missingFonts.isEmpty {
+                let names = read.missingFonts.joined(separator: ", ")
+                notes.append(read.missingFonts.count == 1 ? "\(names) isn't installed, so a stand-in font shows until it is."
+                                                          : "\(names) aren't installed, so a stand-in font shows until they are.")
+            }
+            notes += read.warnings.prefix(2)
+            if read.warnings.count > 2 { notes.append("And \(read.warnings.count - 2) more left out.") }
+            if !notes.isEmpty { editor.showNotice(notes.joined(separator: " ")) }
+        }
+    }
+
+    /// A pasted layer's pictures taken from the project where it already has
+    /// the same file.
+    private func reusingKnownPictures(_ layer: Layer, from media: [SVGImport.EmbeddedMedia]) -> Layer {
+        var l = layer
+        if var look = l.look {
+            for i in look.fills.indices {
+                guard case .image(var p) = look.fills[i].paint,
+                      let hash = media.first(where: { $0.asset.id == p.mediaID })?.asset.contentHash,
+                      let known = project.media.first(where: { $0.contentHash == hash }) else { continue }
+                p.mediaID = known.id
+                look.fills[i].paint = .image(p)
+            }
+            l.look = look
+        }
+        l.children = l.children.map { reusingKnownPictures($0, from: media) }
+        return l
+    }
+
     // MARK: Actions
 
     /// Kinds of action the selection can take together.
@@ -938,11 +998,14 @@ final class EditorController {
     var canPaste: Bool {
         let board = NSPasteboard.general
         return board.data(forType: Self.pasteboardType) != nil || board.data(forType: Self.actionPasteboardType) != nil
+            || board.string(forType: .string).map(FigmaImport.isPayload) == true
     }
 
     /// Pastes in place, in front of everything at the top level. Every pasted
     /// layer is a new layer with new ids, however many times it is pasted.
     func paste() {
+        // A copy from the Twine plugin in Figma.
+        if let text = NSPasteboard.general.string(forType: .string), FigmaImport.isPayload(text) { return pasteFromFigma(text) }
         // Copying clears the pasteboard, so it holds layers or actions, never both.
         if NSPasteboard.general.data(forType: Self.actionPasteboardType) != nil { return pasteActions() }
         guard let data = NSPasteboard.general.data(forType: Self.pasteboardType),

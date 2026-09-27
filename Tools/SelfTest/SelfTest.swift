@@ -509,6 +509,14 @@ enum SelfTest {
                 }
             case "import":
                 controller.importMedia(parts.dropFirst().map { URL(fileURLWithPath: $0) })
+            case "pastefigma":
+                // As Paste with a copy from the Figma plugin on the clipboard,
+                // without touching the clipboard in use.
+                guard let text = try? String(contentsOfFile: parts[1], encoding: .utf8) else { log("PASTEFIGMA unreadable"); break }
+                controller.pasteFromFigma(text)
+            case "composition":
+                let c = controller.project.composition
+                log("COMPOSITION \(c.width)x\(c.height) notice=\(controller.editor.notice ?? "-")")
             case "replace":
                 // As Replace in the inspector, with the file handed in rather
                 // than chosen in the panel, which runs in another process.

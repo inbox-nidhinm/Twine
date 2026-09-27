@@ -52,6 +52,13 @@ struct EditorView: View {
                     .transition(.opacity)
             }
 
+            if let notice = editor.notice {
+                NoticeCard(text: notice) { editor.notice = nil }
+                    .padding(Theme.floatInset)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .transition(.opacity)
+            }
+
             if editor.showShortcuts {
                 ShortcutsCard { editor.showShortcuts = false }
                     .transition(.opacity)
@@ -69,6 +76,7 @@ struct EditorView: View {
         .animation(.easeOut(duration: 0.18), value: editor.showInspector)
         .animation(.easeOut(duration: 0.18), value: editor.mode)
         .animation(.easeOut(duration: 0.15), value: editor.showShortcuts)
+        .animation(.easeOut(duration: 0.18), value: editor.notice)
         .animation(Theme.exportFade, value: editor.showExport)
         .animation(.easeOut(duration: 0.18), value: editor.exports.isExporting || editor.exports.finished != nil)
         .ignoresSafeArea()

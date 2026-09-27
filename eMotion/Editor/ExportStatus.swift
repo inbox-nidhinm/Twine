@@ -69,3 +69,25 @@ private struct ProgressTrack: View {
             .frame(width: Theme.cardWidth / 2, height: Theme.progressBar)
     }
 }
+
+/// A note over the top of the canvas, with a way to dismiss it.
+struct NoticeCard: View {
+    let text: String
+    let dismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(text)
+                .font(ThemeFont.label)
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(4)
+                .frame(maxWidth: 420, alignment: .leading)
+            IconButton(icon: .close, help: "Dismiss", action: dismiss)
+        }
+        .fixedSize()
+        .padding(.leading, Theme.panelPad)
+        .padding(.trailing, Theme.barPad)
+        .padding(.vertical, Theme.barPad)
+        .floatingPanel()
+    }
+}

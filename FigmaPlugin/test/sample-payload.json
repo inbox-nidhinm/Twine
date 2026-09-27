@@ -1,0 +1,423 @@
+{
+ "format": "twine.figma",
+ "version": 1,
+ "nodes": [
+  {
+   "name": "Card",
+   "visible": true,
+   "locked": false,
+   "opacity": 1,
+   "blend": "PASS_THROUGH",
+   "transform": [
+    1,
+    0,
+    0,
+    1,
+    100,
+    50
+   ],
+   "width": 320,
+   "height": 200,
+   "kind": "frame",
+   "children": [
+    {
+     "name": "Photo",
+     "visible": true,
+     "locked": false,
+     "opacity": 1,
+     "blend": "PASS_THROUGH",
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      116,
+      66
+     ],
+     "width": 120,
+     "height": 80,
+     "kind": "rectangle",
+     "radii": [
+      8,
+      8,
+      8,
+      8
+     ],
+     "fills": [
+      {
+       "type": "IMAGE",
+       "visible": true,
+       "opacity": 1,
+       "image": "photo-hash",
+       "scaleMode": "FILL",
+       "rotation": 0
+      }
+     ]
+    },
+    {
+     "name": "Title",
+     "visible": true,
+     "locked": false,
+     "opacity": 1,
+     "blend": "PASS_THROUGH",
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      250,
+      70
+     ],
+     "width": 80,
+     "height": 32,
+     "kind": "text",
+     "text": {
+      "characters": "Hello",
+      "family": "Inter",
+      "style": "Semi Bold",
+      "size": 24,
+      "letterSpacing": -0.48,
+      "lineHeight": 32,
+      "align": "CENTER",
+      "autoResize": "WIDTH_AND_HEIGHT"
+     },
+     "fills": [
+      {
+       "type": "SOLID",
+       "visible": true,
+       "opacity": 1,
+       "color": {
+        "r": 0.1,
+        "g": 0.1,
+        "b": 0.1,
+        "a": 1
+       }
+      }
+     ]
+    },
+    {
+     "kind": "picture",
+     "name": "Mixed",
+     "visible": true,
+     "locked": false,
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      250,
+      110
+     ],
+     "width": 80,
+     "height": 32,
+     "png": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR4nGP4z8DwHwQZ/gMAG/0D/eqA0WQAAAAASUVORK5CYII=",
+     "bounds": [
+      250,
+      110,
+      80,
+      32
+     ]
+    },
+    {
+     "kind": "picture",
+     "name": "Leaning",
+     "visible": true,
+     "locked": false,
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      250,
+      150
+     ],
+     "width": 80,
+     "height": 32,
+     "png": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR4nGP4z8DwHwQZ/gMAG/0D/eqA0WQAAAAASUVORK5CYII=",
+     "bounds": [
+      250,
+      150,
+      80,
+      32
+     ]
+    },
+    {
+     "name": "Icon",
+     "visible": true,
+     "locked": false,
+     "opacity": 1,
+     "blend": "PASS_THROUGH",
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      130,
+      160
+     ],
+     "width": 24,
+     "height": 24,
+     "kind": "vector",
+     "paths": [
+      {
+       "rule": "EVENODD",
+       "d": "M0 0 L24 0 L24 24 L0 24 Z M6 6 L18 6 L18 18 L6 18 Z"
+      }
+     ],
+     "fills": [
+      {
+       "type": "SOLID",
+       "visible": true,
+       "opacity": 1,
+       "color": {
+        "r": 0.3,
+        "g": 0.6,
+        "b": 0.9,
+        "a": 1
+       }
+      }
+     ]
+    },
+    {
+     "name": "Painted Regions",
+     "visible": true,
+     "locked": false,
+     "opacity": 1,
+     "blend": "PASS_THROUGH",
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      160,
+      160
+     ],
+     "width": 24,
+     "height": 24,
+     "kind": "svg",
+     "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\" viewBox=\"0 0 10 10\"><path d=\"M0 0H10V10Z\" fill=\"red\"/></svg>",
+     "bounds": [
+      160,
+      160,
+      24,
+      24
+     ]
+    },
+    {
+     "name": "Masked",
+     "visible": true,
+     "locked": false,
+     "opacity": 1,
+     "blend": "PASS_THROUGH",
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      200,
+      160
+     ],
+     "width": 30,
+     "height": 30,
+     "kind": "group",
+     "children": [
+      {
+       "name": "Mask",
+       "visible": true,
+       "locked": false,
+       "opacity": 1,
+       "blend": "PASS_THROUGH",
+       "transform": [
+        1,
+        0,
+        0,
+        1,
+        200,
+        160
+       ],
+       "width": 30,
+       "height": 30,
+       "isMask": true,
+       "maskType": "ALPHA",
+       "kind": "ellipse",
+       "arc": {
+        "start": 0,
+        "end": 6.283185307179586,
+        "inner": 0
+       },
+       "fills": [
+        {
+         "type": "SOLID",
+         "visible": true,
+         "opacity": 1,
+         "color": {
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 1
+         }
+        }
+       ]
+      },
+      {
+       "name": "Star",
+       "visible": true,
+       "locked": false,
+       "opacity": 1,
+       "blend": "PASS_THROUGH",
+       "transform": [
+        1,
+        0,
+        0,
+        1,
+        200,
+        160
+       ],
+       "width": 30,
+       "height": 30,
+       "kind": "star",
+       "count": 5,
+       "inner": 0.4,
+       "radii": [
+        2
+       ],
+       "fills": [
+        {
+         "type": "SOLID",
+         "visible": true,
+         "opacity": 1,
+         "color": {
+          "r": 1,
+          "g": 0.8,
+          "b": 0,
+          "a": 1
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Rule",
+     "visible": true,
+     "locked": false,
+     "opacity": 1,
+     "blend": "PASS_THROUGH",
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      116,
+      190
+     ],
+     "width": 288,
+     "height": 0,
+     "kind": "line",
+     "fills": [],
+     "strokes": [
+      {
+       "type": "SOLID",
+       "visible": true,
+       "opacity": 1,
+       "color": {
+        "r": 0,
+        "g": 0,
+        "b": 0,
+        "a": 1
+       }
+      }
+     ],
+     "strokeWeight": 2,
+     "strokeAlign": "INSIDE",
+     "cap": "ROUND",
+     "join": "MITER"
+    },
+    {
+     "kind": "picture",
+     "name": "Note",
+     "visible": true,
+     "locked": false,
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      300,
+      180
+     ],
+     "width": 20,
+     "height": 20,
+     "png": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR4nGP4z8DwHwQZ/gMAG/0D/eqA0WQAAAAASUVORK5CYII=",
+     "bounds": [
+      300,
+      180,
+      20,
+      20
+     ]
+    }
+   ],
+   "effects": [
+    {
+     "type": "DROP_SHADOW",
+     "visible": true,
+     "radius": 24,
+     "color": {
+      "r": 0,
+      "g": 0,
+      "b": 0,
+      "a": 0.2
+     },
+     "offset": {
+      "x": 0,
+      "y": 8
+     },
+     "spread": 0
+    }
+   ],
+   "fills": [
+    {
+     "type": "SOLID",
+     "visible": true,
+     "opacity": 1,
+     "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 1
+     }
+    }
+   ],
+   "strokes": [
+    {
+     "type": "SOLID",
+     "visible": true,
+     "opacity": 0.1,
+     "color": {
+      "r": 0,
+      "g": 0,
+      "b": 0,
+      "a": 1
+     }
+    }
+   ],
+   "strokeWeight": 1,
+   "strokeAlign": "INSIDE",
+   "cap": "NONE",
+   "join": "MITER",
+   "radii": [
+    16,
+    16,
+    16,
+    16
+   ],
+   "clips": true
+  }
+ ],
+ "images": {
+  "photo-hash": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR4nGP4z8DwHwQZ/gMAG/0D/eqA0WQAAAAASUVORK5CYII="
+ },
+ "warnings": [
+  "Card is painted with a gradient Twine lacks, which was left out."
+ ]
+}

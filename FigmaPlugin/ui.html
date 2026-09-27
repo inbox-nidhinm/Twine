@@ -1,0 +1,192 @@
+<!doctype html>
+<!-- Made by build.py from ui.src.html: edit that, not this. -->
+<!--
+  The Twine plugin's panel. Edit this file, then run `python3 build.py` in
+  this folder, which writes ui.html with PP Kyoto Light embedded, as Figma
+  needs the panel in one file.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face {
+    font-family: "PP Kyoto";
+    font-weight: 300;
+    src: url(data:font/otf;base64,) format("opentype");
+  }
+  :root {
+    --ground: #3A88C8;
+    --glass: rgba(255, 255, 255, 0.10);
+    --edge: rgba(255, 255, 255, 0.55);
+    --dashes: rgba(255, 255, 255, 0.7);
+    --button: #2C2C2C;
+    --text: #FFFFFF;
+    --text-soft: rgba(255, 255, 255, 0.85);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--ground);
+    color: var(--text);
+    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0 18px;
+    user-select: none;
+    overflow: hidden;
+  }
+  h1 {
+    margin-top: 38px;
+    height: 50px;
+    font-family: "PP Kyoto", Georgia, serif;
+    font-weight: 300;
+    font-size: 36px;
+    line-height: 50px;
+    text-align: center;
+    letter-spacing: 0.01em;
+  }
+  .card {
+    margin-top: 36px;
+    height: 158px;
+    border-radius: 10px;
+    background: var(--glass);
+    border: 1px solid var(--edge);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0 20px;
+  }
+  .card.empty {
+    background: transparent;
+    border: 1px dashed var(--dashes);
+  }
+  .name {
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 24px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  .hint {
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--text-soft);
+    max-width: 190px;
+  }
+  .error { font-size: 13px; line-height: 18px; color: var(--text-soft); }
+  .percent {
+    font-family: "PP Kyoto", Georgia, serif;
+    font-weight: 300;
+    font-size: 56px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  button {
+    margin-top: 30px;
+    height: 43px;
+    border: 0;
+    border-radius: 5px;
+    background: var(--button);
+    color: var(--text);
+    font: inherit;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  button:disabled {
+    background: rgba(44, 44, 44, 0.35);
+    color: rgba(255, 255, 255, 0.45);
+    cursor: default;
+  }
+  textarea { position: fixed; left: -9999px; top: 0; opacity: 0; }
+</style>
+</head>
+<body>
+  <h1>Twine</h1>
+  <div class="card empty" id="card"><div class="hint">Select a frame or a layer to get started.</div></div>
+  <button id="copy" disabled>Copy</button>
+<script>
+  // idle, copying, copied or failed; what is selected; how far a copy is.
+  const state = { phase: "idle", count: 0, name: "", percent: 0, error: "" };
+  let settle = null;
+
+  const card = document.getElementById("card");
+  const button = document.getElementById("copy");
+
+  function render() {
+    card.className = state.count === 0 && state.phase === "idle" ? "card empty" : "card";
+    card.textContent = "";
+    const line = document.createElement("div");
+    if (state.phase === "copying") {
+      line.className = "percent";
+      line.textContent = state.percent + "%";
+    } else if (state.phase === "failed") {
+      line.className = "error";
+      line.textContent = "Could not copy: " + state.error;
+    } else if (state.count === 0) {
+      line.className = "hint";
+      line.textContent = "Select a frame or a layer to get started.";
+    } else {
+      line.className = "name";
+      line.textContent = state.name;
+      line.title = state.name;
+    }
+    card.appendChild(line);
+    button.textContent = state.phase === "copying" ? "Copying" : state.phase === "copied" ? "Copied" : "Copy";
+    button.disabled = state.count === 0 && state.phase === "idle";
+  }
+
+  /// Figma's panel may not use the clipboard's newer interface, so the copy
+  /// goes through a hidden text box, the way it always could.
+  function copyText(text) {
+    const box = document.createElement("textarea");
+    box.value = text;
+    document.body.appendChild(box);
+    box.select();
+    const ok = document.execCommand("copy");
+    box.remove();
+    return ok;
+  }
+
+  button.addEventListener("click", function () {
+    if (state.phase === "copying" || state.count === 0) return;
+    clearTimeout(settle);
+    state.phase = "copying";
+    state.percent = 0;
+    render();
+    parent.postMessage({ pluginMessage: { type: "copy" } }, "*");
+  });
+
+  window.onmessage = function (event) {
+    const message = event.data && event.data.pluginMessage;
+    if (!message) return;
+    if (message.type === "selection") {
+      state.count = message.count;
+      state.name = message.name;
+      // A new selection starts afresh, unless a copy is under way.
+      if (state.phase !== "copying") state.phase = "idle";
+    } else if (message.type === "progress") {
+      state.percent = message.percent;
+    } else if (message.type === "payload") {
+      if (copyText(message.text)) {
+        state.phase = "copied";
+        settle = setTimeout(function () { state.phase = "idle"; render(); }, 2500);
+      } else {
+        state.phase = "failed";
+        state.error = "the clipboard refused it.";
+      }
+    } else if (message.type === "error") {
+      state.phase = "failed";
+      state.error = message.message;
+    }
+    render();
+  };
+
+  render();
+</script>
+</body>
+</html>
