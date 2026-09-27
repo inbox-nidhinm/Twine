@@ -238,8 +238,8 @@ private func near(_ a: Double, _ b: Double, _ e: Double = 1e-6) -> Bool { abs(a 
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
             return bytes
         }
-        // EMOTION_SVG_OUT=folder saves both drawings, to look at.
-        if let folder = ProcessInfo.processInfo.environment["EMOTION_SVG_OUT"] {
+        // TWINE_SVG_OUT=folder saves both drawings, to look at.
+        if let folder = ProcessInfo.processInfo.environment["TWINE_SVG_OUT"] {
             for (name, image) in [("twine", twine), ("system", reference)] {
                 let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
                 try data?.write(to: URL(fileURLWithPath: folder).appendingPathComponent("\(name).png"))

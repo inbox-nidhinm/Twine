@@ -1,6 +1,6 @@
 import Foundation
 
-/// Everything in one `.emotion` file except the media bytes themselves.
+/// Everything in one `.twine` file except the media bytes themselves.
 public struct Project: Codable, Sendable, Equatable {
     public var composition: Composition
     /// Top-level layers, drawn in array order: the last one is in front. The

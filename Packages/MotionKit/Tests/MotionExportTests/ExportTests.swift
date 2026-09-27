@@ -22,7 +22,7 @@ private func project(transparent: Bool, rate: FrameRate = .fps30, duration: Doub
 }
 
 private func temporaryURL(_ ext: String) -> URL {
-    FileManager.default.temporaryDirectory.appendingPathComponent("eMotion-export-\(UUID().uuidString).\(ext)")
+    FileManager.default.temporaryDirectory.appendingPathComponent("Twine-export-\(UUID().uuidString).\(ext)")
 }
 
 /// Every decoded frame of the movie's video track, as BGRA pixel buffers,
@@ -249,7 +249,7 @@ private func pixel(_ buffer: CVPixelBuffer, _ x: Int, _ y: Int) -> (r: Int, g: I
 
 @Suite struct ExportRateTests {
     @Test func aMovieCanBeMadeAtAnotherRate() async throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("eMotion-rate-\(UUID().uuidString).mp4")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Twine-rate-\(UUID().uuidString).mp4")
         defer { try? FileManager.default.removeItem(at: url) }
         let box = Layer(name: "B", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
                                                                 fills: [Fill(paint: .color(.white))])),

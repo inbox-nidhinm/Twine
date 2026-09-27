@@ -1,7 +1,7 @@
 import Foundation
 import MotionModel
 
-/// `~/Documents/eMotion Creations`, where every project lives, loose or in
+/// `~/Documents/Twine Creations`, where every project lives, loose or in
 /// a folder of its own one level down.
 ///
 /// A new project is written here the moment it is made, with a name and no
@@ -11,11 +11,11 @@ enum Creations {
     static var folder: URL {
         // The test copy is pointed somewhere else, so it never touches the
         // projects in use.
-        if let override = ProcessInfo.processInfo.environment["EMOTION_CREATIONS"] {
+        if let override = ProcessInfo.processInfo.environment["TWINE_CREATIONS"] {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return documents.appendingPathComponent("eMotion Creations", isDirectory: true)
+        return documents.appendingPathComponent("Twine Creations", isDirectory: true)
     }
 
     static func ensureFolder() throws {

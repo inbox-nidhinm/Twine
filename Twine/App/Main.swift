@@ -1,11 +1,11 @@
 import AppKit
 
-/// The AppKit app lifecycle rather than SwiftUI's `App`: eMotion's documents
+/// The AppKit app lifecycle rather than SwiftUI's `App`: Twine's documents
 /// are `NSDocument`s, which SwiftUI's document scenes do not host, and an
 /// AppKit main menu validates itself against the responder chain for free.
 /// Every window's content is still SwiftUI.
 @main
-enum EMotionMain {
+enum TwineMain {
     static func main() {
         let app = NSApplication.shared
         // The first document controller created becomes the shared one, so

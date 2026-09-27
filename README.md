@@ -1,6 +1,6 @@
 # Twine
 
-A native macOS app for motion design (the project and its code are still called eMotion), in the spirit of Jitter, in Flip's design language.
+A native macOS app for motion design, in the spirit of Jitter, in Flip's design language.
 
 ## Running it
 
@@ -9,13 +9,13 @@ A native macOS app for motion design (the project and its code are still called 
 open build/Twine.app
 ```
 
-`./make-app.sh debug` makes a debug build. `./test.sh` runs the unit tests. The project also opens in Xcode (`eMotion.xcodeproj`), where Run works as usual.
+`./make-app.sh debug` makes a debug build. `./test.sh` runs the unit tests. The project also opens in Xcode (`Twine.xcodeproj`), where Run works as usual.
 
 ## Where things are
 
-Projects live in `~/Documents/eMotion Creations`. A new project is written there the moment it is made and saves itself about a second after every change, so nothing is ever unsaved and closing a window never asks a question. File > Revert To browses older versions.
+Projects live in `~/Documents/Twine Creations`. A new project is written there the moment it is made and saves itself about a second after every change, so nothing is ever unsaved and closing a window never asks a question. File > Revert To browses older versions.
 
-A project file (`Name.twine`) is a folder that the Finder shows as one file. Projects made before the app was renamed end in `.emotion`; they open and save just the same:
+A project file (`Name.twine`) is a folder that the Finder shows as one file.
 
 ```
 Name.twine/
@@ -26,7 +26,7 @@ Name.twine/
 
 ## The interface
 
-- **One window.** Home opens at launch: every project, newest first. Right-click a card to rename, duplicate, show in Finder, move it to a folder or move it to the Trash. Folders are listed down the left under All Projects (which shows every project, each card naming its folder): the dim New Folder row under them turns into a field for the new folder's name, right-click renames a folder, shows it in Finder or moves it and its projects to the Trash, and a card dragged onto a folder goes into it, or onto All Projects comes out. Folders are real folders inside eMotion Creations, one level deep. Opening a project turns the window into its editor; the Home button (top right of the layers panel) or ⇧⌘H saves it and turns the window back into Home. One project is open at a time: opening another, even from the Finder, takes its place. Closing the window quits.
+- **One window.** Home opens at launch: every project, newest first. Right-click a card to rename, duplicate, show in Finder, move it to a folder or move it to the Trash. Folders are listed down the left under All Projects (which shows every project, each card naming its folder): the dim New Folder row under them turns into a field for the new folder's name, right-click renames a folder, shows it in Finder or moves it and its projects to the Trash, and a card dragged onto a folder goes into it, or onto All Projects comes out. Folders are real folders inside Twine Creations, one level deep. Opening a project turns the window into its editor; the Home button (top right of the layers panel) or ⇧⌘H saves it and turns the window back into Home. One project is open at a time: opening another, even from the Finder, takes its place. Closing the window quits.
 - **The editor** is a full-bleed canvas with panels floating over it. The layers panel is on the left, with the project's name at its head (click it to rename). The inspector is on the right.
 - **Design and Animate** switch at the head of the inspector (⌥⌘1, ⌥⌘2). Design shows the tools along the bottom. Animate hides them and brings up the timeline.
 - With nothing selected, the inspector shows the composition: size, frame rate, duration, background colour and transparency. With a layer selected it shows the layer: transform, shape, fill, stroke and effects.
@@ -157,4 +157,4 @@ Export Current Frame… (Shift-⌘E) saves a PNG of what the canvas shows: the f
 
 ## Status
 
-Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then all 8 redesign milestones and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, MP4, MOV and PNG export, Style and Blur actions, text layers with Text and Shape actions, and pictures, video and sound with Play bars. After those: masks; snapping and alignment; hover, cursors and timeline polish; exporting part of the scene; the ⌘/ shortcuts card; presets made of actions; and a performance pass. Then the pen tool with point editing and the Path action, and the Volume action for fading sound. And any export size, as a percentage, up to 4K. eMotion is for internal use only, never the App Store. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.
+Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then all 8 redesign milestones and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, MP4, MOV and PNG export, Style and Blur actions, text layers with Text and Shape actions, and pictures, video and sound with Play bars. After those: masks; snapping and alignment; hover, cursors and timeline polish; exporting part of the scene; the ⌘/ shortcuts card; presets made of actions; and a performance pass. Then the pen tool with point editing and the Path action, and the Volume action for fading sound. And any export size, as a percentage, up to 4K. Twine is for internal use only, never the App Store. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.

@@ -4,13 +4,13 @@
 #     run.sh PROJECT NAME "step;step;..."
 #
 # PROJECT is a folder in Projects (Actions, Blank, Mask, Style, Text) or a
-# path to any .twine or .emotion package, which is copied first so the original is never
+# path to any .twine package, which is copied first so the original is never
 # touched. Screenshots asked for with "shot X" land in $OUT/NAME/X.png and the
-# log in $OUT/NAME.log, where OUT is $EMOTION_TEST_OUT or a folder in $TMPDIR.
+# log in $OUT/NAME.log, where OUT is $TWINE_TEST_OUT or a folder in $TMPDIR.
 # Prints the state after every step.
 HERE="$(cd "$(dirname "$0")" && pwd)"
 APP="$HERE/../../build/TwineTest.app"
-OUTROOT=${EMOTION_TEST_OUT:-${TMPDIR%/}/emotion-selftest}
+OUTROOT=${TWINE_TEST_OUT:-${TMPDIR%/}/twine-selftest}
 PROJECT=$1; NAME=$2
 [[ -d $PROJECT ]] && SRC=$PROJECT || SRC=$HERE/Projects/$PROJECT.twine
 FILE=$(basename $SRC)
@@ -20,8 +20,8 @@ pkill -x "$N"; sleep 1.5
 mkdir -p $OUTROOT; rm -rf $OUT $OUTROOT/$FILE; mkdir -p $OUT
 cp -R $SRC $OUTROOT/$FILE
 # The test copy keeps its projects in a folder of its own, never the one in use.
-CREATIONS=${EMOTION_TEST_CREATIONS:-$OUTROOT/Creations}; mkdir -p "$CREATIONS"
-(EMOTION_CREATIONS="$CREATIONS" EMOTION_SHOTS=$OUT EMOTION_SELFTEST="$3" "$APP/Contents/MacOS/$N" > $LOG 2>&1 &)
+CREATIONS=${TWINE_TEST_CREATIONS:-$OUTROOT/Creations}; mkdir -p "$CREATIONS"
+(TWINE_CREATIONS="$CREATIONS" TWINE_SHOTS=$OUT TWINE_SELFTEST="$3" "$APP/Contents/MacOS/$N" > $LOG 2>&1 &)
 sleep 1.5; open -g -a "$APP" $OUTROOT/$FILE
 W=""
 for i in {1..900}; do

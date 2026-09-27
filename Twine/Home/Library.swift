@@ -2,7 +2,7 @@ import AppKit
 import Observation
 import MotionModel
 
-/// Everything in `eMotion Creations`, for the home screen: the projects,
+/// Everything in `Twine Creations`, for the home screen: the projects,
 /// loose or in folders, and the folders. A folder is a real one in the
 /// Finder, one level down; anything the Finder does to it shows up here.
 @MainActor
@@ -165,7 +165,6 @@ final class Library {
         if let open = openDocument(at: item.url) {
             open.rename(to: trimmed)
         } else {
-            // Renaming keeps the file's own ending, old or new.
             let target = item.url.deletingLastPathComponent()
                 .appendingPathComponent(trimmed).appendingPathExtension(item.url.pathExtension)
             guard !FileManager.default.fileExists(atPath: target.path) else { return NSSound.beep() }

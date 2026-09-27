@@ -17,15 +17,15 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		E00000000000000000000008 /* eMotion.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = eMotion.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E00000000000000000000008 /* Twine.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Twine.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E00000000000000000000009 /* MotionKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = MotionKit; path = Packages/MotionKit; sourceTree = "<group>"; };
 		E0000000000000000000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		E0000000000000000000000B /* eMotion */ = {
+		E0000000000000000000000B /* Twine */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = eMotion;
+			path = Twine;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -51,7 +51,7 @@
 		E0000000000000000000000D = {
 			isa = PBXGroup;
 			children = (
-				E0000000000000000000000B /* eMotion */,
+				E0000000000000000000000B /* Twine */,
 				E00000000000000000000009 /* MotionKit */,
 				E0000000000000000000000E /* Config */,
 				E0000000000000000000000F /* Products */,
@@ -69,7 +69,7 @@
 		E0000000000000000000000F /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				E00000000000000000000008 /* eMotion.app */,
+				E00000000000000000000008 /* Twine.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -77,9 +77,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		E00000000000000000000010 /* eMotion */ = {
+		E00000000000000000000010 /* Twine */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E00000000000000000000011 /* Build configuration list for PBXNativeTarget "eMotion" */;
+			buildConfigurationList = E00000000000000000000011 /* Build configuration list for PBXNativeTarget "Twine" */;
 			buildPhases = (
 				E00000000000000000000012 /* Sources */,
 				E0000000000000000000000C /* Frameworks */,
@@ -90,9 +90,9 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				E0000000000000000000000B /* eMotion */,
+				E0000000000000000000000B /* Twine */,
 			);
-			name = eMotion;
+			name = Twine;
 			packageProductDependencies = (
 				E0000000000000000000001F /* MotionExport */,
 				E00000000000000000000021 /* MotionImport */,
@@ -102,8 +102,8 @@
 				E00000000000000000000004 /* MotionEditing */,
 				E00000000000000000000006 /* Theme */,
 			);
-			productName = eMotion;
-			productReference = E00000000000000000000008 /* eMotion.app */;
+			productName = Twine;
+			productReference = E00000000000000000000008 /* Twine.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -121,7 +121,7 @@
 					};
 				};
 			};
-			buildConfigurationList = E00000000000000000000015 /* Build configuration list for PBXProject "eMotion" */;
+			buildConfigurationList = E00000000000000000000015 /* Build configuration list for PBXProject "Twine" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -138,7 +138,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				E00000000000000000000010 /* eMotion */,
+				E00000000000000000000010 /* Twine */,
 			);
 		};
 /* End PBXProject section */
@@ -246,7 +246,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.nidhin.emotion;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nidhin.twine;
 				PRODUCT_NAME = Twine;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -276,7 +276,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.nidhin.emotion;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nidhin.twine;
 				PRODUCT_NAME = Twine;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -288,7 +288,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		E00000000000000000000015 /* Build configuration list for PBXProject "eMotion" */ = {
+		E00000000000000000000015 /* Build configuration list for PBXProject "Twine" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E00000000000000000000016 /* Debug */,
@@ -297,7 +297,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E00000000000000000000011 /* Build configuration list for PBXNativeTarget "eMotion" */ = {
+		E00000000000000000000011 /* Build configuration list for PBXNativeTarget "Twine" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E00000000000000000000018 /* Debug */,

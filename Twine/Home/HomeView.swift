@@ -3,7 +3,7 @@ import AppKit
 import MotionModel
 import Theme
 
-/// What the app opens onto: every project in `eMotion Creations`, as a shelf,
+/// What the app opens onto: every project in `Twine Creations`, as a shelf,
 /// with its folders down the sidebar, laid out as re-Flip's home screen is.
 /// Cards drag onto a folder, or onto All Projects to come out of one.
 struct HomeView: View {

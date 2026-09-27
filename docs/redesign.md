@@ -1,8 +1,8 @@
-# eMotion: redesign the animation model and UI around Jitter-style actions
+# Twine: redesign the animation model and UI around Jitter-style actions
 
 The user's redesign brief of 26 September 2026, kept as written. Answers to the audit questions are in `docs/redesign-decisions.md`, which wins where the two differ.
 
-eMotion currently animates like After Effects: each layer carries its own set of keyframed properties, with stopwatch toggles, keyframe diamonds and auto keyframing. I want to replace that with the model Jitter uses. This document explains the new model, the UI changes, what to remove, and the order to do it in.
+Twine currently animates like After Effects: each layer carries its own set of keyframed properties, with stopwatch toggles, keyframe diamonds and auto keyframing. I want to replace that with the model Jitter uses. This document explains the new model, the UI changes, what to remove, and the order to do it in.
 
 ## 1. How to work with me
 

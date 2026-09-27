@@ -1,11 +1,11 @@
 #!/bin/bash
-# Builds Twine (the eMotion project) and puts a double-clickable copy at
+# Builds Twine and puts a double-clickable copy at
 # build/Twine.app.
 #
 #     ./make-app.sh            Release build
 #     ./make-app.sh debug      Debug build
 #
-# The version is the number of builds listed in eMotion/VersionHistory.swift,
+# The version is the number of builds listed in Twine/VersionHistory.swift,
 # counted here and handed to Xcode, so the About box, the home screen and the
 # bundle can never disagree.
 set -euo pipefail
@@ -16,11 +16,11 @@ case "${1:-release}" in
     *) CONFIG=Release ;;
 esac
 
-VERSION=$(grep -c '^        \.init(date:' eMotion/VersionHistory.swift)
+VERSION=$(grep -c '^        \.init(date:' Twine/VersionHistory.swift)
 
 LOG=build/xcodebuild.log
 mkdir -p build
-if ! xcodebuild -project eMotion.xcodeproj -scheme eMotion -configuration "$CONFIG" \
+if ! xcodebuild -project Twine.xcodeproj -scheme Twine -configuration "$CONFIG" \
         -derivedDataPath build/DerivedData \
         MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$VERSION" \
         build > "$LOG" 2>&1; then

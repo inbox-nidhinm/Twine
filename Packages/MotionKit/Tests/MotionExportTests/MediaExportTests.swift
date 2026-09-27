@@ -9,10 +9,10 @@ import MotionModel
 import MotionRendering
 
 private func temporaryURL(_ ext: String) -> URL {
-    FileManager.default.temporaryDirectory.appendingPathComponent("eMotion-media-\(UUID().uuidString).\(ext)")
+    FileManager.default.temporaryDirectory.appendingPathComponent("Twine-media-\(UUID().uuidString).\(ext)")
 }
 
-/// A one-second, 30 fps, 64 by 64 movie of eMotion's own making: black, with
+/// A one-second, 30 fps, 64 by 64 movie of Twine's own making: black, with
 /// a white bar whose height counts the frames, so a frame shows which one it
 /// is. Frame n is n * 2 pixels tall.
 private func countingProject() -> Project {

@@ -12,7 +12,7 @@ final class AudioMixdown: @unchecked Sendable {
     let input: AVAssetWriterInput
     private let reader: AVAssetReader
     private let output: AVAssetReaderAudioMixOutput
-    private let queue = DispatchQueue(label: "eMotion.export.audio")
+    private let queue = DispatchQueue(label: "Twine.export.audio")
     private let done = DispatchSemaphore(value: 0)
     private var started = false
     private let mix: AudioComposition

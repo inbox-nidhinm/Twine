@@ -1,6 +1,6 @@
 // Makes the app icon from the designer's artwork and writes it as an .icns.
 //
-//     swift Tools/make-app-icon.swift Artwork/AppIcon.png eMotion/Resources/AppIcon.icns
+//     swift Tools/make-app-icon.swift Artwork/AppIcon.png Twine/Resources/AppIcon.icns
 //
 // The artwork is a full-bleed square. It is set into the macOS icon grid, an
 // 824 pt rounded square inside a 1024 pt canvas, with the soft shadow Mac

@@ -2,6 +2,8 @@ import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // Before anything reads a setting or the projects folder.
+        FormerName.carryOver()
         NSApp.appearance = NSAppearance(named: .darkAqua)
         Cursors.useAppArrowEverywhere()
         NSApp.mainMenu = MainMenu.build()

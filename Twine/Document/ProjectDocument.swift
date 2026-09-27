@@ -6,7 +6,7 @@ import MotionRendering
 import ImageIO
 import UniformTypeIdentifiers
 
-/// One open project (`.twine`, or `.emotion` from before the rename).
+/// One open project (a `.twine` package).
 ///
 /// Saving is autosave in place: macOS writes the package back a moment after
 /// each change and again on close and quit, keeps older versions for File >
@@ -99,7 +99,7 @@ final class ProjectDocument: NSDocument {
     /// aside the moment they are imported so the original can move or go.
     private var stagedMedia: [String: URL] = [:]
     private lazy var stagingFolder: URL = FileManager.default.temporaryDirectory
-        .appendingPathComponent("eMotion-media", isDirectory: true)
+        .appendingPathComponent("Twine-media", isDirectory: true)
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
 
     /// Where to read an imported file: its staged copy if it came in this
@@ -201,7 +201,6 @@ final class ProjectDocument: NSDocument {
     func rename(to newName: String) {
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = fileURL, !trimmed.isEmpty, trimmed != name, !trimmed.contains("/") else { return }
-        // The file's own ending, old or new, so its type stays what it opened as.
         let target = url.deletingLastPathComponent()
             .appendingPathComponent(trimmed).appendingPathExtension(url.pathExtension)
         guard !FileManager.default.fileExists(atPath: target.path) else {

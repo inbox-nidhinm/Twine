@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Twine everywhere", changes: [
+            "The old name is gone: the projects folder is now Twine Creations in Documents, moved there with everything in it the first time this build opens, and settings carry over.",
+            "Projects ending in .emotion are no longer opened; none were left.",
+        ]),
         .init(date: "27 September 2026", title: "Steady sound", changes: [
             "The outline under the pointer on the canvas is just a line now, with no light wash over the layer.",
             "Sound no longer stutters as playback starts: it starts exactly with the playhead instead of catching up in little jumps.",
@@ -70,7 +74,7 @@ enum VersionHistory {
         .init(date: "27 September 2026", title: "Folders", changes: [
             "The home screen has folders, down the left under All Projects. + makes one and names it; right-click a folder to rename it, show it in Finder or move it to the Trash with its projects.",
             "Drag a project card onto a folder to put it in, or onto All Projects to take it out, or right-click a card and choose a folder under Move to.",
-            "All Projects still shows every project, and each card says which folder it is in. Folders are real folders inside eMotion Creations, so the Finder shows the same.",
+            "All Projects still shows every project, and each card says which folder it is in. Folders are real folders inside Twine Creations, so the Finder shows the same.",
         ]),
         .init(date: "27 September 2026", title: "One window", changes: [
             "Twine is one window now. Opening a project turns the home screen into the editor, and the Home button (or ⇧⌘H) saves the project and turns it back, with a short fade either way.",
@@ -125,7 +129,7 @@ enum VersionHistory {
             "A preset only adds ordinary actions, on new rows, selected and played through, so every part of it can be retimed, re-eased or deleted like any other action. It works from the layer as it looks at the playhead, wherever it is and however faded.",
         ]),
         .init(date: "26 September 2026", title: "Keyboard shortcuts card", changes: [
-            "Help > Keyboard Shortcuts (⌘/) shows every eMotion shortcut on one card, grouped by where it works: modes and tools, view, the canvas, arranging, playback, the timeline and the project. Escape, ⌘/ or a click outside closes it.",
+            "Help > Keyboard Shortcuts (⌘/) shows every Twine shortcut on one card, grouped by where it works: modes and tools, view, the canvas, arranging, playback, the timeline and the project. Escape, ⌘/ or a click outside closes it.",
             "The Pen tool's greyed-out button is gone from the toolbar, since the pen tool is no longer planned.",
         ]),
         .init(date: "26 September 2026", title: "Export part of the scene", changes: [
@@ -145,10 +149,10 @@ enum VersionHistory {
         ]),
         .init(date: "26 September 2026", title: "New rows come into view", changes: [
             "When a new action's row lands below what the timeline shows, the timeline scrolls down to it, so you always see what you added.",
-            "eMotion's arrow now really is the pointer over the side panels and the timeline too. Those parts put the system arrow back on every move; the app now hands them its own whenever they ask for the arrow.",
+            "Twine's arrow now really is the pointer over the side panels and the timeline too. Those parts put the system arrow back on every move; the app now hands them its own whenever they ask for the arrow.",
         ]),
         .init(date: "26 September 2026", title: "One pointer", changes: [
-            "eMotion's own arrow is the pointer everywhere in the app: panels, timeline, home screen and canvas. It no longer switches to the system arrow as it crosses from one to another. Text fields keep the text cursor.",
+            "Twine's own arrow is the pointer everywhere in the app: panels, timeline, home screen and canvas. It no longer switches to the system arrow as it crosses from one to another. Text fields keep the text cursor.",
         ]),
         .init(date: "26 September 2026", title: "Gliding playhead", changes: [
             "A click on the ruler or on empty timeline slides the playhead to that point in a fifth of a second, rather than jumping. Dragging still scrubs directly.",
@@ -297,7 +301,7 @@ enum VersionHistory {
             "Section headers are real buttons, so a click anywhere on the row folds them.",
         ]),
         .init(date: "25 September 2026", title: "The foundation", changes: [
-            "A home screen of every project in eMotion Creations, newest first, with open, rename, duplicate, show in Finder and move to Trash.",
+            "A home screen of every project in Twine Creations, newest first, with open, rename, duplicate, show in Finder and move to Trash.",
             "New projects are written to disk the moment they are made and save themselves from then on. Closing a window never asks a question, and File > Revert To browses older versions.",
             "The project file is a package: document.json with a format version, and a media folder for imported files.",
             "Every change goes through one set of commands, so every change can be undone. A drag or a colour pick undoes as one step.",

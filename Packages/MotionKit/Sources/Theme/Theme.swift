@@ -1,11 +1,11 @@
 import SwiftUI
 import AppKit
 
-/// Every colour, size, radius and type style in eMotion, in one place.
+/// Every colour, size, radius and type style in Twine, in one place.
 ///
 /// Taken from the "Flip Design System" page of the JUI Figma file
 /// (2XErpBfGuIGNU0DkL58Ute, node 171:2055), whose values in turn come from
-/// Flip's `FlipTheme`. The one deliberate difference is the accent: eMotion is
+/// Flip's `FlipTheme`. The one deliberate difference is the accent: Twine is
 /// light blue where Flip is green, and the two tokens derived from the accent
 /// (`rowSelected`, `accentHover`) are re-derived to match.
 ///

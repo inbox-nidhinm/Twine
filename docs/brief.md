@@ -1,11 +1,11 @@
-# eMotion brief
+# Twine brief
 
 The kickoff brief as written by Nidhin, followed by the decisions made while answering the kickoff questions (25 September 2026). Where the two differ, the decisions win.
 
 ## Decisions from kickoff
 
-- Project at `Documents/Claude Code/eMotion`, its own repository, pushed to private GitHub `inbox-nidhinm/eMotion` after each milestone.
-- Xcode project plus `make-app.sh` for a double-clickable build. Bundle `com.nidhin.emotion`, files `Name.emotion`. Signed to run on this Mac only; no sandbox.
+- Project at `Documents/Claude Code/Twine`, its own repository, pushed to private GitHub `inbox-nidhinm/Twine` after each milestone.
+- Xcode project plus `make-app.sh` for a double-clickable build. Bundle `com.nidhin.twine`, files `Name.twine`. Signed to run on this Mac only; no sandbox.
 - In-app Version History, as in Flip.
 - Design tokens from the "Flip Design System" page of Figma file `2XErpBfGuIGNU0DkL58Ute` (node 171:2055), with a light blue accent instead of Flip's green. Placeholder icons for now; do not reuse Flip's icons. Dark only. Placeholder app icon. PP Kyoto Light for display type.
 - A home screen at launch.

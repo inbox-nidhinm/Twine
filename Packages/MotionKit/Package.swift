@@ -1,7 +1,7 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
-// The layers of eMotion that do not need the app to exist. Each is its own
+// The layers of Twine that do not need the app to exist. Each is its own
 // module so the compiler enforces the direction of every dependency: the model
 // knows nothing, editing knows the model, and nothing here knows about views
 // except Theme, which is only tokens and drawing primitives.

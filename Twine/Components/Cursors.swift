@@ -21,7 +21,7 @@ enum Cursors {
         let mine = arrow
         guard mine !== NSCursor.arrow,
               let original = class_getClassMethod(NSCursor.self, #selector(getter: NSCursor.arrow)),
-              let replacement = class_getClassMethod(NSCursor.self, #selector(NSCursor.emotionArrow)) else { return }
+              let replacement = class_getClassMethod(NSCursor.self, #selector(NSCursor.twineArrow)) else { return }
         NSCursor.appArrow = mine
         method_exchangeImplementations(original, replacement)
     }
@@ -87,9 +87,9 @@ extension NSCursor {
     /// has run. Set once at launch, on the main thread, before anything reads it.
     nonisolated(unsafe) fileprivate static var appArrow: NSCursor?
 
-    @objc nonisolated fileprivate class func emotionArrow() -> NSCursor {
+    @objc nonisolated fileprivate class func twineArrow() -> NSCursor {
         // After the swap this runs as `NSCursor.arrow`, and the name
-        // `emotionArrow` runs the system's original.
-        appArrow ?? emotionArrow()
+        // `twineArrow` runs the system's original.
+        appArrow ?? twineArrow()
     }
 }

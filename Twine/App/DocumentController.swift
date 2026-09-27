@@ -1,6 +1,6 @@
 import AppKit
 
-/// Makes File > New write a real project into `eMotion Creations` straight
+/// Makes File > New write a real project into `Twine Creations` straight
 /// away, instead of opening an untitled document that asks where to save it
 /// on close.
 final class DocumentController: NSDocumentController {

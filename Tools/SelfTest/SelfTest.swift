@@ -5,7 +5,7 @@ import MotionEvaluation
 
 // Test driver for the separate test copy of the app. Installed into the app
 // by Tools/SelfTest/install-hook.sh and taken out again by remove-hook.sh;
-// never committed inside eMotion/. Runs a script of clicks,
+// never committed inside Twine/. Runs a script of clicks,
 // keys and seeks in one window, and pauses at each "shot" until the
 // screenshot it asked for exists.
 nonisolated func log(_ s: String) { FileHandle.standardError.write(Data((s + "\n").utf8)) }
@@ -22,8 +22,8 @@ enum SelfTest {
     nonisolated(unsafe) static var started = false
 
     static func run(window: NSWindow, controller: EditorController, menus: MenuHost) {
-        guard !started, let script = ProcessInfo.processInfo.environment["EMOTION_SELFTEST"],
-              let shots = ProcessInfo.processInfo.environment["EMOTION_SHOTS"] else { return }
+        guard !started, let script = ProcessInfo.processInfo.environment["TWINE_SELFTEST"],
+              let shots = ProcessInfo.processInfo.environment["TWINE_SHOTS"] else { return }
         started = true
         let steps = script.split(separator: ";").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         let held = Held()

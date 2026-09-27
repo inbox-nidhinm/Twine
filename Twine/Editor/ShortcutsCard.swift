@@ -1,7 +1,7 @@
 import SwiftUI
 import Theme
 
-/// eMotion's own shortcuts, grouped by where they work, on a card over the
+/// Twine's own shortcuts, grouped by where they work, on a card over the
 /// window (Help > Keyboard Shortcuts, ⌘/). Only the app's: Copy, Paste,
 /// Undo and the like work as everywhere on the Mac and are left out.
 struct ShortcutsCard: View {

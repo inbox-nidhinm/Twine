@@ -7,7 +7,7 @@
 # Starts sampling DELAY seconds after launch, for SECONDS. Writes
 # $OUT/NAME.sample.txt and prints the ranking.
 HERE="$(cd "$(dirname "$0")" && pwd)"
-OUTROOT=${EMOTION_TEST_OUT:-${TMPDIR%/}/emotion-selftest}
+OUTROOT=${TWINE_TEST_OUT:-${TMPDIR%/}/twine-selftest}
 N="Twine""Test"
 pkill -x "$N"; sleep 2
 $HERE/run.sh $1 $2 "$3" >/dev/null 2>&1 &

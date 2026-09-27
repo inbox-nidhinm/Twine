@@ -674,8 +674,8 @@ final class EditorController {
         perform(.batch([.updateActions(ActionEditing.staggered(ordered, gap: gap, rate: frameRate))], name: "Stagger"))
     }
 
-    static let actionPasteboardType = NSPasteboard.PasteboardType("com.nidhin.emotion.actions")
-    static let easingPasteboardType = NSPasteboard.PasteboardType("com.nidhin.emotion.easing")
+    static let actionPasteboardType = NSPasteboard.PasteboardType("com.nidhin.twine.actions")
+    static let easingPasteboardType = NSPasteboard.PasteboardType("com.nidhin.twine.easing")
 
     /// Actions whose easing can be copied from or pasted onto: not instant,
     /// and not a Play, which runs at its clip's speed.
@@ -970,7 +970,7 @@ final class EditorController {
 
     // MARK: Clipboard
 
-    static let pasteboardType = NSPasteboard.PasteboardType("com.nidhin.emotion.layers")
+    static let pasteboardType = NSPasteboard.PasteboardType("com.nidhin.twine.layers")
 
     /// What goes on the pasteboard: the layers and the actions on them and
     /// on everything inside them.

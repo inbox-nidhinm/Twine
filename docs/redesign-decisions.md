@@ -57,4 +57,4 @@ Answers to the audit questions for the Jitter-style redesign (26 September 2026)
 
 ## Housekeeping
 
-- Old projects show a plain message and do not open. My test projects in eMotion Creations may be deleted.
+- Old projects show a plain message and do not open. My test projects in Twine Creations may be deleted.

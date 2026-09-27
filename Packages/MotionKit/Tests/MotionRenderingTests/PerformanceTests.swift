@@ -94,10 +94,10 @@ struct SeededRandom {
 }
 
 /// Timings for the heavy scene, run only when asked for with
-/// `EMOTION_BENCH=1 swift test --filter PerformanceTests`. Prints
-/// milliseconds per frame for each stage; `EMOTION_BENCH_OUT` also writes
+/// `TWINE_BENCH=1 swift test --filter PerformanceTests`. Prints
+/// milliseconds per frame for each stage; `TWINE_BENCH_OUT` also writes
 /// the scene's document, to open in the app.
-@Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["EMOTION_BENCH"] != nil))
+@Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["TWINE_BENCH"] != nil))
 struct PerformanceTests {
     private func ms(_ seconds: Double, frames: Int) -> String { String(format: "%.3f ms", seconds / Double(frames) * 1000) }
 
@@ -105,7 +105,7 @@ struct PerformanceTests {
         let project = stressProject()
         let all = project.allLayers.count
         print("BENCH scene: \(all) layers, \(project.actions.count) actions")
-        if let out = ProcessInfo.processInfo.environment["EMOTION_BENCH_OUT"] {
+        if let out = ProcessInfo.processInfo.environment["TWINE_BENCH_OUT"] {
             try ProjectFormat.encode(project).write(to: URL(fileURLWithPath: out))
         }
         let frames = 240

@@ -3,12 +3,12 @@
 # line that starts it when a project window opens. Undo with remove-hook.sh
 # before committing.
 cd "$(dirname "$0")/../.."
-cp Tools/SelfTest/SelfTest.swift eMotion/App/SelfTest.swift
-grep -q "SelfTest.run" eMotion/Document/EditorWindowController.swift || python3 - <<'PY'
-p='eMotion/Document/EditorWindowController.swift'
+cp Tools/SelfTest/SelfTest.swift Twine/App/SelfTest.swift
+grep -q "SelfTest.run" Twine/Document/EditorWindowController.swift || python3 - <<'PY'
+p='Twine/Document/EditorWindowController.swift'
 s=open(p).read()
 s=s.replace("        if let window { TrafficLights.retry(in: window) }\n    }\n",
             "        if let window { TrafficLights.retry(in: window) }\n        if let window { SelfTest.run(window: window, controller: controller, menus: menus) }\n    }\n",1)
 open(p,'w').write(s)
 PY
-grep -c "SelfTest.run" eMotion/Document/EditorWindowController.swift
+grep -c "SelfTest.run" Twine/Document/EditorWindowController.swift

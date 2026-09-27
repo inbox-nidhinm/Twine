@@ -2,9 +2,9 @@ import Foundation
 
 /// The on-disk shape of a project.
 ///
-/// A `.emotion` file is a folder that Finder shows as one file:
+/// A `.twine` file is a folder that Finder shows as one file:
 ///
-///     Name.emotion/
+///     Name.twine/
 ///         document.json      the project, with its format version
 ///         media/             every imported file, named by asset id
 ///         thumbnail.png      for the home screen, written when there is a renderer
@@ -31,12 +31,8 @@ public enum ProjectFormat {
     public static let thumbnailFileName = "thumbnail.png"
     public static let fileExtension = "twine"
     public static let typeIdentifier = "com.nidhin.twine.project"
-    /// The ending projects had while the app was called eMotion. Such files
-    /// still open, and save under the name they have.
-    public static let olderFileExtension = "emotion"
-    public static let olderTypeIdentifier = "com.nidhin.emotion.project"
     /// Every ending a project can have.
-    public static let readableExtensions = [fileExtension, olderFileExtension]
+    public static let readableExtensions = [fileExtension]
 
     public static func encode(_ project: Project) throws -> Data {
         let encoder = JSONEncoder()
@@ -90,8 +86,8 @@ public enum ProjectFileError: Error, Equatable, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .unreadable(let why): return "The project could not be read. \(why)"
-        case .newerVersion: return "This project was saved by a newer version of eMotion."
-        case .olderVersion: return "This project was made with an earlier version of eMotion, before animation moved to actions, and can no longer be opened."
+        case .newerVersion: return "This project was saved by a newer version of Twine."
+        case .olderVersion: return "This project was made with an earlier version of Twine, before animation moved to actions, and can no longer be opened."
         case .missingMigration(let v): return "Projects saved in format \(v) cannot be opened by this version."
         case .missingDocument: return "The project is missing its document.json."
         }
