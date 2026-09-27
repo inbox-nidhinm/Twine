@@ -19,7 +19,9 @@ N="Twine""Test"
 pkill -x "$N"; sleep 1.5
 mkdir -p $OUTROOT; rm -rf $OUT $OUTROOT/$FILE; mkdir -p $OUT
 cp -R $SRC $OUTROOT/$FILE
-(EMOTION_SHOTS=$OUT EMOTION_SELFTEST="$3" "$APP/Contents/MacOS/$N" > $LOG 2>&1 &)
+# The test copy keeps its projects in a folder of its own, never the one in use.
+CREATIONS=${EMOTION_TEST_CREATIONS:-$OUTROOT/Creations}; mkdir -p "$CREATIONS"
+(EMOTION_CREATIONS="$CREATIONS" EMOTION_SHOTS=$OUT EMOTION_SELFTEST="$3" "$APP/Contents/MacOS/$N" > $LOG 2>&1 &)
 sleep 1.5; open -g -a "$APP" $OUTROOT/$FILE
 W=""
 for i in {1..900}; do

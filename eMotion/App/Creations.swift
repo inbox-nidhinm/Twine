@@ -1,13 +1,19 @@
 import Foundation
 import MotionModel
 
-/// `~/Documents/eMotion Creations`, where every project lives.
+/// `~/Documents/eMotion Creations`, where every project lives, loose or in
+/// a folder of its own one level down.
 ///
 /// A new project is written here the moment it is made, with a name and no
 /// dialog, and saves itself from then on. Nothing ever sits unsaved, and
 /// closing a window never asks a question.
 enum Creations {
     static var folder: URL {
+        // The test copy is pointed somewhere else, so it never touches the
+        // projects in use.
+        if let override = ProcessInfo.processInfo.environment["EMOTION_CREATIONS"] {
+            return URL(fileURLWithPath: override, isDirectory: true)
+        }
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return documents.appendingPathComponent("eMotion Creations", isDirectory: true)
     }

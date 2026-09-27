@@ -11,6 +11,8 @@ Tools/SelfTest/run.sh Actions t1 "wait 1;key m;seek 1;shot a"
 Tools/SelfTest/remove-hook.sh               # always, before committing
 ```
 
+The test copy's home screen lists `$OUTROOT/Creations` (or `$EMOTION_TEST_CREATIONS`), set through `EMOTION_CREATIONS`, so it never sees or changes the projects in use.
+
 `run.sh PROJECT NAME "steps"` copies the project first (from `Projects/`, or any `.twine` or `.emotion` path, which is never changed), opens it in the test copy in the background, runs the steps, and prints the state after each one: selection with positions, actions, mode, tool, time, export, menu, hover, first responder. Screenshots from `shot X` go to `$EMOTION_TEST_OUT/NAME/X.png` (default a folder in `$TMPDIR`), the log to `NAME.log`. Screenshots come out at 1× or 2×; scale to 1440 wide (`ffmpeg -vf "scale=1440:-1,crop=w:h:x:y"`) to read coordinates, which are window points from the top-left.
 
 Projects: `Actions` (two layers with Move, Rotate, Opacity, Scale, Hide), `Blank`, `Mask` (stripes and a spot), `Style` (bars, card, blob, ring with style and blur actions), `Text`. The heavy performance scene is made by the benchmark: `cd Packages/MotionKit && EMOTION_BENCH=1 EMOTION_BENCH_OUT=/path/document.json swift test -c release --filter PerformanceTests`, then put that `document.json` in a `Name.twine` folder.
@@ -25,6 +27,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `wait S` | Waits S seconds after this step (the default is half a second) |
 | `seek T` | Moves the playhead |
 | `click X Y`, `rclick X Y` | A click or right-click |
+| `qclick X Y`, `qrclick X Y` | The same, sent through the app's event queue like a real click: needed for right-click menus over SwiftUI views (home screen cards and folders), which look at the current event |
 | `drag X1 Y1 X2 Y2` | A drag in ten steps |
 | `down X Y`, `to X Y`, `up X Y` | A held drag, a step at a time, for screenshots mid-drag |
 | `open X Y`, `pick X Y` | Clicks until the app's menu opens, or closes |
@@ -38,6 +41,8 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `import PATH`, `save` | Imports media, saves |
 | `actions`, `spec`, `text` | Logs every action, the selected actions' specs, the selected text layer |
 | `path`, `path xy` | Logs the selected shape's points, style and box, and whether its points are showing or being drawn; `xy` adds each point's and handle's place in the window, to click on |
+| `moveproject NAME FOLDER`, `showfolder FOLDER` | Moves a home screen project into a folder (`-` for out of one), as a drop does; shows a folder (`-` for All Projects) |
+| `library` | Logs the home screen's folders (with counts), which is showing, and every project with its folder |
 | `home`, `openfile PATH` | Turns the window to the home screen, as the Home button does; opens a project in the window, as the Finder does (never point it at a real project) |
 | `offers` | Logs what Add Action and Add Preset offer for the selection |
 | `add KIND` | Adds an action by its kind's name (`move`, `path`, `volume`...), as the Add Action menu does |

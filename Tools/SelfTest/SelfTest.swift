@@ -124,6 +124,18 @@ enum SelfTest {
             case "clear": for _ in 0..<14 { key("\u{7f}", 51); key("\u{f728}", 117) }
             case "click": mouse(.leftMouseDown, n[0], n[1]); mouse(.leftMouseUp, n[0], n[1])
             case "rclick": mouse(.rightMouseDown, n[0], n[1]); mouse(.rightMouseUp, n[0], n[1])
+            case "qrclick", "qclick":
+                // Through the app's event queue, as a real click comes, so
+                // views that look at the current event (right-click menus
+                // over SwiftUI) see it for what it is.
+                let p = NSPoint(x: n[0], y: window.contentView!.bounds.height - n[1])
+                let (down, up): (NSEvent.EventType, NSEvent.EventType) = parts[0] == "qrclick" ? (.rightMouseDown, .rightMouseUp) : (.leftMouseDown, .leftMouseUp)
+                for type in [down, up] {
+                    if let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: held.flags, timestamp: ProcessInfo.processInfo.systemUptime,
+                                                  windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: held.clicks, pressure: 1) {
+                        NSApp.postEvent(e, atStart: false)
+                    }
+                }
             case "drag":
                 mouse(.leftMouseDown, n[0], n[1])
                 for k in 1...10 {
@@ -471,6 +483,20 @@ enum SelfTest {
                     }.joined(separator: " ")
                 }
                 log(line)
+            case "library":
+                // The home screen's folders and projects, each with its folder.
+                let lib = HomeWindowController.shared.library
+                log("LIBRARY folders=\(lib.folders.map { "\($0.name)(\(lib.count(in: $0)))" }) shown=\(lib.selectedFolder?.lastPathComponent ?? "All") items=\(lib.items.map { "\($0.folder?.lastPathComponent ?? "-")/\($0.name)" }.sorted())")
+            case "moveproject":
+                // Moves a home screen project into a folder by name, or out with "-",
+                // as dropping its card on a folder or All Projects does.
+                let lib = HomeWindowController.shared.library
+                if let item = lib.items.first(where: { $0.name == parts[1] }) {
+                    lib.move(item.url, to: parts[2] == "-" ? nil : lib.folders.first { $0.name == parts[2] }?.url)
+                } else { log("no project \(parts[1])") }
+            case "showfolder":
+                let lib = HomeWindowController.shared.library
+                lib.selectedFolder = parts[1] == "-" ? nil : lib.folders.first { $0.name == parts[1] }?.url
             case "home":
                 // Home, as the layers panel's button does.
                 HomeWindowController.shared.showWindow(nil)

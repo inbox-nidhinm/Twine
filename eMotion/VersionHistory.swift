@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "Folders", changes: [
+            "The home screen has folders, down the left under All Projects. + makes one and names it; right-click a folder to rename it, show it in Finder or move it to the Trash with its projects.",
+            "Drag a project card onto a folder to put it in, or onto All Projects to take it out, or right-click a card and choose a folder under Move to.",
+            "All Projects still shows every project, and each card says which folder it is in. Folders are real folders inside eMotion Creations, so the Finder shows the same.",
+        ]),
         .init(date: "27 September 2026", title: "One window", changes: [
             "Twine is one window now. Opening a project turns the home screen into the editor, and the Home button (or ⇧⌘H) saves the project and turns it back, with a short fade either way.",
             "One project is open at a time: opening another, from the home screen or the Finder, saves the first and takes its place. Closing the window quits Twine.",
