@@ -276,10 +276,11 @@ struct HomeView: View {
     private func projectCard(_ item: Library.Item) -> some View {
         let lit = hovered == item.url || renaming == item.url
         return VStack(alignment: .leading, spacing: 0) {
-            ProjectThumbnail(item: item)
-                .frame(width: card - cardPad * 2, height: card - cardPad * 2)
-                .background(RoundedRectangle(cornerRadius: thumbRadius).fill(Theme.panelRaised))
-                .clipShape(RoundedRectangle(cornerRadius: thumbRadius))
+            // No ground of its own: the picture keeps its shape, as wide as
+            // the card and as tall as that makes it, up to a square for a
+            // tall one, with nothing filling around it.
+            ProjectThumbnail(item: item, side: card - cardPad * 2, radius: thumbRadius)
+                .frame(width: card - cardPad * 2)
 
             Group {
                 if renaming == item.url {
@@ -360,24 +361,39 @@ struct HomeView: View {
 
 /// The saved thumbnail when there is one; otherwise the composition's shape
 /// and ground, so an empty project still looks like its own frame. Fitted
-/// inside the card's square, on the raised grey, as re-Flip's are.
+/// inside the card's square with its own rounded corners and nothing behind.
 private struct ProjectThumbnail: View {
     let item: Library.Item
+    /// The widest and tallest it may be.
+    let side: CGFloat
+    let radius: CGFloat
+
+    /// Width over height: the picture's, or the composition's.
+    private var aspect: CGFloat {
+        if let size = item.thumbnail?.size, size.width > 0, size.height > 0 { return size.width / size.height }
+        if let c = item.composition, c.width > 0, c.height > 0 { return CGFloat(c.width) / CGFloat(c.height) }
+        return 16 / 9
+    }
+
+    /// Sized from its proportions rather than by fitting into a square, which
+    /// would hold the whole square open around a wide picture.
+    private var size: CGSize {
+        aspect >= 1 ? CGSize(width: side, height: side / aspect) : CGSize(width: side * aspect, height: side)
+    }
 
     var body: some View {
-        ZStack {
+        Group {
             if let thumbnail = item.thumbnail {
-                Image(nsImage: thumbnail).resizable().scaledToFit()
+                Image(nsImage: thumbnail).resizable()
+            } else if let composition = item.composition, composition.background.isTransparent {
+                Checkerboard(cell: 4)
             } else if let composition = item.composition {
-                Group {
-                    if composition.background.isTransparent {
-                        Checkerboard(cell: 4)
-                    } else {
-                        Rectangle().fill(composition.background.color.opaque)
-                    }
-                }
-                .aspectRatio(CGFloat(composition.width) / CGFloat(composition.height), contentMode: .fit)
+                Rectangle().fill(composition.background.color.opaque)
+            } else {
+                Rectangle().fill(Theme.panelRaised)
             }
         }
+        .frame(width: size.width, height: size.height)
+        .clipShape(RoundedRectangle(cornerRadius: radius))
     }
 }

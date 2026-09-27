@@ -25,7 +25,7 @@ enum VersionHistory {
     static let builds: [Build] = [
         .init(date: "27 September 2026", title: "Home screen like re-Flip's", changes: [
             "The home screen now looks like re-Flip's: plain rows down the sidebar, and a dim New Folder row under the folders, which you click and type the new folder's name into.",
-            "Project cards have a bigger, square thumbnail, sit on the background until the pointer is over them, and show the date without the time.",
+            "Project cards have a bigger thumbnail, keeping the picture's own shape with nothing filling its sides, sit on the background until the pointer is over them, and show the date without the time.",
         ]),
         .init(date: "27 September 2026", title: "Folders", changes: [
             "The home screen has folders, down the left under All Projects. + makes one and names it; right-click a folder to rename it, show it in Finder or move it to the Trash with its projects.",
