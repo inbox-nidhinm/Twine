@@ -12,9 +12,10 @@ import MotionExport
 ///
 /// The sound is set going at a moment on the host clock, the one the
 /// playhead's display clock runs on, a little ahead so it is ready, and
-/// drift is only judged once it has had time to start. Seeking and playing
-/// straight away instead left the player a beat behind while it started,
-/// which read as drift and sent it back again: the stutter.
+/// drift is only judged once it has had time to start, and not at all past
+/// where the sound runs out. The stutter was the player, stopped at its end,
+/// being sought on every frame and then, on the next loop, only nudged
+/// along in jumps without ever playing again.
 @MainActor
 final class AudioPreview {
     private var player: AVPlayer?
