@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "27 September 2026", title: "The .twine file", changes: [
+            "New projects end in .twine, shown in Finder as Twine projects. Projects that still end in .emotion open and save just as before.",
+        ]),
         .init(date: "27 September 2026", title: "Twine", changes: [
             "The app is now called Twine, with a new icon: in the Dock, in Finder, in the menus and on the home screen.",
             "Projects keep their .emotion ending and stay in the eMotion Creations folder, so everything made so far opens as before, and every setting is kept.",

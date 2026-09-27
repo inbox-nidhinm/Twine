@@ -4,7 +4,7 @@
 #     run.sh PROJECT NAME "step;step;..."
 #
 # PROJECT is a folder in Projects (Actions, Blank, Mask, Style, Text) or a
-# path to any .emotion package, which is copied first so the original is never
+# path to any .twine or .emotion package, which is copied first so the original is never
 # touched. Screenshots asked for with "shot X" land in $OUT/NAME/X.png and the
 # log in $OUT/NAME.log, where OUT is $EMOTION_TEST_OUT or a folder in $TMPDIR.
 # Prints the state after every step.
@@ -12,7 +12,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 APP="$HERE/../../build/TwineTest.app"
 OUTROOT=${EMOTION_TEST_OUT:-${TMPDIR%/}/emotion-selftest}
 PROJECT=$1; NAME=$2
-[[ -d $PROJECT ]] && SRC=$PROJECT || SRC=$HERE/Projects/$PROJECT.emotion
+[[ -d $PROJECT ]] && SRC=$PROJECT || SRC=$HERE/Projects/$PROJECT.twine
 FILE=$(basename $SRC)
 OUT=$OUTROOT/$NAME; LOG=$OUTROOT/$NAME.log
 N="Twine""Test"

@@ -21,6 +21,7 @@
             <true/>
             <key>LSItemContentTypes</key>
             <array>
+                <string>com.nidhin.twine.project</string>
                 <string>com.nidhin.emotion.project</string>
             </array>
             <key>NSDocumentClass</key>
@@ -29,6 +30,25 @@
     </array>
     <key>UTExportedTypeDeclarations</key>
     <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.nidhin.twine.project</string>
+            <key>UTTypeDescription</key>
+            <string>Twine Project</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>com.apple.package</string>
+                <string>public.composite-content</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>twine</string>
+                </array>
+            </dict>
+        </dict>
+        <!-- Projects made while the app was called eMotion. -->
         <dict>
             <key>UTTypeIdentifier</key>
             <string>com.nidhin.emotion.project</string>

@@ -27,8 +27,14 @@ public enum ProjectFormat {
     public static let documentFileName = "document.json"
     public static let mediaFolderName = "media"
     public static let thumbnailFileName = "thumbnail.png"
-    public static let fileExtension = "emotion"
-    public static let typeIdentifier = "com.nidhin.emotion.project"
+    public static let fileExtension = "twine"
+    public static let typeIdentifier = "com.nidhin.twine.project"
+    /// The ending projects had while the app was called eMotion. Such files
+    /// still open, and save under the name they have.
+    public static let olderFileExtension = "emotion"
+    public static let olderTypeIdentifier = "com.nidhin.emotion.project"
+    /// Every ending a project can have.
+    public static let readableExtensions = [fileExtension, olderFileExtension]
 
     public static func encode(_ project: Project) throws -> Data {
         let encoder = JSONEncoder()

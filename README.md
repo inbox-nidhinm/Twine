@@ -15,10 +15,10 @@ open build/Twine.app
 
 Projects live in `~/Documents/eMotion Creations`. A new project is written there the moment it is made and saves itself about a second after every change, so nothing is ever unsaved and closing a window never asks a question. File > Revert To browses older versions.
 
-A project file (`Name.emotion`) is a folder that the Finder shows as one file:
+A project file (`Name.twine`) is a folder that the Finder shows as one file. Projects made before the app was renamed end in `.emotion`; they open and save just the same:
 
 ```
-Name.emotion/
+Name.twine/
     document.json    the project, with a formatVersion
     media/           imported images, video and audio
     thumbnail.png    for the home screen (from milestone 2)

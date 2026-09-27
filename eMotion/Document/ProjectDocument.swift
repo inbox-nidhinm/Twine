@@ -176,8 +176,9 @@ final class ProjectDocument: NSDocument {
     func rename(to newName: String) {
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = fileURL, !trimmed.isEmpty, trimmed != name, !trimmed.contains("/") else { return }
+        // The file's own ending, old or new, so its type stays what it opened as.
         let target = url.deletingLastPathComponent()
-            .appendingPathComponent(trimmed).appendingPathExtension(ProjectFormat.fileExtension)
+            .appendingPathComponent(trimmed).appendingPathExtension(url.pathExtension)
         guard !FileManager.default.fileExists(atPath: target.path) else {
             NSSound.beep()
             return

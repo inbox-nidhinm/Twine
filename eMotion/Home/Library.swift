@@ -29,7 +29,7 @@ final class Library {
                                                 options: [.skipsHiddenFiles])) ?? []
         // A project is a folder, so it is picked out by its extension rather
         // than by whether it is a directory.
-        let found = urls.filter { $0.pathExtension == ProjectFormat.fileExtension }.map { url in
+        let found = urls.filter { ProjectFormat.readableExtensions.contains($0.pathExtension) }.map { url in
             let document = url.appendingPathComponent(ProjectFormat.documentFileName)
             let modified = (try? document.resourceValues(forKeys: [.contentModificationDateKey]))?
                 .contentModificationDate ?? .distantPast
@@ -59,8 +59,9 @@ final class Library {
         if let open = openDocument(at: item.url) {
             open.rename(to: trimmed)
         } else {
+            // Renaming keeps the file's own ending, old or new.
             let target = item.url.deletingLastPathComponent()
-                .appendingPathComponent(trimmed).appendingPathExtension(ProjectFormat.fileExtension)
+                .appendingPathComponent(trimmed).appendingPathExtension(item.url.pathExtension)
             guard !FileManager.default.fileExists(atPath: target.path) else { return NSSound.beep() }
             do { try FileManager.default.moveItem(at: item.url, to: target) } catch { NSApp.presentError(error) }
         }
