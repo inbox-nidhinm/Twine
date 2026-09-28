@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Tidier inspector sections", changes: [
+            "An empty section, such as Stroke, Effects or Mask with nothing added, has its name centred between its lines.",
+            "The last section in the layer inspector has a line under it too.",
+            "Back to Presets has a line under it, apart from the action's own settings.",
+        ]),
         .init(date: "28 September 2026", title: "Quicker hex fields", changes: [
             "Clicking a hex field selects its digits, so typing or pasting replaces them straight away, as number fields already did.",
             "A short hex code fills out the rest: 0 becomes 000000, 1a becomes 1A1A1A and abc becomes AABBCC.",

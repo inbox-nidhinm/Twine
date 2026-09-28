@@ -27,6 +27,7 @@ struct ActionInspector: View {
         VStack(alignment: .leading, spacing: 0) {
             if let pickPreset, !controller.availablePresets.isEmpty {
                 BackToPresets(action: pickPreset)
+                PanelDivider()
             }
             HeaderRow(title: actions.count == 1 ? first.name : sameKind ? kindName : "Actions") {
                 if !newActions.isEmpty { AddActionButton(entries: newActions) }
@@ -94,7 +95,7 @@ private struct BackToPresets: View {
         .onHover { hovering = $0 }
         .help("Picks a preset to add to the layer at the playhead")
         .padding(.horizontal, Theme.panelPad)
-        .frame(height: Theme.button, alignment: .bottomLeading)
+        .frame(height: Theme.button, alignment: .leading)
     }
 }
 

@@ -698,6 +698,14 @@ extension View {
             .padding(.trailing, Theme.buttonInset + Theme.rowGutter)
     }
 
+    /// A section's space under its rows. A section with nothing but its
+    /// header (no stroke, no effects) splits it above and below instead, so
+    /// the name sits centred between the dividers, at the same height.
+    func sectionPadding(empty: Bool = false) -> some View {
+        padding(.top, empty ? Theme.panelPad / 2 : 0)
+            .padding(.bottom, empty ? Theme.panelPad / 2 : Theme.panelPad)
+    }
+
     /// A row with a button that acts on it, placed in the button column
     /// level with the row. The row is laid out on a grid body, so the
     /// button reaches out into the column the body leaves free.

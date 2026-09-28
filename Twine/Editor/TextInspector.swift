@@ -338,7 +338,7 @@ struct TextStrokeSection: View {
                 .gridBody()
             }
         }
-        .padding(.bottom, Theme.panelPad)
+        .sectionPadding(empty: text.stroke == nil)
     }
 
     static func color(of stroke: Stroke) -> RGBA {

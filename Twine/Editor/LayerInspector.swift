@@ -64,6 +64,7 @@ struct LayerInspector: View {
                 PanelDivider()
                 MaskSection(layer: layer, controller: controller)
             }
+            PanelDivider()
         }
     }
 
@@ -555,7 +556,7 @@ private struct FillSection: View {
                 .gridBody()
             }
         }
-        .padding(.bottom, Theme.panelPad)
+        .sectionPadding(empty: shape.fills.isEmpty)
     }
 
     private func editShape(_ change: (inout ShapeContent) -> Void) {
@@ -748,7 +749,7 @@ private struct StrokeSection: View {
                 .gridBody()
             }
         }
-        .padding(.bottom, Theme.panelPad)
+        .sectionPadding(empty: shape.strokes.isEmpty)
     }
 
     private func editShape(_ change: (inout ShapeContent) -> Void) {
@@ -992,7 +993,7 @@ private struct MaskSection: View {
                 .gridBody()
             }
         }
-        .padding(.bottom, Theme.panelPad)
+        .sectionPadding(empty: layer.mask == nil)
     }
 
     /// Front first, as the layers panel lists them.
@@ -1061,7 +1062,7 @@ private struct EffectsSection: View {
             if showsSkew { skewRows.gridBody() }
             if showsTilt { tiltRows.gridBody() }
         }
-        .padding(.bottom, Theme.panelPad)
+        .sectionPadding(empty: layer.effects.isEmpty && !showsSkew && !showsTilt)
     }
 
     /// An effect's icon and name, with its remove button in the column.
