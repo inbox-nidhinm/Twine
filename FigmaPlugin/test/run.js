@@ -36,6 +36,7 @@ function node(type, props) {
   n.absoluteRenderBounds = props.absoluteRenderBounds || {
     x: n.absoluteTransform[0][2], y: n.absoluteTransform[1][2], width: n.width, height: n.height,
   };
+  n.absoluteBoundingBox = n.absoluteRenderBounds;
   if (n.children) for (const child of n.children) child.parent = n;
   return n;
 }
@@ -122,7 +123,17 @@ vm.runInNewContext(code, { figma: figma, __html__: "", console: console, Math: M
 (async function () {
   // Objects from inside the sandbox are compared as text, their prototypes
   // being the sandbox's own.
-  assert.strictEqual(JSON.stringify(messages[0]), JSON.stringify({ type: "selection", count: 1, name: "Card" }));
+  const selection = messages[0];
+  assert.strictEqual(selection.type, "selection");
+  assert.strictEqual(selection.count, 1);
+  assert.strictEqual(selection.name, "Card");
+  assert.strictEqual(selection.width, 320);
+  assert.strictEqual(selection.height, 200);
+  assert(selection.layers > 10, "every layer inside is counted");
+  // The panel's picture of the selection follows.
+  await new Promise(function (done) { setTimeout(done, 0); });
+  const preview = messages.find(function (m) { return m.type === "preview"; });
+  assert(preview && preview.parts.length === 1 && Math.abs(preview.aspect - 1.6) < 1e-9, "the card is drawn for the panel");
   await figma.ui.onmessage({ type: "copy" });
   const done = messages.find(function (m) { return m.type === "payload"; });
   assert(done, "no copy: " + JSON.stringify(messages.filter(function (m) { return m.type === "error"; })));

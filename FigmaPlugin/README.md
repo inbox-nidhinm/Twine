@@ -18,7 +18,7 @@ Figma has no icon setting for a plugin run from a folder, so a development plugi
 
 ## Using it
 
-Select a frame or some layers, run the plugin, and press **Copy**. In Twine, press ⌘V.
+Select a frame or some layers, run the plugin, and press **Copy**. In Twine, press ⌘V. The panel shows a picture of what is selected, with its size and how many layers it holds.
 
 - Into an empty project, the composition takes the copy's size and it lines up exactly.
 - Into a project with layers, it comes in centred, at its exact size.

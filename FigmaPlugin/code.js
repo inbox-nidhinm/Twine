@@ -20,18 +20,75 @@ const PICTURE_SCALE = 2;
 
 figma.showUI(__html__, { width: 339, height: 380, themeColors: false });
 
+// The panel's preview: at most this many layers drawn, each at most this
+// many pixels on its longer side (twice the size shown, so it stays sharp).
+const PREVIEW_LAYERS = 12;
+const PREVIEW_PIXELS = 480;
+
+/// What the panel shows of the selection: its name, its size (the box
+/// around all of it) and how many layers it holds.
 function selectionInfo() {
   const selection = figma.currentPage.selection;
   if (selection.length === 0) return { type: "selection", count: 0, name: "" };
+  const box = bounds(selection);
   return {
     type: "selection",
     count: selection.length,
     name: selection.length === 1 ? selection[0].name : selection.length + " layers",
+    width: Math.round(box.width),
+    height: Math.round(box.height),
+    layers: selection.reduce(function (sum, node) { return sum + count(node); }, 0),
   };
 }
 
-figma.on("selectionchange", function () { figma.ui.postMessage(selectionInfo()); });
-figma.ui.postMessage(selectionInfo());
+function bounds(nodes) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const node of nodes) {
+    const b = node.absoluteBoundingBox;
+    if (!b) continue;
+    minX = Math.min(minX, b.x); minY = Math.min(minY, b.y);
+    maxX = Math.max(maxX, b.x + b.width); maxY = Math.max(maxY, b.y + b.height);
+  }
+  if (minX === Infinity) return { x: 0, y: 0, width: 0, height: 0 };
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+/// A picture of the selection for the panel: each layer drawn by Figma,
+/// with where it sits in the box around them all, back to front, so the
+/// panel lays them out as the canvas does. A newer selection wins: a
+/// picture still being drawn for an older one is dropped.
+let previewToken = 0;
+async function sendPreview() {
+  const token = ++previewToken;
+  const selection = sortedBack(figma.currentPage.selection.slice()).slice(-PREVIEW_LAYERS);
+  if (selection.length === 0) return;
+  const box = bounds(selection);
+  const longest = Math.max(box.width, box.height, 1);
+  const scale = Math.min(PREVIEW_PIXELS / longest, 2);
+  const parts = [];
+  for (const node of selection) {
+    const b = node.absoluteBoundingBox;
+    if (!b || b.width <= 0 || b.height <= 0) continue;
+    try {
+      const bytes = await node.exportAsync({ format: "PNG", constraint: { type: "SCALE", value: scale } });
+      if (token !== previewToken) return;
+      parts.push({ png: figma.base64Encode(bytes), x: (b.x - box.x) / longest, y: (b.y - box.y) / longest,
+                   width: b.width / longest, height: b.height / longest });
+    } catch (error) {
+      // A layer Figma cannot draw is left out of the picture.
+    }
+  }
+  if (token !== previewToken) return;
+  figma.ui.postMessage({ type: "preview", aspect: box.width / Math.max(box.height, 1), parts: parts });
+}
+
+function selectionChanged() {
+  figma.ui.postMessage(selectionInfo());
+  sendPreview();
+}
+
+figma.on("selectionchange", selectionChanged);
+selectionChanged();
 
 figma.ui.onmessage = async function (message) {
   if (message.type !== "copy") return;

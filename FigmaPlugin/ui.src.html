@@ -1,8 +1,10 @@
 <!doctype html>
 <!--
-  The Twine plugin's panel. Edit this file, then run `python3 build.py` in
-  this folder, which writes ui.html with PP Kyoto Light embedded, as Figma
-  needs the panel in one file.
+  The Twine plugin's panel, drawn as the app draws its panels (the design is
+  on Page 3 of the Twine Figma file). Edit this file, then run
+  `python3 build.py` in this folder, which writes ui.html with PP Kyoto Light
+  embedded, as Figma needs the panel in one file. Figma's own window title
+  already says Twine, so the panel has no header of its own.
 -->
 <html>
 <head>
@@ -13,130 +15,227 @@
     font-weight: 300;
     src: url(data:font/otf;base64,{{KYOTO}}) format("opentype");
   }
+  /* The app's own values (Packages/MotionKit/Sources/Theme). */
   :root {
-    --ground: #3A88C8;
-    --glass: rgba(255, 255, 255, 0.10);
-    --edge: rgba(255, 255, 255, 0.55);
-    --dashes: rgba(255, 255, 255, 0.7);
-    --button: #2C2C2C;
+    --canvas: #1E1E1E;
+    --panel: #2C2C2C;
+    --raised: #383838;
+    --edge: rgba(255, 255, 255, 0.12);
+    --dashes: rgba(255, 255, 255, 0.16);
+    --accent: #4C9FEF;
+    --accent-hover: #6EB3F3;
+    --busy: #33506C;
     --text: #FFFFFF;
-    --text-soft: rgba(255, 255, 255, 0.85);
+    --text-secondary: #B3B3B3;
+    --text-tertiary: #808080;
   }
   * { box-sizing: border-box; margin: 0; }
   html, body { height: 100%; }
   body {
-    background: var(--ground);
+    background: var(--canvas);
     color: var(--text);
-    font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    padding: 0 18px;
+    padding: 8px;
     user-select: none;
     overflow: hidden;
   }
-  h1 {
-    margin-top: 38px;
-    height: 50px;
-    font-family: "PP Kyoto", Georgia, serif;
-    font-weight: 300;
-    font-size: 36px;
-    line-height: 50px;
-    text-align: center;
-    letter-spacing: 0.01em;
-  }
-  .card {
-    margin-top: 36px;
-    height: 158px;
-    border-radius: 10px;
-    background: var(--glass);
+  .panel {
+    height: 100%;
+    background: var(--panel);
     border: 1px solid var(--edge);
+    border-radius: 10px;
+    padding: 12px;
     display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .well {
+    position: relative;
+    flex: none;
+    height: 210px;
+    border-radius: 8px;
+    background: var(--raised);
+    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    text-align: center;
-    padding: 0 20px;
+    gap: 14px;
+    overflow: hidden;
   }
-  .card.empty {
+  .well.empty {
     background: transparent;
     border: 1px dashed var(--dashes);
   }
-  .name {
-    font-size: 18px;
-    font-weight: 600;
-    line-height: 24px;
+  .hint, .error {
+    font-size: 11px;
+    line-height: 15px;
+    color: var(--text-tertiary);
+    text-align: center;
+    max-width: 220px;
+  }
+  .thumb {
+    position: relative;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
   }
-  .hint {
-    font-size: 14px;
-    line-height: 20px;
-    color: var(--text-soft);
-    max-width: 190px;
-  }
-  .error { font-size: 13px; line-height: 18px; color: var(--text-soft); }
+  .thumb img { position: absolute; display: block; }
   .percent {
     font-family: "PP Kyoto", Georgia, serif;
     font-weight: 300;
-    font-size: 56px;
+    font-size: 48px;
     line-height: 1;
     font-variant-numeric: tabular-nums;
   }
+  .track {
+    width: 160px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+  }
+  .track div { height: 100%; border-radius: 2px; background: var(--accent); }
+  .check {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 24px;
+    height: 24px;
+    border-radius: 12px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .details { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .details[hidden] { display: none; }
+  .name {
+    font-size: 13px;
+    line-height: 16px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .meta { font-size: 11px; line-height: 14px; color: var(--text-secondary); }
+  .meta.done { color: var(--accent); }
+  .space { flex: 1; }
   button {
-    margin-top: 30px;
-    height: 43px;
+    flex: none;
+    height: 36px;
     border: 0;
     border-radius: 5px;
-    background: var(--button);
+    background: var(--accent);
     color: var(--text);
     font: inherit;
-    font-size: 16px;
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
   }
-  button:disabled {
-    background: rgba(44, 44, 44, 0.35);
-    color: rgba(255, 255, 255, 0.45);
-    cursor: default;
-  }
+  button:hover:not(:disabled) { background: var(--accent-hover); }
+  button:disabled { background: var(--raised); color: var(--text-tertiary); cursor: default; }
+  button.busy, button.busy:disabled { background: var(--busy); color: rgba(255, 255, 255, 0.7); }
+  button.done, button.done:disabled { background: var(--busy); color: var(--text); }
   textarea { position: fixed; left: -9999px; top: 0; opacity: 0; }
 </style>
 </head>
 <body>
-  <h1>Twine</h1>
-  <div class="card empty" id="card"><div class="hint">Select a frame or a layer to get started.</div></div>
-  <button id="copy" disabled>Copy</button>
+  <div class="panel">
+    <div class="well empty" id="well"><div class="hint">Select a frame or layers</div></div>
+    <div class="details" id="details" hidden>
+      <div class="name" id="name"></div>
+      <div class="meta" id="meta"></div>
+    </div>
+    <div class="space"></div>
+    <button id="copy" disabled>Copy</button>
+  </div>
 <script>
   // idle, copying, copied or failed; what is selected; how far a copy is.
-  const state = { phase: "idle", count: 0, name: "", percent: 0, error: "" };
+  const state = { phase: "idle", count: 0, name: "", width: 0, height: 0, layers: 0, percent: 0, error: "", preview: null };
   let settle = null;
 
-  const card = document.getElementById("card");
+  const well = document.getElementById("well");
+  const details = document.getElementById("details");
+  const nameLine = document.getElementById("name");
+  const meta = document.getElementById("meta");
   const button = document.getElementById("copy");
 
-  function render() {
-    card.className = state.count === 0 && state.phase === "idle" ? "card empty" : "card";
-    card.textContent = "";
-    const line = document.createElement("div");
-    if (state.phase === "copying") {
-      line.className = "percent";
-      line.textContent = state.percent + "%";
-    } else if (state.phase === "failed") {
-      line.className = "error";
-      line.textContent = "Could not copy: " + state.error;
-    } else if (state.count === 0) {
-      line.className = "hint";
-      line.textContent = "Select a frame or a layer to get started.";
-    } else {
-      line.className = "name";
-      line.textContent = state.name;
-      line.title = state.name;
+  function element(tag, className) {
+    const e = document.createElement(tag);
+    if (className) e.className = className;
+    return e;
+  }
+
+  /// The selection's picture: each layer Figma drew, laid out where it sits,
+  /// fitted into the thumbnail's largest box.
+  function thumbnail(preview) {
+    const box = element("div", "thumb");
+    const maxW = 200, maxH = 125;
+    const w = preview.aspect >= maxW / maxH ? maxW : maxH * preview.aspect;
+    const h = w / preview.aspect;
+    box.style.width = w + "px";
+    box.style.height = h + "px";
+    const unit = Math.max(w, h);
+    for (const part of preview.parts) {
+      const img = element("img");
+      img.src = "data:image/png;base64," + part.png;
+      img.style.left = part.x * unit + "px";
+      img.style.top = part.y * unit + "px";
+      img.style.width = part.width * unit + "px";
+      img.style.height = part.height * unit + "px";
+      box.appendChild(img);
     }
-    card.appendChild(line);
+    return box;
+  }
+
+  function check() {
+    const badge = element("div", "check");
+    badge.innerHTML = '<svg width="12" height="9" viewBox="0 0 12 9" fill="none"><path d="M1 4.5L4.5 8L11 1" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    return badge;
+  }
+
+  function render() {
+    const selected = state.count > 0;
+    well.textContent = "";
+    well.className = "well";
+    if (state.phase === "copying") {
+      const pct = element("div", "percent");
+      pct.textContent = state.percent + "%";
+      const track = element("div", "track");
+      const done = element("div");
+      done.style.width = state.percent + "%";
+      track.appendChild(done);
+      well.appendChild(pct);
+      well.appendChild(track);
+    } else if (state.phase === "failed") {
+      const line = element("div", "error");
+      line.textContent = "Could not copy: " + state.error;
+      well.appendChild(line);
+    } else if (!selected) {
+      well.className = "well empty";
+      const hint = element("div", "hint");
+      hint.textContent = "Select a frame or layers";
+      well.appendChild(hint);
+    } else if (state.preview && state.preview.parts.length) {
+      well.appendChild(thumbnail(state.preview));
+    }
+    if (state.phase === "copied") well.appendChild(check());
+
+    details.hidden = !selected;
+    nameLine.textContent = state.name;
+    nameLine.title = state.name;
+    if (state.phase === "copied") {
+      meta.textContent = "Copied. Paste in Twine with ⌘V";
+      meta.className = "meta done";
+    } else {
+      meta.textContent = state.width + " × " + state.height + "  ·  " + state.layers + (state.layers === 1 ? " layer" : " layers");
+      meta.className = "meta";
+    }
+
+    button.className = state.phase === "copying" ? "busy" : state.phase === "copied" ? "done" : "";
     button.textContent = state.phase === "copying" ? "Copying" : state.phase === "copied" ? "Copied" : "Copy";
-    button.disabled = state.count === 0 && state.phase === "idle";
+    button.disabled = !selected || state.phase === "copying";
   }
 
   /// Figma's panel may not use the clipboard's newer interface, so the copy
@@ -166,8 +265,14 @@
     if (message.type === "selection") {
       state.count = message.count;
       state.name = message.name;
+      state.width = message.width || 0;
+      state.height = message.height || 0;
+      state.layers = message.layers || 0;
+      state.preview = null;
       // A new selection starts afresh, unless a copy is under way.
       if (state.phase !== "copying") state.phase = "idle";
+    } else if (message.type === "preview") {
+      state.preview = message;
     } else if (message.type === "progress") {
       state.percent = message.percent;
     } else if (message.type === "payload") {

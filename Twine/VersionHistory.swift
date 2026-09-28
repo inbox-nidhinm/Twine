@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Figma plugin, Twine's look", changes: [
+            "The Figma plugin now looks like Twine: a dark panel with a picture of what is selected, its size and how many layers it holds, and a blue Copy button.",
+            "While it copies, the percentage and a progress bar show in the preview; once copied, a check shows in its corner.",
+        ]),
         .init(date: "28 September 2026", title: "Skew from Figma", changes: [
             "Layers skewed in Figma paste in as editable Twine layers, slanted exactly as in Figma, instead of pictures: shapes, frames with everything inside them, vectors and text.",
         ]),
