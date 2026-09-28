@@ -221,28 +221,65 @@ struct InspectorPanel: View {
 }
 
 /// Aligning and spacing the selection, at the head of the Position section:
-/// one layer lines up with the composition, several with each other.
+/// one layer lines up with the composition, several with each other. The
+/// three horizontal and the three vertical alignments sit in two trays, as
+/// Figma has them; spacing, which only means something for three or more
+/// layers, is a menu at the end.
 struct AlignRow: View {
     let controller: EditorController
 
+    @Environment(MenuHost.self) private var menus
+    @State private var distributeFrame: CGRect = .zero
+
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(Alignment.Edge.allCases, id: \.self) { edge in
-                IconButton(icon: edge.icon, help: "\(edge.title) (\(edge.shortcut))") { controller.align(edge) }
+        HStack(spacing: 8) {
+            tray([.left, .centerX, .right])
+            tray([.top, .centerY, .bottom])
+            IconButton(icon: .distributeV, help: "Distribute: equal spaces between three or more layers") {
+                menus.show([
+                    .item("Distribute Horizontally  ⌃⌥H", disabled: !controller.canDistribute) { controller.distribute(.x) },
+                    .item("Distribute Vertically  ⌃⌥V", disabled: !controller.canDistribute) { controller.distribute(.y) },
+                ], at: CGPoint(x: distributeFrame.maxX - Theme.menuMinWidth, y: distributeFrame.maxY + 4))
             }
-            .disabled(!controller.canAlign)
-            Spacer(minLength: 0)
-            Group {
-                IconButton(icon: .distributeH, help: "Distribute horizontally: equal spaces across, for three or more layers (⌃⌥H)") {
-                    controller.distribute(.x)
-                }
-                IconButton(icon: .distributeV, help: "Distribute vertically: equal spaces down, for three or more layers (⌃⌥V)") {
-                    controller.distribute(.y)
-                }
-            }
-            .disabled(!controller.canDistribute)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { distributeFrame = $0 }
         }
-        // The glyphs, not their buttons, line up with the fields below.
-        .padding(.horizontal, Theme.panelPad - 4)
+        .padding(.horizontal, Theme.panelPad)
+    }
+
+    private func tray(_ edges: [MotionEditing.Alignment.Edge]) -> some View {
+        // The gaps between the buttons show the panel through them, which
+        // draws the rules between them.
+        HStack(spacing: 1) {
+            ForEach(edges, id: \.self) { edge in
+                TrayButton(icon: edge.icon, help: "\(edge.title) (\(edge.shortcut))") { controller.align(edge) }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusControl))
+        .disabled(!controller.canAlign)
+    }
+}
+
+/// One button in a tray of them: raised, lighter under the pointer.
+private struct TrayButton: View {
+    let icon: Icon
+    let help: String
+    let action: () -> Void
+
+    @State private var hovering = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        Button(action: action) {
+            IconView(icon, size: 15)
+                .foregroundStyle(hovering && isEnabled ? Theme.textPrimary : Theme.textSecondary)
+                .opacity(isEnabled ? 1 : 0.4)
+                .frame(maxWidth: .infinity)
+                .frame(height: Theme.control)
+                .background(hovering && isEnabled ? Theme.panelHover : Theme.panelRaised)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(help)
     }
 }

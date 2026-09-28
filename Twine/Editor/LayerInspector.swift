@@ -125,7 +125,7 @@ struct LayerInspector: View {
             Group {
                 // A group's size is only where it was made; a frame's is its own.
                 if !layer.isGroup || layer.isFrame {
-                    linkedPair(link: true) {
+                    linkedPair(link: widthHeightLink) {
                         number("W", layer.size.width, accepts: { $0 >= 0 }) { l, v in
                             if keepsProportions(l), l.size.width > 0 {
                                 resize(&l, width: v, height: l.size.height * v / l.size.width)
@@ -142,10 +142,8 @@ struct LayerInspector: View {
                             }
                         }
                     }
-                    scaleRow(link: false)
-                } else {
-                    scaleRow(link: true)
                 }
+                scaleRow
                 if let geometry = layer.look?.geometry { shapeFields(geometry) }
                 if case .group(let group) = layer.content {
                     CheckRow(label: "Clip content", isOn: group.clipsContent) {
@@ -165,62 +163,60 @@ struct LayerInspector: View {
         .padding(.bottom, Theme.panelPad)
     }
 
-    /// Two fields with the proportions link between them, or a gap its size,
-    /// so rows beneath line up with the ones above.
-    private func linkedPair<Left: View, Right: View>(link: Bool, @ViewBuilder left: () -> Left,
-                                                     @ViewBuilder right: () -> Right) -> some View {
+    /// Two fields with a link between them, or a gap its size, so rows
+    /// beneath line up with the ones above.
+    private func linkedPair<Link: View, Left: View, Right: View>(link: Link, @ViewBuilder left: () -> Left,
+                                                                 @ViewBuilder right: () -> Right) -> some View {
         HStack(spacing: 4) {
             left().frame(maxWidth: .infinity)
-            if link {
-                IconButton(icon: t.isScaleLinked ? .link : .unlink,
-                           help: t.isScaleLinked ? "Keeps proportions: width and height, and scale, change together"
-                                                 : "Width and height, and scale each way, change separately") {
-                    controller.edit(layer.id) { l in l.transform.isScaleLinked.toggle() }
-                }
-            } else {
-                Color.clear.frame(width: Theme.control, height: 1)
-            }
+            link.frame(width: Theme.control)
             right().frame(maxWidth: .infinity)
         }
     }
 
-    /// Text sets its own height, so only its width is ever typed.
-    private func keepsProportions(_ l: Layer) -> Bool {
-        if case .text = l.content { return false }
-        return l.transform.isScaleLinked
+    /// Keeps width and height in proportion. Text sets its own height, so it
+    /// has none.
+    @ViewBuilder private var widthHeightLink: some View {
+        if case .text = layer.content {
+            Color.clear.frame(height: 1)
+        } else {
+            IconButton(icon: layer.keepsProportions ? .link : .unlink,
+                       help: layer.keepsProportions ? "Keeps proportions: width and height change together"
+                                                    : "Width and height change separately") {
+                controller.edit(layer.id) { l in l.keepsProportions.toggle() }
+            }
+        }
     }
 
-    @ViewBuilder private func scaleRow(link: Bool) -> some View {
+    private func keepsProportions(_ l: Layer) -> Bool {
+        if case .text = l.content { return false }
+        return l.keepsProportions
+    }
+
+    /// Both ways always, with their own link between them.
+    private var scaleRow: some View {
         let scale = t.scale
-        if t.isScaleLinked {
-            linkedPair(link: link) {
-                UnitField(unit: "S", value: scale.x * 100, decimals: 1, suffix: "%") { v in
-                    controller.edit(layer.id) { l in
-                        let s = l.transform.scale
-                        let ratio = s.x != 0 ? s.y / s.x : 1
-                        l.transform.scale = Vec2(v / 100, v / 100 * ratio)
-                    }
+        return linkedPair(link: IconButton(icon: t.isScaleLinked ? .link : .unlink,
+                                           help: t.isScaleLinked ? "Scales both ways together" : "Scales each way separately") {
+            controller.edit(layer.id) { l in l.transform.isScaleLinked.toggle() }
+        }) {
+            UnitField(unit: "SX", value: scale.x * 100, decimals: 1, suffix: "%") { v in
+                controller.edit(layer.id) { l in
+                    let s = l.transform.scale
+                    let y = l.transform.isScaleLinked ? (s.x != 0 ? s.y / s.x * v / 100 : v / 100) : s.y
+                    l.transform.scale = Vec2(v / 100, y)
                 }
-                .help("Scale")
-            } right: {
-                Color.clear.frame(height: 1)
             }
-        } else {
-            linkedPair(link: link) {
-                UnitField(unit: "SX", value: scale.x * 100, decimals: 1, suffix: "%") { v in
-                    controller.edit(layer.id) { l in
-                        l.transform.scale = Vec2(v / 100, l.transform.scale.y)
-                    }
+            .help("Scale across")
+        } right: {
+            UnitField(unit: "SY", value: scale.y * 100, decimals: 1, suffix: "%") { v in
+                controller.edit(layer.id) { l in
+                    let s = l.transform.scale
+                    let x = l.transform.isScaleLinked ? (s.y != 0 ? s.x / s.y * v / 100 : v / 100) : s.x
+                    l.transform.scale = Vec2(x, v / 100)
                 }
-                .help("Scale across")
-            } right: {
-                UnitField(unit: "SY", value: scale.y * 100, decimals: 1, suffix: "%") { v in
-                    controller.edit(layer.id) { l in
-                        l.transform.scale = Vec2(l.transform.scale.x, v / 100)
-                    }
-                }
-                .help("Scale down")
             }
+            .help("Scale down")
         }
     }
 

@@ -717,15 +717,17 @@ final class CanvasNSView: NSView {
 
         case .resize(let resize):
             guard let parentInverse = parentInverse(of: resize.layer.id) else { return }
+            // A layer set to keep its proportions keeps them as Shift would.
+            let keep = shift || resize.layer.keepsProportions
             func resized(_ pointer: Vec2) -> Layer {
                 CanvasGeometry.resized(resize.layer, handle: resize.handle, pointer: parentInverse.apply(pointer),
-                                       keepAspect: shift, fromCenter: option)
+                                       keepAspect: keep, fromCenter: option)
             }
             var edited = resized(point)
             // Kept to its proportions, a corner cannot follow a guide on
             // both axes, so only a free resize snaps.
             snap = nil
-            if snapping(event), !shift, let parentWorld = parentInverse.inverted,
+            if snapping(event), !keep, let parentWorld = parentInverse.inverted,
                let result = snapped(edited, handle: resize.handle, parentWorld: parentWorld),
                result.offset != .zero || !result.guides.isEmpty {
                 edited = resized(point + result.offset)

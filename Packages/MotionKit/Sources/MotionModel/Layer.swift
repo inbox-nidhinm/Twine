@@ -28,6 +28,10 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
     /// at Normal lets its children blend with what is behind it too, as
     /// Figma's Pass Through does.
     public var blendMode: BlendMode
+    /// Whether changing its width or height changes the other with it, in
+    /// the inspector and on the canvas, as Figma's constrain proportions. A
+    /// setting of the editor rather than of the look. Off for new layers.
+    public var keepsProportions: Bool
     public var content: LayerContent
 
     public init(id: UUID = UUID(), name: String, content: LayerContent, size: Size2, position: Vec2) {
@@ -42,11 +46,12 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
         self.effects = []
         self.mask = nil
         self.blendMode = .normal
+        self.keepsProportions = false
         self.content = content
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, isVisible, isLocked, isSoloed, transform, size, opacity, effects, mask, blendMode, content
+        case id, name, isVisible, isLocked, isSoloed, transform, size, opacity, effects, mask, blendMode, keepsProportions, content
     }
 
     public init(from decoder: Decoder) throws {
@@ -63,6 +68,7 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
         mask = try c.decodeIfPresent(MaskReference.self, forKey: .mask)
         // Blend modes arrived after the first files.
         blendMode = try c.decodeIfPresent(BlendMode.self, forKey: .blendMode) ?? .normal
+        keepsProportions = try c.decodeIfPresent(Bool.self, forKey: .keepsProportions) ?? false
         content = try c.decode(LayerContent.self, forKey: .content)
     }
 
@@ -80,6 +86,8 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
         try c.encodeIfPresent(mask, forKey: .mask)
         // Left out at Normal, so files without blending read as before.
         if blendMode != .normal { try c.encode(blendMode, forKey: .blendMode) }
+        // Left out when off, as it is for nearly every layer.
+        if keepsProportions { try c.encode(keepsProportions, forKey: .keepsProportions) }
         try c.encode(content, forKey: .content)
     }
 

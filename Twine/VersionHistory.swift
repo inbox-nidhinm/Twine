@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Position like Figma", changes: [
+            "The alignment buttons sit in two trays, left to right and top to bottom, as in Figma; distributing is in a menu from the button beside them.",
+            "Scale always shows both ways, SX and SY, with its own link between them.",
+            "The link between width and height is now its own setting, off for new layers: when on, typing one changes the other, and resizing on the canvas keeps the proportions too.",
+        ]),
         .init(date: "28 September 2026", title: "Presets in pairs", changes: [
             "Presets are no longer grouped into entrances, exits and emphasis. Fade, Slide, Scale, Rotate, Blur, Drop and Sound Fade are each one preset, with In and Out in its settings; their tiles play the way in, then the way out.",
             "New: Rotate Out and Drop Out, so every preset that brings a layer on can also take it off.",
