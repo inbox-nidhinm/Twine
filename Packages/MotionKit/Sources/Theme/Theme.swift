@@ -195,13 +195,7 @@ public enum Theme {
     public static let exportCounterShare: CGFloat = 0.36
     /// How the player and the counter trade places: cubic-bezier(0.5, 0, 0, 1).
     public static let exportEase = Animation.timingCurve(0.5, 0, 0, 1, duration: 0.8)
-    /// Each counter digit's window, as a multiple of the figures' height: room
-    /// above and below for the fade, so a digit at rest is never touched by it.
-    public static let counterWindow: CGFloat = 1.5
-    /// How much of the window at its top and bottom fades out, so a stepping
-    /// digit melts away rather than being cut off.
-    public static let counterFeather: CGFloat = 0.17
-    /// How each digit of the counter steps up to the next, on the same curve.
+    /// How the counter slides from one number to the next, on the same curve.
     public static let counterEase = Animation.timingCurve(0.5, 0, 0, 1, duration: 0.4)
     /// The panel appearing and going.
     public static let exportFade = Animation.timingCurve(0.5, 0, 0, 1, duration: 0.35)
@@ -225,32 +219,35 @@ public enum ThemeFont {
     /// Tiny numbers on tiles and markers.
     public static let micro = Font.system(size: 8, weight: .medium)
 
-    /// PP Kyoto Light, for the home screen's titles, and the export panel's
-    /// name and counter.
-    ///
-    /// Registered with the process at first use rather than through the
-    /// Info.plist, because the font ships inside this package's resource
-    /// bundle. If registration fails, `Font.custom` falls back to the system
-    /// face, which costs a different-looking title rather than a crash.
-    public static func display(_ size: CGFloat) -> Font {
+    /// PP Kyoto, for the home screen's titles and the export panel's name
+    /// (Light) and its counter (Thin).
+    public enum DisplayWeight: String, CaseIterable, Sendable {
+        case light = "PPKyoto-Light"
+        case thin = "PPKyoto-Thin"
+    }
+
+    /// The display face. Registered with the process at first use rather
+    /// than through the Info.plist, because the fonts ship inside this
+    /// package's resource bundle. If registration fails, `Font.custom` falls
+    /// back to the system face, which costs a different-looking title rather
+    /// than a crash.
+    public static func display(_ size: CGFloat, _ weight: DisplayWeight = .light) -> Font {
         _ = registered
-        return .custom(displayFace, size: size)
+        return .custom(weight.rawValue, size: size)
     }
 
     /// The widest digit of the display face at `size`, so a counter's
     /// digit keeps one width whichever digit shows.
-    public static func displayDigitWidth(_ size: CGFloat) -> CGFloat {
-        _ = registered
-        guard let font = NSFont(name: displayFace, size: size) else { return size * 0.62 }
+    public static func displayDigitWidth(_ size: CGFloat, _ weight: DisplayWeight = .light) -> CGFloat {
+        guard let font = nsFont(size, weight) else { return size * 0.62 }
         return (0...9).map { ("\($0)" as NSString).size(withAttributes: [.font: font]).width }.max() ?? size * 0.62
     }
 
     /// How tall the display face's figures stand at `size`, and how far to
     /// move a line of them down so the figures, not the line, sit centred in
-    /// a box: for counter digits clipped close to the figures.
-    public static func displayFigures(_ size: CGFloat) -> (height: CGFloat, nudge: CGFloat) {
-        _ = registered
-        guard let font = NSFont(name: displayFace, size: size) else { return (size * 0.72, 0) }
+    /// a box of that height.
+    public static func displayFigures(_ size: CGFloat, _ weight: DisplayWeight = .light) -> (height: CGFloat, nudge: CGFloat) {
+        guard let font = nsFont(size, weight) else { return (size * 0.72, 0) }
         // Measured down from the top of a line's box, which runs from the
         // ascender to the descender: the box's middle, and the middle of the
         // figures, which stand from the baseline to the cap height.
@@ -261,18 +258,22 @@ public enum ThemeFont {
 
     /// The gap to add between lines so the display face sits on 130% leading.
     public static func displayLeading(_ size: CGFloat) -> CGFloat {
-        _ = registered
-        guard let font = NSFont(name: displayFace, size: size) else { return size * 0.3 }
+        guard let font = nsFont(size, .light) else { return size * 0.3 }
         let natural = font.ascender - font.descender + font.leading
         return max(0, size * 1.3 - natural)
     }
 
-    private static let displayFace = "PPKyoto-Light"
+    private static func nsFont(_ size: CGFloat, _ weight: DisplayWeight) -> NSFont? {
+        _ = registered
+        return NSFont(name: weight.rawValue, size: size)
+    }
 
     private static let registered: Bool = {
-        guard let url = Bundle.module.url(forResource: displayFace, withExtension: "otf", subdirectory: "Fonts")
-        else { return false }
-        return CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+        DisplayWeight.allCases.map { weight in
+            guard let url = Bundle.module.url(forResource: weight.rawValue, withExtension: "otf", subdirectory: "Fonts")
+            else { return false }
+            return CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+        }.allSatisfy { $0 }
     }()
 }
 

@@ -10,8 +10,8 @@ import Theme
 /// Export, as a panel over the whole window: the settings down the left, and
 /// on the right a preview of exactly what will be written, which plays at
 /// the export's frame rate with its sound. Exporting sends the player up and
-/// out and brings a counter up from below, its digits stepping up as the
-/// frames are written; when it ends they trade places back, and the button
+/// out and brings a counter up from below, sliding from number to number as
+/// the frames are written; when it ends they trade places back, and the button
 /// offers to export again. Closing the panel (the cross, or Escape) stops an
 /// export in flight.
 struct ExportPanel: View {
@@ -27,7 +27,8 @@ struct ExportPanel: View {
     /// where it got to.
     @State private var percent = 0
     /// Follows the export, but lets go a moment after it ends, so the last
-    /// digits finish stepping before the counter leaves.
+    /// slides (one under way and the one after it) finish before the
+    /// counter leaves.
     @State private var showsCounter = false
     /// Whether the size is typed as a percentage rather than picked.
     @State private var typesSize = false
@@ -70,7 +71,7 @@ struct ExportPanel: View {
                 showsCounter = true
             } else {
                 percent = Int((session.lastProgress * 100).rounded(.down))
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
                     if !session.isExporting { showsCounter = false }
                 }
             }
@@ -205,7 +206,7 @@ struct ExportPanel: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .offset(y: showsCounter ? -height : 0)
 
-                StepCounter(value: percent, size: height * Theme.exportCounterShare)
+                SlideCounter(value: percent, size: height * Theme.exportCounterShare)
                     .padding(.trailing, Theme.panelPad * 4)
                     .padding(.bottom, Theme.panelPad * 2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
@@ -549,66 +550,62 @@ final class ExportPreviewView: NSView {
 
 // MARK: - The counter
 
-/// The export's progress as a big number and a percent sign. Each digit
-/// that changes steps up once: the old one rises out of its window as the
-/// new one rises in from below, however far the number jumped, so fast
-/// progress reads as calm steps rather than spinning digits. A new place
-/// (10, 100) rises in from below too.
-private struct StepCounter: View {
+/// The export's progress as a big number and a percent sign, moving as the
+/// app's Counter does with its Slide transition: the old number rises one
+/// type size and fades out while the new one rises into place from one type
+/// size below, fading in. A slide always finishes; a number that changed
+/// meanwhile slides in straight after, so at most two show at once.
+private struct SlideCounter: View {
     let value: Int
     let size: CGFloat
 
+    /// The number showing, which trails `value` while a slide is under way.
+    @State private var shown: Int?
+    @State private var sliding = false
+
     var body: some View {
-        let places = value >= 100 ? [2, 1, 0] : value >= 10 ? [1, 0] : [0]
-        HStack(alignment: .center, spacing: 0) {
-            ForEach(places, id: \.self) { place in
-                DigitStep(digit: value / Int(pow(10, Double(place))) % 10, size: size)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-            Text("%")
-                .font(ThemeFont.display(size))
-                .foregroundStyle(Theme.textPrimary)
-                .offset(y: ThemeFont.displayFigures(size).nudge)
-                .frame(height: DigitStep.window(size))
+        ZStack(alignment: .trailing) {
+            Figures(text: "\(shown ?? value)%", size: size)
+                .id(shown)
+                .transition(.asymmetric(insertion: .offset(y: size).combined(with: .opacity),
+                                        removal: .offset(y: -size).combined(with: .opacity)))
         }
-        .animation(Theme.counterEase, value: places.count)
         .fixedSize()
+        .onAppear { shown = value }
+        .onChange(of: value) { _, _ in slide() }
+    }
+
+    private func slide() {
+        guard !sliding, shown != value else { return }
+        sliding = true
+        withAnimation(Theme.counterEase, completionCriteria: .removed) {
+            shown = value
+        } completion: {
+            sliding = false
+            slide()
+        }
     }
 }
 
-/// One place of the counter: its digit, which steps up to the next when it
-/// changes, the two fading at the window's top and bottom edges.
-private struct DigitStep: View {
-    let digit: Int
+/// A line of the thin display face with every digit in a box as wide as the
+/// widest, as a counting text layer keeps its digits, so the number never
+/// shifts sideways as it counts. The figures, not the line, fill its height.
+private struct Figures: View {
+    let text: String
     let size: CGFloat
 
-    /// Each digit's window: the figures' height with room above and below,
-    /// where stepping digits fade in and out.
-    static func window(_ size: CGFloat) -> CGFloat { ThemeFont.displayFigures(size).height * Theme.counterWindow }
-
-    /// Opaque in the middle, fading to nothing at the top and bottom edges.
-    /// (A mask only reads its colours' opacity.)
-    private static let feather = LinearGradient(stops: [
-        .init(color: .clear, location: 0),
-        .init(color: .black, location: Theme.counterFeather),
-        .init(color: .black, location: 1 - Theme.counterFeather),
-        .init(color: .clear, location: 1),
-    ], startPoint: .top, endPoint: .bottom)
-
     var body: some View {
-        let height = Self.window(size)
-        ZStack {
-            Text("\(digit)")
-                .font(ThemeFont.display(size))
-                .foregroundStyle(Theme.textPrimary)
-                .fixedSize()
-                .offset(y: ThemeFont.displayFigures(size).nudge)
-                .id(digit)
-                .transition(.asymmetric(insertion: .move(edge: .bottom), removal: .move(edge: .top)))
+        let figures = ThemeFont.displayFigures(size, .thin)
+        HStack(spacing: 0) {
+            ForEach(Array(text.enumerated()), id: \.offset) { _, character in
+                Text(String(character))
+                    .font(ThemeFont.display(size, .thin))
+                    .foregroundStyle(Theme.textPrimary)
+                    .fixedSize()
+                    .frame(width: character.isNumber ? ThemeFont.displayDigitWidth(size, .thin) : nil)
+            }
         }
-        .frame(width: ThemeFont.displayDigitWidth(size), height: height)
-        .animation(Theme.counterEase, value: digit)
-        .clipped()
-        .mask(Self.feather)
+        .offset(y: figures.nudge)
+        .frame(height: figures.height)
     }
 }
