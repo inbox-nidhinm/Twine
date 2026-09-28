@@ -171,6 +171,13 @@ final class EditorController {
 
     func begin(_ name: String) { store.beginContinuousChange(name) }
 
+    /// Opens a change that takes ordinary edits as its steps, for a drag
+    /// across a number field, whose every step is the field's usual commit.
+    func beginScrub(_ name: String) { store.beginContinuousChange(name, folding: true) }
+
+    /// What the inspector's number fields report their drags to.
+    var scrubbing: Scrubbing { Scrubbing(begin: { [weak self] in self?.beginScrub($0) }, end: { [weak self] in self?.end() }) }
+
     func update(_ layers: [Layer]) {
         try? store.updateContinuousChange(layerUpdate(layers))
     }

@@ -56,25 +56,23 @@ struct StyleValueFields: View {
 
     @ViewBuilder private func stroke(_ s: StrokeAction) -> some View {
         let from = inherited?.stroke ?? s.end
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(s.initial != nil) { editing("Starting Stroke", Self.stroke { a, _ in a.initial = nil }) } }) {
             OptionalField(unit: "W", value: s.initial?.width, placeholder: from.width, decimals: 1, suffix: "px",
                           accepts: { $0 >= 0 }) { v in
                 editing("Starting Stroke", Self.stroke { a, st in
                     a.initial = v.map { StrokeLook(width: $0, paint: (a.initial ?? st?.stroke ?? a.end).paint) }
                 })
             }
-            clearButton(s.initial != nil) { editing("Starting Stroke", Self.stroke { a, _ in a.initial = nil }) }
         }
         .help("The width it starts at. Empty starts from the layer's stroke when the action begins.")
         if let initial = s.initial {
             PaintControls(paint: initial.paint, title: "Stroke",
                           edit: callbacks("Starting Stroke", Self.stroke) { a, p in a.initial?.paint = p })
         }
-        LabeledRow(label: "To") {
+        StackedRow(label: "To") {
             UnitField(unit: "W", value: s.end.width, decimals: 1, suffix: "px", accepts: { $0 >= 0 }) { v in
                 editing("Stroke", Self.stroke { a, _ in a.end.width = v })
             }
-            spacer
         }
         PaintControls(paint: s.end.paint, title: "Stroke", edit: callbacks("Stroke", Self.stroke) { $0.end.paint = $1 })
     }
@@ -83,7 +81,7 @@ struct StyleValueFields: View {
 
     @ViewBuilder private func trim(_ t: TrimAction) -> some View {
         let from = inherited?.trim ?? .whole
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(t.initial != nil) { editing("Starting Trim", Self.trim { a, _ in a.initial = nil }) } }) {
             OptionalField(value: t.initial.map { $0.start * 100 }, placeholder: from.start * 100,
                           decimals: 1, suffix: "%", accepts: Self.percent) { v in
                 editing("Starting Trim", Self.trim { a, st in
@@ -96,18 +94,16 @@ struct StyleValueFields: View {
                     a.initial = v.map { TrimRange(start: (a.initial ?? st?.trim ?? .whole).start, end: $0 / 100) }
                 })
             }
-            clearButton(t.initial != nil) { editing("Starting Trim", Self.trim { a, _ in a.initial = nil }) }
         }
         // No S and E letters: "100 %" only just fits beside the button.
         .help("How much of the stroke is drawn when it starts: from the first number to the second, along the path. Set both to 0% to draw it on from nothing.")
-        LabeledRow(label: "To") {
+        StackedRow(label: "To") {
             UnitField(value: t.end.start * 100, decimals: 1, suffix: "%", accepts: Self.percent) { v in
                 editing("Trim", Self.trim { a, _ in a.end.start = v / 100 })
             }
             UnitField(value: t.end.end * 100, decimals: 1, suffix: "%", accepts: Self.percent) { v in
                 editing("Trim", Self.trim { a, _ in a.end.end = v / 100 })
             }
-            spacer
         }
         .help("How much is drawn when it ends, from the first number to the second. 0% to 100% is the whole stroke.")
     }
@@ -117,14 +113,13 @@ struct StyleValueFields: View {
     @ViewBuilder private func corners(_ r: CornerRadiusAction) -> some View {
         let from = inherited?.cornerRadii ?? .zero
         if r.isLinked {
-            LabeledRow(label: "From") {
+            StackedRow(label: "From", accessory: { clearButton(r.initial != nil) { editing("Starting Corners", Self.corners { a, _ in a.initial = nil }) } }) {
                 OptionalField(unit: "R", value: r.initial?.topLeft, placeholder: from.topLeft, accepts: { $0 >= 0 }) { v in
                     editing("Starting Corners", Self.corners { a, _ in a.initial = v.map { CornerRadii(all: $0) } })
                 }
-                clearButton(r.initial != nil) { editing("Starting Corners", Self.corners { a, _ in a.initial = nil }) }
             }
             .help("The radius it starts at. Empty starts from the layer's corners when the action begins.")
-            LabeledRow(label: "To") {
+            StackedRow(label: "To") {
                 UnitField(unit: "R", value: r.end.topLeft, accepts: { $0 >= 0 }) { v in
                     editing("Corner Radius", Self.corners { a, _ in a.end = CornerRadii(all: v) })
                 }
@@ -216,25 +211,23 @@ struct StyleValueFields: View {
     // MARK: Blurs
 
     @ViewBuilder private func layerBlur(_ b: LayerBlurAction) -> some View {
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(b.initial != nil) { editing("Starting Blur", Self.layerBlur { a, _ in a.initial = nil }) } }) {
             OptionalField(unit: "Blur", value: b.initial, placeholder: inherited?.layerBlur ?? 0, decimals: 1,
                           accepts: { $0 >= 0 }) { v in
                 editing("Starting Blur", Self.layerBlur { a, _ in a.initial = v })
             }
-            clearButton(b.initial != nil) { editing("Starting Blur", Self.layerBlur { a, _ in a.initial = nil }) }
         }
         .help("The blur it starts at. Empty starts from the layer's blur when the action begins, or from none.")
-        LabeledRow(label: "To") {
+        StackedRow(label: "To") {
             UnitField(unit: "Blur", value: b.end, decimals: 1, accepts: { $0 >= 0 }) { v in
                 editing("Layer Blur", Self.layerBlur { a, _ in a.end = v })
             }
-            spacer
         }
     }
 
     @ViewBuilder private func backgroundBlur(_ b: BackgroundBlurAction) -> some View {
         let from = inherited?.backgroundBlur ?? BackgroundBlur.noBlur
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(b.initial != nil) { editing("Starting Blur", Self.backgroundBlur { a, _ in a.initial = nil }) } }) {
             OptionalField(value: b.initial?.radius, placeholder: from.radius, decimals: 1, suffix: "px",
                           accepts: { $0 >= 0 }) { v in
                 editing("Starting Blur", Self.backgroundBlur { a, st in
@@ -247,11 +240,10 @@ struct StyleValueFields: View {
                     a.initial = v.map { BackgroundBlur(radius: (a.initial ?? st?.backgroundBlur ?? BackgroundBlur.noBlur).radius, blend: $0 / 100) }
                 })
             }
-            clearButton(b.initial != nil) { editing("Starting Blur", Self.backgroundBlur { a, _ in a.initial = nil }) }
         }
         // Blur in px, then blend in %: no room for their names beside the button.
         .help("The blur (px) and blend (%) it starts at. Empty starts from the layer's background blur, or from none.")
-        LabeledRow(label: "To") {
+        StackedRow(label: "To") {
             UnitField(value: b.end.radius, decimals: 1, suffix: "px", accepts: { $0 >= 0 }) { v in
                 editing("Background Blur", Self.backgroundBlur { a, _ in a.end.radius = v })
             }
@@ -259,59 +251,51 @@ struct StyleValueFields: View {
                 editing("Background Blur", Self.backgroundBlur { a, _ in a.end.blend = v / 100 })
             }
             .help("Blend: how much of the blurred background shows over the sharp one.")
-            spacer
         }
     }
 
     // MARK: Text
 
     @ViewBuilder private func letterSpacing(_ v: LetterSpacingAction) -> some View {
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(v.initial != nil) { editing("Starting Spacing", Self.letterSpacing { a, _ in a.initial = nil }) } }) {
             OptionalField(value: v.initial, placeholder: inherited?.letterSpacing ?? 0, decimals: 1, suffix: "px") { x in
                 editing("Starting Spacing", Self.letterSpacing { a, _ in a.initial = x })
             }
-            clearButton(v.initial != nil) { editing("Starting Spacing", Self.letterSpacing { a, _ in a.initial = nil }) }
         }
         .help("The letter spacing it starts at. Empty starts from the text's own.")
-        LabeledRow(label: "To") {
+        StackedRow(label: "To") {
             UnitField(value: v.end, decimals: 1, suffix: "px") { x in editing("Letter Spacing", Self.letterSpacing { a, _ in a.end = x }) }
-            spacer
         }
     }
 
     @ViewBuilder private func lineHeight(_ v: LineHeightAction) -> some View {
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(v.initial != nil) { editing("Starting Line Height", Self.lineHeight { a, _ in a.initial = nil }) } }) {
             OptionalField(value: v.initial, placeholder: inherited?.lineHeight ?? 0, decimals: 1, suffix: "px",
                           accepts: { $0 > 0 }) { x in
                 editing("Starting Line Height", Self.lineHeight { a, _ in a.initial = x })
             }
-            clearButton(v.initial != nil) { editing("Starting Line Height", Self.lineHeight { a, _ in a.initial = nil }) }
         }
         .help("The line height it starts at, baseline to baseline. Empty starts from the text's own.")
-        LabeledRow(label: "To") {
+        StackedRow(label: "To") {
             UnitField(value: v.end, decimals: 1, suffix: "px", accepts: { $0 > 0 }) { x in
                 editing("Line Height", Self.lineHeight { a, _ in a.end = x })
             }
-            spacer
         }
     }
 
     @ViewBuilder private func counter(_ c: CounterAction) -> some View {
         let found = NumberFormat.read(inherited?.text?.text ?? "")?.value ?? 0
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(c.from != nil) { editing("Counter", Self.counter { a, _ in a.from = nil }) } }) {
             OptionalField(value: c.from, placeholder: found, decimals: 4) { x in
                 editing("Counter", Self.counter { a, _ in a.from = x })
             }
-            clearButton(c.from != nil) { editing("Counter", Self.counter { a, _ in a.from = nil }) }
         }
         .help("The number it counts from. Empty starts from the number in the text, or 0. Set, it shows from the start of the scene.")
-        LabeledRow(label: "To") {
+        StackedRow(label: "To") {
             UnitField(value: c.to, decimals: 4) { x in editing("Counter", Self.counter { a, _ in a.to = x }) }
-            spacer
         }
-        LabeledRow(label: "Step") {
+        StackedRow(label: "Step") {
             UnitField(value: c.step, decimals: 4, accepts: { $0 > 0 }) { x in editing("Counter", Self.counter { a, _ in a.step = x }) }
-            spacer
         }
         .help("How much each change adds. The count keeps the text's own look: its symbols, decimals, separators and zeros.")
         SegmentRow(selection: c.transition, options: [.none, .fade, .slide], title: Self.transitionTitle) { t in
@@ -407,7 +391,7 @@ struct StyleValueFields: View {
     /// back to the shape it starts from.
     @ViewBuilder private func path(_ v: PathAction) -> some View {
         let count = v.end.subpaths.reduce(0) { $0 + $1.points.count }
-        LabeledRow(label: "To") {
+        StackedRow(label: "To") {
             Text(count == 1 ? "1 point" : "\(count) points")
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textTertiary)
@@ -476,7 +460,7 @@ struct StyleValueFields: View {
 
     @ViewBuilder private func play(_ p: PlayAction) -> some View {
         let length = controller.asset(ofLayer: action.targetLayerID)?.duration
-        LabeledRow(label: "Trim") {
+        StackedRow(label: "Trim") {
             UnitField(value: p.trimStart, decimals: 2, suffix: "s", accepts: { v in v >= 0 && (length.map { v < $0 } ?? true) }) { v in
                 controller.editActions("Trim") { a in
                     guard case .play(var play) = a.spec else { return }
@@ -486,26 +470,23 @@ struct StyleValueFields: View {
                     a.spec = .play(play)
                 }
             }
-            spacer
         }
         .help("How far into the file it starts playing. Dragging the bar's left end on the timeline trims it too.")
     }
 
     /// A fade, in percent of the file's own level, up to 100%.
     @ViewBuilder private func volume(_ v: VolumeAction) -> some View {
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(v.initial != nil) { editing("Starting Volume", Self.volume { a, _ in a.initial = nil }) } }) {
             OptionalField(value: v.initial.map { $0 * 100 }, placeholder: (inherited?.volume ?? 1) * 100,
                           suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { x in
                 editing("Starting Volume", Self.volume { a, _ in a.initial = x.map { $0 / 100 } })
             }
-            clearButton(v.initial != nil) { editing("Starting Volume", Self.volume { a, _ in a.initial = nil }) }
         }
         .help("The level it starts at. Set it to 0% to fade a sound in from nothing, before the action begins.")
-        LabeledRow(label: "To") {
+        StackedRow(label: "To") {
             UnitField(value: v.end * 100, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { x in
                 editing("Volume", Self.volume { a, _ in a.end = x / 100 })
             }
-            spacer
         }
         .help("The level it ends at: 100% is the file's own")
     }
@@ -613,7 +594,7 @@ struct StyleValueFields: View {
                 }
                 content()
             } else {
-                LabeledRow(label: "From") {
+                StackedRow(label: "From") {
                     preview
                     Text("Current")
                         .font(ThemeFont.label)
@@ -627,9 +608,7 @@ struct StyleValueFields: View {
 
     @ViewBuilder private func clearButton(_ visible: Bool, _ action: @escaping () -> Void) -> some View {
         if visible {
-            IconButton(icon: .close, help: "Start from wherever the layer is instead", action: action)
-        } else {
-            spacer
+            IconButton(icon: .close, help: "Start from wherever the layer is instead", size: 16, iconBox: 12, action: action)
         }
     }
 }

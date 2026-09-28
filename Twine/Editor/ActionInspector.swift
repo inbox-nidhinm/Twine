@@ -382,20 +382,18 @@ private struct ValueFields: View {
     @ViewBuilder private func move(_ m: MoveAction) -> some View {
         let from = inherited?.position ?? .zero
         modeRow(m.mode)
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(m.initial != nil) { editMove("Starting Value") { m, _ in m.initial = nil } } }) {
             OptionalField(unit: "X", value: m.initial?.x, placeholder: from.x) { v in
                 editMove("Starting Value") { m, s in m.initial = v.map { Vec2($0, (m.initial ?? s.position).y) } }
             }
             OptionalField(unit: "Y", value: m.initial?.y, placeholder: from.y) { v in
                 editMove("Starting Value") { m, s in m.initial = v.map { Vec2((m.initial ?? s.position).x, $0) } }
             }
-            clearButton(m.initial != nil) { editMove("Starting Value") { m, _ in m.initial = nil } }
         }
         .help("Where it starts. Empty starts from wherever the layer is when the action begins.")
-        LabeledRow(label: m.mode == .to ? "To" : "By") {
+        StackedRow(label: m.mode == .to ? "To" : "By") {
             UnitField(unit: "X", value: m.end.x) { v in editMove("Move") { m, _ in m.end.x = v } }
             UnitField(unit: "Y", value: m.end.y) { v in editMove("Move") { m, _ in m.end.y = v } }
-            Color.clear.frame(width: Theme.control)
         }
         .help(m.mode == .to ? "Where it ends, in the layer's parent's space." : "How far it moves from where it starts.")
         HStack {
@@ -430,7 +428,7 @@ private struct ValueFields: View {
     @ViewBuilder private func scale(_ s: ScaleAction) -> some View {
         let from = inherited?.scale ?? .one
         modeRow(s.mode)
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(s.initial != nil) { editScale("Starting Value") { s, _ in s.initial = nil } } }) {
             if s.isLinked {
                 OptionalField(unit: "S", value: s.initial.map { $0.x * 100 }, placeholder: from.x * 100, decimals: 1, suffix: "%") { v in
                     editScale("Starting Value") { s, _ in s.initial = v.map { Vec2($0 / 100, $0 / 100) } }
@@ -443,10 +441,9 @@ private struct ValueFields: View {
                     editScale("Starting Value") { s, st in s.initial = v.map { Vec2((s.initial ?? st.scale).x, $0 / 100) } }
                 }
             }
-            clearButton(s.initial != nil) { editScale("Starting Value") { s, _ in s.initial = nil } }
         }
         .help("The scale it starts at. Empty starts from the layer's scale when the action begins.")
-        LabeledRow(label: s.mode == .to ? "To" : "By") {
+        StackedRow(label: s.mode == .to ? "To" : "By") {
             if s.isLinked {
                 UnitField(unit: "S", value: s.end.x * 100, decimals: 1, suffix: "%") { v in
                     editScale("Scale") { s, _ in s.end = Vec2(v / 100, v / 100) }
@@ -477,16 +474,14 @@ private struct ValueFields: View {
 
     @ViewBuilder private func rotate(_ r: RotateAction) -> some View {
         modeRow(r.mode)
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(r.initial != nil) { editRotate("Starting Value") { $0.initial = nil } } }) {
             OptionalField(unit: "R", value: r.initial, placeholder: inherited?.rotation ?? 0, decimals: 1, suffix: "°") { v in
                 editRotate("Starting Value") { $0.initial = v }
             }
-            clearButton(r.initial != nil) { editRotate("Starting Value") { $0.initial = nil } }
         }
         .help("The angle it starts at. Empty starts from the layer's angle when the action begins.")
-        LabeledRow(label: r.mode == .to ? "To" : "By") {
+        StackedRow(label: r.mode == .to ? "To" : "By") {
             UnitField(unit: "R", value: r.end, decimals: 1, suffix: "°") { v in editRotate("Rotate") { $0.end = v } }
-            Color.clear.frame(width: Theme.control)
         }
         .help(r.mode == .to ? "The angle it ends at. 720° spins twice." : "How far it turns. Negative turns anticlockwise.")
     }
@@ -504,20 +499,18 @@ private struct ValueFields: View {
     @ViewBuilder private func skew(_ k: SkewAction) -> some View {
         let from = inherited?.skew ?? .zero
         modeRow(k.mode)
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(k.initial != nil) { editSkew("Starting Value") { k, _ in k.initial = nil } } }) {
             OptionalField(unit: "X", value: k.initial?.x, placeholder: from.x, decimals: 1, suffix: "°") { v in
                 editSkew("Starting Value") { k, s in k.initial = v.map { Vec2($0, (k.initial ?? s.skew).y) } }
             }
             OptionalField(unit: "Y", value: k.initial?.y, placeholder: from.y, decimals: 1, suffix: "°") { v in
                 editSkew("Starting Value") { k, s in k.initial = v.map { Vec2((k.initial ?? s.skew).x, $0) } }
             }
-            clearButton(k.initial != nil) { editSkew("Starting Value") { k, _ in k.initial = nil } }
         }
         .help("The slant it starts at. Empty starts from the layer's slant when the action begins.")
-        LabeledRow(label: k.mode == .to ? "To" : "By") {
+        StackedRow(label: k.mode == .to ? "To" : "By") {
             UnitField(unit: "X", value: k.end.x, decimals: 1, suffix: "°") { v in editSkew("Skew") { k, _ in k.end.x = v } }
             UnitField(unit: "Y", value: k.end.y, decimals: 1, suffix: "°") { v in editSkew("Skew") { k, _ in k.end.y = v } }
-            Color.clear.frame(width: Theme.control)
         }
         .help("X slants its sides, so the bottom moves across; Y slants its top and bottom, so the right side moves down.")
     }
@@ -535,30 +528,27 @@ private struct ValueFields: View {
     @ViewBuilder private func tilt(_ t: TiltAction) -> some View {
         let from = inherited?.tilt ?? .none
         modeRow(t.mode)
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(t.initial != nil) { editTilt("Starting Value") { t, _ in t.initial = nil } } }) {
             OptionalField(unit: "X", value: t.initial?.x, placeholder: from.x, decimals: 1, suffix: "°") { v in
                 editTilt("Starting Value") { t, s in t.initial = v.map { Tilt(x: $0, y: (t.initial ?? s.tilt).y, depth: t.end.depth) } }
             }
             OptionalField(unit: "Y", value: t.initial?.y, placeholder: from.y, decimals: 1, suffix: "°") { v in
                 editTilt("Starting Value") { t, s in t.initial = v.map { Tilt(x: (t.initial ?? s.tilt).x, y: $0, depth: t.end.depth) } }
             }
-            clearButton(t.initial != nil) { editTilt("Starting Value") { t, _ in t.initial = nil } }
         }
         .help("The tilt it starts at. Empty starts from the layer's tilt when the action begins.")
-        LabeledRow(label: t.mode == .to ? "To" : "By") {
+        StackedRow(label: t.mode == .to ? "To" : "By") {
             UnitField(unit: "X", value: t.end.x, decimals: 1, suffix: "°") { v in editTilt("Tilt") { t, _ in t.end.x = v } }
             UnitField(unit: "Y", value: t.end.y, decimals: 1, suffix: "°") { v in editTilt("Tilt") { t, _ in t.end.y = v } }
-            Color.clear.frame(width: Theme.control)
         }
         .help("X tips it back around a level line through its anchor, the top going away; Y turns it around an upright line, the right side going away. 180° shows its back.")
-        LabeledRow(label: "Depth") {
+        StackedRow(label: "Depth") {
             UnitField(value: t.end.depth, decimals: 0, suffix: "px", accepts: { $0 > 1 }) { v in
                 editTilt("Depth") { t, _ in
                     t.end.depth = v
                     t.initial?.depth = v
                 }
             }
-            Color.clear.frame(width: Theme.control)
         }
         .help("How far away it is seen from. Nearer makes the perspective stronger.")
     }
@@ -574,19 +564,17 @@ private struct ValueFields: View {
     // MARK: Opacity
 
     @ViewBuilder private func opacity(_ o: OpacityAction) -> some View {
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(o.initial != nil) { editOpacity("Starting Value") { $0.initial = nil } } }) {
             OptionalField(value: o.initial.map { $0 * 100 }, placeholder: (inherited?.opacity ?? 1) * 100,
                           suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
                 editOpacity("Starting Value") { $0.initial = v.map { $0 / 100 } }
             }
-            clearButton(o.initial != nil) { editOpacity("Starting Value") { $0.initial = nil } }
         }
         .help("The opacity it starts at. Set it to fade a layer in from nothing, before the action begins.")
-        LabeledRow(label: "To") {
+        StackedRow(label: "To") {
             UnitField(value: o.end * 100, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
                 editOpacity("Opacity") { $0.end = v / 100 }
             }
-            Color.clear.frame(width: Theme.control)
         }
     }
 
@@ -602,17 +590,16 @@ private struct ValueFields: View {
 
     @ViewBuilder private func resize(_ r: ResizeAction) -> some View {
         let from = inherited?.size ?? Size2(0, 0)
-        LabeledRow(label: "From") {
+        StackedRow(label: "From", accessory: { clearButton(r.initial != nil) { editResize("Starting Value") { r, _ in r.initial = nil } } }) {
             OptionalField(unit: "W", value: r.initial?.width, placeholder: from.width, accepts: { $0 >= 0 }) { v in
                 editResize("Starting Value") { r, st in r.initial = v.map { Size2($0, (r.initial ?? st.size).height) } }
             }
             OptionalField(unit: "H", value: r.initial?.height, placeholder: from.height, accepts: { $0 >= 0 }) { v in
                 editResize("Starting Value") { r, st in r.initial = v.map { Size2((r.initial ?? st.size).width, $0) } }
             }
-            clearButton(r.initial != nil) { editResize("Starting Value") { r, _ in r.initial = nil } }
         }
         .help("The size it starts at. Empty starts from the layer's size when the action begins.")
-        LabeledRow(label: "To") {
+        StackedRow(label: "To") {
             UnitField(unit: "W", value: r.end.width, accepts: { $0 >= 0 }) { v in
                 editResize("Resize") { r, _ in
                     if r.isLinked, r.end.width > 0 { r.end.height *= v / r.end.width }
@@ -667,13 +654,11 @@ private struct ValueFields: View {
         .help("To ends at a fixed value. By changes the value it starts from by an amount, so it follows the layer wherever it is designed.")
     }
 
-    /// Empties the starting value, so it inherits again. A spacer when
-    /// there is nothing to clear, so the fields keep their widths.
+    /// Empties the starting value, so it inherits again. Beside the row's
+    /// name, so the fields keep the whole width.
     @ViewBuilder private func clearButton(_ visible: Bool, _ action: @escaping () -> Void) -> some View {
         if visible {
-            IconButton(icon: .close, help: "Start from wherever the layer is instead", action: action)
-        } else {
-            Color.clear.frame(width: Theme.control)
+            IconButton(icon: .close, help: "Start from wherever the layer is instead", size: 16, iconBox: 12, action: action)
         }
     }
 }

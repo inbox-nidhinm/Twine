@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import Theme
 
 /// Label above, then a chunky track the full width of the panel with the value
@@ -270,11 +271,15 @@ struct UnitField: View {
     let value: Double
     var decimals: Int = 0
     var suffix: String = ""
+    /// How much a point of dragging across the field changes it; nil is
+    /// `ScrubSurface.step(for:)`.
+    var step: Double? = nil
     var accepts: (Double) -> Bool = { _ in true }
     let commit: (Double) -> Void
 
     @State private var text = ""
     @FocusState private var focused: Bool
+    @Environment(\.scrubbing) private var scrubbing
 
     var body: some View {
         HStack(spacing: 7) {
@@ -299,9 +304,14 @@ struct UnitField: View {
         .frame(height: Theme.control)
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
-        // A click anywhere in the box, its letter included, starts typing.
-        .contentShape(Rectangle())
-        .onTapGesture { focused = true }
+        // A click anywhere in the box, its letter included, starts typing;
+        // a drag across it changes the number.
+        .overlay {
+            if !focused {
+                ScrubSurface(start: { value }, step: step ?? ScrubSurface.step(for: suffix), accepts: accepts,
+                             commit: commit, focus: { ScrubSurface.focus { focused = true } }, scrubbing: scrubbing)
+            }
+        }
     }
 
     private func format(_ v: Double) -> String {
@@ -345,12 +355,14 @@ struct OptionalField: View {
     let placeholder: Double
     var decimals: Int = 0
     var suffix: String = ""
+    var step: Double? = nil
     var accepts: (Double) -> Bool = { _ in true }
     /// Nil when the field is emptied.
     let commit: (Double?) -> Void
 
     @State private var text = ""
     @FocusState private var focused: Bool
+    @Environment(\.scrubbing) private var scrubbing
 
     var body: some View {
         HStack(spacing: 7) {
@@ -376,9 +388,15 @@ struct OptionalField: View {
         .frame(height: Theme.control)
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
-        // A click anywhere in the box, its letter included, starts typing.
-        .contentShape(Rectangle())
-        .onTapGesture { focused = true }
+        // A click starts typing; a drag changes the number, from the one
+        // it falls back to while empty.
+        .overlay {
+            if !focused {
+                ScrubSurface(start: { value ?? placeholder }, step: step ?? ScrubSurface.step(for: suffix),
+                             accepts: accepts, commit: { commit($0) },
+                             focus: { ScrubSurface.focus { focused = true } }, scrubbing: scrubbing)
+            }
+        }
     }
 
     private func format(_ v: Double) -> String {
@@ -418,6 +436,46 @@ struct LabeledRow<Content: View>: View {
             content()
         }
         .frame(height: Theme.panelRow)
+    }
+}
+
+/// A name above and controls filling the whole width under it, as Easing
+/// sits over its menu: for rows of two fields that need the room, such as
+/// an action's From and To.
+struct StackedRow<Accessory: View, Content: View>: View {
+    let label: String
+    /// Small, at the end of the name's line, such as a button that empties
+    /// the fields.
+    @ViewBuilder var accessory: () -> Accessory
+    @ViewBuilder var content: () -> Content
+
+    init(label: String, @ViewBuilder accessory: @escaping () -> Accessory,
+         @ViewBuilder content: @escaping () -> Content) {
+        self.label = label
+        self.accessory = accessory
+        self.content = content
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Text(label)
+                    .font(ThemeFont.label)
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                accessory()
+            }
+            .frame(height: 14)
+            HStack(spacing: 8) { content() }
+                .frame(height: Theme.panelRow)
+        }
+    }
+}
+
+extension StackedRow where Accessory == EmptyView {
+    init(label: String, @ViewBuilder content: @escaping () -> Content) {
+        self.init(label: label, accessory: { EmptyView() }, content: content)
     }
 }
 
@@ -553,5 +611,126 @@ struct HeaderRow<Accessory: View>: View {
         .padding(.leading, Theme.panelPad)
         .padding(.trailing, Theme.panelPad - 4)
         .frame(height: Theme.button)
+    }
+}
+
+// MARK: - Dragging numbers
+
+/// What a number field's drag reports to, so the whole drag undoes as one
+/// step. The inspector sets it; a field without it still drags, a step at
+/// a time.
+struct Scrubbing {
+    let begin: (String) -> Void
+    let end: () -> Void
+}
+
+extension EnvironmentValues {
+    @Entry var scrubbing: Scrubbing? = nil
+}
+
+/// Laid over a number field while it is not being typed in: a drag across
+/// it changes the number, as in Figma, and a click without a drag starts
+/// typing with the number selected. Shift moves ten times as fast, Option a
+/// tenth as fast. An AppKit view rather than a SwiftUI gesture, so every
+/// press lands and the pointer stays the resize arrows throughout.
+struct ScrubSurface: NSViewRepresentable {
+    let start: () -> Double
+    let step: Double
+    let accepts: (Double) -> Bool
+    let commit: (Double) -> Void
+    let focus: () -> Void
+    let scrubbing: Scrubbing?
+
+    /// Seconds move by hundredths a point; everything else by whole units:
+    /// pixels, degrees, percent.
+    static func step(for suffix: String) -> Double { suffix == "s" ? 0.01 : 1 }
+
+    /// Gives the field the keyboard, then selects its number, so typing
+    /// replaces it, as a click in Figma does.
+    @MainActor static func focus(_ take: @escaping () -> Void) {
+        take()
+        DispatchQueue.main.async { NSApp.sendAction(#selector(NSResponder.selectAll(_:)), to: nil, from: nil) }
+    }
+
+    func makeNSView(context: Context) -> ScrubView { ScrubView() }
+
+    func updateNSView(_ view: ScrubView, context: Context) { view.surface = self }
+}
+
+final class ScrubView: NSView {
+    var surface: ScrubSurface?
+
+    private var pressX: CGFloat = 0
+    private var lastX: CGFloat = 0
+    /// The number as dragged, before rounding; nil until the pointer has
+    /// moved far enough to count as a drag rather than a click.
+    private var raw: Double?
+    private var committed: Double = 0
+    /// A press that moves less than this is a click.
+    private let deadZone: CGFloat = 3
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.cursorUpdate, .mouseMoved, .activeInKeyWindow, .inVisibleRect],
+                                       owner: self))
+    }
+
+    // SwiftUI puts its arrow back as the pointer moves, so the pointer is set
+    // on every move, not only by a cursor rect.
+    override func cursorUpdate(with event: NSEvent) { Cursors.resizeHorizontal.set() }
+    override func mouseMoved(with event: NSEvent) { Cursors.resizeHorizontal.set() }
+
+    override func mouseDown(with event: NSEvent) {
+        pressX = event.locationInWindow.x
+        lastX = pressX
+        raw = nil
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let surface else { return }
+        let x = event.locationInWindow.x
+        if raw == nil {
+            guard abs(x - pressX) > deadZone else { return }
+            let start = surface.start()
+            raw = start
+            committed = start
+            lastX = x
+            surface.scrubbing?.begin("Change Value")
+        }
+        Cursors.resizeHorizontal.set()
+        let flags = event.modifierFlags
+        let fine = flags.contains(.option)
+        let speed = flags.contains(.shift) ? 10 : fine ? 0.1 : 1
+        let quantum = surface.step * (fine ? 0.1 : 1)
+        var value = ((raw ?? committed) + Double(x - lastX) * surface.step * speed)
+        lastX = x
+        value = (value / quantum).rounded() * quantum
+        // Past a limit, it rests on the last value the field takes, so
+        // dragging back moves it again at once.
+        if !surface.accepts(value) {
+            let back = committed > value ? quantum : -quantum
+            var tries = 0
+            while !surface.accepts(value) && tries < 10_000 {
+                value += back
+                tries += 1
+            }
+            if !surface.accepts(value) { value = committed }
+        }
+        raw = value
+        guard abs(value - committed) > quantum / 2 else { return }
+        committed = value
+        surface.commit(value)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        if raw == nil {
+            surface?.focus()
+        } else {
+            surface?.scrubbing?.end()
+        }
+        raw = nil
     }
 }

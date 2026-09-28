@@ -82,6 +82,9 @@ struct EditorView: View {
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
         .tint(Theme.accent)
+        // Every number field in the window, its cards and menus included,
+        // undoes a drag as one step.
+        .environment(\.scrubbing, controller.scrubbing)
     }
 
     /// Design mode floats the tools in a bar centred under the canvas,

@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Drag to change numbers", changes: [
+            "Drag across any number field to change it, as in Figma: positions, sizes, scale, corner radius, angles, percentages, an action's From, To and By, and the rest. Shift moves ten times as fast, Option a tenth as fast, and each drag undoes in one step. A click still lets you type, with the number selected.",
+            "An action's From, To and By have their names above the fields, so the fields take the whole width and long numbers show in full.",
+        ]),
         .init(date: "28 September 2026", title: "Position like Figma", changes: [
             "The alignment buttons sit in two trays, left to right and top to bottom, as in Figma; distributing is in a menu from the button beside them.",
             "Scale always shows both ways, SX and SY, with its own link between them.",

@@ -20,6 +20,10 @@ public final class ProjectStore {
     /// The state when a continuous change (a drag, a slider) began.
     @ObservationIgnored private var continuousStart: Project?
     @ObservationIgnored private var continuousName = ""
+    /// While a folding change is open, plain commands join it rather than
+    /// each becoming an undo step: for controls whose every step is an
+    /// ordinary edit, such as dragging across a number field.
+    @ObservationIgnored private var foldsCommands = false
 
     public init(project: Project, undoManager: UndoManager) {
         self.project = project
@@ -29,6 +33,7 @@ public final class ProjectStore {
     /// Applies one command as one undo step. A command that changes nothing
     /// records nothing.
     public func perform(_ command: EditorCommand) throws {
+        if foldsCommands, continuousStart != nil { return try command.apply(to: &project) }
         let before = project
         try command.apply(to: &project)
         guard project != before else { return }
@@ -40,6 +45,7 @@ public final class ProjectStore {
     /// the history goes with them.
     public func load(_ project: Project) {
         continuousStart = nil
+        foldsCommands = false
         self.project = project
         undoManager.removeAllActions(withTarget: self)
     }
@@ -48,8 +54,15 @@ public final class ProjectStore {
 
     /// Starts a change that arrives as many small steps, like dragging a layer
     /// or a slider, and should undo as one.
-    public func beginContinuousChange(_ name: String) {
-        if continuousStart == nil { continuousStart = project }
+    ///
+    /// With `folding`, `perform` joins the change too until it ends, so a
+    /// control that only knows how to make ordinary edits still undoes as
+    /// one step.
+    public func beginContinuousChange(_ name: String, folding: Bool = false) {
+        if continuousStart == nil {
+            continuousStart = project
+            foldsCommands = folding
+        }
         continuousName = name
     }
 
@@ -65,6 +78,7 @@ public final class ProjectStore {
     public func endContinuousChange() {
         guard let start = continuousStart else { return }
         continuousStart = nil
+        foldsCommands = false
         guard project != start else { return }
         record(before: start, name: continuousName)
     }
@@ -74,6 +88,7 @@ public final class ProjectStore {
     public func cancelContinuousChange() {
         guard let start = continuousStart else { return }
         continuousStart = nil
+        foldsCommands = false
         project = start
     }
 

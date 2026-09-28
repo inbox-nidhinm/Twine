@@ -36,6 +36,23 @@ import MotionModel
         #expect(store.project.layers.map(\.name) == ["Renamed"])
     }
 
+    @Test func aFoldingChangeTakesPlainCommandsAsOneStep() throws {
+        let store = makeStore()
+        let a = shape("A")
+        try store.perform(.insertLayers([a], parentID: nil, index: nil))
+        store.beginContinuousChange("Change Value", folding: true)
+        for name in ["B", "C", "D"] { try store.perform(.renameLayer(a.id, name)) }
+        store.endContinuousChange()
+        #expect(store.project.layers.map(\.name) == ["D"])
+        #expect(store.undoManager.undoActionName == "Change Value")
+        store.undoManager.undo()
+        #expect(store.project.layers.map(\.name) == ["A"])
+        // Once it ends, commands are their own steps again.
+        try store.perform(.renameLayer(a.id, "E"))
+        store.undoManager.undo()
+        #expect(store.project.layers.map(\.name) == ["A"])
+    }
+
     @Test func aCommandThatChangesNothingRecordsNothing() throws {
         let a = shape("A")
         let store = makeStore(Project(layers: [a]))
