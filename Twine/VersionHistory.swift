@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Icons a little lighter", changes: [
+            "Icon lines are a touch lighter than in the last build: 1.6 points on the tools and playback buttons, and lighter in the same proportion at every other size.",
+        ]),
         .init(date: "28 September 2026", title: "The export counter slides", changes: [
             "The export's percentage moves the way a Counter with the Slide transition does: each number rises and fades away as the next rises in from below.",
             "The percentage is set in PP Kyoto Thin.",

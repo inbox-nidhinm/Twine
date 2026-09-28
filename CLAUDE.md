@@ -117,7 +117,7 @@ What keeps it fast, and must stay so: `ActionTracks.state` walks only the channe
 
 ## Icons
 
-SVGs in `Icons/`, 24x24, stroked, `M L H V C Z` only. Since 28 September 2026 every icon the app shows is the designer's (supplied in `~/Desktop/28-09`, copied in under the existing names; the music note's filled stem and flag were traced to a centre line, since icons are stroked); the ones no screen shows (most action icons, trash, export, filter, the keyframe and stopwatch ones) are still placeholders. The four `corner...` icons label the per-corner radius fields. The app draws every icon's line at `Theme.iconStroke` (2.4 on the grid, heavier than the artwork's 1.5; the user's choice), scaling with the icon, so a 20 pt icon has a 2 pt line. Regenerate after editing:
+SVGs in `Icons/`, 24x24, stroked, `M L H V C Z` only. Since 28 September 2026 every icon the app shows is the designer's (supplied in `~/Desktop/28-09`, copied in under the existing names; the music note's filled stem and flag were traced to a centre line, since icons are stroked); the ones no screen shows (most action icons, trash, export, filter, the keyframe and stopwatch ones) are still placeholders. The four `corner...` icons label the per-corner radius fields. The app draws every icon's line at `Theme.iconStroke` (1.92 on the grid, heavier than the artwork's 1.5; the user's choice), scaling with the icon, so a 20 pt icon has a 1.6 pt line. Regenerate after editing:
 
 ```bash
 python3 Tools/svg_to_swift.py --icons Icons --out Packages/MotionKit/Sources/Theme/Icons.swift
