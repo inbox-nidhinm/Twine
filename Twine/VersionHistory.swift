@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Clean letter by letter animation", changes: [
+            "Text presets set to letters, words or lines no longer drag slivers of the lines above and below along with each piece, which made text look doubled and glitchy.",
+            "Letters that reach past their own box, such as an f or an italic's tail, are no longer cut off while they move.",
+        ]),
         .init(date: "28 September 2026", title: "Shift-click and trimming together", changes: [
             "Shift-click on the timeline selects every action between the last one you clicked and this one. Command-click still adds or takes away one.",
             "With several actions selected, dragging the end of one of them lengthens or shortens them all by the same time.",

@@ -541,7 +541,7 @@ final class Node {
         for (layer, unit) in zip(unitLayers, text.units) {
             let imageKey = UnitImageKey(text: key, location: unit.range.location, length: unit.range.length)
             let image = unitImages[imageKey] ?? {
-                let made = TextImage(key, region: unit.box)
+                let made = TextImage(key, unit: (unit.box, unit.range))
                 unitImages[imageKey] = made
                 return made
             }()
@@ -769,7 +769,7 @@ private final class TextUnitLayer {
         }
         RevealLayers.apply(unit.reveal, size: size, clip: clip, content: content)
         if (picture.contents as AnyObject?) !== image.image { picture.contents = image.image }
-        // The picture covers the box and a margin above and below it.
+        // The picture covers the box and a margin all round it.
         picture.transform = CATransform3DIdentity
         picture.anchorPoint = CGPoint(x: 0.5, y: 0.5)
         picture.frame = CGRect(x: image.origin.x - unit.box.minX, y: image.origin.y - unit.box.minY,

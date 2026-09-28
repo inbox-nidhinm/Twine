@@ -493,6 +493,35 @@ private enum BlendMaths {
         #expect(ink(after, in: spans[1].box) > 10)
     }
 
+    @Test func aMovingLineCarriesNothingOfItsNeighbours() throws {
+        // Tall capitals and long tails, which reach into the margin round
+        // the next line's picture.
+        let content = TextContent(text: "Ag\nAg\nAg", fontFamily: "SF Pro", fontWeight: 900, fontSize: 24, color: RGBA(1, 0, 0))
+        let size = TextLayout.size(of: content.text, style: TextStyle(content), width: nil)
+        var layer = Layer(name: "T", content: .text(content), size: size, position: Vec2(8, 8))
+        layer.transform.anchor = .zero
+        // From the centre out: the middle line comes in first, alone.
+        let settings = PresetAction(preset: .fadeIn, unit: .lines, order: .center, delay: 0.5)
+        let action = Action(target: layer.id, start: 0, duration: 1, easing: .preset(.none, intensity: 0),
+                            spec: .preset(settings))
+        let project = Project(composition: transparentComposition(96), layers: [layer], actions: [action])
+        let lines = TextSpans.spans(.lines, of: content.text, style: TextStyle(content), width: nil)
+        #expect(lines.count == 3)
+        let image = try render(project, pixels: 96, at: 0.49)
+        func ink(rows: ClosedRange<Double>) -> Int {
+            var count = 0
+            for y in Int(8 + rows.lowerBound)...Int(8 + rows.upperBound) {
+                for x in 0..<96 where pixel(image, x, y).a > 40 { count += 1 }
+            }
+            return count
+        }
+        // The middle line shows; above and below it nothing has begun, so
+        // nothing of the other lines rides along with it.
+        #expect(ink(rows: lines[1].box.minY + 4...lines[1].box.maxY - 4) > 20)
+        #expect(ink(rows: 0...lines[0].box.maxY - 3) == 0)
+        #expect(ink(rows: lines[2].box.minY + 3...lines[2].box.maxY) == 0)
+    }
+
     @Test func aTextStrokeOutlinesTheLetters() throws {
         var content = TextContent(text: "I", fontFamily: "SF Pro", fontWeight: 900, fontSize: 48, color: RGBA(1, 0, 0))
         let size = TextLayout.size(of: content.text, style: TextStyle(content), width: nil)
