@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Heavier icons", changes: [
+            "Icons are drawn with a heavier line: 2 points on the tools and playback buttons, and heavier in the same proportion at every other size.",
+        ]),
         .init(date: "28 September 2026", title: "New icons", changes: [
             "Every icon in the app is now the designer's own: the tools, the layers panel, the inspector, the effects, presets and the timeline's playback buttons.",
             "The fields for each corner's radius show a drawing of their corner instead of TL, TR, BL and BR.",

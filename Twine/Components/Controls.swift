@@ -198,7 +198,7 @@ struct CheckRow: View {
                         .strokeBorder(isOn ? .clear : hovering ? Theme.edgeHover : Theme.textTertiary, lineWidth: 1))
                     .overlay {
                         if isOn {
-                            IconView(.check, size: Theme.checkbox - 2, lineWidth: 2)
+                            IconView(.check, size: Theme.checkbox - 2, lineWidth: Theme.checkStroke)
                                 .foregroundStyle(Theme.canvas)
                         }
                     }

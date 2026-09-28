@@ -108,6 +108,12 @@ public enum Theme {
     public static let icon: CGFloat = 20
     /// The grid icon artwork is drawn on.
     public static let iconGrid: CGFloat = 24
+    /// An icon's line, on its grid: it scales with the icon, so a 20 pt icon
+    /// draws a 2 pt line and a 15 pt one a 1.5 pt line. The artwork is drawn
+    /// at 1.5; the app draws it heavier.
+    public static let iconStroke: CGFloat = 2.4
+    /// The tick in a checkbox, a little heavier than other icons.
+    public static let checkStroke: CGFloat = 3.2
     public static let panelRow: CGFloat = 24
     public static let listRow: CGFloat = 32
     public static let barRow: CGFloat = 40

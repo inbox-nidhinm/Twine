@@ -9,10 +9,10 @@ import SwiftUI
 /// way SF Symbols do.
 public struct IconShape: Shape {
     public let icon: Icon
-    /// On the artwork's own 24-unit grid, matching the source SVGs.
+    /// On the artwork's own 24-unit grid.
     public var lineWidth: CGFloat
 
-    public init(icon: Icon, lineWidth: CGFloat = 1.5) {
+    public init(icon: Icon, lineWidth: CGFloat = Theme.iconStroke) {
         self.icon = icon
         self.lineWidth = lineWidth
     }
@@ -36,7 +36,7 @@ public struct IconView: View {
     public var size: CGFloat
     public var lineWidth: CGFloat
 
-    public init(_ icon: Icon, size: CGFloat = Theme.icon, lineWidth: CGFloat = 1.5) {
+    public init(_ icon: Icon, size: CGFloat = Theme.icon, lineWidth: CGFloat = Theme.iconStroke) {
         self.icon = icon
         self.size = size
         self.lineWidth = lineWidth
