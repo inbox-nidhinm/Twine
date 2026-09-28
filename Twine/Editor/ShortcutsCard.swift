@@ -25,8 +25,8 @@ struct ShortcutsCard: View {
                     IconButton(icon: .close, help: "Close (Esc or ⌘/)", action: dismiss)
                 }
                 .padding(.horizontal, pad)
-                .frame(height: 38)
-                .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: 1) }
+                .frame(height: Theme.sheetHeader)
+                .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: Theme.hairline) }
 
                 ScrollView {
                     HStack(alignment: .top, spacing: pad) {
@@ -93,6 +93,7 @@ struct ShortcutsCard: View {
                 s("Zoom to fit, actual size", "⌘0", "⌥⌘0"),
                 s("Zoom in, out", "⌘=", "⌘-"),
                 s("Hide layers, inspector", "⌘1", "⌘2"),
+                s("Full screen", "⌃⌘F"),
                 s("Keyboard shortcuts", "⌘/"),
             ]),
         ],
@@ -126,6 +127,7 @@ struct ShortcutsCard: View {
                 s("Start, end", "Home", "End"),
             ]),
             Group(title: "Timeline", items: [
+                s("Add or take away an action", "⌘", "click"),
                 s("Select the actions between", "⇧", "click"),
                 s("Move actions a frame", "←→", "⇧←→"),
                 s("Trim both ends", "⌥", "drag end"),
@@ -137,6 +139,7 @@ struct ShortcutsCard: View {
                 s("Import", "⌘I"),
                 s("Export, current frame", "⌘E", "⇧⌘E"),
                 s("Duplicate, rename layer", "⌘D", "⌘R"),
+                s("Duplicate project", "⇧⌘S"),
                 s("Home", "⇧⌘H"),
             ]),
         ],

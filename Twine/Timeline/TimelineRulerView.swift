@@ -38,7 +38,7 @@ final class TimelineRulerView: NSView {
         let mid = bounds.height / 2
         let endX = viewport.x(for: controller.duration)
         if endX < bounds.width {
-            ctx.setFillColor(CGColor(gray: 0, alpha: 0.22))
+            ctx.setFillColor(NSColor(Theme.pastTheEnd).cgColor)
             ctx.fill(CGRect(x: max(endX, 0), y: 0, width: bounds.width - max(endX, 0), height: bounds.height))
         }
 
@@ -81,7 +81,7 @@ final class TimelineRulerView: NSView {
                                                    : Self.pillFormat(controller.editor.time)) as NSString
         let pillText: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
-            .foregroundColor: NSColor.white,
+            .foregroundColor: NSColor(Theme.textOnColor),
         ]
         let size = time.size(withAttributes: pillText)
         let pill = CGRect(x: px - (size.width + 22) / 2, y: mid - 11, width: size.width + 22, height: 22)

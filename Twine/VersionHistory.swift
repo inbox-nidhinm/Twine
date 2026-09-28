@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Shortcuts card", changes: [
+            "The Keyboard Shortcuts card lists Duplicate project, full screen and Command-click to add or take away an action in the timeline.",
+        ]),
         .init(date: "29 September 2026", title: "Faster masks, sturdier export", changes: [
             "Scenes with a mask play much faster: a thousand layers and one mask took 45 ms a frame to work out, and now take under 2 ms.",
             "An export that fails part way stops reading its sounds too, and can no longer wait for ever on a sound that will never finish.",
@@ -557,8 +560,8 @@ struct VersionHistoryCard: View {
                     IconButton(icon: .close, help: "Close (Esc)", action: dismiss)
                 }
                 .padding(.horizontal, pad)
-                .frame(height: 38)
-                .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: 1) }
+                .frame(height: Theme.sheetHeader)
+                .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: Theme.hairline) }
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {

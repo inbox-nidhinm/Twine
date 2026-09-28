@@ -410,7 +410,7 @@ struct AnchorPicker: View {
                 }
             }
         }
-        .padding(4)
+        .padding(Theme.menuPad)
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
     }

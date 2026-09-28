@@ -77,7 +77,7 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Rectangle().fill(Theme.border)
-                .frame(height: 1)
+                .frame(height: Theme.hairline)
                 .padding(.horizontal, Theme.panelPad)
                 .padding(.bottom, Theme.rowGap)
 
@@ -259,7 +259,7 @@ struct HomeView: View {
             .contentShape(Rectangle())
             .gesture(WindowDragGesture())
 
-            Rectangle().fill(Theme.border).frame(height: 1)
+            Rectangle().fill(Theme.border).frame(height: Theme.hairline)
 
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: card, maximum: card), spacing: gutter,

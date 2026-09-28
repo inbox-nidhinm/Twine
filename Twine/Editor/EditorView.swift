@@ -112,7 +112,7 @@ struct EditorView: View {
     /// The timeline's top edge, dragged to make it taller or shorter.
     private var timelineGrip: some View {
         Color.clear
-            .frame(height: 6)
+            .frame(height: Theme.resizeEdge)
             .contentShape(Rectangle())
             .background(CursorArea(cursor: Cursors.resizeVertical))
             // SwiftUI's own pointer as well, since the window's SwiftUI puts

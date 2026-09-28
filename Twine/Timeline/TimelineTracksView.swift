@@ -271,7 +271,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         // After the composition ends, dimmed.
         let endX = x(for: controller.duration)
         if endX < bounds.width {
-            ctx.setFillColor(CGColor(gray: 0, alpha: 0.22))
+            ctx.setFillColor(NSColor(Theme.pastTheEnd).cgColor)
             ctx.fill(CGRect(x: max(endX, gutter), y: 0, width: bounds.width - max(endX, gutter), height: bounds.height))
         }
         // The line between the labels and the bars.
@@ -385,7 +385,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         // Under the pointer, a handle at each end says the ends drag.
         if hoveredBar == action.id, !action.isInstant, rect.width >= Self.edgeReach * 2.4 {
             let size = Self.handleSize
-            ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+            ctx.setFillColor(NSColor(Theme.handle).cgColor)
             for x in [rect.minX + Self.handleInset, rect.maxX - Self.handleInset - size.width] {
                 let handle = CGRect(x: x, y: rect.midY - size.height / 2, width: size.width, height: size.height)
                 ctx.addPath(CGPath(roundedRect: handle, cornerWidth: size.width / 2, cornerHeight: size.width / 2, transform: nil))

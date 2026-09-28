@@ -129,9 +129,9 @@ private struct SaturationSquare: View {
                 Rectangle().fill(LinearGradient(colors: [.white, hue], startPoint: .leading, endPoint: .trailing))
                 Rectangle().fill(LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom))
                 Circle()
-                    .strokeBorder(Color.white, lineWidth: 2)
+                    .strokeBorder(Theme.pickerRing, lineWidth: 2)
                     .background(Circle().fill(hsb.rgba(alpha: 1).opaque))
-                    .shadow(color: .black.opacity(0.3), radius: 1)
+                    .shadow(color: Theme.pickerRingShadow, radius: 1)
                     .frame(width: ColorPicker.thumb, height: ColorPicker.thumb)
                     .offset(x: hsb.s * geo.size.width - ColorPicker.thumb / 2,
                             y: (1 - hsb.b) * geo.size.height - ColorPicker.thumb / 2)
@@ -171,9 +171,9 @@ private struct PickerBar<Track: View>: View {
                     .overlay(Capsule().strokeBorder(Theme.edge, lineWidth: 1))
                     .padding(.horizontal, ColorPicker.thumb / 2)
                 Circle()
-                    .strokeBorder(Color.white, lineWidth: 2)
+                    .strokeBorder(Theme.pickerRing, lineWidth: 2)
                     .background(Circle().fill(thumbFill))
-                    .shadow(color: .black.opacity(0.3), radius: 1)
+                    .shadow(color: Theme.pickerRingShadow, radius: 1)
                     .frame(width: ColorPicker.thumb, height: ColorPicker.thumb)
                     .offset(x: value * travel)
             }

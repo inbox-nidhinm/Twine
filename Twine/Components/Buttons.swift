@@ -31,7 +31,7 @@ struct BarGlyph: View {
     var body: some View {
         IconView(icon, size: iconBox)
             .frame(width: size, height: size)
-            .foregroundStyle(isOn ? Color.white
+            .foregroundStyle(isOn ? Theme.textOnColor
                              : disabled ? Theme.textTertiary.opacity(0.4)
                              : lit || (hoverLights && hovering) ? Theme.textPrimary
                              : Theme.textSecondary)
@@ -110,7 +110,7 @@ struct PrimaryButton: View {
         Button(action: action) {
             Text(title)
                 .font(ThemeFont.labelStrong)
-                .foregroundStyle(Color.white.opacity(disabled ? 0.5 : 1))
+                .foregroundStyle(Theme.textOnColor.opacity(disabled ? 0.5 : 1))
                 .frame(maxWidth: .infinity)
                 .frame(height: Theme.primaryButton)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl)

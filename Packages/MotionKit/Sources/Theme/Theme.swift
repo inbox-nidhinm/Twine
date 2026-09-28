@@ -88,6 +88,41 @@ public enum Theme {
     public static let grip = Color(white: 0.72)
     /// Behind numbers laid over artwork.
     public static let badge = Color.black.opacity(0.55)
+    /// Words and glyphs on a coloured fill: the tool in hand, a segment
+    /// that is on, the Export button, the playhead's time, a guide's gap.
+    public static let textOnColor = Color.white
+    /// The canvas's handles and points and a timeline bar's trim handles:
+    /// white, so they read over artwork of any colour.
+    public static let handle = Color.white
+    /// The ring round the colour picker's markers, and its soft shadow,
+    /// together readable on any colour.
+    public static let pickerRing = Color.white
+    public static let pickerRingShadow = Color.black.opacity(0.3)
+    /// Over the ruler and the tracks after the composition ends.
+    public static let pastTheEnd = Color.black.opacity(0.22)
+    /// The checkerboard that stands for transparency: its two greys and
+    /// the side of a square.
+    public static let checkerDark = Color(white: 0.42)
+    public static let checkerLight = Color(white: 0.52)
+    public static let checkerCell: CGFloat = 8
+    /// A dividing line, and the cards' header rows under which one runs:
+    /// floating cards (the easing card, popups) and the larger sheets
+    /// (Version History, Keyboard Shortcuts).
+    public static let hairline: CGFloat = 1
+    public static let cardHeader: CGFloat = 34
+    public static let sheetHeader: CGFloat = 38
+    /// The bar on a slider's or a switch's pill that says it drags.
+    public static let gripWidth: CGFloat = 2
+    public static let gripHeight: CGFloat = 10
+    public static let radiusGrip: CGFloat = 1
+    /// Round a menu's items, and round the anchor picker's dots.
+    public static let menuPad: CGFloat = 4
+    /// A row's small icon buttons (eye, lock, a field's clear button), and
+    /// the layers panel's disclosure chevron.
+    public static let rowIconButton: CGFloat = 22
+    public static let disclosure: CGFloat = 14
+    /// How far above and below an edge it can be grabbed to resize.
+    public static let resizeEdge: CGFloat = 6
     /// The shadow under every floating card.
     public static let shadow = Color.black.opacity(0.4)
     public static let shadowRadius: CGFloat = 12

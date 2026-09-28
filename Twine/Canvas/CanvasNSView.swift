@@ -1360,11 +1360,11 @@ final class CanvasNSView: NSView {
     /// The checkerboard behind a transparent composition, shared with the
     /// export preview.
     static let checkerColor: CGColor = {
-        let cell = 8.0
+        let cell = Theme.checkerCell
         let image = NSImage(size: NSSize(width: cell * 2, height: cell * 2), flipped: false) { rect in
-            NSColor(white: 0.42, alpha: 1).setFill()
+            NSColor(Theme.checkerDark).setFill()
             rect.fill()
-            NSColor(white: 0.52, alpha: 1).setFill()
+            NSColor(Theme.checkerLight).setFill()
             NSRect(x: 0, y: 0, width: cell, height: cell).fill()
             NSRect(x: cell, y: cell, width: cell, height: cell).fill()
             return true

@@ -17,7 +17,7 @@ struct TimelinePanel: View {
             HStack(spacing: 0) {
                 TransportBar(controller: controller, editor: editor)
                     .frame(width: TimelineRow.labelWidth - 1)
-                Rectangle().fill(Theme.border).frame(width: 1)
+                Rectangle().fill(Theme.border).frame(width: Theme.hairline)
                 TimelineRuler(controller: controller, editor: editor)
             }
             .frame(height: Self.headerHeight)

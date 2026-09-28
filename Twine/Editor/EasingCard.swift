@@ -134,8 +134,8 @@ struct EasingCard: View {
             }
         }
         .padding(.horizontal, back == nil ? Theme.panelPad : Theme.panelPad - 6)
-        .frame(height: 34)
-        .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: 1) }
+        .frame(height: Theme.cardHeader)
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: Theme.hairline) }
     }
 }
 

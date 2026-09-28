@@ -54,6 +54,7 @@ nonisolated final class CanvasOverlay: CALayer {
     private let cropHandles = CAShapeLayer()
 
     private static let accent = NSColor(Theme.accent).cgColor
+    private static let handle = NSColor(Theme.handle).cgColor
 
     override init() {
         super.init()
@@ -93,10 +94,10 @@ nonisolated final class CanvasOverlay: CALayer {
         marquee.fillColor = NSColor(Theme.accent).withAlphaComponent(0.08).cgColor
         marquee.strokeColor = Self.accent
         marquee.lineWidth = 1
-        handles.fillColor = CGColor(gray: 1, alpha: 1)
+        handles.fillColor = Self.handle
         handles.strokeColor = Self.accent
         handles.lineWidth = 1
-        anchor.fillColor = CGColor(gray: 1, alpha: 1)
+        anchor.fillColor = Self.handle
         anchor.strokeColor = Self.accent
         anchor.lineWidth = 1
         motion.fillColor = nil
@@ -106,13 +107,13 @@ nonisolated final class CanvasOverlay: CALayer {
         motionArms.fillColor = nil
         motionArms.strokeColor = NSColor(Theme.accent).withAlphaComponent(0.6).cgColor
         motionArms.lineWidth = 1
-        motionStart.fillColor = CGColor(gray: 1, alpha: 1)
+        motionStart.fillColor = Self.handle
         motionStart.strokeColor = Self.accent
         motionStart.lineWidth = 1.5
         motionEnd.fillColor = Self.accent
-        motionEnd.strokeColor = CGColor(gray: 1, alpha: 1)
+        motionEnd.strokeColor = Self.handle
         motionEnd.lineWidth = 1.5
-        motionHandles.fillColor = CGColor(gray: 1, alpha: 1)
+        motionHandles.fillColor = Self.handle
         motionHandles.strokeColor = Self.accent
         motionHandles.lineWidth = 1
         textSelection.fillColor = NSColor(Theme.accent).withAlphaComponent(0.3).cgColor
@@ -137,17 +138,17 @@ nonisolated final class CanvasOverlay: CALayer {
         cropLine.strokeColor = Self.accent
         cropLine.lineWidth = 1
         cropLine.lineDashPattern = [4, 3]
-        cropHandles.fillColor = CGColor(gray: 1, alpha: 1)
+        cropHandles.fillColor = Self.handle
         cropHandles.strokeColor = Self.accent
         cropHandles.lineWidth = 1
-        pathHandles.fillColor = CGColor(gray: 1, alpha: 1)
+        pathHandles.fillColor = Self.handle
         pathHandles.strokeColor = Self.accent
         pathHandles.lineWidth = 1
-        pathPoints.fillColor = CGColor(gray: 1, alpha: 1)
+        pathPoints.fillColor = Self.handle
         pathPoints.strokeColor = Self.accent
         pathPoints.lineWidth = 1.5
         pathSelected.fillColor = Self.accent
-        pathSelected.strokeColor = CGColor(gray: 1, alpha: 1)
+        pathSelected.strokeColor = Self.handle
         pathSelected.lineWidth = 1.5
         for l in [guides, gapLines] {
             l.fillColor = nil
@@ -197,7 +198,7 @@ nonisolated final class CanvasOverlay: CALayer {
             label.contentsScale = 2
             label.fontSize = 10
             label.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .semibold)
-            label.foregroundColor = CGColor(gray: 1, alpha: 1)
+            label.foregroundColor = NSColor(Theme.textOnColor).cgColor
             label.backgroundColor = Self.guide
             label.alignmentMode = .center
             label.cornerRadius = 3

@@ -43,7 +43,7 @@ struct ExportPanel: View {
                 .frame(width: Theme.exportColumn)
             Rectangle()
                 .fill(Theme.border)
-                .frame(width: 1)
+                .frame(width: Theme.hairline)
             stage
         }
         .overlay(alignment: .topTrailing) {

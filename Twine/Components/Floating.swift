@@ -76,8 +76,8 @@ struct PopupCard<Accessory: View, Content: View>: View {
                 accessory()
             }
             .padding(.horizontal, Theme.panelPad)
-            .frame(height: 34)
-            .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: 1) }
+            .frame(height: Theme.cardHeader)
+            .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: Theme.hairline) }
 
             VStack(alignment: .leading, spacing: 8) { content() }
                 .padding(Theme.panelPad)

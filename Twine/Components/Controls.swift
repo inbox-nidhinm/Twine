@@ -78,10 +78,10 @@ private struct PillTrack: View {
                     .fill(Theme.thumb)
                     .frame(width: thumbWidth + travel * CGFloat(t), height: Theme.track - inset * 2)
                     .overlay(alignment: .trailing) {
-                        RoundedRectangle(cornerRadius: 1)
+                        RoundedRectangle(cornerRadius: Theme.radiusGrip)
                             .fill(hovering || grab != nil ? Theme.grip : .clear)
-                            .frame(width: 2, height: 10)
-                            .padding(.trailing, thumbWidth / 2 - 1)
+                            .frame(width: Theme.gripWidth, height: Theme.gripHeight)
+                            .padding(.trailing, thumbWidth / 2 - Theme.gripWidth / 2)
                     }
                     .padding(.leading, inset)
 
@@ -150,7 +150,7 @@ struct PillToggle: View {
                 RoundedRectangle(cornerRadius: Theme.radiusTrack - 1)
                     .fill(Theme.thumb)
                     .frame(width: thumb, height: thumb)
-                    .overlay(RoundedRectangle(cornerRadius: 1).fill(Theme.grip).frame(width: 2, height: 10))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.radiusGrip).fill(Theme.grip).frame(width: Theme.gripWidth, height: Theme.gripHeight))
                     .padding(.horizontal, inset)
             }
             .frame(width: width, height: Theme.track)
@@ -233,7 +233,7 @@ struct SegmentRow<Value: Hashable>: View {
                 Segment(title: title(option), icon: icon?(option), isOn: option == selection) { select(option) }
             }
         }
-        .padding(2)
+        .padding(Theme.trayPad)
         .background(RoundedRectangle(cornerRadius: Theme.radiusControl + 1).fill(Theme.panelRaised))
         .frame(height: Theme.panelRow + 4)
     }
@@ -258,7 +258,7 @@ private struct Segment: View {
                         .lineLimit(1)
                 }
             }
-                .foregroundStyle(isOn ? Color.white : Theme.textSecondary)
+                .foregroundStyle(isOn ? Theme.textOnColor : Theme.textSecondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
                     .fill(isOn ? Theme.chosen : hovering ? Theme.rowHover : .clear))
@@ -575,7 +575,7 @@ struct PanelDivider: View {
     var body: some View {
         Rectangle()
             .fill(Theme.border)
-            .frame(height: 1)
+            .frame(height: Theme.hairline)
     }
 }
 
@@ -656,7 +656,7 @@ private struct StepButton: View {
             IconView(icon, size: 15)
                 .foregroundStyle(disabled ? Theme.textTertiary.opacity(0.4)
                                  : hovering ? Theme.textPrimary : Theme.textSecondary)
-                .frame(width: 22, height: Theme.control)
+                .frame(width: Theme.rowIconButton, height: Theme.control)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
                     .fill(hovering && !disabled ? Theme.panelHover : .clear))
                 .contentShape(Rectangle())

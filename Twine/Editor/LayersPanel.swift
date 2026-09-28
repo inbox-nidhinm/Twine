@@ -186,12 +186,12 @@ private struct LayerRow: View {
                     IconView(.chevronRight, size: 12)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                         .foregroundStyle(Theme.textTertiary)
-                        .frame(width: 14, height: Theme.listRow)
+                        .frame(width: Theme.disclosure, height: Theme.listRow)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             } else {
-                Color.clear.frame(width: 14, height: 1)
+                Color.clear.frame(width: Theme.disclosure, height: Theme.hairline)
             }
             IconView(isMask ? .mask : layer.icon, size: 15)
                 .foregroundStyle(selected ? Theme.textPrimary : Theme.textTertiary)
@@ -279,7 +279,7 @@ private struct LayerRow: View {
         Button(action: action) {
             IconView(icon, size: 15)
                 .foregroundStyle(on ? Theme.textPrimary : Theme.textTertiary)
-                .frame(width: 22, height: Theme.listRow)
+                .frame(width: Theme.rowIconButton, height: Theme.listRow)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
