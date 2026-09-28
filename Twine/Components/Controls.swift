@@ -667,7 +667,7 @@ struct HeaderRow<Accessory: View>: View {
             accessory()
         }
         .padding(.leading, Theme.panelPad)
-        .padding(.trailing, Theme.panelPad - 4)
+        .padding(.trailing, Theme.buttonInset)
         .frame(height: Theme.button)
     }
 }
@@ -676,10 +676,11 @@ struct HeaderRow<Accessory: View>: View {
 
 extension View {
     /// A section's body on the inspector's grid: its rows start at the
-    /// panel's inset and stop short of the button column.
+    /// panel's inset and stop short of the button column, which lines up
+    /// with the section headers' add and remove buttons.
     func gridBody() -> some View {
         padding(.leading, Theme.panelPad)
-            .padding(.trailing, Theme.panelPad + Theme.rowGutter)
+            .padding(.trailing, Theme.buttonInset + Theme.rowGutter)
     }
 
     /// A row with a button that acts on it, placed in the button column

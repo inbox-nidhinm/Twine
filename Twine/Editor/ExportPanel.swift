@@ -49,7 +49,7 @@ struct ExportPanel: View {
             IconButton(icon: .close, help: session.isExporting ? "Stop the export and close (Esc)" : "Close (Esc)") {
                 controller.closeExport()
             }
-            .padding(Theme.panelPad - 4)
+            .padding(Theme.buttonInset)
         }
         .floatingPanel()
         .padding(Theme.floatInset)

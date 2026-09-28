@@ -144,6 +144,11 @@ public enum Theme {
     /// 2026).
     public static let columnGap: CGFloat = 8
     public static let rowGutter: CGFloat = control + columnGap
+    /// How far a small button's box sits from the panel's right edge: closer
+    /// than `panelPad`, because the box is wider than its glyph. Section
+    /// headers' add and remove buttons and the button column share it, so
+    /// every button in the inspector lines up.
+    public static let buttonInset: CGFloat = panelPad - 4
     /// Card to window edge.
     public static let floatInset: CGFloat = 8
     /// Card to card.

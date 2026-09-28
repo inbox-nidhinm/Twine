@@ -46,7 +46,7 @@ struct LayersPanel: View {
             IconButton(icon: .home, help: "Home (⇧⌘H)") {
                 HomeWindowController.shared.showWindow(nil)
             }
-            .padding(.trailing, Theme.panelPad - 4)
+            .padding(.trailing, Theme.buttonInset)
             .padding(.top, Theme.panelPad - 6)
         }
         // Selecting something inside a folded group opens the group, so the

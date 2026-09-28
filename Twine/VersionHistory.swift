@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Buttons in one line", changes: [
+            "Every button at the right of the inspector now lines up with the sections' add and remove buttons, and the fields grew a little to keep the same gap before them.",
+        ]),
         .init(date: "28 September 2026", title: "The inspector's grid", changes: [
             "Every row in the inspector stops at the same edge, with a column at the right for the button that acts on that row: the links, the corners button, show and hide, the stroke's settings, distribute, mute, and in Animate the links and the button that empties a starting value.",
             "Section headers only add or remove; showing and hiding moved onto the fill's, stroke's or effect's first row.",
