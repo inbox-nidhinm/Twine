@@ -286,12 +286,12 @@ struct LayerInspector: View {
                 }
                 if perCorner || !r.isUniform {
                     HStack(spacing: 8) {
-                        corner("TL", r.topLeft) { c, v in c.topLeft = v }
-                        corner("TR", r.topRight) { c, v in c.topRight = v }
+                        corner(.cornerTopLeft, r.topLeft) { c, v in c.topLeft = v }
+                        corner(.cornerTopRight, r.topRight) { c, v in c.topRight = v }
                     }
                     HStack(spacing: 8) {
-                        corner("BL", r.bottomLeft) { c, v in c.bottomLeft = v }
-                        corner("BR", r.bottomRight) { c, v in c.bottomRight = v }
+                        corner(.cornerBottomLeft, r.bottomLeft) { c, v in c.bottomLeft = v }
+                        corner(.cornerBottomRight, r.bottomRight) { c, v in c.bottomRight = v }
                     }
                 }
             }
@@ -340,8 +340,8 @@ struct LayerInspector: View {
         }
     }
 
-    private func corner(_ unit: String, _ value: Double, _ set: @escaping (inout CornerRadii, Double) -> Void) -> some View {
-        UnitField(unit: unit, value: value, decimals: 1, accepts: { $0 >= 0 }) { v in
+    private func corner(_ icon: Icon, _ value: Double, _ set: @escaping (inout CornerRadii, Double) -> Void) -> some View {
+        UnitField(icon: icon, value: value, decimals: 1, accepts: { $0 >= 0 }) { v in
             guard case .rectangle(let radii) = layer.shapeGeometry else { return }
             var r = radii
             set(&r, v)

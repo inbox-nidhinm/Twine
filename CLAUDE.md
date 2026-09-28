@@ -117,7 +117,7 @@ What keeps it fast, and must stay so: `ActionTracks.state` walks only the channe
 
 ## Icons
 
-Placeholder SVGs in `Icons/`, 24x24, stroked, `M L H V C Z` only. Regenerate after editing:
+SVGs in `Icons/`, 24x24, stroked, `M L H V C Z` only. Since 28 September 2026 every icon the app shows is the designer's (supplied in `~/Desktop/28-09`, copied in under the existing names; the music note's filled stem and flag were traced to a centre line, since icons are stroked); the ones no screen shows (most action icons, trash, export, filter, the keyframe and stopwatch ones) are still placeholders. The four `corner...` icons label the per-corner radius fields. Regenerate after editing:
 
 ```bash
 python3 Tools/svg_to_swift.py --icons Icons --out Packages/MotionKit/Sources/Theme/Icons.swift

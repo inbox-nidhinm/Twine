@@ -363,6 +363,8 @@ struct UnitField: View {
 /// number empties it again.
 struct OptionalField: View {
     var unit: String = ""
+    /// Drawn in place of the name, as in `UnitField`.
+    var icon: Icon? = nil
     let value: Double?
     let placeholder: Double
     var decimals: Int = 0
@@ -378,7 +380,10 @@ struct OptionalField: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            if !unit.isEmpty {
+            if let icon {
+                IconView(icon, size: 13)
+                    .foregroundStyle(Theme.textTertiary)
+            } else if !unit.isEmpty {
                 // Never cut short: the number gives way first.
                 Text(unit)
                     .font(ThemeFont.unit)

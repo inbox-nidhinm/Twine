@@ -129,7 +129,7 @@ struct StyleValueFields: View {
                 clearButton(r.initial != nil) { editing("Starting Corners", Self.corners { a, _ in a.initial = nil }) }
             }
             cornerGrid { corner in
-                OptionalField(unit: corner.unit, value: r.initial?[keyPath: corner.path], placeholder: from[keyPath: corner.path],
+                OptionalField(icon: corner.icon, value: r.initial?[keyPath: corner.path], placeholder: from[keyPath: corner.path],
                               accepts: { $0 >= 0 }) { v in
                     editing("Starting Corners", Self.corners { a, st in
                         guard let v else { a.initial = nil; return }
@@ -142,7 +142,7 @@ struct StyleValueFields: View {
             .help("The corners it starts at, clockwise from the top left. Empty starts from the layer's corners.")
             sectionLabel("To") { linkButton(r) }
             cornerGrid { corner in
-                UnitField(unit: corner.unit, value: r.end[keyPath: corner.path], accepts: { $0 >= 0 }) { v in
+                UnitField(icon: corner.icon, value: r.end[keyPath: corner.path], accepts: { $0 >= 0 }) { v in
                     editing("Corner Radius", Self.corners { a, _ in a.end[keyPath: corner.path] = v })
                 }
             }
@@ -150,16 +150,16 @@ struct StyleValueFields: View {
     }
 
     private struct Corner: Identifiable {
-        let unit: String
+        let icon: Icon
         let path: WritableKeyPath<CornerRadii, Double>
-        var id: String { unit }
+        var id: Icon { icon }
     }
 
     /// Four fields in the corners' own places: top left and right, then
     /// bottom left and right.
     private func cornerGrid<Field: View>(@ViewBuilder _ field: @escaping (Corner) -> Field) -> some View {
-        let rows = [[Corner(unit: "TL", path: \.topLeft), Corner(unit: "TR", path: \.topRight)],
-                    [Corner(unit: "BL", path: \.bottomLeft), Corner(unit: "BR", path: \.bottomRight)]]
+        let rows = [[Corner(icon: .cornerTopLeft, path: \.topLeft), Corner(icon: .cornerTopRight, path: \.topRight)],
+                    [Corner(icon: .cornerBottomLeft, path: \.bottomLeft), Corner(icon: .cornerBottomRight, path: \.bottomRight)]]
         return VStack(spacing: 8) {
             ForEach(rows.indices, id: \.self) { i in
                 HStack(spacing: 8) { ForEach(rows[i]) { field($0) } }

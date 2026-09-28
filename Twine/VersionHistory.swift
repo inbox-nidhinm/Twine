@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "New icons", changes: [
+            "Every icon in the app is now the designer's own: the tools, the layers panel, the inspector, the effects, presets and the timeline's playback buttons.",
+            "The fields for each corner's radius show a drawing of their corner instead of TL, TR, BL and BR.",
+        ]),
         .init(date: "28 September 2026", title: "Buttons in one line", changes: [
             "Every button at the right of the inspector now lines up with the sections' add and remove buttons, and the fields grew a little to keep the same gap before them.",
         ]),
