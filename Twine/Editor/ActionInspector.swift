@@ -436,7 +436,8 @@ extension Easing {
 extension EasingPreset {
     var title: String {
         switch self {
-        case .none: return "None"
+        // Files still say none.
+        case .none: return "Linear"
         case .smooth: return "Smooth"
         case .natural: return "Natural"
         case .slowDown: return "Slow down"

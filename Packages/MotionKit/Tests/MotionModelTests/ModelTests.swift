@@ -44,6 +44,18 @@ import Testing
         #expect(RGBA(hex: "nope") == nil)
     }
 
+    @Test func shortTypedHexFillsTheRest() {
+        #expect(RGBA(typed: "0")?.hex6 == "000000")
+        #expect(RGBA(typed: "f")?.hex6 == "FFFFFF")
+        #expect(RGBA(typed: "1a")?.hex6 == "1A1A1A")
+        #expect(RGBA(typed: "#abc")?.hex6 == "AABBCC")
+        #expect(RGBA(typed: " 4C9FEF ")?.hex6 == "4C9FEF")
+        #expect(RGBA(typed: "00000080")?.a == 128.0 / 255)
+        #expect(RGBA(typed: "") == nil)
+        #expect(RGBA(typed: "1234") == nil)
+        #expect(RGBA(typed: "zz") == nil)
+    }
+
 }
 
 @Suite struct LayerTreeTests {

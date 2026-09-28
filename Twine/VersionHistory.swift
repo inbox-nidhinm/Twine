@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Linear", changes: [
+            "The easing that runs at an even speed is called Linear rather than None.",
+        ]),
         .init(date: "28 September 2026", title: "The easing card", changes: [
             "Easing is picked from a card of tiles beside the inspector, each showing its curve. Under the pointer, a tile plays a small box moving with that easing.",
             "Picking a tile keeps the card open. Clicking the picked tile again shows its graph and an Intensity slider.",

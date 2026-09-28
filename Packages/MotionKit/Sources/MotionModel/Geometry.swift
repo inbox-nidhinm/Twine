@@ -71,6 +71,23 @@ public struct RGBA: AnimatableValue, Hashable {
                   Double(v & 0xFF) / 255)
     }
 
+    /// What a hex field takes, as Figma's does: one digit fills all six
+    /// (`0` is `000000`), two repeat three times (`1a` is `1A1A1A`), three
+    /// double each (`abc` is `AABBCC`), and six or eight are read as they
+    /// are. Nil for anything else.
+    public init?(typed: String) {
+        var text = typed.trimmingCharacters(in: .whitespaces)
+        if text.hasPrefix("#") { text.removeFirst() }
+        guard !text.isEmpty, text.allSatisfy(\.isHexDigit) else { return nil }
+        switch text.count {
+        case 1: text = String(repeating: text, count: 6)
+        case 2: text = String(repeating: text, count: 3)
+        case 3: text = text.map { "\($0)\($0)" }.joined()
+        default: break
+        }
+        self.init(hex: text)
+    }
+
     /// Six digits, upper case, no hash. Alpha is shown separately in the UI.
     public var hex6: String {
         func byte(_ c: Double) -> Int { Int((min(max(c, 0), 1) * 255).rounded()) }
