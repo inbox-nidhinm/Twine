@@ -138,6 +138,12 @@ public enum Theme {
 
     /// What every panel insets its contents by.
     public static let panelPad: CGFloat = 12
+    /// The inspector's button column, one button wide, and the gap before
+    /// it. Every row's controls stop short of it; a button that acts on a
+    /// row sits in it, level with the row (the user's grid, 28 September
+    /// 2026).
+    public static let columnGap: CGFloat = 8
+    public static let rowGutter: CGFloat = control + columnGap
     /// Card to window edge.
     public static let floatInset: CGFloat = 8
     /// Card to card.

@@ -268,6 +268,10 @@ private struct Segment: View {
 /// shown after the number and may be typed or left off.
 struct UnitField: View {
     var unit: String = ""
+    /// Drawn in place of the name, such as the arc on a joined arc field.
+    var icon: Icon? = nil
+    /// Square inside a `JoinedFields`, which rounds the whole.
+    var corner: CGFloat = Theme.radiusControl
     let value: Double
     var decimals: Int = 0
     var suffix: String = ""
@@ -282,8 +286,11 @@ struct UnitField: View {
     @Environment(\.scrubbing) private var scrubbing
 
     var body: some View {
-        HStack(spacing: 7) {
-            if !unit.isEmpty {
+        HStack(spacing: 5) {
+            if let icon {
+                IconView(icon, size: 13)
+                    .foregroundStyle(Theme.textTertiary)
+            } else if !unit.isEmpty {
                 // Never cut short: the number gives way first.
                 Text(unit)
                     .font(ThemeFont.unit)
@@ -307,8 +314,8 @@ struct UnitField: View {
         .padding(.horizontal, 8)
         .frame(height: Theme.control)
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
-        .focusRing(focused)
+        .background(RoundedRectangle(cornerRadius: corner).fill(Theme.panelRaised))
+        .focusRing(focused, corner: corner)
         // A click anywhere in the box, its letter included, starts typing;
         // a drag across it changes the number.
         .overlay {
@@ -370,7 +377,7 @@ struct OptionalField: View {
     @Environment(\.scrubbing) private var scrubbing
 
     var body: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 5) {
             if !unit.isEmpty {
                 // Never cut short: the number gives way first.
                 Text(unit)
@@ -454,8 +461,8 @@ struct StackedRow<Accessory: View, Content: View>: View {
     let label: String
     /// When set, the name is a menu of these, such as To or By.
     var menu: [MenuEntry]? = nil
-    /// Small, at the end of the name's line, such as a button that empties
-    /// the fields.
+    /// A button that acts on the fields, such as emptying them or linking
+    /// them, in the button column level with them.
     @ViewBuilder var accessory: () -> Accessory
     @ViewBuilder var content: () -> Content
 
@@ -479,12 +486,19 @@ struct StackedRow<Accessory: View, Content: View>: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                accessory()
             }
             .frame(height: 14)
-            HStack(spacing: 8) { content() }
-                .frame(height: Theme.panelRow)
+            if Accessory.self == EmptyView.self {
+                fields
+            } else {
+                fields.rowButton { accessory() }
+            }
         }
+    }
+
+    private var fields: some View {
+        HStack(spacing: 8) { content() }
+            .frame(height: Theme.panelRow)
     }
 }
 
@@ -658,6 +672,48 @@ struct HeaderRow<Accessory: View>: View {
     }
 }
 
+// MARK: - The inspector's grid
+
+extension View {
+    /// A section's body on the inspector's grid: its rows start at the
+    /// panel's inset and stop short of the button column.
+    func gridBody() -> some View {
+        padding(.leading, Theme.panelPad)
+            .padding(.trailing, Theme.panelPad + Theme.rowGutter)
+    }
+
+    /// A row with a button that acts on it, placed in the button column
+    /// level with the row. The row is laid out on a grid body, so the
+    /// button reaches out into the column the body leaves free.
+    func rowButton<Button: View>(alignment: VerticalAlignment = .center,
+                                 @ViewBuilder _ button: () -> Button) -> some View {
+        HStack(alignment: alignment, spacing: Theme.columnGap) {
+            frame(maxWidth: .infinity)
+            // Holds the column's width even when the button is not showing,
+            // so the row still stops where the others do.
+            ZStack {
+                Color.clear.frame(width: Theme.control, height: 1)
+                button()
+            }
+            .frame(width: Theme.control)
+        }
+        .padding(.trailing, -Theme.rowGutter)
+    }
+}
+
+/// Several number fields joined into one box, split by thin rules, for
+/// values that belong together, as Figma shows an ellipse's arc. Give the
+/// fields `corner: 0`; the box rounds the whole.
+struct JoinedFields<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        // The one-point gaps show the panel through, which draws the rules.
+        HStack(spacing: 1) { content() }
+            .clipShape(RoundedRectangle(cornerRadius: Theme.radiusControl))
+    }
+}
+
 /// A number field's unit, such as px or %, fixed at its end.
 struct UnitSuffix: View {
     let text: String
@@ -676,8 +732,8 @@ struct UnitSuffix: View {
 extension View {
     /// A thin line in the accent round a field while it has the keyboard,
     /// so it is plain which one is being typed in.
-    func focusRing(_ isFocused: Bool) -> some View {
-        overlay(RoundedRectangle(cornerRadius: Theme.radiusControl)
+    func focusRing(_ isFocused: Bool, corner: CGFloat = Theme.radiusControl) -> some View {
+        overlay(RoundedRectangle(cornerRadius: corner)
             .strokeBorder(isFocused ? Theme.accent : .clear, lineWidth: 1))
     }
 }

@@ -119,11 +119,10 @@ struct StyleValueFields: View {
                 }
             }
             .help("The radius it starts at. Empty starts from the layer's corners when the action begins.")
-            StackedRow(label: "To") {
+            StackedRow(label: "To", accessory: { linkButton(r) }) {
                 UnitField(unit: "R", value: r.end.topLeft, accepts: { $0 >= 0 }) { v in
                     editing("Corner Radius", Self.corners { a, _ in a.end = CornerRadii(all: v) })
                 }
-                linkButton(r)
             }
         } else {
             sectionLabel("From") {
@@ -391,16 +390,17 @@ struct StyleValueFields: View {
     /// back to the shape it starts from.
     @ViewBuilder private func path(_ v: PathAction) -> some View {
         let count = v.end.subpaths.reduce(0) { $0 + $1.points.count }
-        StackedRow(label: "To") {
-            Text(count == 1 ? "1 point" : "\(count) points")
-                .font(ThemeFont.label)
-                .foregroundStyle(Theme.textTertiary)
-            Spacer(minLength: 0)
+        StackedRow(label: "To", accessory: {
             IconButton(icon: .close, help: "Put the end back to the shape it starts from") {
                 editing("Reset Path", Self.path { a, st in
                     if let from = a.initial ?? st?.path { a.end = from }
                 })
             }
+        }) {
+            Text(count == 1 ? "1 point" : "\(count) points")
+                .font(ThemeFont.label)
+                .foregroundStyle(Theme.textTertiary)
+            Spacer(minLength: 0)
         }
     }
 
@@ -564,20 +564,21 @@ struct StyleValueFields: View {
     private static func percent(_ v: Double) -> Bool { v >= 0 && v <= 100 }
 
     /// Keeps a row's fields the width of the rows with a button at the end.
-    private var spacer: some View { Color.clear.frame(width: Theme.control) }
 
     private func sectionLabel(_ title: String) -> some View {
         sectionLabel(title) { EmptyView() }
     }
 
+    /// A name over controls below it, with any button for them in the
+    /// button column.
     private func sectionLabel<Accessory: View>(_ title: String, @ViewBuilder accessory: () -> Accessory) -> some View {
         HStack(spacing: 8) {
             Text(title)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
             Spacer(minLength: 0)
-            accessory()
         }
+        .rowButton { accessory() }
         .frame(height: Theme.panelRow)
     }
 
@@ -594,13 +595,12 @@ struct StyleValueFields: View {
                 }
                 content()
             } else {
-                StackedRow(label: "From") {
+                StackedRow(label: "From", accessory: { IconButton(icon: .plus, help: "Set where it starts", action: set) }) {
                     preview
                     Text("Current")
                         .font(ThemeFont.label)
                         .foregroundStyle(Theme.textTertiary)
                     Spacer(minLength: 0)
-                    IconButton(icon: .plus, help: "Set where it starts", action: set)
                 }
             }
         }
@@ -608,7 +608,7 @@ struct StyleValueFields: View {
 
     @ViewBuilder private func clearButton(_ visible: Bool, _ action: @escaping () -> Void) -> some View {
         if visible {
-            IconButton(icon: .close, help: "Start from wherever the layer is instead", size: 16, iconBox: 12, action: action)
+            IconButton(icon: .close, help: "Start from wherever the layer is instead", action: action)
         }
     }
 }

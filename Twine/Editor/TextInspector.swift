@@ -54,7 +54,7 @@ struct TextSection: View {
                 }
                 .help("Auto width grows the box to fit each line. Fixed width keeps the box's width and wraps inside it.")
             }
-            .padding(.horizontal, Theme.panelPad)
+            .gridBody()
         }
         .padding(.bottom, Theme.panelPad)
     }

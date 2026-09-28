@@ -84,7 +84,7 @@ struct InspectorPanel: View {
                         return c
                     }))
                 }
-                .padding(.horizontal, Theme.panelPad)
+                .gridBody()
             }
             .padding(.bottom, Theme.panelPad)
         }
@@ -147,7 +147,7 @@ struct InspectorPanel: View {
 
                     background
                 }
-                .padding(.horizontal, Theme.panelPad)
+                .gridBody()
                 .padding(.bottom, Theme.panelPad)
                 .transition(.opacity)
             }
@@ -235,6 +235,8 @@ struct AlignRow: View {
         HStack(spacing: 8) {
             tray([.left, .centerX, .right])
             tray([.top, .centerY, .bottom])
+        }
+        .rowButton {
             IconButton(icon: .distributeV, help: "Distribute: equal spaces between three or more layers") {
                 menus.show([
                     .item("Distribute Horizontally  ⌃⌥H", disabled: !controller.canDistribute) { controller.distribute(.x) },
@@ -243,7 +245,7 @@ struct AlignRow: View {
             }
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { distributeFrame = $0 }
         }
-        .padding(.horizontal, Theme.panelPad)
+        .gridBody()
     }
 
     private func tray(_ edges: [MotionEditing.Alignment.Edge]) -> some View {

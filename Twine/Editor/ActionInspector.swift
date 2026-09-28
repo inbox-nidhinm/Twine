@@ -40,7 +40,7 @@ struct ActionInspector: View {
                     EasingFields(controller: controller, actions: actions)
                 }
             }
-            .padding(.horizontal, Theme.panelPad)
+            .gridBody()
             .padding(.bottom, Theme.panelPad)
 
             if sameKind, let settings = first.preset {
@@ -49,12 +49,14 @@ struct ActionInspector: View {
                 if !Presets.controls(for: settings.preset).isEmpty || settings.preset.reversed != nil {
                     PanelDivider()
                     PresetFields(controller: controller, settings: settings)
-                        .padding(Theme.panelPad)
+                        .gridBody()
+                        .padding(.vertical, Theme.panelPad)
                 }
             } else if sameKind {
                 PanelDivider()
                 ValueFields(controller: controller, action: first, inherited: controller.inheritedState(for: first))
-                    .padding(Theme.panelPad)
+                    .gridBody()
+                    .padding(.vertical, Theme.panelPad)
             }
         }
     }
@@ -145,7 +147,6 @@ private struct PresetFields: View {
                 UnitField(value: settings.distance ?? own.distance ?? 0, decimals: 0, suffix: "px", accepts: { $0 >= 0 }) { v in
                     edit("Distance") { $0.distance = v }
                 }
-                Color.clear.frame(width: Theme.control)
             }
             .help(kind == .shake ? "How far it shakes each way." : kind == .bounce ? "How high it bounces." : "How far it travels.")
         case .scale:
@@ -153,14 +154,12 @@ private struct PresetFields: View {
                 UnitField(value: (settings.scale ?? own.scale ?? 1) * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 }) { v in
                     edit("Scale") { $0.scale = v / 100 }
                 }
-                Color.clear.frame(width: Theme.control)
             }
             .help(kind == .pulse ? "How big it grows before settling back."
                   : kind.entering == false ? "The size it shrinks to, of its own." : "The size it grows from, of its own.")
         case .angle:
             LabeledRow(label: "Angle") {
                 UnitField(value: settings.angle ?? own.angle ?? 0, decimals: 0, suffix: "°") { v in edit("Angle") { $0.angle = v } }
-                Color.clear.frame(width: Theme.control)
             }
             .help(kind == .wiggle ? "How far it tips each way."
                   : kind.entering == false ? "How far it turns on the way out. Negative turns the other way."
@@ -168,7 +167,6 @@ private struct PresetFields: View {
         case .blur:
             LabeledRow(label: "Blur") {
                 UnitField(value: settings.blur ?? own.blur ?? 0, decimals: 0, accepts: { $0 >= 0 }) { v in edit("Blur") { $0.blur = v } }
-                Color.clear.frame(width: Theme.control)
             }
             .help(kind.entering == false ? "How blurred it ends." : "How blurred it starts.")
         case .fades:
@@ -468,7 +466,14 @@ private struct ValueFields: View {
             }
         }
         .help("The scale it starts at. Empty starts from the layer's scale when the action begins.")
-        StackedRow(label: s.mode == .to ? "To" : "By", menu: modeEntries(s.mode)) {
+        StackedRow(label: s.mode == .to ? "To" : "By", menu: modeEntries(s.mode), accessory: {
+            IconButton(icon: s.isLinked ? .link : .unlink, help: s.isLinked ? "Unlink width and height" : "Link width and height") {
+                editScale("Link Scale") { s, _ in
+                    s.isLinked.toggle()
+                    if s.isLinked { s.end.y = s.end.x; s.initial = s.initial.map { Vec2($0.x, $0.x) } }
+                }
+            }
+        }) {
             if s.isLinked {
                 UnitField(unit: "S", value: s.end.x * 100, decimals: 1, suffix: "%") { v in
                     editScale("Scale") { s, _ in s.end = Vec2(v / 100, v / 100) }
@@ -476,12 +481,6 @@ private struct ValueFields: View {
             } else {
                 UnitField(unit: "X", value: s.end.x * 100, decimals: 1, suffix: "%") { v in editScale("Scale") { s, _ in s.end.x = v / 100 } }
                 UnitField(unit: "Y", value: s.end.y * 100, decimals: 1, suffix: "%") { v in editScale("Scale") { s, _ in s.end.y = v / 100 } }
-            }
-            IconButton(icon: s.isLinked ? .link : .unlink, help: s.isLinked ? "Unlink width and height" : "Link width and height") {
-                editScale("Link Scale") { s, _ in
-                    s.isLinked.toggle()
-                    if s.isLinked { s.end.y = s.end.x; s.initial = s.initial.map { Vec2($0.x, $0.x) } }
-                }
             }
         }
         .help(s.mode == .to ? "The scale it ends at." : "What it multiplies the starting scale by.")
@@ -621,7 +620,11 @@ private struct ValueFields: View {
             }
         }
         .help("The size it starts at. Empty starts from the layer's size when the action begins.")
-        StackedRow(label: "To") {
+        StackedRow(label: "To", accessory: {
+            IconButton(icon: r.isLinked ? .link : .unlink, help: r.isLinked ? "Unlink width and height" : "Keep width and height in proportion") {
+                editResize("Link Size") { r, _ in r.isLinked.toggle() }
+            }
+        }) {
             UnitField(unit: "W", value: r.end.width, accepts: { $0 >= 0 }) { v in
                 editResize("Resize") { r, _ in
                     if r.isLinked, r.end.width > 0 { r.end.height *= v / r.end.width }
@@ -633,9 +636,6 @@ private struct ValueFields: View {
                     if r.isLinked, r.end.height > 0 { r.end.width *= v / r.end.height }
                     r.end.height = v
                 }
-            }
-            IconButton(icon: r.isLinked ? .link : .unlink, help: r.isLinked ? "Unlink width and height" : "Keep width and height in proportion") {
-                editResize("Link Size") { r, _ in r.isLinked.toggle() }
             }
         }
         .help("The size it ends at. The layer grows and shrinks around its anchor.")
@@ -680,11 +680,11 @@ private struct ValueFields: View {
         }
     }
 
-    /// Empties the starting value, so it inherits again. Beside the row's
-    /// name, so the fields keep the whole width.
+    /// Empties the starting value, so it inherits again. In the button
+    /// column on the From row.
     @ViewBuilder private func clearButton(_ visible: Bool, _ action: @escaping () -> Void) -> some View {
         if visible {
-            IconButton(icon: .close, help: "Start from wherever the layer is instead", size: 16, iconBox: 12, action: action)
+            IconButton(icon: .close, help: "Start from wherever the layer is instead", action: action)
         }
     }
 }
