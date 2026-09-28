@@ -8,7 +8,9 @@ import Foundation
 /// file. Masks, selections, and a future Figma importer all refer to layers by
 /// it, so treat it as the layer's identity rather than as a database key.
 public struct Layer: Codable, Sendable, Equatable, Identifiable {
-    public let id: UUID
+    /// Set only here and by `withID`, which copying uses, so nothing else
+    /// can change a layer's identity.
+    public private(set) var id: UUID
     public var name: String
     public var isVisible: Bool
     public var isLocked: Bool
@@ -48,6 +50,14 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
         self.blendMode = .normal
         self.keepsProportions = false
         self.content = content
+    }
+
+    /// The layer whole under another id: every property carried, so one
+    /// added later is carried too, which copying field by field forgot.
+    func withID(_ id: UUID) -> Layer {
+        var copy = self
+        copy.id = id
+        return copy
     }
 
     private enum CodingKeys: String, CodingKey {

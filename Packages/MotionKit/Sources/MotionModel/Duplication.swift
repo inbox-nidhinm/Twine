@@ -25,15 +25,8 @@ extension Layer {
     private func copied(into map: inout [UUID: UUID]) -> Layer {
         let newID = UUID()
         map[id] = newID
-        var copy = Layer(id: newID, name: name, content: content, size: size, position: .zero)
-        copy.isVisible = isVisible
-        copy.isLocked = isLocked
-        copy.isSoloed = isSoloed
-        copy.transform = transform
-        copy.size = size
-        copy.opacity = opacity
+        var copy = withID(newID)
         copy.effects = effects.map { Effect(isEnabled: $0.isEnabled, kind: $0.kind) }
-        copy.mask = mask
         switch content {
         case .shape(var shape):
             shape.fills = shape.fills.map { Fill(isEnabled: $0.isEnabled, paint: $0.paint) }
@@ -41,10 +34,28 @@ extension Layer {
             copy.content = .shape(shape)
         case .group(var group):
             group.children = group.children.map { $0.copied(into: &map) }
+            if var frame = group.frame {
+                frame.fills = frame.fills.map { Fill(isEnabled: $0.isEnabled, paint: $0.paint) }
+                frame.strokes = frame.strokes.map { $0.withNewID() }
+                group.frame = frame
+            }
             copy.content = .group(group)
+        case .text(var text):
+            text.stroke = text.stroke?.withNewID()
+            copy.content = .text(text)
         default:
             break
         }
+        return copy
+    }
+
+    /// The layer with every mask inside it that names a layer in `map`
+    /// pointing at that layer's copy instead: for layers copied one by one
+    /// together, such as a picture and its mask selected side by side, so
+    /// each copy is masked by the other's copy, not the original.
+    public func remappingMasks(_ map: [UUID: UUID]) -> Layer {
+        var copy = self
+        copy.remapMasks(map)
         return copy
     }
 

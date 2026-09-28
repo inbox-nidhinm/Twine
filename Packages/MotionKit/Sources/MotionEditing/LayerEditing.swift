@@ -52,10 +52,14 @@ extension Action {
     /// Rotations add `angle`, scales multiply by `scale`, and opacities
     /// multiply by `opacity`, for To values and initial values. By rotations
     /// and By scales are relative already and stay as they are.
+    ///
+    /// Into a `mirrored` space (one flipped over, as a group with one scale
+    /// negative is), turns run the other way and slants lean the other way.
     public func remapped(point: (Vec2) -> Vec2, vector: (Vec2) -> Vec2, angle: Double = 0,
-                         scale: Vec2 = .one, opacity: Double = 1) -> Action {
+                         scale: Vec2 = .one, opacity: Double = 1, mirrored: Bool = false) -> Action {
         var copy = self
         func scaled(_ v: Vec2) -> Vec2 { Vec2(v.x * scale.x, v.y * scale.y) }
+        func turned(_ a: Double) -> Double { mirrored ? angle - a : a + angle }
         switch spec {
         case .move(var m):
             m.end = m.mode == .to ? point(m.end) : vector(m.end)
@@ -63,9 +67,13 @@ extension Action {
             m.curve = m.curve.map { MotionCurve(startHandle: vector($0.startHandle), endHandle: vector($0.endHandle)) }
             copy.spec = .move(m)
         case .rotate(var r):
-            if r.mode == .to { r.end += angle }
-            r.initial = r.initial.map { $0 + angle }
+            r.end = r.mode == .to ? turned(r.end) : mirrored ? -r.end : r.end
+            r.initial = r.initial.map(turned)
             copy.spec = .rotate(r)
+        case .skew(var k) where mirrored:
+            k.end = Vec2(-k.end.x, -k.end.y)
+            k.initial = k.initial.map { Vec2(-$0.x, -$0.y) }
+            copy.spec = .skew(k)
         case .scale(var s):
             if s.mode == .to { s.end = scaled(s.end) }
             s.initial = s.initial.map(scaled)

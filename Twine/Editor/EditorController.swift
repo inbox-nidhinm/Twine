@@ -199,12 +199,13 @@ final class EditorController {
 
     func end() { store.endContinuousChange() }
 
-    /// A step of typing on the canvas. Typing is one continuous change,
-    /// recorded only when it ends, so each step also tells the document it
-    /// has something to save: otherwise quitting or a crash mid-sentence
-    /// would find nothing edited and lose the words.
-    func type(_ layers: [Layer]) {
-        update(layers)
+    /// A step of typing on the canvas, joining the steps before it with the
+    /// same `key` (see `ProjectStore.perform(_:joining:)`). A joined step
+    /// records nothing, so it also tells the document it has something to
+    /// save: otherwise quitting or a crash mid-sentence would find nothing
+    /// edited and lose the words.
+    func type(_ layers: [Layer], joining key: String) {
+        try? store.perform(.batch([layerUpdate(layers)], name: "Edit Text"), joining: key)
         document?.updateChangeCount(.changeDone)
     }
 
@@ -937,15 +938,19 @@ final class EditorController {
     /// Copies of layers, each just in front of its original and moved by
     /// `offset`, with their animation (moved with them where it is absolute).
     private func duplicates(of layers: [Layer], offset: Vec2) -> (EditorCommand, [Layer]) {
-        var commands: [EditorCommand] = []
-        var copies: [Layer] = []
+        var placed: [(copy: Layer, parentID: UUID?, index: Int)] = []
         var map: [UUID: UUID] = [:]
         for layer in layers {
             guard let location = project.location(of: layer.id) else { continue }
             var copy = layer.duplicated(recordingIDs: &map).translated(by: offset)
             copy.name = layer.name
-            commands.append(.insertLayers([copy], parentID: location.parentID, index: location.index + 1))
-            copies.append(copy)
+            placed.append((copy, location.parentID, location.index))
+        }
+        // Copied side by side, a layer and its mask each point at the
+        // other's copy only once every copy has its id.
+        let copies = placed.map { $0.copy.remappingMasks(map) }
+        var commands: [EditorCommand] = zip(copies, placed).map { copy, p in
+            .insertLayers([copy], parentID: p.parentID, index: p.index + 1)
         }
         let actions = project.actionCopies(for: map).map { $0.remapped(point: { $0 + offset }, vector: { $0 }) }
         if !actions.isEmpty { commands.append(.insertActions(actions)) }
@@ -1101,7 +1106,7 @@ final class EditorController {
         guard let data = NSPasteboard.general.data(forType: Self.pasteboardType),
               let clipboard = try? JSONDecoder().decode(LayerClipboard.self, from: data) else { return }
         var map: [UUID: UUID] = [:]
-        let copies = clipboard.layers.map { $0.duplicated(recordingIDs: &map) }
+        let copies = clipboard.layers.map { $0.duplicated(recordingIDs: &map) }.map { $0.remappingMasks(map) }
         let actions = Project(actions: clipboard.actions).actionCopies(for: map)
         if perform(.batch([.insertLayers(copies, parentID: nil, index: nil), .insertActions(actions)],
                           name: copies.count == 1 ? "Paste Layer" : "Paste Layers")) {

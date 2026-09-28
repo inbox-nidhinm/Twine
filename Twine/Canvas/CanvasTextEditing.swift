@@ -7,6 +7,9 @@ import MotionEvaluation
 struct TextSession {
     let layerID: UUID
     var text: EditableText
+    /// What the session's steps join by, so its typing undoes as one step
+    /// unless something else happens in between.
+    let undoKey = UUID().uuidString
     /// The column kept through a run of up and down arrows.
     var goalX: Double?
     /// Undo and redo inside the session. Afterwards the whole session undoes
@@ -44,7 +47,6 @@ extension CanvasNSView: NSTextInputClient, NSMenuItemValidation {
             session.text.place(geometry.position(at: local))
             textSession = session
         }
-        controller.begin("Edit Text")
         controller.editor.editingText = id
         window?.makeFirstResponder(self)
         window?.invalidateCursorRects(for: self)
@@ -52,14 +54,14 @@ extension CanvasNSView: NSTextInputClient, NSMenuItemValidation {
         redrawOverlay()
     }
 
-    /// Stops typing. The session is one undo step; a text left empty goes.
+    /// Stops typing. The typing is one undo step, unless other changes came
+    /// between its letters; a text left empty goes.
     func endTextEditing() {
         guard let session = textSession, let controller else { return }
         inputContext?.discardMarkedText()
         textSession = nil
         caretTimer?.invalidate()
         caretTimer = nil
-        controller.end()
         controller.editor.editingText = nil
         if session.text.text.isEmpty, controller.project.layer(withID: session.layerID) != nil {
             _ = controller.perform(.deleteLayers([session.layerID]))
@@ -198,7 +200,7 @@ extension CanvasNSView: NSTextInputClient, NSMenuItemValidation {
         l.name = EditorController.textName(renaming: l.name, from: old, to: session.text.text)
         content.text = session.text.text
         l.content = .text(content)
-        controller.type([l])
+        controller.type([l], joining: session.undoKey)
         inputContext?.invalidateCharacterCoordinates()
         window?.invalidateCursorRects(for: self)
         restartCaret()

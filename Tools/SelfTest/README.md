@@ -66,6 +66,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 
 ## What fools a test
 
+- After `openfile` or `home`, every step still logs and drives the controller of the project first opened, so `tree`, `text` and the state line show the old project, not the one reopened. To check what was saved, read the copy's `document.json`.
 - Posted `mouseMoved` events never reach tracking areas: use `hover`, `rhover`, `chover`, which call the view directly.
 - The pointer after a cursor-rect refresh follows the real mouse, which is elsewhere during a test, so `cursor` readings taken after one mean nothing. Readings straight after a `mouseMoved` are good.
 - Menu shortcuts and responder-chain actions do not reach a window that is not active, and the test copy never is. Call the command through `call`, or say it was not checked.

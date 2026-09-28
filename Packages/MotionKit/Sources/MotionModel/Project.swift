@@ -46,8 +46,13 @@ public struct Composition: Codable, Sendable, Equatable {
     /// a frame boundary is rounded to the nearest one, and there is always at
     /// least one frame to show.
     public var frameCount: Int {
-        max(1, Int((duration * frameRate.perSecond).rounded()))
+        max(1, FrameRate.whole((duration * frameRate.perSecond).rounded()))
     }
+
+    /// The longest a composition or an action may run, and the furthest an
+    /// action may start: a day, far past any motion design, and short of the
+    /// numbers that stop being countable in frames.
+    public static let longest: Double = 86_400
 }
 
 /// The composition's ground. Transparency is a switch beside the colour rather

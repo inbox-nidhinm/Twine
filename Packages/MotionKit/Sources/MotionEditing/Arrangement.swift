@@ -84,11 +84,15 @@ public enum Arrangement {
         let g = group.transform
         let groupTransform = Affine.layer(position: g.position, anchor: g.anchor, scale: g.scale, rotation: g.rotation, skew: g.skew)
         let rotation = g.rotation, scale = g.scale, opacity = group.opacity
+        // A group flipped over (one scale negative) turns its children's
+        // turns and slants the other way.
+        let mirrored = scale.x * scale.y < 0
 
         let children = group.children.map { child -> Layer in
             var c = child
             c.transform.position = groupTransform.apply(child.transform.position)
-            c.transform.rotation = child.transform.rotation + rotation
+            c.transform.rotation = mirrored ? rotation - child.transform.rotation : child.transform.rotation + rotation
+            if mirrored { c.transform.skew = Vec2(-child.transform.skew.x, -child.transform.skew.y) }
             c.transform.scale = Vec2(child.transform.scale.x * scale.x, child.transform.scale.y * scale.y)
             c.opacity = child.opacity * opacity
             return c
@@ -96,7 +100,7 @@ public enum Arrangement {
         let childIDs = Set(group.children.map(\.id))
         let moved = project.actions.filter { childIDs.contains($0.targetLayerID) }
             .map { $0.remapped(point: groupTransform.apply, vector: groupTransform.applyToVector,
-                               angle: rotation, scale: scale, opacity: opacity) }
+                               angle: rotation, scale: scale, opacity: opacity, mirrored: mirrored) }
         return (.batch([.deleteLayers([id]), .insertLayers(children, parentID: location.parentID, index: location.index),
                         .updateActions(moved)],
                        name: "Ungroup"), children.map(\.id))
@@ -122,7 +126,8 @@ public enum Arrangement {
                 let (angle, scale) = turnAndScale(of: m)
                 edited.append(carried(layer, by: m))
                 actions += project.actions.filter { $0.targetLayerID == id }
-                    .map { $0.remapped(point: m.apply, vector: m.applyToVector, angle: angle, scale: scale) }
+                    .map { $0.remapped(point: m.apply, vector: m.applyToVector, angle: angle, scale: scale,
+                                       mirrored: Self.mirrors(m)) }
             }
         }
         var commands: [EditorCommand] = [.moveLayers(ids, parentID: parentID, index: index)]
@@ -144,13 +149,23 @@ public enum Arrangement {
         let (angle, scale) = turnAndScale(of: m)
         var l = layer
         l.transform.position = m.apply(layer.transform.position)
-        l.transform.rotation = layer.transform.rotation + angle
+        if mirrors(m) {
+            l.transform.rotation = angle - layer.transform.rotation
+            l.transform.skew = Vec2(-layer.transform.skew.x, -layer.transform.skew.y)
+        } else {
+            l.transform.rotation = layer.transform.rotation + angle
+        }
         l.transform.scale = Vec2(layer.transform.scale.x * scale.x, layer.transform.scale.y * scale.y)
         return l
     }
 
+    /// Whether `m` flips things over, as a group with one scale negative does.
+    private static func mirrors(_ m: Affine) -> Bool { m.a * m.d - m.b * m.c < 0 }
+
+    /// The turn and scale of `m`, the height's scale negative when it flips
+    /// things over, so a flipped layer carried through it stays flipped.
     private static func turnAndScale(of m: Affine) -> (angle: Double, scale: Vec2) {
-        (atan2(m.b, m.a) * 180 / .pi, Vec2(hypot(m.a, m.b), hypot(m.c, m.d)))
+        (atan2(m.b, m.a) * 180 / .pi, Vec2(hypot(m.a, m.b), (mirrors(m) ? -1 : 1) * hypot(m.c, m.d)))
     }
 
     /// From a group's own space into the composition's, as designed; the

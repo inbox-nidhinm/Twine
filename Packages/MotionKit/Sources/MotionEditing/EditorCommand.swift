@@ -65,6 +65,15 @@ public enum EditorCommand: Sendable {
         // goes with its layer, whichever command took the layer away.
         let remaining = Set(draft.allLayers.map(\.id))
         draft.actions.removeAll { !remaining.contains($0.targetLayerID) }
+        // Likewise a mask naming a layer that is not there. Checked once
+        // the whole command is done, so a batch that takes a layer out and
+        // puts it back, as ungrouping does, keeps the masks that name it,
+        // and layers pasted from another project drop masks they left behind.
+        for layer in draft.allLayers {
+            if let mask = layer.mask, !remaining.contains(mask.layerID) {
+                draft.updateLayer(layer.id) { $0.mask = nil }
+            }
+        }
         // A text box is always the size of its words, whatever changed them.
         for layer in draft.allLayers where layer.isText {
             let fitted = layer.fittedText()
@@ -76,7 +85,8 @@ public enum EditorCommand: Sendable {
     private func apply(into p: inout Project) throws {
         switch self {
         case .setComposition(let composition):
-            guard composition.width > 0, composition.height > 0, composition.duration > 0 else {
+            guard composition.width > 0, composition.height > 0, composition.duration > 0,
+                  composition.duration <= Composition.longest else {
                 throw EditorError.invalidValue
             }
             p.composition = composition
@@ -92,14 +102,6 @@ public enum EditorCommand: Sendable {
         case .deleteLayers(let ids):
             for id in ids where p.layer(withID: id) != nil {
                 p.removeLayer(id)
-            }
-            // A layer masked by something that no longer exists would render
-            // unmasked anyway; dropping the reference keeps the file honest.
-            let remaining = Set(p.allLayers.map(\.id))
-            for layer in p.allLayers {
-                if let mask = layer.mask, !remaining.contains(mask.layerID) {
-                    p.updateLayer(layer.id) { $0.mask = nil }
-                }
             }
 
         case .moveLayers(let ids, let parentID, let index):
@@ -150,7 +152,7 @@ public enum EditorCommand: Sendable {
             for action in actions {
                 guard !p.actions.contains(where: { $0.id == action.id }) else { throw EditorError.duplicateID(action.id) }
                 guard p.layer(withID: action.targetLayerID) != nil else { throw EditorError.notFound(action.targetLayerID) }
-                guard action.duration >= 0, action.start.isFinite, action.duration.isFinite else { throw EditorError.invalidValue }
+                guard action.fitsInTime else { throw EditorError.invalidValue }
                 p.actions.append(action)
             }
 
@@ -158,7 +160,7 @@ public enum EditorCommand: Sendable {
             for action in actions {
                 guard let i = p.actions.firstIndex(where: { $0.id == action.id }) else { throw EditorError.notFound(action.id) }
                 guard p.layer(withID: action.targetLayerID) != nil else { throw EditorError.notFound(action.targetLayerID) }
-                guard action.duration >= 0, action.start.isFinite, action.duration.isFinite else { throw EditorError.invalidValue }
+                guard action.fitsInTime else { throw EditorError.invalidValue }
                 p.actions[i] = action
             }
 
@@ -182,4 +184,11 @@ public enum EditorError: Error, Equatable {
     case duplicateID(UUID)
     case invalidMove
     case invalidValue
+}
+
+extension Action {
+    /// Whether it starts and runs within `Composition.longest`.
+    var fitsInTime: Bool {
+        duration >= 0 && duration <= Composition.longest && abs(start) <= Composition.longest
+    }
 }

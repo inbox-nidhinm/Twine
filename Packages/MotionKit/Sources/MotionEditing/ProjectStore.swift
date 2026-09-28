@@ -24,6 +24,9 @@ public final class ProjectStore {
     /// each becoming an undo step: for controls whose every step is an
     /// ordinary edit, such as dragging across a number field.
     @ObservationIgnored private var foldsCommands = false
+    /// The key of the last step while `perform(_:joining:)` may still add
+    /// to it: cleared by any other step, undo, redo or continuous change.
+    @ObservationIgnored private var joinable: String?
 
     /// At most this many steps can be undone (the user's choice, 28 September
     /// 2026; After Effects allows 99, Photoshop keeps 50).
@@ -55,10 +58,27 @@ public final class ProjectStore {
         record(before: before, name: command.actionName)
     }
 
+    /// Applies a command that joins the last step when that step came from
+    /// here with the same `key` and nothing has happened since; otherwise it
+    /// starts a step of its own. For typing: the letters typed in one go
+    /// undo together, while a change made in between (a new font size from
+    /// the inspector) is its own step, in the order they happened, rather
+    /// than one step held open the whole time swallowing it.
+    public func perform(_ command: EditorCommand, joining key: String) throws {
+        guard continuousStart == nil else { return try perform(command) }
+        if key == joinable { return try command.apply(to: &project) }
+        let before = project
+        try command.apply(to: &project)
+        guard project != before else { return }
+        record(before: before, name: command.actionName)
+        joinable = key
+    }
+
     /// Swaps in a project read from disk, such as a version restored from the
     /// Versions browser. What was undoable belonged to the old contents, so
     /// the history goes with them.
     public func load(_ project: Project) {
+        joinable = nil
         continuousStart = nil
         foldsCommands = false
         self.project = project
@@ -76,6 +96,7 @@ public final class ProjectStore {
     /// control that only knows how to make ordinary edits still undoes as
     /// one step.
     public func beginContinuousChange(_ name: String, folding: Bool = false) {
+        joinable = nil
         if continuousStart == nil {
             continuousStart = project
             foldsCommands = folding
@@ -112,6 +133,7 @@ public final class ProjectStore {
     // MARK: Undo
 
     private func record(before: Project, name: String) {
+        joinable = nil
         undoManager.beginUndoGrouping()
         undoManager.registerUndo(withTarget: self) { store in
             MainActor.assumeIsolated { store.restore(before, name: name) }
@@ -156,6 +178,7 @@ public final class ProjectStore {
     /// Undo and redo are the same operation in opposite directions: swap in
     /// the other snapshot and register the one being left as its own reverse.
     private func restore(_ snapshot: Project, name: String) {
+        joinable = nil
         if undoManager.isUndoing, let cost = undoCosts.popLast() {
             redoCosts.append(cost)
         } else if undoManager.isRedoing, let cost = redoCosts.popLast() {

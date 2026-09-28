@@ -139,7 +139,7 @@ struct InspectorPanel: View {
                     }
 
                     LabeledRow(label: "Duration") {
-                        UnitField(value: composition.duration, decimals: 3, suffix: "s", accepts: { $0 > 0 }) { v in
+                        UnitField(value: composition.duration, decimals: 3, suffix: "s", accepts: { $0 > 0 && $0 <= Composition.longest }) { v in
                             edit { $0.duration = v }
                         }
                         .help("Length in seconds")

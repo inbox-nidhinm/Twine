@@ -164,4 +164,25 @@ import MotionModel
         store.undoManager.undo()
         #expect(store.project.composition.width == 1920)
     }
+
+    @Test func stepsWithTheSameKeyJoinUntilSomethingElseHappens() throws {
+        let store = makeStore()
+        let a = shape("A")
+        try store.perform(.insertLayers([a], parentID: nil, index: nil))
+        // Typing "Hi", a change from elsewhere, then "!" in the same session.
+        try store.perform(.renameLayer(a.id, "H"), joining: "typing")
+        try store.perform(.renameLayer(a.id, "Hi"), joining: "typing")
+        try store.perform(.setLocked([a.id], true))
+        try store.perform(.renameLayer(a.id, "Hi!"), joining: "typing")
+        store.undoManager.undo()
+        #expect(store.project.layers[0].name == "Hi" && store.project.layers[0].isLocked)
+        store.undoManager.undo()
+        #expect(store.project.layers[0].name == "Hi" && !store.project.layers[0].isLocked)
+        store.undoManager.undo()
+        #expect(store.project.layers[0].name == "A")
+        // After an undo, the next step with the key starts afresh.
+        try store.perform(.renameLayer(a.id, "B"), joining: "typing")
+        store.undoManager.undo()
+        #expect(store.project.layers[0].name == "A")
+    }
 }

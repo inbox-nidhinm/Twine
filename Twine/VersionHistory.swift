@@ -23,6 +23,14 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Copies, masks and undo", changes: [
+            "Duplicating, pasting or Option-dragging a layer keeps its blend mode and its width and height link.",
+            "A layer and its mask duplicated or pasted together come out as a new pair: the copy is masked by the mask's copy, not the original.",
+            "Ungrouping keeps the masks of layers outside the group that use a layer inside it.",
+            "A layer taken out of a flipped group, by ungrouping or by dragging it out, stays exactly as it showed, turns and slants included.",
+            "Changing something in the inspector while typing on the canvas is its own undo step, in the order it happened.",
+            "Durations and action times are held to a day, so typing a huge number no longer crashes Twine.",
+        ]),
         .init(date: "28 September 2026", title: "Safer typing and imports", changes: [
             "Words typed on the canvas are kept when you go Home, open another project, close the window or quit before you finish typing. They were lost before.",
             "An SVG that refers to itself, nests or repeats past what any drawing needs, or holds numbers too large to draw is refused or read safely, rather than crashing Twine.",

@@ -15,6 +15,21 @@ public struct FrameRate: Codable, Sendable, Hashable {
         self.seconds = seconds
     }
 
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let frames = try c.decode(Int.self, forKey: .frames), seconds = try c.decode(Int.self, forKey: .seconds)
+        // A damaged file's rate of nothing would make every time infinite,
+        // and a project with an infinite time can never be saved again.
+        guard frames > 0, seconds > 0 else {
+            self = .fps30
+            return
+        }
+        self.frames = frames
+        self.seconds = seconds
+    }
+
+    private enum CodingKeys: String, CodingKey { case frames, seconds }
+
     public static let fps24 = FrameRate(frames: 24)
     public static let fps25 = FrameRate(frames: 25)
     public static let fps30 = FrameRate(frames: 30)
@@ -40,12 +55,19 @@ public struct FrameRate: Codable, Sendable, Hashable {
     /// The frame showing at `time`. A hair of tolerance keeps a time computed
     /// as `time(ofFrame: n)` from rounding down to frame n - 1.
     public func frame(at time: Double) -> Int {
-        Int((time * perSecond + 1e-9).rounded(.down))
+        Self.whole((time * perSecond + 1e-9).rounded(.down))
     }
 
     /// `time` moved onto the nearest frame boundary.
     public func snapped(_ time: Double) -> Double {
-        self.time(ofFrame: Int((time * perSecond).rounded()))
+        self.time(ofFrame: Self.whole((time * perSecond).rounded()))
+    }
+
+    /// A frame number as a whole number, held far inside what one can
+    /// count, so no time, however wild, makes the conversion crash.
+    static func whole(_ frames: Double) -> Int {
+        guard frames.isFinite else { return 0 }
+        return Int(min(max(frames, -1e15), 1e15))
     }
 
     /// How the rate reads in a menu: whole rates as integers, others to two places.
