@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Presets you can see", changes: [
+            "In Animate, a selected layer shows two tiles, New Action and Select Preset, in place of the two menus.",
+            "Select Preset opens every preset as a tile that plays it on a small square, grouped into entrances, exits, emphasis and sound, so you can see what each does before picking it. Picking one adds it at the playhead and shows its settings.",
+        ]),
         .init(date: "28 September 2026", title: "The inspector rearranged", changes: [
             "The layer inspector is now in sections: Position (alignment, X and Y, rotation and the anchor), Layout (width and height with the proportions link between them, scale, corners and Clip content) and Appearance (blend mode and opacity side by side).",
             "With the link on, typing a width or height changes the other to keep the proportions.",

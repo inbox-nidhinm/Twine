@@ -64,6 +64,9 @@ public enum Theme {
     /// any colour, grey included, and never read as a selection.
     public static let canvasHover = Color.white
     public static let canvasHoverEdge = Color.black
+    /// The stand-in shape that plays each preset in the preset picker: light,
+    /// as a layer on the canvas would be, on the tile's raised grey.
+    public static let previewShape = Color(white: 0.86)
     /// Smart guides and equal-spacing marks while something snaps.
     public static let guide = Color(red: 0xF2 / 255, green: 0x4E / 255, blue: 0x6B / 255)
 
