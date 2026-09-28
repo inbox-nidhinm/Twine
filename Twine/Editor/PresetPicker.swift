@@ -59,9 +59,10 @@ private struct BigTile: View {
     }
 }
 
-/// Every preset the selection can take, each on a tile that plays it, so
-/// what you pick is what you saw. A pair (Fade In and Fade Out) is one tile
-/// playing both; it goes on as In and turns to Out in its settings.
+/// Every preset the selection can take, in headed groups, each on a tile
+/// that plays it, so what you pick is what you saw. A pair (Fade In and
+/// Fade Out) is one tile playing both; it goes on as In and turns to Out in
+/// its settings.
 struct PresetPicker: View {
     let presets: [Preset]
     let pick: (Preset) -> Void
@@ -74,9 +75,21 @@ struct PresetPicker: View {
             HeaderRow(title: "Presets") {
                 IconButton(icon: .close, help: "Back to actions") { close() }
             }
-            LazyVGrid(columns: columns, spacing: 10) {
-                ForEach(presets) { preset in
-                    PresetTile(preset: preset) { pick(preset) }
+            VStack(alignment: .leading, spacing: Theme.panelPad) {
+                ForEach(PresetGroup.allCases, id: \.self) { group in
+                    let shown = presets.filter { $0.group == group }
+                    if !shown.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(group.title)
+                                .font(ThemeFont.labelStrong)
+                                .foregroundStyle(Theme.textPrimary)
+                            LazyVGrid(columns: columns, spacing: 10) {
+                                ForEach(shown) { preset in
+                                    PresetTile(preset: preset) { pick(preset) }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .padding(.horizontal, Theme.panelPad)
@@ -96,7 +109,7 @@ private struct PresetTile: View {
             VStack(spacing: 6) {
                 Color.clear
                     .aspectRatio(1, contentMode: .fit)
-                    .overlay { PresetThumbnail(kind: preset.kind) }
+                    .overlay { PresetThumbnail(preset: preset) }
                     .background(hovering ? Theme.panelHover : Theme.panelRaised)
                     .clipShape(RoundedRectangle(cornerRadius: Theme.radiusWell))
                 Text(preset.name)
@@ -108,44 +121,64 @@ private struct PresetTile: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(preset.kind.reversed == nil ? "Adds \(preset.name) at the playhead"
+        .help(preset.isText ? "Adds \(preset.name) at the playhead, moving the text \(preset.text?.unit?.rawValue ?? "letters") one by one"
+              : preset.kind.reversed == nil ? "Adds \(preset.name) at the playhead"
               : "Adds \(Presets.name(of: preset.kind)) at the playhead; its settings turn it to \(preset.name) Out")
     }
 }
 
 /// A preset playing on a stand-in, over and over. The motion is the real
 /// one, worked out by the same rules that play it on the canvas, so the
-/// tile can never show something the preset does not do.
+/// tile can never show something the preset does not do. A text preset
+/// plays on a row of small squares standing for its letters.
 struct PresetThumbnail: View {
-    let kind: PresetKind
+    let preset: Preset
 
     var body: some View {
-        let preview = PresetPreview.of(kind)
+        let preview = PresetPreview.of(preset)
         TimelineView(.animation) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: preview.period)
             let state = preview.state(at: t)
+            let letters = preview.letters(at: t)
             Canvas { context, size in
                 if preview.isSound {
                     Self.drawSound(state, in: &context, size: size)
+                } else if let letters {
+                    let k = size.width / PresetPreview.scene
+                    for (i, letter) in letters.enumerated() {
+                        var c = context
+                        c.translateBy(x: PresetPreview.letterCentre(i) * k, y: PresetPreview.scene / 2 * k)
+                        Self.drawShape(letter, side: PresetPreview.letter, in: &c, scale: k)
+                    }
                 } else {
-                    Self.drawShape(state, in: &context, size: size)
+                    var c = context
+                    let k = size.width / PresetPreview.scene
+                    c.translateBy(x: state.position.x * k, y: state.position.y * k)
+                    Self.drawShape(state, side: PresetPreview.side, in: &c, scale: k)
                 }
             }
         }
     }
 
-    private static func drawShape(_ state: LayerState, in context: inout GraphicsContext, size: CGSize) {
-        guard state.isShown, state.opacity > 0.001,
+    /// A rounded square of `side` at the context's origin, as `state` has
+    /// it: faded, blurred, turned, scaled, tilted (drawn as the narrowing a
+    /// turn in depth gives) and clipped by any reveal.
+    private static func drawShape(_ state: LayerState, side: Double, in context: inout GraphicsContext, scale k: Double) {
+        guard state.isShown, state.opacity > 0.001, !state.reveal.showsNothing,
               abs(state.scale.x) > 0.0001, abs(state.scale.y) > 0.0001 else { return }
-        let k = size.width / PresetPreview.scene
         context.opacity = state.opacity
         // Blur is stored as Figma has it, twice the spread.
         if state.layerBlur > 0 { context.addFilter(.blur(radius: state.layerBlur / 2 * k)) }
-        context.translateBy(x: state.position.x * k, y: state.position.y * k)
         context.rotate(by: .degrees(state.rotation))
-        context.scaleBy(x: state.scale.x, y: state.scale.y)
-        let w = state.size.width * k, h = state.size.height * k
+        context.scaleBy(x: state.scale.x * max(abs(cos(state.tilt.y * .pi / 180)), 0.001),
+                        y: state.scale.y * max(abs(cos(state.tilt.x * .pi / 180)), 0.001))
+        let w = side * k, h = side * k
         let box = CGRect(x: -w / 2, y: -h / 2, width: w, height: h)
+        if case .clipped(let r) = state.reveal {
+            context.clip(to: Path(CGRect(x: box.minX + r.x * w, y: box.minY + r.y * h, width: r.width * w, height: r.height * h)))
+            context.translateBy(x: r.dx * w, y: r.dy * h)
+            context.scaleBy(x: r.zoom, y: r.zoom)
+        }
         context.fill(RoundedRectangle(cornerRadius: w * PresetPreview.roundness).path(in: box),
                      with: .color(Theme.previewShape))
     }
@@ -176,6 +209,10 @@ struct PresetPreview {
     /// The stand-in: a rounded square, so a turn shows as a circle's would not.
     static let side = 128.0
     static let roundness = 0.22
+    /// A text preset's letters: five small squares in a row.
+    static let letter = 44.0
+    static let letters = 5
+    private static let letterGap = 12.0
     /// An empty moment before it plays, a hold between a pair's In and Out,
     /// and a rest after, so each loop reads as one go.
     private static let lead = 0.35
@@ -186,18 +223,24 @@ struct PresetPreview {
     let tracks: ActionTracks
     let period: Double
     let isSound: Bool
+    let isText: Bool
 
-    private static var cache: [PresetKind: PresetPreview] = [:]
+    private static var cache: [String: PresetPreview] = [:]
 
-    static func of(_ kind: PresetKind) -> PresetPreview {
-        if let known = cache[kind] { return known }
-        let made = make(kind)
-        cache[kind] = made
+    static func of(_ preset: Preset) -> PresetPreview {
+        if let known = cache[preset.id] { return known }
+        let made = make(preset)
+        cache[preset.id] = made
         return made
     }
 
-    private static func make(_ kind: PresetKind) -> PresetPreview {
-        let preset = Presets.preset(kind)
+    /// The centre of letter `i` across the scene.
+    static func letterCentre(_ i: Int) -> Double {
+        let total = Double(letters) * letter + Double(letters - 1) * letterGap
+        return (scene - total) / 2 + letter / 2 + Double(i) * (letter + letterGap)
+    }
+
+    private static func make(_ preset: Preset) -> PresetPreview {
         let isSound = preset.isSound
         let corner = Vec2((scene - side) / 2, (scene - side) / 2)
         let layer = isSound
@@ -205,14 +248,33 @@ struct PresetPreview {
                     size: Size2(side, side), position: Vec2(scene / 2, scene / 2))
             : LayerFactory.shape(.rectangle, in: Box(origin: corner, size: Size2(side, side)), name: preset.name)
         let rate = FrameRate(frames: 60)
-        var actions = [Presets.action(preset, for: layer, at: lead, frameRate: rate)]
-        // A pair plays its way in, then its way out.
-        if let out = kind.reversed {
-            actions.append(Presets.action(Presets.preset(out), for: layer, at: actions[0].end + hold, frameRate: rate))
+        var first = Presets.action(preset, for: layer, at: lead, frameRate: rate)
+        // Letters travel their own size, as they do on a text.
+        if preset.isText, case .preset(var p) = first.spec, p.distance != nil {
+            p.distance = letter
+            first.spec = .preset(p)
+        }
+        var actions = [first]
+        // A pair plays its way in, then its way out, with the same settings.
+        if let out = preset.kind.reversed, case .preset(var p) = first.spec {
+            p.preset = out
+            let own = PresetRecipe.defaults(out)
+            if !preset.isText { p = own }
+            let length = preset.isText ? first.duration : max(rate.snapped(PresetRecipe.length(out)), rate.frameDuration)
+            actions.append(Action(target: layer.id, start: first.end + hold, duration: length,
+                                  easing: PresetRecipe.easing(out), spec: .preset(p)))
         }
         return PresetPreview(layer: layer, tracks: ActionTracks(actions),
-                             period: (actions.last?.end ?? lead) + rest, isSound: isSound)
+                             period: (actions.last?.end ?? lead) + rest, isSound: isSound, isText: preset.isText)
     }
 
     func state(at time: Double) -> LayerState { tracks.state(of: layer, at: time) }
+
+    /// A text preset's letters at `time`, each as moved from its place; nil
+    /// for any other preset.
+    func letters(at time: Double) -> [LayerState]? {
+        guard isText else { return nil }
+        return tracks.textAnimation(of: layer.id, at: time)?.states(count: Self.letters, at: time)
+            ?? Array(repeating: TextAnimation.rest, count: Self.letters)
+    }
 }

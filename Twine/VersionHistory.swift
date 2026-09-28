@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "More presets, in groups, and text letter by letter", changes: [
+            "The preset picker is in groups: Fade, Scale, Mask, Blur, Emphasis, Text and Sound.",
+            "New presets: Shrink, Twist, Move & Scale, Blur & Slide, Blur & Scale, and five Mask presets that reveal the layer inside its own box: Mask Reveal, Mask Center, Mask Resize, Mask & Slide and Mask Shrink. Scale is now called Grow and Rotate is Spin.",
+            "On a text, any preset can move its letters, words or lines one by one: Apply to, Order (forward, backward, from the centre, from the edges or random) and Delay are in its settings.",
+            "Text presets for text layers: Typewriter, Letters Rise, Letters Pop, Words Blur and Lines Reveal.",
+        ]),
         .init(date: "28 September 2026", title: "Icons in the action menu", changes: [
             "Every kind of action in the New Action menu shows its icon beside its name.",
         ]),

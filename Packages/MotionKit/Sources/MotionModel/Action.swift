@@ -603,9 +603,18 @@ public struct PresetAction: Codable, Sendable, Equatable {
     public var blur: Double?
     /// Whether it fades as it moves.
     public var fades: Bool?
+    /// On a text layer, what moves on its own: each letter, word or line in
+    /// turn. Nil moves the whole layer.
+    public var unit: TextUnit?
+    /// The order the letters, words or lines go in; nil is forward.
+    public var order: TextOrder?
+    /// Seconds between one letter, word or line starting and the next; nil
+    /// is the unit's own (`TextUnit.delay`).
+    public var delay: Double?
 
     public init(preset: PresetKind, direction: PresetDirection? = nil, distance: Double? = nil, scale: Double? = nil,
-                angle: Double? = nil, blur: Double? = nil, fades: Bool? = nil) {
+                angle: Double? = nil, blur: Double? = nil, fades: Bool? = nil, unit: TextUnit? = nil,
+                order: TextOrder? = nil, delay: Double? = nil) {
         self.preset = preset
         self.direction = direction
         self.distance = distance
@@ -613,6 +622,9 @@ public struct PresetAction: Codable, Sendable, Equatable {
         self.angle = angle
         self.blur = blur
         self.fades = fades
+        self.unit = unit
+        self.order = order
+        self.delay = delay
     }
 }
 
@@ -622,8 +634,45 @@ public enum PresetKind: String, Codable, Sendable, CaseIterable {
     case blurIn = "blur-in", dropIn = "drop-in"
     case fadeOut = "fade-out", slideOut = "slide-out", scaleOut = "scale-out", blurOut = "blur-out"
     case rotateOut = "rotate-out", dropOut = "drop-out"
+    case shrinkIn = "shrink-in", shrinkOut = "shrink-out", twistIn = "twist-in", twistOut = "twist-out"
+    case moveScaleIn = "move-scale-in", moveScaleOut = "move-scale-out"
+    case maskRevealIn = "mask-reveal-in", maskRevealOut = "mask-reveal-out"
+    case maskCenterIn = "mask-center-in", maskCenterOut = "mask-center-out"
+    case maskResizeIn = "mask-resize-in", maskResizeOut = "mask-resize-out"
+    case maskSlideIn = "mask-slide-in", maskSlideOut = "mask-slide-out"
+    case maskShrinkIn = "mask-shrink-in", maskShrinkOut = "mask-shrink-out"
+    case blurSlideIn = "blur-slide-in", blurSlideOut = "blur-slide-out"
+    case blurScaleIn = "blur-scale-in", blurScaleOut = "blur-scale-out"
     case fadeSoundIn = "fade-sound-in", fadeSoundOut = "fade-sound-out"
     case pulse, bounce, shake, wiggle
+}
+
+/// What of a text moves on its own in a preset.
+public enum TextUnit: String, Codable, Sendable, CaseIterable {
+    case letters, words, lines
+
+    /// The gap between one starting and the next, unless set.
+    public var delay: Double {
+        switch self {
+        case .letters: 0.03
+        case .words: 0.08
+        case .lines: 0.15
+        }
+    }
+}
+
+/// The order letters, words or lines go in.
+public enum TextOrder: String, Codable, Sendable, CaseIterable {
+    /// First to last.
+    case forward
+    /// Last to first.
+    case backward
+    /// From the middle out to both ends.
+    case center
+    /// From both ends in to the middle.
+    case edges
+    /// Shuffled, the same way every time.
+    case random
 }
 
 public enum PresetDirection: String, Codable, Sendable, CaseIterable {

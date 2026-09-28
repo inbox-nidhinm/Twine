@@ -66,8 +66,10 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
             #expect(near(end.scale, Vec2(1, 1)), "\(preset.name)")
             #expect(near(end.rotation, 10), "\(preset.name)")
             #expect(near(end.layerBlur, 0), "\(preset.name)")
-            // Before it, the layer waits unseen.
-            #expect(tracks.state(of: layer, at: 0.5).opacity == 0, "\(preset.name)")
+            #expect(end.reveal == .none && end.tilt == layer.transform.tilt, "\(preset.name)")
+            // Before it, the layer waits unseen: faded right out, or clipped away.
+            let before = tracks.state(of: layer, at: 0.5)
+            #expect(before.opacity == 0 || before.reveal.showsNothing, "\(preset.name)")
         }
     }
 
@@ -77,7 +79,7 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
             let action = bar(preset, on: layer)
             let tracks = ActionTracks([action])
             let end = tracks.state(of: layer, at: action.end + 0.01)
-            #expect(end.opacity < 1e-6 || end.scale.x < 1e-6, "\(preset.name)")
+            #expect(end.opacity < 1e-6 || end.scale.x < 1e-6 || end.reveal.showsNothing, "\(preset.name)")
             // Untouched until it starts.
             #expect(near(tracks.state(of: layer, at: 0.5).opacity, 0.5), "\(preset.name)")
         }
@@ -130,7 +132,8 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
     }
 
     @Test func splittingPlaysTheSame() throws {
-        for preset in PresetKind.allCases.filter({ !$0.isSound }).map(Presets.preset) {
+        // Every one but those that clip the layer, which no action does.
+        for preset in PresetKind.allCases.filter({ !$0.isSound && Presets.splits(PresetRecipe.defaults($0)) }).map(Presets.preset) {
             var layer = square()
             // Something before it on the layer, so the split fixes the right values.
             let earlier = Action(target: layer.id, start: 0, duration: 0.5, spec: .move(MoveAction(mode: .by, end: Vec2(30, 0))))
@@ -174,7 +177,9 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
         #expect(soundPresets.count == 1)
         // A sound takes only the sound presets, a shape everything else.
         #expect(Presets.available(for: [sound], in: project) == soundPresets)
-        #expect(Presets.available(for: [square()], in: project).count == Presets.library.count - soundPresets.count)
+        let textPresets = Presets.library.filter(\.isText)
+        #expect(Presets.available(for: [square()], in: project).count
+                == Presets.library.count - soundPresets.count - textPresets.count)
         // A sound among layers that draw is left out rather than emptying the list.
         #expect(Presets.available(for: [square(), sound], in: project) == Presets.available(for: [square()], in: project))
     }
@@ -217,7 +222,8 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
     @Test func pairsAreNamedForTheirWay() {
         #expect(Presets.name(of: .fadeIn) == "Fade In")
         #expect(Presets.name(of: .fadeOut) == "Fade Out")
-        #expect(Presets.name(of: .scalePop) == "Scale In")
+        #expect(Presets.name(of: .scalePop) == "Grow In")
+        #expect(Presets.name(of: .maskSlideOut) == "Mask & Slide Out")
         #expect(Presets.name(of: .dropOut) == "Drop Out")
         #expect(Presets.name(of: .fadeSoundOut) == "Sound Fade Out")
         #expect(Presets.name(of: .shake) == "Shake")
@@ -230,5 +236,120 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
         // A shake keeps its jolts' own easing, so it offers none.
         #expect(!PresetRecipe.usesEasing(.shake))
         #expect(PresetRecipe.usesEasing(.slideIn))
+    }
+
+    @Test func thePickerShowsEveryGroupInOrder() {
+        // The library runs group by group, so the picker's headings each come once.
+        let groups = Presets.library.map(\.group)
+        let runs = groups.enumerated().filter { $0.offset == 0 || groups[$0.offset - 1] != $0.element }.map(\.element)
+        #expect(runs == PresetGroup.allCases)
+    }
+
+    @Test func aMaskPresetClipsTheLayerToItsOwnBox() {
+        let layer = square()
+        var action = bar(Presets.preset(.maskResizeIn), on: layer, at: 0)
+        action.easing = .preset(.none, intensity: 0)
+        let tracks = ActionTracks([action])
+        // Shut before, open halfway from the left halfway through, whole after.
+        #expect(tracks.state(of: layer, at: 0).reveal.showsNothing)
+        let half = tracks.state(of: layer, at: action.duration / 2).reveal.box
+        #expect(near(half.x, 0) && near(half.width, 0.5) && near(half.height, 1))
+        #expect(tracks.state(of: layer, at: action.end + 0.01).reveal == .none)
+        // It moves nothing else.
+        #expect(near(tracks.state(of: layer, at: action.duration / 2).position, Vec2(500, 300)))
+        // Out closes it again, toward the other side.
+        let out = bar(Presets.preset(.maskResizeOut), on: layer, at: 0)
+        #expect(ActionTracks([out]).state(of: layer, at: out.end + 0.01).reveal.showsNothing)
+        // A clip is no action, so the bar stays one piece.
+        #expect(Presets.split(action, of: layer, from: LayerState(design: layer), frameRate: .fps60) == nil)
+    }
+
+    @Test func textPresetsSuitOnlyText() throws {
+        let text = Layer(name: "T", content: .text(TextContent(text: "Hi there")), size: Size2(100, 40), position: .zero)
+        let project = Project(layers: [text, square()])
+        #expect(Presets.available(for: [text], in: project).contains { $0.isText })
+        #expect(!Presets.available(for: [square()], in: project).contains { $0.isText })
+        #expect(!Presets.available(for: [text, square()], in: project).contains { $0.isText })
+        // A text preset goes on moving letters, and they travel one type size.
+        let rise = try #require(Presets.library.first { $0.name == "Letters Rise" })
+        let action = Presets.action(rise, for: text, at: 0, frameRate: .fps60)
+        guard case .preset(let settings) = action.spec else { Issue.record("not a preset"); return }
+        #expect(settings.unit == .letters && settings.direction == .bottom && settings.distance == 48)
+        #expect(action.name == "Letters Rise" && near(action.duration, 0.8))
+        #expect(!Presets.splits(settings))
+        // It survives a file.
+        let data = try JSONEncoder().encode(action)
+        #expect(try JSONDecoder().decode(Action.self, from: data) == action)
+    }
+
+    @Test func lettersTakeTurnsAcrossTheBar() {
+        let text = Layer(name: "T", content: .text(TextContent(text: "abcde")), size: Size2(100, 40), position: .zero)
+        var settings = PresetRecipe.defaults(.fadeIn)
+        settings.unit = .letters
+        settings.delay = 0.1
+        let action = Action(target: text.id, start: 1, duration: 1, easing: .preset(.none, intensity: 0), spec: .preset(settings))
+        let tracks = ActionTracks([action])
+        // The layer itself is left alone: the letters move instead.
+        #expect(tracks.state(of: text, at: 1.1).opacity == 1)
+        let animation = tracks.textAnimation(of: text.id, at: 1.1)
+        // Each letter fades in over what is left after the delays: 0.6s.
+        let early = animation?.states(count: 5, at: 1.3) ?? []
+        #expect(early.count == 5)
+        #expect(near(early[0].opacity, 0.5) && near(early[1].opacity, 1.0 / 3) && early[4].opacity == 0)
+        // Before the bar every letter waits unseen; after it every one is home.
+        #expect(animation?.states(count: 5, at: 0.5).allSatisfy { $0.opacity == 0 } == true)
+        #expect(animation?.states(count: 5, at: 2.01).allSatisfy { $0 == TextAnimation.rest } == true)
+        // Backward starts with the last.
+        settings.order = .backward
+        let back = ActionTracks([Action(target: text.id, start: 1, duration: 1, easing: .preset(.none, intensity: 0),
+                                        spec: .preset(settings))])
+        let states = back.textAnimation(of: text.id, at: 1.3)?.states(count: 5, at: 1.3) ?? []
+        #expect(near(states[4].opacity, 0.5) && states[0].opacity == 0)
+    }
+
+    @Test func aDelayTooLongForTheTextIsShortened() {
+        var settings = PresetRecipe.defaults(.fadeIn)
+        settings.unit = .letters
+        settings.delay = 1
+        let action = Action(target: UUID(), start: 0, duration: 1, easing: .preset(.none, intensity: 0), spec: .preset(settings))
+        let animation = ActionTracks([action]).textAnimation(of: action.targetLayerID, at: 0)
+        // Ten letters still all arrive by the bar's end.
+        #expect(animation?.states(count: 10, at: 1.001).allSatisfy { near($0.opacity, 1) } == true)
+        #expect(animation?.states(count: 10, at: 0.9).last.map { $0.opacity > 0 && $0.opacity < 1 } == true)
+    }
+
+    @Test func randomOrderIsTheSameEveryTime() {
+        let id = UUID()
+        let a = TextAnimation.ranks(12, order: .random, seed: id)
+        #expect(a == TextAnimation.ranks(12, order: .random, seed: id))
+        #expect(Set(a) == Set((0..<12).map(Double.init)))
+        #expect(TextAnimation.ranks(5, order: .center, seed: id) == [2, 1, 0, 1, 2])
+        #expect(TextAnimation.ranks(5, order: .edges, seed: id) == [0, 1, 2, 1, 0])
+    }
+
+    @Test func textSplitsIntoLettersWordsAndLines() {
+        let style = TextStyle(TextContent(text: ""))
+        let text = "Hi big\nworld"
+        #expect(TextSpans.spans(.letters, of: text, style: style, width: nil).count == 10)
+        let words = TextSpans.spans(.words, of: text, style: style, width: nil)
+        #expect(words.map(\.range.location) == [0, 3, 7])
+        let lines = TextSpans.spans(.lines, of: text, style: style, width: nil)
+        #expect(lines.count == 2)
+        // Words sit left to right on their line, and lines one under the other.
+        #expect(words[0].box.maxX <= words[1].box.minX && words[2].box.minY > words[0].box.minY)
+        #expect(lines[1].box.minY >= lines[0].box.maxY - 1e-6)
+    }
+
+    @Test func aTextPresetDrawsTheLettersOnlyWhileTheyMove() {
+        let text = Layer(name: "T", content: .text(TextContent(text: "abc")), size: Size2(100, 40), position: .zero)
+        let rise = Presets.library.first { $0.name == "Letters Rise" }!
+        let action = Presets.action(rise, for: text, at: 0, frameRate: .fps60)
+        let project = Project(layers: [text], actions: [action])
+        func units(at t: Double) -> [ResolvedTextUnit] {
+            guard case .text(let t) = evaluate(project, at: t).layer(text.id)?.content else { return [] }
+            return t.units
+        }
+        #expect(units(at: 0.2).count == 3)
+        #expect(units(at: action.end + 0.01).isEmpty)
     }
 }

@@ -179,7 +179,7 @@ private final class MaskNode {
 
 // MARK: - One layer
 
-private final class Node {
+final class Node {
     /// No implicit animation on anything this renderer creates. Never
     /// mutated after it is made, and `NSNull` is immutable, so sharing it
     /// between an export's thread and the main thread is safe.
@@ -248,6 +248,16 @@ private final class Node {
     private var textImages: [TextImage?] = [nil, nil]
     /// A video layer's frame.
     private var mediaLayer: CALayer?
+    /// While a text preset moves a text's letters, words or lines one by
+    /// one, each of them, and the pictures they are drawn from.
+    private var unitLayers: [TextUnitLayer] = []
+    private var unitImages: [UnitImageKey: TextImage] = [:]
+    /// Made the first time a Mask preset clips the layer: a holder as big as
+    /// the part that shows, clipping, around the layer's own sublayers.
+    private var revealClip: CALayer?
+    private var revealContent: CALayer?
+    /// Where the layer's own sublayers go: inside the reveal once there is one.
+    private var host: CALayer { revealContent ?? container }
 
     init(scale: CGFloat) {
         self.scale = scale
@@ -321,6 +331,7 @@ private final class Node {
             blurRadius = layer.blur
             container.filters = layer.blur > 0 ? [Blur.filter(amount: layer.blur)] : nil
         }
+        updateReveal(layer.reveal, size: layer.size)
 
         switch layer.content {
         case .shape(let shape):
@@ -379,7 +390,7 @@ private final class Node {
         // Compared with what was last set rather than read back, which
         // copies the list out of Core Animation every frame.
         if arranged.count != wanted.count || !zip(arranged, wanted).allSatisfy({ $0 === $1 }) {
-            container.sublayers = wanted
+            host.sublayers = wanted
             arranged = wanted
         }
     }
@@ -481,7 +492,7 @@ private final class Node {
             let l = CALayer()
             l.actions = Self.noActions
             l.masksToBounds = true
-            container.sublayers = [l]
+            host.sublayers = [l]
             mediaLayer = l
         }
         guard let mediaLayer else { return }
@@ -504,6 +515,58 @@ private final class Node {
         textLayers = []
         textKeys = [nil, nil]
         textImages = [nil, nil]
+        clearUnits()
+    }
+
+    private func clearUnits() {
+        for u in unitLayers { u.holder.removeFromSuperlayer() }
+        unitLayers = []
+        unitImages = [:]
+    }
+
+    /// Each letter, word or line drawn on its own, moved as the text preset
+    /// has it. Its picture is the text drawn over just its box, so it lines
+    /// up with the rest exactly as the whole text would.
+    private func updateUnits(_ text: ResolvedText, size: Size2) {
+        let width = text.sizing == .fixedWidth ? size.width : nil
+        let key = TextImage.Key(text: text.text, style: text.style, color: text.color, width: width, scale: scale)
+        if unitImages.keys.first.map({ $0.text != key }) ?? false { unitImages = [:] }
+        while unitLayers.count > text.units.count { unitLayers.removeLast().holder.removeFromSuperlayer() }
+        while unitLayers.count < text.units.count {
+            let made = TextUnitLayer(scale: scale)
+            host.addSublayer(made.holder)
+            unitLayers.append(made)
+        }
+        for (layer, unit) in zip(unitLayers, text.units) {
+            let imageKey = UnitImageKey(text: key, location: unit.range.location, length: unit.range.length)
+            let image = unitImages[imageKey] ?? {
+                let made = TextImage(key, region: unit.box)
+                unitImages[imageKey] = made
+                return made
+            }()
+            layer.update(unit, image: image, flips: flipsContents)
+        }
+    }
+
+    /// Clips the layer to part of its box, with its content moved and
+    /// zoomed behind the clip, as a Mask preset has it. The holders are made
+    /// the first time and kept, open and still, once the reveal ends.
+    private func updateReveal(_ reveal: Reveal, size: Size2) {
+        guard reveal != .none || revealClip != nil else { return }
+        if revealClip == nil {
+            let clip = CALayer(), content = CALayer()
+            for l in [clip, content] {
+                l.anchorPoint = .zero
+                l.actions = Self.noActions
+            }
+            content.sublayers = container.sublayers
+            clip.addSublayer(content)
+            container.sublayers = [clip]
+            revealClip = clip
+            revealContent = content
+        }
+        guard let revealClip, let revealContent else { return }
+        RevealLayers.apply(reveal, size: size.cg, clip: revealClip, content: revealContent)
     }
 
     /// Draws the current text, and the previous one during a swap, each at
@@ -518,8 +581,14 @@ private final class Node {
                 l.contentsScale = scale
                 return l
             }
-            container.sublayers = textLayers
+            host.sublayers = textLayers
         }
+        guard text.units.isEmpty else {
+            for l in textLayers { l.isHidden = true }
+            updateUnits(text, size: size)
+            return
+        }
+        if !unitLayers.isEmpty { clearUnits() }
         let width = text.sizing == .fixedWidth ? size.width : nil
         let swap = text.swap
         let texts = [swap?.previous, text.text]
@@ -636,6 +705,77 @@ private final class Node {
 /// or outside of the path, which is how Core Animation, which only strokes
 /// centred on the path, gets the other two alignments: the stroke is drawn at
 /// twice the width and half of it is masked away.
+/// Places a reveal's two holders: the clip, as big as the part of the box
+/// that shows and clipping to itself, with its bounds in the layer's own
+/// coordinates so what it holds needs no moving; and inside it the content,
+/// moved and zoomed about the box's centre.
+enum RevealLayers {
+    static func apply(_ reveal: Reveal, size: CGSize, clip: CALayer, content: CALayer) {
+        let b = reveal.box
+        let open = reveal == .none ? CGRect(origin: .zero, size: size)
+            : CGRect(x: b.x * size.width, y: b.y * size.height, width: b.width * size.width, height: b.height * size.height)
+        clip.masksToBounds = reveal != .none
+        clip.bounds = open
+        clip.position = open.origin
+        content.bounds = CGRect(origin: .zero, size: size)
+        content.position = .zero
+        let centre = Vec2(size.width / 2, size.height / 2)
+        let moved = Affine.translation(Vec2(-centre.x, -centre.y)).then(.scale(Vec2(b.zoom, b.zoom)))
+            .then(.translation(Vec2(centre.x + b.dx * size.width, centre.y + b.dy * size.height)))
+        content.transform = reveal == .none ? CATransform3DIdentity : moved.caTransform
+    }
+}
+
+/// Which picture a letter, word or line is drawn from.
+private struct UnitImageKey: Hashable {
+    let text: TextImage.Key
+    let location: Int
+    let length: Int
+}
+
+/// One letter, word or line of a text moved by a text preset: a holder
+/// placed by its transform, fading and blurring as a whole, and inside it a
+/// reveal and the picture.
+private final class TextUnitLayer {
+    let holder = CALayer()
+    private let clip = CALayer()
+    private let content = CALayer()
+    private let picture = CALayer()
+    private var blur = 0.0
+
+    init(scale: CGFloat) {
+        for l in [holder, clip, content, picture] {
+            l.anchorPoint = .zero
+            l.actions = Node.noActions
+        }
+        picture.contentsScale = scale
+        holder.allowsGroupOpacity = true
+        holder.addSublayer(clip)
+        clip.addSublayer(content)
+        content.addSublayer(picture)
+    }
+
+    func update(_ unit: ResolvedTextUnit, image: TextImage, flips: Bool) {
+        let size = CGSize(width: unit.box.width, height: unit.box.height)
+        holder.bounds = CGRect(origin: .zero, size: size)
+        holder.position = .zero
+        holder.transform = unit.transform.caTransform
+        holder.opacity = Float(unit.opacity)
+        if unit.blur != blur {
+            blur = unit.blur
+            holder.filters = unit.blur > 0 ? [Blur.filter(amount: unit.blur)] : nil
+        }
+        RevealLayers.apply(unit.reveal, size: size, clip: clip, content: content)
+        if (picture.contents as AnyObject?) !== image.image { picture.contents = image.image }
+        // The picture covers the box and a margin above and below it.
+        picture.transform = CATransform3DIdentity
+        picture.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        picture.frame = CGRect(x: image.origin.x - unit.box.minX, y: image.origin.y - unit.box.minY,
+                               width: image.box.width, height: image.box.height)
+        picture.transform = flips ? CATransform3DMakeScale(1, -1, 1) : CATransform3DIdentity
+    }
+}
+
 private final class PaintLayers {
     let root = CALayer()
     private let shape = CAShapeLayer()

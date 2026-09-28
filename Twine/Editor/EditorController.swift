@@ -547,10 +547,10 @@ final class EditorController {
         insertAndShow(made, name: preset.name)
     }
 
-    /// Whether any selected action is a preset bar, which Split into Actions
-    /// can take apart.
+    /// Whether any selected action is a preset bar Split into Actions can
+    /// take apart: not one moving letters one by one, or clipping.
     var canSplitPresets: Bool {
-        selectedActions.contains { if case .preset = $0.spec { return true } else { return false } }
+        selectedActions.contains { if case .preset(let p) = $0.spec { return Presets.splits(p) } else { return false } }
     }
 
     /// Swaps each selected preset bar for the ordinary actions it is made of,

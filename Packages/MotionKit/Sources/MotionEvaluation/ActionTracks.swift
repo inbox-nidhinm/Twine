@@ -10,6 +10,8 @@ public enum Channel: String, Hashable, Sendable, CaseIterable {
     case letterSpacing, lineHeight, text, arc, star, path
     case media, volume
     case skew, tilt
+    /// A clip of the layer's own box, which only the Mask presets drive.
+    case reveal
 }
 
 extension ActionKind {
@@ -140,6 +142,8 @@ public struct LayerState: Sendable, Equatable {
     public var sourceTime: Double?
     /// Video and audio only: the sound's level, 1 being the file's own.
     public var volume: Double?
+    /// A clip of the layer's own box, from a Mask preset; `.none` otherwise.
+    public var reveal: Reveal = .none
 
     /// The layer as it is designed, with no actions.
     public init(design layer: Layer) {
@@ -223,10 +227,15 @@ public struct ActionTracks: Sendable {
     private var presetLayers: Set<UUID> = []
     /// The layers with a Move that turns them along its path (rule 9).
     private var turningLayers: Set<UUID> = []
+    /// Presets that move a text's letters, words or lines one by one, by
+    /// layer, in start order. They leave the layer's own channels alone.
+    private var textPresets: [UUID: [TextPreset]] = [:]
 
     public init(_ actions: [Action]) {
         for action in actions where action.isEnabled {
-            if case .preset(let p) = action.spec {
+            if case .preset(let p) = action.spec, p.unit != nil {
+                textPresets[action.targetLayerID, default: []].append(TextPreset(action, p))
+            } else if case .preset(let p) = action.spec {
                 // On every property it reaches, as one action there.
                 let parts = PresetRecipe.parts(p)
                 presetParts[action.id] = parts
@@ -244,6 +253,26 @@ public struct ActionTracks: Sendable {
                 tracks[layer]?[channel] = list.sorted(by: Self.order)
             }
         }
+        for (layer, list) in textPresets {
+            textPresets[layer] = list.sorted { Self.order($0.action, $1.action) }
+        }
+    }
+
+    /// How a text layer's letters, words or lines move at `time`: the text
+    /// preset in force then (the latest to have started, or before any has,
+    /// the first), or nil when the layer has none. Only one is in force at a
+    /// time; each ends with every letter where it belongs and starts from
+    /// there, so handing over shows nothing.
+    public func textAnimation(of layer: UUID, at time: Double) -> TextAnimation? {
+        guard !textPresets.isEmpty, let list = textPresets[layer], let first = list.first else { return nil }
+        let current = list.last { $0.action.start <= time } ?? first
+        return TextAnimation(current)
+    }
+
+    /// The same, for a text layer only: anything else draws whole.
+    func textAnimation(of layer: Layer, at time: Double) -> TextAnimation? {
+        guard !textPresets.isEmpty, case .text = layer.content else { return nil }
+        return textAnimation(of: layer.id, at: time)
     }
 
     /// Earlier start first; actions that start together go in row order.
@@ -296,7 +325,9 @@ public struct ActionTracks: Sendable {
             case .rotation: state.rotation = walk(state.rotation, steps(list, Self.rotationStep, Self.rotationPart), at: time)
             case .opacity: state.opacity = walk(state.opacity, steps(list, Self.opacityStep, Self.opacityPart), at: time)
             case .skew: state.skew = walk(state.skew, list.compactMap(Self.skewStep), at: time)
-            case .tilt: state.tilt = walk(state.tilt, list.compactMap(Self.tiltStep), at: time)
+            case .tilt: state.tilt = walk(state.tilt, steps(list, Self.tiltStep, Self.tiltPart), at: time)
+            case .reveal:
+                state.reveal = Reveal(walk(state.reveal.box, steps(list, { _ in nil }, Self.revealPart), at: time))
             case .size: state.size = walk(state.size, list.compactMap(Self.sizeStep), at: time)
             case .visibility: state.isShown = walk(1, Self.visibilitySteps(list), at: time) > 0.5
             // Only what the layer has: a Colour on a layer with no fill does nothing.
@@ -431,6 +462,19 @@ public struct ActionTracks: Sendable {
     private static func layerBlurPart(_ e: PresetEffect) -> PartRun<Double>? {
         guard case .blur(let from, let to) = e else { return nil }
         return PartRun(holds: from != nil) { inherited, _, _ in (from ?? inherited, to) }
+    }
+
+    private static func tiltPart(_ e: PresetEffect) -> PartRun<Tilt>? {
+        guard case .tilt(let by, let entering) = e else { return nil }
+        func turned(_ t: Tilt, _ d: Double) -> Tilt { Tilt(x: t.x, y: t.y + d, depth: t.depth) }
+        return PartRun(holds: entering) { inherited, own, _ in
+            entering ? (turned(own, -by), own) : (inherited, turned(inherited, by))
+        }
+    }
+
+    private static func revealPart(_ e: PresetEffect) -> PartRun<RevealBox>? {
+        guard case .reveal(let from, let to) = e else { return nil }
+        return PartRun(holds: from != nil) { inherited, _, _ in (from ?? inherited, to ?? .full) }
     }
 
     private static func volumePart(_ e: PresetEffect) -> PartRun<Double>? {

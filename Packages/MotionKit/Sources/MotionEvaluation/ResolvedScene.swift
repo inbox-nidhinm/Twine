@@ -144,6 +144,8 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
     public var mask: ResolvedMask?
     /// Skew and tilt, boxed when there are any (see `Warp`).
     public var warp: Warp = .none
+    /// A clip of the layer's own box from a Mask preset, or `.none`.
+    public var reveal: Reveal = .none
     /// Degrees each way (see `Transform.skew`).
     public var skew: Vec2 { warp.skew }
     /// A turn in depth (see `Tilt`), which `transform` leaves out and
@@ -240,10 +242,38 @@ public struct ResolvedText: Sendable, Equatable {
     public var lineHeight: Double?
     public var sizing: TextSizing
     public var tabularDigits: Bool
+    /// While a text preset moves its letters, words or lines one by one,
+    /// each of them, drawn in place of the whole text; empty otherwise.
+    public var units: [ResolvedTextUnit] = []
 
     public var style: TextStyle {
         TextStyle(fontFamily: fontFamily, fontWeight: fontWeight, fontSize: fontSize, alignment: alignment,
                   letterSpacing: letterSpacing, lineHeight: lineHeight, tabularDigits: tabularDigits)
+    }
+}
+
+/// One letter, word or line of a text, moved on its own by a text preset.
+public struct ResolvedTextUnit: Sendable, Equatable {
+    /// Its characters, in UTF-16 units of the text.
+    public var range: NSRange
+    /// Its box in the text's own space, where it sits at rest.
+    public var box: Box
+    /// From its own box (origin at its top-left) into the text's space, as
+    /// it is drawn now: moved, scaled, turned and tilted about its centre.
+    public var transform: Projective
+    public var opacity: Double
+    /// In Figma's units, as `ResolvedLayer.blur`.
+    public var blur: Double
+    /// A clip of its own box, or `.none`.
+    public var reveal: Reveal
+
+    public init(range: NSRange, box: Box, transform: Projective, opacity: Double, blur: Double, reveal: Reveal) {
+        self.range = range
+        self.box = box
+        self.transform = transform
+        self.opacity = opacity
+        self.blur = blur
+        self.reveal = reveal
     }
 }
 

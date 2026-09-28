@@ -22,6 +22,13 @@ public enum PresetEffect: Sendable, Equatable {
     /// Volume from `from` (nil carries on) to `to` (nil is the layer's own
     /// level, at most 100%).
     case volume(from: Double?, to: Double?)
+    /// Turns in depth around an upright line by `by` degrees (a tilt's y).
+    /// Entering, it turns into its own tilt from `by` short of it;
+    /// otherwise it turns on by that much.
+    case tilt(by: Double, entering: Bool)
+    /// A clip of the layer's own box, from `from` (nil carries on) to `to`
+    /// (nil is the whole box, nothing clipped).
+    case reveal(from: RevealBox?, to: RevealBox?)
 
     public var channel: Channel {
         switch self {
@@ -31,6 +38,8 @@ public enum PresetEffect: Sendable, Equatable {
         case .rotate: .rotation
         case .blur: .layerBlur
         case .volume: .volume
+        case .tilt: .tilt
+        case .reveal: .reveal
         }
     }
 
@@ -41,7 +50,8 @@ public enum PresetEffect: Sendable, Equatable {
         switch self {
         case .opacity(let from, _), .scale(let from, _), .volume(let from, _): from != nil
         case .blur(let from, _): from != nil
-        case .move(_, let entering), .rotate(_, let entering): entering
+        case .reveal(let from, _): from != nil
+        case .move(_, let entering), .rotate(_, let entering), .tilt(_, let entering): entering
         }
     }
 }
@@ -70,7 +80,22 @@ public enum PresetRecipe {
         case .slideOut: PresetAction(preset: kind, direction: .right, distance: travel, fades: true)
         case .scalePop: PresetAction(preset: kind, scale: 0, fades: true)
         case .scaleOut: PresetAction(preset: kind, scale: 0, fades: true)
-        case .rotateIn, .rotateOut: PresetAction(preset: kind, scale: 0.6, angle: 90, fades: true)
+        case .rotateIn, .rotateOut: PresetAction(preset: kind, scale: 0.6, angle: 180, fades: true)
+        case .shrinkIn, .shrinkOut: PresetAction(preset: kind, scale: 1.5, fades: true)
+        case .twistIn, .twistOut: PresetAction(preset: kind, angle: 90, fades: true)
+        case .moveScaleIn: PresetAction(preset: kind, direction: .bottom, distance: travel / 2, scale: 0.5, fades: true)
+        case .moveScaleOut: PresetAction(preset: kind, direction: .top, distance: travel / 2, scale: 0.5, fades: true)
+        case .maskRevealIn: PresetAction(preset: kind, direction: .bottom)
+        case .maskRevealOut: PresetAction(preset: kind, direction: .top)
+        case .maskResizeIn: PresetAction(preset: kind, direction: .left)
+        case .maskResizeOut: PresetAction(preset: kind, direction: .right)
+        case .maskSlideIn: PresetAction(preset: kind, direction: .left, distance: travel / 2)
+        case .maskSlideOut: PresetAction(preset: kind, direction: .right, distance: travel / 2)
+        case .maskShrinkIn, .maskShrinkOut: PresetAction(preset: kind, scale: 1.4)
+        case .maskCenterIn, .maskCenterOut: PresetAction(preset: kind)
+        case .blurSlideIn: PresetAction(preset: kind, direction: .bottom, distance: travel / 3, blur: 16, fades: true)
+        case .blurSlideOut: PresetAction(preset: kind, direction: .top, distance: travel / 3, blur: 16, fades: true)
+        case .blurScaleIn, .blurScaleOut: PresetAction(preset: kind, scale: 0.6, blur: 16, fades: true)
         case .blurIn, .blurOut: PresetAction(preset: kind, blur: 24, fades: true)
         case .dropIn, .dropOut: PresetAction(preset: kind, distance: travel * 1.5, fades: true)
         case .pulse: PresetAction(preset: kind, scale: 1.12)
@@ -89,8 +114,10 @@ public enum PresetRecipe {
     /// The easing a new bar takes: that of its main motion.
     public static func easing(_ kind: PresetKind) -> Easing {
         switch kind {
-        case .slideIn, .rotateIn, .blurIn: slowDown
-        case .slideOut, .blurOut, .rotateOut, .dropOut: accelerate
+        case .slideIn, .rotateIn, .blurIn, .shrinkIn, .twistIn, .moveScaleIn, .blurSlideIn, .blurScaleIn,
+             .maskRevealIn, .maskCenterIn, .maskResizeIn, .maskSlideIn, .maskShrinkIn: slowDown
+        case .slideOut, .blurOut, .rotateOut, .dropOut, .shrinkOut, .twistOut, .moveScaleOut, .blurSlideOut, .blurScaleOut,
+             .maskRevealOut, .maskCenterOut, .maskResizeOut, .maskSlideOut, .maskShrinkOut: accelerate
         case .scalePop: .preset(.overshoot, intensity: 0.6)
         case .scaleOut: .preset(.accelerate, intensity: 0.5)
         case .dropIn: .preset(.spring, intensity: 0.5)
@@ -120,6 +147,15 @@ public enum PresetRecipe {
     // MARK: The recipes, in seconds at their own length
 
     private static let slowDown = Easing.preset(.slowDown, intensity: 0.6)
+
+    private static func opposite(_ d: PresetDirection) -> PresetDirection {
+        switch d {
+        case .left: .right
+        case .right: .left
+        case .top: .bottom
+        case .bottom: .top
+        }
+    }
     private static let accelerate = Easing.preset(.accelerate, intensity: 0.6)
 
     private static func seconds(_ kind: PresetKind, _ settings: PresetAction? = nil) -> (length: Double, parts: [PresetPart]) {
@@ -136,6 +172,10 @@ public enum PresetRecipe {
         func fadeOut(at start: Double = 0, _ length: Double) -> [PresetPart] {
             fades ? [part(.opacity(from: nil, to: 0), at: start, for: length, easing: .default)] : []
         }
+        let direction = s.direction ?? own.direction ?? .left
+        let scale = s.scale ?? own.scale ?? 1
+        let angle = s.angle ?? own.angle ?? 90
+        let blur = s.blur ?? own.blur ?? 24
         func toward(_ direction: PresetDirection?) -> Vec2 {
             switch direction ?? own.direction ?? .left {
             case .left: Vec2(-distance, 0)
@@ -171,6 +211,57 @@ public enum PresetRecipe {
             return (0.8, [part(.move(by: Vec2(0, -distance), entering: true), for: 0.8)] + fadeIn(0.2))
         case .dropOut:
             return (0.5, [part(.move(by: Vec2(0, distance), entering: false), for: 0.5)] + fadeOut(at: 0.3, 0.2))
+        case .shrinkIn:
+            return (0.5, [part(.scale(from: scale, to: nil), for: 0.5)] + fadeIn(0.3))
+        case .shrinkOut:
+            return (0.4, [part(.scale(from: nil, to: scale), for: 0.4)] + fadeOut(at: 0.1, 0.3))
+        case .twistIn:
+            return (0.6, [part(.tilt(by: angle, entering: true), for: 0.6)] + fadeIn(0.3))
+        case .twistOut:
+            return (0.5, [part(.tilt(by: angle, entering: false), for: 0.5)] + fadeOut(at: 0.2, 0.3))
+        case .moveScaleIn:
+            return (0.6, [part(.move(by: toward(s.direction), entering: true), for: 0.6),
+                          part(.scale(from: scale, to: nil), for: 0.6)] + fadeIn(0.3))
+        case .moveScaleOut:
+            return (0.5, [part(.move(by: toward(s.direction), entering: false), for: 0.5),
+                          part(.scale(from: nil, to: scale), for: 0.5)] + fadeOut(at: 0.2, 0.3))
+        // The Mask presets clip the layer to its own box. Reveal slides the
+        // content in behind it; Center opens it from the middle; Resize opens
+        // it from one side; Slide opens it from the side the layer is
+        // heading for while the layer slides that way, as through a slot;
+        // Shrink opens it from the centre as the content shrinks into place.
+        case .maskRevealIn:
+            return (0.6, [part(.reveal(from: .away(direction), to: nil), for: 0.6)])
+        case .maskRevealOut:
+            return (0.5, [part(.reveal(from: nil, to: .away(direction)), for: 0.5)])
+        case .maskCenterIn:
+            return (0.6, [part(.reveal(from: .middle, to: nil), for: 0.6)])
+        case .maskCenterOut:
+            return (0.5, [part(.reveal(from: nil, to: .middle), for: 0.5)])
+        case .maskResizeIn:
+            return (0.6, [part(.reveal(from: .edge(direction), to: nil), for: 0.6)])
+        case .maskResizeOut:
+            return (0.5, [part(.reveal(from: nil, to: .edge(direction)), for: 0.5)])
+        case .maskSlideIn:
+            return (0.6, [part(.move(by: toward(s.direction), entering: true), for: 0.6),
+                          part(.reveal(from: .edge(Self.opposite(direction)), to: nil), for: 0.6)])
+        case .maskSlideOut:
+            return (0.5, [part(.move(by: toward(s.direction), entering: false), for: 0.5),
+                          part(.reveal(from: nil, to: .edge(Self.opposite(direction))), for: 0.5)])
+        case .maskShrinkIn:
+            return (0.7, [part(.reveal(from: .centre(zoom: scale), to: nil), for: 0.7)])
+        case .maskShrinkOut:
+            return (0.5, [part(.reveal(from: nil, to: .centre(zoom: scale)), for: 0.5)])
+        case .blurSlideIn:
+            return (0.6, [part(.blur(from: blur, to: 0), for: 0.6),
+                          part(.move(by: toward(s.direction), entering: true), for: 0.6)] + fadeIn(0.4))
+        case .blurSlideOut:
+            return (0.5, [part(.blur(from: nil, to: blur), for: 0.5),
+                          part(.move(by: toward(s.direction), entering: false), for: 0.5)] + fadeOut(0.5))
+        case .blurScaleIn:
+            return (0.6, [part(.blur(from: blur, to: 0), for: 0.6), part(.scale(from: scale, to: nil), for: 0.6)] + fadeIn(0.4))
+        case .blurScaleOut:
+            return (0.5, [part(.blur(from: nil, to: blur), for: 0.5), part(.scale(from: nil, to: scale), for: 0.5)] + fadeOut(0.5))
         case .fadeSoundIn:
             return (1, [part(.volume(from: 0, to: nil), for: 1)])
         case .fadeSoundOut:

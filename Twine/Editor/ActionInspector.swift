@@ -45,10 +45,12 @@ struct ActionInspector: View {
 
             if sameKind, let settings = first.preset {
                 // A preset with nothing to set but its timing, and no way to
-                // turn it In or Out, shows nothing more.
-                if !Presets.controls(for: settings.preset).isEmpty || settings.preset.reversed != nil {
+                // turn it In or Out or move a text letter by letter, shows
+                // nothing more.
+                let onText = !settings.preset.isSound && actions.allSatisfy { controller.project.layer(withID: $0.targetLayerID)?.isText == true }
+                if !Presets.controls(for: settings.preset).isEmpty || settings.preset.reversed != nil || onText {
                     PanelDivider()
-                    PresetFields(controller: controller, settings: settings)
+                    PresetFields(controller: controller, settings: settings, onText: onText)
                         .gridBody()
                         .padding(.vertical, Theme.panelPad)
                 }
@@ -92,6 +94,8 @@ extension Action {
 private struct PresetFields: View {
     let controller: EditorController
     let settings: PresetAction
+    /// Every bar is on a text, so it can move the text letter by letter.
+    var onText = false
 
     private var kind: PresetKind { settings.preset }
     private var own: PresetAction { PresetRecipe.defaults(kind) }
@@ -109,6 +113,74 @@ private struct PresetFields: View {
             ForEach(Presets.controls(for: kind), id: \.self) { control in
                 row(control)
             }
+            if onText { textRows }
+        }
+    }
+
+    /// Whether the whole text moves, or its letters, words or lines one by
+    /// one, in what order and how far apart.
+    @ViewBuilder private var textRows: some View {
+        Text("Text animation")
+            .font(ThemeFont.labelStrong)
+            .foregroundStyle(Theme.textPrimary)
+            .padding(.top, 4)
+        LabeledRow(label: "Apply to") {
+            MenuField(value: Self.title(settings.unit), entries: {
+                ([nil] + TextUnit.allCases.map(Optional.some)).map { unit in
+                    .item(Self.title(unit), checked: unit == settings.unit) { setUnit(unit) }
+                }
+            }, height: Theme.control)
+        }
+        .help("Moves the whole text, or each letter, word or line in turn.")
+        if settings.unit != nil {
+            LabeledRow(label: "Order") {
+                MenuField(value: Self.title(settings.order ?? .forward), entries: {
+                    TextOrder.allCases.map { order in
+                        .item(Self.title(order), checked: order == (settings.order ?? .forward)) {
+                            edit("Order") { $0.order = order }
+                        }
+                    }
+                }, height: Theme.control)
+            }
+            .help("Which go first. Random shuffles them, the same way every time.")
+            LabeledRow(label: "Delay") {
+                UnitField(value: (settings.delay ?? settings.unit?.delay ?? 0) * 1000, decimals: 0, suffix: "ms",
+                          step: 1, accepts: { $0 >= 0 }) { v in edit("Delay") { $0.delay = v / 1000 } }
+            }
+            .help("The time between one starting and the next. The bar's length holds them all, so a long text on a short bar starts them closer together.")
+        }
+    }
+
+    private static func title(_ unit: TextUnit?) -> String {
+        switch unit {
+        case nil: "Whole Text"
+        case .letters?: "Letters"
+        case .words?: "Words"
+        case .lines?: "Lines"
+        }
+    }
+
+    private static func title(_ order: TextOrder) -> String {
+        switch order {
+        case .forward: "Forward"
+        case .backward: "Backward"
+        case .center: "From Center"
+        case .edges: "From Edges"
+        case .random: "Random"
+        }
+    }
+
+    /// A distance still at its own value follows the change: a text's
+    /// letters travel their type size, the whole text the preset's own.
+    private func setUnit(_ unit: TextUnit?) {
+        controller.editActions("Apply to \(Self.title(unit))") { a in
+            guard case .preset(var p) = a.spec, p.preset == kind,
+                  let layer = controller.project.layer(withID: a.targetLayerID) else { return }
+            let before = Presets.unitDistance(p, of: layer)
+            let kept = p.distance
+            p.unit = unit
+            if kept == before { p.distance = Presets.unitDistance(p, of: layer) }
+            a.spec = .preset(p)
         }
     }
 

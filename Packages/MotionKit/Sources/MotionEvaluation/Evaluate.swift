@@ -44,7 +44,8 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks) -
             let state = tracks.state(of: layer, at: time)
             // Hidden by an action: the layer and everything inside it.
             guard state.isShown else { continue }
-            guard let resolved = resolve(layer, state: state, parent: parent, pictures: pictures) else { continue }
+            guard let resolved = resolve(layer, state: state, parent: parent, pictures: pictures,
+                                         animation: tracks.textAnimation(of: layer, at: time), time: time) else { continue }
             out.append(resolved)
             if layer.isGroup { walk(layer.children, parent: layer.id, soloedAbove: soloed) }
         }
@@ -115,7 +116,10 @@ private struct WorldTransforms {
         let parent = project.location(of: id)?.parentID
         if let layer = project.layer(withID: id), layer.isVisible, parent.map({ resolved($0) != nil }) ?? true {
             let state = tracks.state(of: layer, at: time)
-            if state.isShown { result = resolve(layer, state: state, parent: parent, pictures: pictures) }
+            if state.isShown {
+                result = resolve(layer, state: state, parent: parent, pictures: pictures,
+                                 animation: tracks.textAnimation(of: layer, at: time), time: time)
+            }
         }
         cache[id] = result
         return result
@@ -128,7 +132,8 @@ private struct WorldTransforms {
     }
 }
 
-private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures: [UUID: Size2]) -> ResolvedLayer? {
+private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures: [UUID: Size2],
+                     animation: TextAnimation?, time: Double) -> ResolvedLayer? {
     var size = state.size
     let content: ResolvedContent
     var clips = false
@@ -156,7 +161,9 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
         let width = text.sizing == .fixedWidth ? state.size.width : nil
         size = TextLayout.size(of: shown.visible, style: resolved.style, width: width)
         textAnchor = TextLayout.anchor(layer.transform.anchor, from: layer.size, to: size, alignment: text.alignment)
-        content = .text(resolved)
+        var drawn = resolved
+        if let animation { drawn.units = units(of: shown.text, style: resolved.style, width: width, animation, at: time) }
+        content = .text(drawn)
     case .video(let video):
         content = .video(mediaID: video.mediaID, sourceTime: state.sourceTime ?? 0, fit: video.fit)
     case .audio:
@@ -209,7 +216,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
     let anchor = textAnchor ?? Vec2(designSize.width != 0 ? layer.transform.anchor.x * size.width / designSize.width : layer.transform.anchor.x,
                       designSize.height != 0 ? layer.transform.anchor.y * size.height / designSize.height : layer.transform.anchor.y)
 
-    return ResolvedLayer(id: layer.id, parentID: parent, size: size,
+    var resolved = ResolvedLayer(id: layer.id, parentID: parent, size: size,
                          position: state.position, anchor: anchor,
                          scale: state.scale, rotation: state.rotation,
                          opacity: min(max(state.opacity, 0), 1),
@@ -219,6 +226,26 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
                          // Filled in once every layer is resolved, since a
                          // mask can sit anywhere in the tree.
                          mask: nil, warp: state.warp)
+    resolved.reveal = state.reveal
+    return resolved
+}
+
+/// A text's letters, words or lines as a text preset has them at `time`,
+/// each placed from its own centre. Empty when every one is at rest, so a
+/// finished preset draws the text whole again.
+private func units(of text: String, style: TextStyle, width: Double?, _ animation: TextAnimation,
+                   at time: Double) -> [ResolvedTextUnit] {
+    let spans = TextSpans.spans(animation.unit, of: text, style: style, width: width)
+    let states = animation.states(count: spans.count, at: time)
+    guard states.contains(where: { $0 != TextAnimation.rest }) else { return [] }
+    return zip(spans, states).map { span, state in
+        let centre = Vec2(span.box.width / 2, span.box.height / 2)
+        let transform = Projective.layer(position: span.box.center + state.position, anchor: centre,
+                                         scale: state.scale, rotation: state.rotation, skew: state.skew, tilt: state.tilt)
+        return ResolvedTextUnit(range: span.range, box: span.box, transform: transform,
+                                opacity: state.isShown ? min(max(state.opacity, 0), 1) : 0,
+                                blur: max(state.layerBlur, 0), reveal: state.reveal)
+    }
 }
 
 /// The shape with its actions applied: the first fill's paint, the first

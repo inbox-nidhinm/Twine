@@ -448,4 +448,48 @@ private enum BlendMaths {
         }
         #expect(pixel(image, 32, 32).r > 250, "the middle stays white")
     }
+
+    @Test func aMaskPresetClipsWhatIsDrawn() throws {
+        let square = shape(at: .zero, size: Size2(64, 64))
+        var settings = PresetAction(preset: .maskResizeIn, direction: .left)
+        settings.direction = .left
+        let action = Action(target: square.id, start: 0, duration: 1, easing: .preset(.none, intensity: 0),
+                            spec: .preset(settings))
+        let project = Project(composition: transparentComposition(), layers: [square], actions: [action])
+        // Halfway, the clip has opened across the left half.
+        let half = try render(project, at: 0.5)
+        #expect(pixel(half, 16, 32).a > 250)
+        #expect(pixel(half, 48, 32).a == 0)
+        // Before, nothing; after, the whole square, with no clip left behind.
+        #expect(pixel(try render(project, at: 0), 16, 32).a == 0)
+        #expect(pixel(try render(project, at: 1.1), 60, 60).a > 250)
+    }
+
+    @Test func lettersDrawOneByOne() throws {
+        let content = TextContent(text: "II", fontFamily: "SF Pro", fontWeight: 900, fontSize: 40, color: RGBA(1, 0, 0))
+        let size = TextLayout.size(of: content.text, style: TextStyle(content), width: nil)
+        var layer = Layer(name: "T", content: .text(content), size: size, position: .zero)
+        layer.transform.anchor = .zero
+        var settings = PresetAction(preset: .fadeIn, unit: .letters, delay: 0.5)
+        settings.unit = .letters
+        let action = Action(target: layer.id, start: 0, duration: 1, easing: .preset(.none, intensity: 0),
+                            spec: .preset(settings))
+        let project = Project(composition: transparentComposition(), layers: [layer], actions: [action])
+        let spans = TextSpans.spans(.letters, of: content.text, style: TextStyle(content), width: nil)
+        func ink(_ image: CGImage, in box: Box) -> Int {
+            var count = 0
+            for x in Int(box.minX)..<Int(box.maxX) {
+                for y in stride(from: Int(box.minY), to: Int(box.maxY), by: 2) where pixel(image, x, y).a > 128 { count += 1 }
+            }
+            return count
+        }
+        // Just before halfway the first letter is nearly in and the second
+        // has not begun.
+        let image = try render(project, at: 0.49)
+        #expect(ink(image, in: spans[0].box) > 10)
+        #expect(ink(image, in: spans[1].box) == 0)
+        // Afterwards both show, drawn whole again.
+        let after = try render(project, at: 1.1)
+        #expect(ink(after, in: spans[1].box) > 10)
+    }
 }
