@@ -16,6 +16,12 @@ struct BarGlyph: View {
     /// What shows the button is on: the accent for tools, `chosen` for a
     /// switch that is on, as in the inspector.
     var onFill: Color = Theme.accent
+    /// The icon in full white without being on, as the pause button is
+    /// while playing.
+    var lit: Bool = false
+    /// Hover whitens the icon (with a clear `hoverFill`) rather than
+    /// lifting a fill behind it.
+    var hoverLights: Bool = false
 
     private var fill: Color {
         if isOn { return onFill }
@@ -27,6 +33,7 @@ struct BarGlyph: View {
             .frame(width: size, height: size)
             .foregroundStyle(isOn ? Color.white
                              : disabled ? Theme.textTertiary.opacity(0.4)
+                             : lit || (hoverLights && hovering) ? Theme.textPrimary
                              : Theme.textSecondary)
             .background(RoundedRectangle(cornerRadius: Theme.radius(forButton: size)).fill(fill))
             .contentShape(Rectangle())
@@ -42,6 +49,8 @@ struct BarButton: View {
     var iconBox: CGFloat = Theme.icon
     var hoverFill: Color = Theme.panelRaised.opacity(0.6)
     var onFill: Color = Theme.accent
+    var lit: Bool = false
+    var hoverLights: Bool = false
     let action: () -> Void
 
     @State private var hovering = false
@@ -49,7 +58,7 @@ struct BarButton: View {
     var body: some View {
         Button(action: action) {
             BarGlyph(icon: icon, isOn: isOn, hovering: hovering, disabled: disabled,
-                     size: size, iconBox: iconBox, hoverFill: hoverFill, onFill: onFill)
+                     size: size, iconBox: iconBox, hoverFill: hoverFill, onFill: onFill, lit: lit, hoverLights: hoverLights)
         }
         .buttonStyle(.plain)
         .disabled(disabled)

@@ -59,16 +59,23 @@ private struct TransportBar: View {
 
     var body: some View {
         HStack(spacing: Theme.transportGap) {
-            BarButton(icon: .jumpStart, help: "Go to the start (Home)") { controller.jumpToStart() }
-            BarButton(icon: .stepBack, help: "Previous frame (comma; Shift for ten, Option for the previous action edge)") { controller.step(-1) }
-            BarButton(icon: editor.isPlaying ? .pause : .play, help: editor.isPlaying ? "Pause (Space)" : "Play (Space)") {
-                controller.togglePlay()
-            }
-            BarButton(icon: .stepForward, help: "Next frame (full stop; Shift for ten, Option for the next action edge)") { controller.step(1) }
-            BarButton(icon: .jumpEnd, help: "Go to the end (End)") { controller.jumpToEnd() }
+            button(.jumpStart, "Go to the start (Home)") { controller.jumpToStart() }
+            button(.stepBack, "Previous frame (comma; Shift for ten, Option for the previous action edge)") { controller.step(-1) }
+            // White while playing, so the pause reads as what is going on.
+            button(editor.isPlaying ? .pause : .play, editor.isPlaying ? "Pause (Space)" : "Play (Space)",
+                   lit: editor.isPlaying) { controller.togglePlay() }
+            button(.stepForward, "Next frame (full stop; Shift for ten, Option for the next action edge)") { controller.step(1) }
+            button(.jumpEnd, "Go to the end (End)") { controller.jumpToEnd() }
             BarButton(icon: .loop, help: editor.loops ? "Looping: playback starts over at the end" : "Stops at the end",
-                      isOn: editor.loops, onFill: Theme.chosen) { editor.loops.toggle() }
+                      isOn: editor.loops, size: Theme.transportButton, iconBox: Theme.transportIcon, hoverFill: .clear,
+                      onFill: Theme.chosen, hoverLights: true) { editor.loops.toggle() }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Small, and lit white under the pointer rather than filled.
+    private func button(_ icon: Icon, _ help: String, lit: Bool = false, _ action: @escaping () -> Void) -> some View {
+        BarButton(icon: icon, help: help, size: Theme.transportButton, iconBox: Theme.transportIcon, hoverFill: .clear,
+                  lit: lit, hoverLights: true, action: action)
     }
 }

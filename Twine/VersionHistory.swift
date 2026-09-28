@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Smaller play controls", changes: [
+            "The timeline's play controls are smaller, turn white under the pointer, and the pause button shows white while playing.",
+        ]),
         .init(date: "28 September 2026", title: "Back to Presets", changes: [
             "An action's settings have Back to Presets at the top, in place of the presets button beside its name.",
         ]),
