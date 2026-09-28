@@ -47,10 +47,6 @@ struct InspectorPanel: View {
     /// share, or with nothing selected, the composition.
     @ViewBuilder private var designContent: some View {
         let selected = controller.selectedLayers
-        if !selected.isEmpty {
-            AlignRow(controller: controller)
-            PanelDivider()
-        }
         if selected.count == 1, let layer = selected.first {
             LayerInspector(layer: layer, controller: controller)
                 .id(layer.id)
@@ -64,25 +60,51 @@ struct InspectorPanel: View {
 
     // MARK: Several layers
 
-    /// What several layers have in common to change together.
+    /// What several layers have in common to change together: lining them
+    /// up, and how they mix and show.
     private func multipleSelection(_ layers: [Layer]) -> some View {
         let values = layers.map(\.opacity)
         let shared = values.allSatisfy { abs($0 - values[0]) < 1e-9 } ? values[0] : values.max() ?? 1
-        return VStack(alignment: .leading, spacing: 8) {
-            HeaderRow(title: "Layers") {}
-            SliderRow(label: "Opacity", value: shared * 100, range: 0...100, readout: { "\(Int($0.rounded()))%" },
-                      onChange: { v in
-                          controller.update(layers.map { l in
-                              var c = l
-                              c.opacity = v / 100
-                              return c
-                          })
-                      },
-                      onBegin: { controller.begin("Opacity") },
-                      onEnd: { controller.end() })
+        let blends = Set(layers.map(\.blendMode))
+        return VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
+                HeaderRow(title: "Position") {}
+                AlignRow(controller: controller)
+            }
+            .padding(.bottom, Theme.panelPad)
+            PanelDivider()
+            VStack(alignment: .leading, spacing: 8) {
+                HeaderRow(title: "Appearance") {}
+                BlendOpacityRow(blend: blends.count == 1 ? layers[0].blendMode.title : "Mixed",
+                                entries: { blendEntries(layers) }, opacity: shared,
+                                isGroup: layers.contains(where: \.isGroup)) { v in
+                    controller.perform(.updateLayers(layers.map { l in
+                        var c = l
+                        c.opacity = v
+                        return c
+                    }))
+                }
                 .padding(.horizontal, Theme.panelPad)
+            }
+            .padding(.bottom, Theme.panelPad)
         }
-        .padding(.bottom, Theme.panelPad)
+    }
+
+    private func blendEntries(_ layers: [Layer]) -> [MenuEntry] {
+        var entries: [MenuEntry] = []
+        for (i, group) in BlendMode.groups.enumerated() {
+            if i > 0 { entries.append(.separator) }
+            entries += group.map { mode in
+                .item(mode.title, checked: layers.allSatisfy { $0.blendMode == mode }) {
+                    controller.perform(.updateLayers(layers.map { l in
+                        var c = l
+                        c.blendMode = mode
+                        return c
+                    }))
+                }
+            }
+        }
+        return entries
     }
 
     // MARK: Composition
@@ -198,10 +220,9 @@ struct InspectorPanel: View {
     private static func gcd(_ a: Int, _ b: Int) -> Int { b == 0 ? a : gcd(b, a % b) }
 }
 
-/// Aligning and spacing the selection, across the top of Design's
-/// inspector: one layer lines up with the composition, several with each
-/// other.
-private struct AlignRow: View {
+/// Aligning and spacing the selection, at the head of the Position section:
+/// one layer lines up with the composition, several with each other.
+struct AlignRow: View {
     let controller: EditorController
 
     var body: some View {
@@ -221,7 +242,7 @@ private struct AlignRow: View {
             }
             .disabled(!controller.canDistribute)
         }
-        .padding(.horizontal, Theme.panelPad)
-        .padding(.vertical, 8)
+        // The glyphs, not their buttons, line up with the fields below.
+        .padding(.horizontal, Theme.panelPad - 4)
     }
 }

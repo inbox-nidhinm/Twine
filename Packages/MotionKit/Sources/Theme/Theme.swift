@@ -108,6 +108,8 @@ public enum Theme {
     public static let panelRow: CGFloat = 24
     public static let listRow: CGFloat = 32
     public static let barRow: CGFloat = 40
+    /// The box of a check mark.
+    public static let checkbox: CGFloat = 14
     /// Slider and toggle tracks.
     public static let track: CGFloat = 26
     /// A picture's thumbnail in the inspector: as tall as two rows of

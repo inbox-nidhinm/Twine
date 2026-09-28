@@ -201,6 +201,8 @@ struct MenuField: View {
     let value: String
     let entries: () -> [MenuEntry]
     var isEnabled = true
+    /// `Theme.control` to sit level with number fields in one row.
+    var height: CGFloat = Theme.panelRow + 4
 
     @Environment(MenuHost.self) private var menus
     @State private var frame: CGRect = .zero
@@ -224,7 +226,7 @@ struct MenuField: View {
                     .foregroundStyle(Theme.textTertiary)
             }
             .padding(.horizontal, 8)
-            .frame(height: Theme.panelRow + 4)
+            .frame(height: height)
             .frame(maxWidth: .infinity)
             .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
                 .fill(hovering && isEnabled ? Theme.panelHover : Theme.panelRaised))

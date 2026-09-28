@@ -178,6 +178,44 @@ struct ToggleRow: View {
     }
 }
 
+/// A check mark and its name, for a setting that is simply on or off in a
+/// section that already names what it is about, such as Clip content. The
+/// whole row is the button.
+struct CheckRow: View {
+    let label: String
+    let isOn: Bool
+    let toggle: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: Theme.radiusSwatchMark + 1)
+                    .fill(isOn ? Theme.textPrimary : .clear)
+                    .overlay(RoundedRectangle(cornerRadius: Theme.radiusSwatchMark + 1)
+                        .strokeBorder(isOn ? .clear : hovering ? Theme.edgeHover : Theme.textTertiary, lineWidth: 1))
+                    .overlay {
+                        if isOn {
+                            IconView(.check, size: Theme.checkbox - 2, lineWidth: 2)
+                                .foregroundStyle(Theme.canvas)
+                        }
+                    }
+                    .frame(width: Theme.checkbox, height: Theme.checkbox)
+                Text(label)
+                    .font(ThemeFont.label)
+                    .foregroundStyle(hovering ? Theme.textPrimary : Theme.textSecondary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .frame(height: Theme.panelRow)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+    }
+}
+
 /// A row of mutually exclusive words, the chosen one raised in grey.
 /// Unlabelled: it sits under a header that already names it.
 struct SegmentRow<Value: Hashable>: View {

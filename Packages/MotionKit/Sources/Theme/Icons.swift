@@ -13,6 +13,7 @@ public enum Icon: String, CaseIterable, Sendable {
     case color
     case counter
     case filter
+    case innerShadow
     case layerBlur
     case letterSpacing
     case lineHeight
@@ -38,6 +39,7 @@ public enum Icon: String, CaseIterable, Sendable {
     case distributeV
     case link
     case preset
+    case settings
     case unlink
     case audio
     case eyeSlash
@@ -119,6 +121,10 @@ public enum Icon: String, CaseIterable, Sendable {
         ]
         case .filter: return [   // Actions/filter.svg
             "M4 5 H20 L14 12 V19 L10 17 V12 Z"
+        ]
+        case .innerShadow: return [   // Actions/inner-shadow.svg
+            "M4.5 4.5 H19.5 V19.5 H4.5 Z",
+            "M8 16 V8 H16"
         ]
         case .layerBlur: return [   // Actions/layer-blur.svg
             "M12 7.5 C14.5 7.5 16.5 9.5 16.5 12 C16.5 14.5 14.5 16.5 12 16.5 C9.5 16.5 7.5 14.5 7.5 12 C7.5 9.5 9.5 7.5 12 7.5 Z",
@@ -255,6 +261,14 @@ public enum Icon: String, CaseIterable, Sendable {
         case .preset: return [   // Inspector/preset.svg
             "M10 4 C10.6 8.2 12.8 10.4 17 11 C12.8 11.6 10.6 13.8 10 18 C9.4 13.8 7.2 11.6 3 11 C7.2 10.4 9.4 8.2 10 4 Z",
             "M18 14.5 C18.2 16.2 18.8 16.8 20.5 17 C18.8 17.2 18.2 17.8 18 19.5 C17.8 17.8 17.2 17.2 15.5 17 C17.2 16.8 17.8 16.2 18 14.5 Z"
+        ]
+        case .settings: return [   // Inspector/settings.svg
+            "M4 8 H8",
+            "M14 8 H20",
+            "M13 8 C13 9.1 12.1 10 11 10 C9.9 10 9 9.1 9 8 C9 6.9 9.9 6 11 6 C12.1 6 13 6.9 13 8 Z",
+            "M4 16 H10",
+            "M16 16 H20",
+            "M15 16 C15 17.1 14.1 18 13 18 C11.9 18 11 17.1 11 16 C11 14.9 11.9 14 13 14 C14.1 14 15 14.9 15 16 Z"
         ]
         case .unlink: return [   // Inspector/unlink.svg
             "M8.5 11.5 L6.5 13.5 C5.1 14.9 5.1 17.1 6.5 18.5 C7.9 19.9 10.1 19.9 11.5 18.5 L13.5 16.5",

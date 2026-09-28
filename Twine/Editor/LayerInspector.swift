@@ -16,7 +16,13 @@ struct LayerInspector: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Sound has nowhere to be and nothing to show.
-            if case .audio = layer.content {} else { transformSection }
+            if case .audio = layer.content {} else {
+                positionSection
+                PanelDivider()
+                layoutSection
+                PanelDivider()
+                appearanceSection
+            }
             if case .video(let v) = layer.content {
                 PanelDivider()
                 VideoSection(layer: layer, video: v, controller: controller)
@@ -32,7 +38,6 @@ struct LayerInspector: View {
                 EmptyView()
             }
             if case .shape(let shape) = layer.content {
-                shapeSection(shape.geometry)
                 PanelDivider()
                 FillSection(layer: layer, shape: shape, controller: controller)
                 PanelDivider()
@@ -42,26 +47,11 @@ struct LayerInspector: View {
                 PanelDivider()
                 TextSection(layer: layer, text: text, controller: controller)
             }
-            if case .group(let group) = layer.content {
-                if let look = layer.look { shapeSection(look.geometry) }
-                ToggleRow(label: "Clip content", isOn: group.clipsContent) {
-                    controller.edit(layer.id) { l in
-                        if case .group(var g) = l.content {
-                            g.clipsContent.toggle()
-                            l.content = .group(g)
-                        }
-                    }
-                }
-                .help(layer.isFrame ? "Hides whatever lies outside the frame, round its corners too."
-                                    : "Hides whatever lies outside the group's box.")
-                .padding(.horizontal, Theme.panelPad)
-                .padding(.bottom, Theme.panelPad)
-                if layer.isFrame, let look = layer.look {
-                    PanelDivider()
-                    FillSection(layer: layer, shape: look, controller: controller)
-                    PanelDivider()
-                    StrokeSection(layer: layer, shape: look, controller: controller)
-                }
+            if layer.isFrame, let look = layer.look {
+                PanelDivider()
+                FillSection(layer: layer, shape: look, controller: controller)
+                PanelDivider()
+                StrokeSection(layer: layer, shape: look, controller: controller)
             }
             PanelDivider()
             EffectsSection(layer: layer, controller: controller)
@@ -89,11 +79,14 @@ struct LayerInspector: View {
         return entries
     }
 
-    // MARK: Transform
+    // MARK: Position
 
-    private var transformSection: some View {
+    /// Where the layer sits: lined up with the composition, its place, its
+    /// turn, and the point it turns about.
+    private var positionSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HeaderRow(title: "Layer") {}
+            HeaderRow(title: "Position") {}
+            AlignRow(controller: controller)
             Group {
                 HStack(spacing: 8) {
                     number("X", t.position.x) { l, v in
@@ -104,105 +97,145 @@ struct LayerInspector: View {
                     }
                 }
                 .help("Where the anchor point sits, in pixels")
-                // A group's size is only where it was made; a frame's is its own.
-                if !layer.isGroup || layer.isFrame {
-                    HStack(spacing: 8) {
-                        number("W", layer.size.width, accepts: { $0 >= 0 }) { l, v in resize(&l, width: v) }
-                        number("H", layer.size.height, accepts: { $0 >= 0 }) { l, v in resize(&l, height: v) }
-                    }
-                }
                 HStack(spacing: 8) {
                     UnitField(unit: "R", value: t.rotation, decimals: 1, suffix: "°") { v in
                         controller.edit(layer.id) { l in l.transform.rotation = v }
                     }
                     .help("Rotation in degrees, clockwise")
-                }
-                HStack(spacing: 8) {
-                    UnitField(unit: "Skew X", value: t.skew.x, decimals: 1, suffix: "°") { v in
-                        controller.edit(layer.id) { l in l.transform.skew.x = v }
-                    }
-                    .help("Slants its sides, so the bottom moves across")
-                    UnitField(unit: "Skew Y", value: t.skew.y, decimals: 1, suffix: "°") { v in
-                        controller.edit(layer.id) { l in l.transform.skew.y = v }
-                    }
-                    .help("Slants its top and bottom, so the right side moves down")
-                }
-                HStack(spacing: 8) {
-                    UnitField(unit: "Tilt X", value: t.tilt.x, decimals: 1, suffix: "°") { v in
-                        controller.edit(layer.id) { l in l.transform.tilt.x = v }
-                    }
-                    .help("Tips it back in perspective around a level line through its anchor, the top going away")
-                    UnitField(unit: "Tilt Y", value: t.tilt.y, decimals: 1, suffix: "°") { v in
-                        controller.edit(layer.id) { l in l.transform.tilt.y = v }
-                    }
-                    .help("Turns it in perspective around an upright line through its anchor, the right side going away")
-                }
-                // Depth only matters once it is tilted.
-                if t.tilt.isTilted {
-                    HStack(spacing: 8) {
-                        UnitField(unit: "Depth", value: t.tilt.depth, decimals: 0, suffix: "px", accepts: { $0 > 1 }) { v in
-                            controller.edit(layer.id) { l in l.transform.tilt.depth = v }
-                        }
-                        .help("How far away it is seen from. Nearer makes the perspective stronger.")
-                    }
-                }
-                HStack(spacing: 8) {
-                    scaleFields
+                    Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
                 }
                 HStack(spacing: 8) {
                     number("AX", t.anchor.x) { l, v in moveAnchor(&l, x: v) }
                     number("AY", t.anchor.y) { l, v in moveAnchor(&l, y: v) }
                 }
                 .help("The point the layer turns and scales about, in pixels from its top-left")
-                opacity
-                MenuRow(label: "Blend", value: layer.blendMode.title, entries: blendEntries)
-                    .help(layer.isGroup ? "How the layer mixes with what is behind it. At Normal, what is inside a group or frame blends through it, as Figma's Pass Through does."
-                                        : "How the layer mixes with what is behind it")
             }
             .padding(.horizontal, Theme.panelPad)
         }
         .padding(.bottom, Theme.panelPad)
     }
 
-    @ViewBuilder private var scaleFields: some View {
-        let scale = t.scale
-        if t.isScaleLinked {
-            UnitField(unit: "S", value: scale.x * 100, decimals: 1, suffix: "%") { v in
-                controller.edit(layer.id) { l in
-                    let s = l.transform.scale
-                    let ratio = s.x != 0 ? s.y / s.x : 1
-                    l.transform.scale = Vec2(v / 100, v / 100 * ratio)
+    // MARK: Layout
+
+    /// How big the layer is and what shape: its size, its scale, its
+    /// corners or points, and for a group or frame, whether it clips.
+    private var layoutSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HeaderRow(title: "Layout") {}
+            Group {
+                // A group's size is only where it was made; a frame's is its own.
+                if !layer.isGroup || layer.isFrame {
+                    linkedPair(link: true) {
+                        number("W", layer.size.width, accepts: { $0 >= 0 }) { l, v in
+                            if keepsProportions(l), l.size.width > 0 {
+                                resize(&l, width: v, height: l.size.height * v / l.size.width)
+                            } else {
+                                resize(&l, width: v)
+                            }
+                        }
+                    } right: {
+                        number("H", layer.size.height, accepts: { $0 >= 0 }) { l, v in
+                            if keepsProportions(l), l.size.height > 0 {
+                                resize(&l, width: l.size.width * v / l.size.height, height: v)
+                            } else {
+                                resize(&l, height: v)
+                            }
+                        }
+                    }
+                    scaleRow(link: false)
+                } else {
+                    scaleRow(link: true)
+                }
+                if let geometry = layer.look?.geometry { shapeFields(geometry) }
+                if case .group(let group) = layer.content {
+                    CheckRow(label: "Clip content", isOn: group.clipsContent) {
+                        controller.edit(layer.id) { l in
+                            if case .group(var g) = l.content {
+                                g.clipsContent.toggle()
+                                l.content = .group(g)
+                            }
+                        }
+                    }
+                    .help(layer.isFrame ? "Hides whatever lies outside the frame, round its corners too."
+                                        : "Hides whatever lies outside the group's box.")
                 }
             }
-            .help("Scale")
-        } else {
-            UnitField(unit: "SX", value: scale.x * 100, decimals: 1, suffix: "%") { v in
-                controller.edit(layer.id) { l in
-                    l.transform.scale = Vec2(v / 100, l.transform.scale.y)
-                }
-            }
-            UnitField(unit: "SY", value: scale.y * 100, decimals: 1, suffix: "%") { v in
-                controller.edit(layer.id) { l in
-                    l.transform.scale = Vec2(l.transform.scale.x, v / 100)
-                }
-            }
+            .padding(.horizontal, Theme.panelPad)
         }
-        IconButton(icon: t.isScaleLinked ? .link : .unlink,
-                   help: t.isScaleLinked ? "Scale both ways together" : "Scale each way separately") {
-            controller.edit(layer.id) { l in l.transform.isScaleLinked.toggle() }
+        .padding(.bottom, Theme.panelPad)
+    }
+
+    /// Two fields with the proportions link between them, or a gap its size,
+    /// so rows beneath line up with the ones above.
+    private func linkedPair<Left: View, Right: View>(link: Bool, @ViewBuilder left: () -> Left,
+                                                     @ViewBuilder right: () -> Right) -> some View {
+        HStack(spacing: 4) {
+            left().frame(maxWidth: .infinity)
+            if link {
+                IconButton(icon: t.isScaleLinked ? .link : .unlink,
+                           help: t.isScaleLinked ? "Keeps proportions: width and height, and scale, change together"
+                                                 : "Width and height, and scale each way, change separately") {
+                    controller.edit(layer.id) { l in l.transform.isScaleLinked.toggle() }
+                }
+            } else {
+                Color.clear.frame(width: Theme.control, height: 1)
+            }
+            right().frame(maxWidth: .infinity)
         }
     }
 
-    private var opacity: some View {
-        SliderRow(label: "Opacity", value: layer.opacity * 100, range: 0...100,
-                  readout: { "\(Int($0.rounded()))%" },
-                  onChange: { v in
-                      var l = layer
-                      l.opacity = v / 100
-                      controller.update([l])
-                  },
-                  onBegin: { controller.begin("Opacity") },
-                  onEnd: { controller.end() })
+    /// Text sets its own height, so only its width is ever typed.
+    private func keepsProportions(_ l: Layer) -> Bool {
+        if case .text = l.content { return false }
+        return l.transform.isScaleLinked
+    }
+
+    @ViewBuilder private func scaleRow(link: Bool) -> some View {
+        let scale = t.scale
+        if t.isScaleLinked {
+            linkedPair(link: link) {
+                UnitField(unit: "S", value: scale.x * 100, decimals: 1, suffix: "%") { v in
+                    controller.edit(layer.id) { l in
+                        let s = l.transform.scale
+                        let ratio = s.x != 0 ? s.y / s.x : 1
+                        l.transform.scale = Vec2(v / 100, v / 100 * ratio)
+                    }
+                }
+                .help("Scale")
+            } right: {
+                Color.clear.frame(height: 1)
+            }
+        } else {
+            linkedPair(link: link) {
+                UnitField(unit: "SX", value: scale.x * 100, decimals: 1, suffix: "%") { v in
+                    controller.edit(layer.id) { l in
+                        l.transform.scale = Vec2(v / 100, l.transform.scale.y)
+                    }
+                }
+                .help("Scale across")
+            } right: {
+                UnitField(unit: "SY", value: scale.y * 100, decimals: 1, suffix: "%") { v in
+                    controller.edit(layer.id) { l in
+                        l.transform.scale = Vec2(l.transform.scale.x, v / 100)
+                    }
+                }
+                .help("Scale down")
+            }
+        }
+    }
+
+    // MARK: Appearance
+
+    private var appearanceSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HeaderRow(title: "Appearance") {}
+            BlendOpacityRow(blend: layer.blendMode.title, entries: blendEntries,
+                            opacity: layer.opacity, isGroup: layer.isGroup) { v in
+                controller.edit(layer.id) { $0.opacity = v }
+            }
+            .padding(.horizontal, Theme.panelPad)
+        }
+        .padding(.bottom, Theme.panelPad)
     }
 
 
@@ -241,7 +274,7 @@ struct LayerInspector: View {
 
     // MARK: Shape
 
-    @ViewBuilder private func shapeSection(_ geometry: ShapeGeometry) -> some View {
+    @ViewBuilder private func shapeFields(_ geometry: ShapeGeometry) -> some View {
         switch geometry {
         case .rectangle(let radii):
             let r = radii
@@ -266,14 +299,10 @@ struct LayerInspector: View {
                     }
                 }
             }
-            .padding(.horizontal, Theme.panelPad)
-            .padding(.bottom, Theme.panelPad)
         case .polygon(let sides):
             StepRow(label: "Sides", value: sides, range: 3...60) { n in
                 setGeometry(.polygon(sides: n))
             }
-            .padding(.horizontal, Theme.panelPad)
-            .padding(.bottom, Theme.panelPad)
         case .star(let points, let inner, let corner):
             VStack(alignment: .leading, spacing: 8) {
                 StepRow(label: "Points", value: points, range: 3...60) { n in
@@ -290,8 +319,6 @@ struct LayerInspector: View {
                     .help("Rounds every point, in pixels")
                 }
             }
-            .padding(.horizontal, Theme.panelPad)
-            .padding(.bottom, Theme.panelPad)
         case .ellipse(let arc):
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
@@ -310,8 +337,6 @@ struct LayerInspector: View {
                 }
                 .help("The hole in the middle, as a share of the ellipse: 0% is solid, 80% a thin ring")
             }
-            .padding(.horizontal, Theme.panelPad)
-            .padding(.bottom, Theme.panelPad)
         default:
             EmptyView()
         }
@@ -346,6 +371,32 @@ struct LayerInspector: View {
                         _ set: @escaping (inout Layer, Double) -> Void) -> some View {
         UnitField(unit: unit, value: value, decimals: 1, accepts: accepts) { v in
             controller.edit(layer.id) { l in set(&l, v) }
+        }
+    }
+}
+
+// MARK: - Appearance
+
+/// How a layer mixes with what is behind it and how much of it shows, side
+/// by side, as Figma has them. For one layer or several.
+struct BlendOpacityRow: View {
+    let blend: String
+    let entries: () -> [MenuEntry]
+    let opacity: Double
+    var isGroup = false
+    /// 0 to 1.
+    let setOpacity: (Double) -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            MenuField(value: blend, entries: entries, height: Theme.control)
+                .help(isGroup ? "Blend: how the layer mixes with what is behind it. At Normal, what is inside a group or frame blends through it, as Figma's Pass Through does."
+                              : "Blend: how the layer mixes with what is behind it")
+            UnitField(value: opacity * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
+                setOpacity(v / 100)
+            }
+            .frame(width: Theme.labelWidth + Theme.control)
+            .help("Opacity")
         }
     }
 }
@@ -574,7 +625,8 @@ private struct StrokeSection: View {
     let shape: ShapeContent
     let controller: EditorController
 
-
+    @Environment(MenuHost.self) private var menus
+    @State private var settingsFrame: CGRect = .zero
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -604,59 +656,35 @@ private struct StrokeSection: View {
                                     return l
                                 },
                                 toggle: { editShape { $0.strokes[0].isEnabled.toggle() } })
-                    LabeledRow(label: "Width") {
+                    HStack(spacing: 8) {
+                        // An open line has no inside or outside.
+                        if shape.geometry.isClosed {
+                            MenuField(value: stroke.alignment.rawValue.capitalized, entries: {
+                                StrokeAlignment.allCases.map { a in
+                                    .item(a.rawValue.capitalized, checked: a == stroke.alignment) {
+                                        editShape { $0.strokes[0].alignment = a }
+                                    }
+                                }
+                            }, height: Theme.control)
+                            .help("Whether the stroke sits centred on the edge, inside it, or outside it")
+                        }
                         UnitField(value: stroke.width, decimals: 1, suffix: "px", accepts: { $0 >= 0 }) { v in
                             editShape { $0.strokes[0].width = v }
                         }
-                    }
-                    // A frame's stroke has no ends to trim.
-                    if !layer.isFrame {
-                        LabeledRow(label: "Trim start") {
-                            UnitField(value: stroke.trimStart * 100, decimals: 1, suffix: "%",
-                                      accepts: { $0 >= 0 && $0 <= 100 }) { v in
-                                editShape { $0.strokes[0].trimStart = v / 100 }
+                        .help("Stroke width")
+                        IconButton(icon: .settings, help: layer.isFrame ? "More stroke settings: ends, corners and dashes"
+                                                                        : "More stroke settings: trim, ends, corners and dashes") {
+                            // Beside the inspector, towards the canvas, level with the button.
+                            let inspectorLeft = settingsFrame.maxX + Theme.panelPad - Theme.panelWidth
+                            menus.showPopup(at: CGPoint(x: inspectorLeft - Theme.floatGap - Theme.cardWidth,
+                                                        y: settingsFrame.minY - 40)) {
+                                PopupCard(title: "Stroke", width: Theme.cardWidth) {
+                                    StrokeSettings(layerID: layer.id, controller: controller)
+                                }
                             }
                         }
-                        .help("How much of the path is left undrawn at its start. Animate it to draw a line on.")
-                        LabeledRow(label: "Trim end") {
-                            UnitField(value: stroke.trimEnd * 100, decimals: 1, suffix: "%",
-                                      accepts: { $0 >= 0 && $0 <= 100 }) { v in
-                                editShape { $0.strokes[0].trimEnd = v / 100 }
-                            }
-                        }
-                        .help("Where along the path the stroke stops")
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { settingsFrame = $0 }
                     }
-                    if shape.geometry.isClosed {
-                        SegmentRow(selection: stroke.alignment, options: StrokeAlignment.allCases,
-                                   title: { $0.rawValue.capitalized }) { a in
-                            editShape { $0.strokes[0].alignment = a }
-                        }
-                        .help("Whether the stroke sits centred on the edge, inside it, or outside it")
-                    }
-                    SegmentRow(selection: stroke.cap, options: LineCap.allCases, title: { $0.rawValue.capitalized }) { c in
-                        editShape { $0.strokes[0].cap = c }
-                    }
-                    .help("The ends of open lines and dashes")
-                    SegmentRow(selection: stroke.join, options: LineJoin.allCases, title: { $0.rawValue.capitalized }) { j in
-                        editShape { $0.strokes[0].join = j }
-                    }
-                    .help("The corners")
-                    HStack(spacing: 8) {
-                        UnitField(unit: "Dash", value: stroke.dashPattern.first ?? 0, decimals: 1, accepts: { $0 >= 0 }) { v in
-                            editShape { s in
-                                let gap = s.strokes[0].dashPattern.count > 1 ? s.strokes[0].dashPattern[1] : v
-                                s.strokes[0].dashPattern = v > 0 ? [v, gap] : []
-                            }
-                        }
-                        UnitField(unit: "Gap", value: stroke.dashPattern.count > 1 ? stroke.dashPattern[1] : 0,
-                                  decimals: 1, accepts: { $0 >= 0 }) { v in
-                            editShape { s in
-                                let dash = s.strokes[0].dashPattern.first ?? max(v, 1)
-                                s.strokes[0].dashPattern = [dash, v]
-                            }
-                        }
-                    }
-                    .help("Dash and gap lengths in pixels. A dash of 0 is a solid line.")
                 }
                 .padding(.horizontal, Theme.panelPad)
             }
@@ -668,6 +696,81 @@ private struct StrokeSection: View {
         var s = shape
         change(&s)
         controller.edit(layer.id) { l in l.look = s }
+    }
+}
+
+/// The stroke settings that are set once and left: trim, ends, corners and
+/// dashes. Raised from the Stroke section's settings button, and reads the
+/// layer afresh each time, so it follows every edit while it is up.
+private struct StrokeSettings: View {
+    let layerID: UUID
+    let controller: EditorController
+
+    var body: some View {
+        if let layer = controller.project.layer(withID: layerID), let stroke = layer.look?.strokes.first {
+            // A frame's stroke has no ends to trim.
+            if !layer.isFrame {
+                LabeledRow(label: "Trim start") {
+                    UnitField(value: stroke.trimStart * 100, decimals: 1, suffix: "%",
+                              accepts: { $0 >= 0 && $0 <= 100 }) { v in
+                        edit { $0.trimStart = v / 100 }
+                    }
+                }
+                .help("How much of the path is left undrawn at its start. Animate it to draw a line on.")
+                LabeledRow(label: "Trim end") {
+                    UnitField(value: stroke.trimEnd * 100, decimals: 1, suffix: "%",
+                              accepts: { $0 >= 0 && $0 <= 100 }) { v in
+                        edit { $0.trimEnd = v / 100 }
+                    }
+                }
+                .help("Where along the path the stroke stops")
+            }
+            titled("Ends") {
+                SegmentRow(selection: stroke.cap, options: LineCap.allCases, title: { $0.rawValue.capitalized }) { c in
+                    edit { $0.cap = c }
+                }
+            }
+            .help("The ends of open lines and dashes")
+            titled("Corners") {
+                SegmentRow(selection: stroke.join, options: LineJoin.allCases, title: { $0.rawValue.capitalized }) { j in
+                    edit { $0.join = j }
+                }
+            }
+            .help("How the stroke turns a corner")
+            HStack(spacing: 8) {
+                UnitField(unit: "Dash", value: stroke.dashPattern.first ?? 0, decimals: 1, accepts: { $0 >= 0 }) { v in
+                    edit { s in
+                        let gap = s.dashPattern.count > 1 ? s.dashPattern[1] : v
+                        s.dashPattern = v > 0 ? [v, gap] : []
+                    }
+                }
+                UnitField(unit: "Gap", value: stroke.dashPattern.count > 1 ? stroke.dashPattern[1] : 0,
+                          decimals: 1, accepts: { $0 >= 0 }) { v in
+                    edit { s in
+                        let dash = s.dashPattern.first ?? max(v, 1)
+                        s.dashPattern = [dash, v]
+                    }
+                }
+            }
+            .help("Dash and gap lengths in pixels. A dash of 0 is a solid line.")
+        }
+    }
+
+    private func titled<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(ThemeFont.label)
+                .foregroundStyle(Theme.textSecondary)
+            content()
+        }
+    }
+
+    private func edit(_ change: @escaping (inout Stroke) -> Void) {
+        controller.edit(layerID) { l in
+            guard var s = l.look, !s.strokes.isEmpty else { return }
+            change(&s.strokes[0])
+            l.look = s
+        }
     }
 }
 
@@ -843,12 +946,24 @@ private struct EffectsSection: View {
 
     @Environment(MenuHost.self) private var menus
     @State private var addFrame: CGRect = .zero
+    /// Skew and Tilt show once they are set, or once added from the menu
+    /// while still at zero, until another layer is picked.
+    @State private var addedSkew = false
+    @State private var addedTilt = false
 
+    private var t: Transform { layer.transform }
+    /// Sound is never drawn, so it cannot slant or turn.
+    private var canWarp: Bool {
+        if case .audio = layer.content { return false }
+        return true
+    }
+    private var showsSkew: Bool { canWarp && (addedSkew || t.skew != .zero) }
+    private var showsTilt: Bool { canWarp && (addedTilt || t.tilt.isTilted) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HeaderRow(title: "Effects") {
-                IconButton(icon: .plus, help: "Add a shadow or a blur") {
+                IconButton(icon: .plus, help: "Add a shadow, a blur, a skew or a tilt") {
                     var entries: [MenuEntry] = [.item("Drop Shadow") { add(.dropShadow(DropShadow())) }]
                     // These follow a shape's outline, so only shapes and
                     // frames have them.
@@ -859,6 +974,11 @@ private struct EffectsSection: View {
                     if layer.look != nil {
                         entries.append(.item("Background Blur") { add(.backgroundBlur(BackgroundBlur())) })
                     }
+                    if canWarp && !(showsSkew && showsTilt) {
+                        entries.append(.separator)
+                        if !showsSkew { entries.append(.item("Skew") { addedSkew = true }) }
+                        if !showsTilt { entries.append(.item("Tilt") { addedTilt = true }) }
+                    }
                     menus.show(entries, at: CGPoint(x: addFrame.maxX - Theme.menuMinWidth, y: addFrame.maxY + 4))
                 }
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { addFrame = $0 }
@@ -867,17 +987,79 @@ private struct EffectsSection: View {
                 effectRows(effect, index: index)
                     .padding(.horizontal, Theme.panelPad)
             }
+            if showsSkew { skewRows.padding(.horizontal, Theme.panelPad) }
+            if showsTilt { tiltRows.padding(.horizontal, Theme.panelPad) }
         }
         .padding(.bottom, Theme.panelPad)
     }
 
+    /// An effect's icon and name, with its buttons at the end.
+    private func titleRow<Accessory: View>(_ icon: Icon, _ title: String,
+                                           @ViewBuilder accessory: () -> Accessory) -> some View {
+        HStack(spacing: 4) {
+            IconView(icon, size: 15)
+                .foregroundStyle(Theme.textTertiary)
+                .padding(.trailing, 2)
+            Text(title)
+                .font(ThemeFont.label)
+                .foregroundStyle(Theme.textSecondary)
+            Spacer(minLength: 0)
+            accessory()
+        }
+    }
+
+    private var skewRows: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            titleRow(.skew, "Skew") {
+                IconButton(icon: .minus, help: "Remove") {
+                    addedSkew = false
+                    controller.edit(layer.id) { l in l.transform.skew = .zero }
+                }
+            }
+            HStack(spacing: 8) {
+                UnitField(unit: "X", value: t.skew.x, decimals: 1, suffix: "°") { v in
+                    controller.edit(layer.id) { l in l.transform.skew.x = v }
+                }
+                .help("Slants its sides, so the bottom moves across")
+                UnitField(unit: "Y", value: t.skew.y, decimals: 1, suffix: "°") { v in
+                    controller.edit(layer.id) { l in l.transform.skew.y = v }
+                }
+                .help("Slants its top and bottom, so the right side moves down")
+            }
+        }
+    }
+
+    private var tiltRows: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            titleRow(.tilt, "Tilt") {
+                IconButton(icon: .minus, help: "Remove") {
+                    addedTilt = false
+                    controller.edit(layer.id) { l in l.transform.tilt = .none }
+                }
+            }
+            HStack(spacing: 8) {
+                UnitField(unit: "X", value: t.tilt.x, decimals: 1, suffix: "°") { v in
+                    controller.edit(layer.id) { l in l.transform.tilt.x = v }
+                }
+                .help("Tips it back in perspective around a level line through its anchor, the top going away")
+                UnitField(unit: "Y", value: t.tilt.y, decimals: 1, suffix: "°") { v in
+                    controller.edit(layer.id) { l in l.transform.tilt.y = v }
+                }
+                .help("Turns it in perspective around an upright line through its anchor, the right side going away")
+            }
+            // Depth only matters once it is tilted.
+            if t.tilt.isTilted {
+                UnitField(unit: "Depth", value: t.tilt.depth, decimals: 0, suffix: "px", accepts: { $0 > 1 }) { v in
+                    controller.edit(layer.id) { l in l.transform.tilt.depth = v }
+                }
+                .help("How far away it is seen from. Nearer makes the perspective stronger.")
+            }
+        }
+    }
+
     @ViewBuilder private func effectRows(_ effect: Effect, index: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 4) {
-                Text(effect.title)
-                    .font(ThemeFont.label)
-                    .foregroundStyle(Theme.textSecondary)
-                Spacer(minLength: 0)
+            titleRow(effect.icon, effect.title) {
                 IconButton(icon: effect.isEnabled ? .eye : .eyeSlash, help: effect.isEnabled ? "Hide" : "Show") {
                     edit(index) { $0.isEnabled.toggle() }
                 }
@@ -994,6 +1176,16 @@ extension Effect {
         case .innerShadow: return "Inner Shadow"
         case .layerBlur: return "Layer Blur"
         case .backgroundBlur: return "Background Blur"
+        }
+    }
+
+    /// The same drawings as the actions that animate each one.
+    var icon: Icon {
+        switch kind {
+        case .dropShadow: return .shadow
+        case .innerShadow: return .innerShadow
+        case .layerBlur: return .layerBlur
+        case .backgroundBlur: return .backgroundBlur
         }
     }
 }

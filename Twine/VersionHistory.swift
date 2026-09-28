@@ -23,6 +23,14 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "The inspector rearranged", changes: [
+            "The layer inspector is now in sections: Position (alignment, X and Y, rotation and the anchor), Layout (width and height with the proportions link between them, scale, corners and Clip content) and Appearance (blend mode and opacity side by side).",
+            "With the link on, typing a width or height changes the other to keep the proportions.",
+            "Clip content is a check mark.",
+            "Stroke shows its alignment as a menu with the width beside it; trim, ends, corners and dashes are in a card from the settings button next to them.",
+            "Skew and Tilt moved into Effects, added from its + menu, and every effect shows an icon for what it is.",
+            "Several selected layers can share a blend mode as well as an opacity.",
+        ]),
         .init(date: "28 September 2026", title: "A quieter inspector", changes: [
             "The inspector no longer uses blue: the chosen tab in a row of choices is a lighter grey, switches that are on sit in the same grey, and the easing curve is drawn in white.",
             "Blue is kept for the selection on the canvas, the layers panel and the Export button.",
