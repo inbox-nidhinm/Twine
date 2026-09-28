@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Smaller add buttons", changes: [
+            "New Action and Select Preset at the foot of an action's settings are two small buttons, one over the other, rather than big tiles.",
+        ]),
         .init(date: "28 September 2026", title: "Add another from an action", changes: [
             "An action's settings end with New Action and Select Preset, so you can add another to the same layer straight away.",
         ]),

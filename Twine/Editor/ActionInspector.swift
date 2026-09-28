@@ -65,9 +65,10 @@ struct ActionInspector: View {
             // there is no need to pick the layer again.
             if !newActions.isEmpty || pickPreset != nil {
                 PanelDivider()
-                ActionTiles(newActions: newActions,
-                            hasPresets: pickPreset != nil && !controller.availablePresets.isEmpty) { pickPreset?() }
-                    .padding(Theme.panelPad)
+                AddAnother(newActions: newActions,
+                           hasPresets: pickPreset != nil && !controller.availablePresets.isEmpty) { pickPreset?() }
+                    .gridBody()
+                    .padding(.vertical, Theme.panelPad)
             }
         }
     }
@@ -94,6 +95,30 @@ private struct BackToPresets: View {
         .help("Picks a preset to add to the layer at the playhead")
         .padding(.horizontal, Theme.panelPad)
         .frame(height: Theme.button, alignment: .bottomLeading)
+    }
+}
+
+/// New Action and Select Preset as two small buttons, one over the other,
+/// at the foot of an action's settings: the tiles' choices, kept small
+/// since adding is not what this inspector is for.
+private struct AddAnother: View {
+    let newActions: [MenuEntry]
+    let hasPresets: Bool
+    let pickPreset: () -> Void
+
+    @Environment(MenuHost.self) private var menus
+    @State private var newFrame: CGRect = .zero
+
+    var body: some View {
+        VStack(spacing: 6) {
+            PanelButton(title: "New Action", icon: .plus, disabled: newActions.isEmpty) {
+                menus.show(newActions, at: CGPoint(x: newFrame.minX, y: newFrame.maxY + 4))
+            }
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { newFrame = $0 }
+            .help("Adds another action to the layer at the playhead, half a second long.")
+            PanelButton(title: "Select Preset", icon: .presets, disabled: !hasPresets, action: pickPreset)
+                .help("Picks a ready-made animation to add to the layer at the playhead.")
+        }
     }
 }
 
