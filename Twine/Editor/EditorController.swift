@@ -21,6 +21,17 @@ final class EditorController {
     private(set) lazy var media = MediaLibrary { [weak self] id in self?.document?.mediaURL(for: id) }
     /// Sounds' loudness, for the timeline's Play bars.
     let waveforms = Waveforms()
+
+    /// Lets go of the pictures, videos and waveforms of files no layer uses
+    /// any more, as after a delete, an undone import or a replace. They stay
+    /// in the package, so an undo brings them back from there. Run when
+    /// changes settle (`ProjectDocument`), not on every step.
+    func releaseUnusedMedia() {
+        let used = Set(project.allLayers.flatMap(\.mediaIDs))
+        media.keep(only: used)
+        waveforms.keep(only: used)
+        Thumbnail.videos.keep(only: used)
+    }
     /// The sound while playing.
     private lazy var audio = AudioPreview { [weak self] id in self?.document?.mediaURL(for: id) }
 

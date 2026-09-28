@@ -57,7 +57,9 @@ final class ProjectDocument: NSDocument {
     nonisolated override func fileWrapper(ofType typeName: String) throws -> FileWrapper {
         let (json, thumbnail) = try MainActor.assumeIsolated { () throws -> (Data, Data?) in
             guard let store else { throw ProjectFileError.missingDocument }
-            return (try ProjectFormat.encode(store.project), Thumbnail.png(of: store.project, media: mediaURLs))
+            let pictures = editorController?.media ?? MediaLibrary(locate: { [mediaURLs] in mediaURLs[$0] })
+            return (try ProjectFormat.encode(store.project), Thumbnail.png(of: store.project, pictures: pictures,
+                                                                             media: mediaURLs))
         }
         let root = package ?? FileWrapper(directoryWithFileWrappers: [:])
 
@@ -162,7 +164,11 @@ final class ProjectDocument: NSDocument {
         saveSoon?.invalidate()
         let timer = Timer(timeInterval: 1, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, self.isDocumentEdited else { return }
+                guard let self else { return }
+                // Undo and redo count as changes too, so a delete undone or
+                // redone lets go of what it no longer needs here.
+                self.editorController?.releaseUnusedMedia()
+                guard self.isDocumentEdited else { return }
                 self.autosave(withImplicitCancellability: false) { _ in }
             }
         }
@@ -173,6 +179,12 @@ final class ProjectDocument: NSDocument {
     override func close() {
         saveSoon?.invalidate()
         super.close()
+    }
+
+    /// The editor showing this document, whose pictures the thumbnail
+    /// borrows and whose unused media is let go.
+    private var editorController: EditorController? {
+        windowControllers.lazy.compactMap { ($0 as? EditorWindowController)?.controller }.first
     }
 
     /// Saves anything not yet saved, then closes: for when the window turns
@@ -222,8 +234,15 @@ enum Thumbnail {
     static let longSide = 320.0
 
     private static var renderer: OffscreenRenderer?
+    /// Video decoders of the thumbnail's own: sharing the canvas's would send
+    /// its decoder back to the start on every save, and reading from there
+    /// again costs the next frame on the canvas a noticeable pause.
+    static let videos = MediaLibrary(locate: { located[$0] })
+    private static var located: [UUID: URL] = [:]
 
-    static func png(of project: Project, media: [UUID: URL] = [:]) -> Data? {
+    /// Pictures come from `pictures` (the editor's, already read, so a save
+    /// never reads them all again), videos from the thumbnail's own.
+    static func png(of project: Project, pictures: MediaLibrary, media: [UUID: URL] = [:]) -> Data? {
         let size = project.composition.size
         guard size.width > 0, size.height > 0 else { return nil }
         let scale = longSide / max(size.width, size.height)
@@ -231,7 +250,9 @@ enum Thumbnail {
         if renderer?.pixelWidth != width || renderer?.pixelHeight != height {
             renderer = OffscreenRenderer(pixelWidth: width, pixelHeight: height)
         }
-        renderer?.media = MediaLibrary(locate: { media[$0] })
+        located = media
+        renderer?.media = ThumbnailMedia(pictures: pictures, videos: videos)
+        defer { renderer?.media = nil }
         guard let image = renderer?.image(of: evaluate(project, at: 0)) else { return nil }
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)
@@ -239,4 +260,18 @@ enum Thumbnail {
         CGImageDestinationAddImage(destination, image, nil)
         return CGImageDestinationFinalize(destination) ? data as Data : nil
     }
+}
+
+/// The editor's pictures with the thumbnail's own video decoders.
+private final class ThumbnailMedia: MediaProvider {
+    let pictures: MediaLibrary
+    let videos: MediaLibrary
+
+    init(pictures: MediaLibrary, videos: MediaLibrary) {
+        self.pictures = pictures
+        self.videos = videos
+    }
+
+    func image(_ mediaID: UUID) -> CGImage? { pictures.image(mediaID) }
+    func videoFrame(_ mediaID: UUID, at time: Double) -> CGImage? { videos.videoFrame(mediaID, at: time) }
 }

@@ -15,6 +15,11 @@ final class Waveforms {
 
     /// The peaks, or nil while they are still being read (or the file will
     /// not open).
+    /// Lets go of the waveforms of sounds no layer plays any more.
+    func keep(only used: Set<UUID>) {
+        peaks = peaks.filter { used.contains($0.key) }
+    }
+
     func peaks(for mediaID: UUID, at url: URL?) -> [Float]? {
         if let known = peaks[mediaID] { return known }
         guard let url, !reading.contains(mediaID) else { return nil }
@@ -35,13 +40,14 @@ final class Waveforms {
         let box = TrackBox()
         let job = AssetBox(asset: asset)
         Task.detached {
-            box.track = try? await job.asset.loadTracks(withMediaType: .audio).first
+            box.tracks = (try? await job.asset.loadTracks(withMediaType: .audio)) ?? []
             semaphore.signal()
         }
         semaphore.wait()
-        guard let track = box.track, let reader = try? AVAssetReader(asset: asset) else { return [] }
+        // Every sound track mixed, as export hears them.
+        guard !box.tracks.isEmpty, let reader = try? AVAssetReader(asset: asset) else { return [] }
         let rate = 8000.0
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+        let output = AVAssetReaderAudioMixOutput(audioTracks: box.tracks, audioSettings: [
             AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: rate, AVNumberOfChannelsKey: 1,
             AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false,
             AVLinearPCMIsNonInterleaved: false,
@@ -74,7 +80,7 @@ final class Waveforms {
 }
 
 nonisolated private final class TrackBox: @unchecked Sendable {
-    var track: AVAssetTrack?
+    var tracks: [AVAssetTrack] = []
 }
 
 nonisolated private struct AssetBox: @unchecked Sendable {

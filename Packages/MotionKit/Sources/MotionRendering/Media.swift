@@ -45,6 +45,14 @@ public final class MediaLibrary: MediaProvider {
         videos[mediaID] = nil
     }
 
+    /// Lets go of every picture and video not in `used`, closing their
+    /// decoders, so files no layer shows any more take no memory. One that
+    /// comes back (an undo) is read from its file again when next drawn.
+    public func keep(only used: Set<UUID>) {
+        images = images.filter { used.contains($0.key) }
+        videos = videos.filter { used.contains($0.key) }
+    }
+
     /// The whole picture, turned the way its camera says it should be, in
     /// sRGB like everything else the renderer draws.
     static func loadImage(_ url: URL) -> CGImage? {

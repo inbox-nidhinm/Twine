@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Memory let go", changes: [
+            "Pictures, videos and waveforms that no layer uses any more are let go from memory a second after you stop editing, so deleting a big picture gives its memory back. Undo brings it back from the project.",
+            "Saving no longer reads every picture again to draw the project's thumbnail.",
+            "Waveforms show every sound track in a file.",
+        ]),
         .init(date: "28 September 2026", title: "Sound, phone videos, WebM and undo", changes: [
             "Portrait videos from a phone no longer come in upside down.",
             "Exported sound never clips: loud clips that overlap are held just under full volume, and quieter sound is left exactly as it was.",
