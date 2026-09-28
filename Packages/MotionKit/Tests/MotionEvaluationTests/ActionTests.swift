@@ -159,12 +159,13 @@ private func near(_ a: Vec2, _ b: Vec2, _ tolerance: Double = 1e-9) -> Bool {
         #expect(state(layer, [a], at: 1).opacity == 0)
     }
 
-    @Test func aLayerWhoseFirstVisibilityActionIsShowIsHiddenUntilIt() {
+    @Test func aShowNeverHidesWhatComesBeforeIt() {
         let layer = square()
         let show = Action(target: layer.id, start: 2, duration: 0, spec: .visibility(VisibilityAction(isVisible: true)))
-        #expect(!state(layer, [show], at: 0).isShown)
-        #expect(!state(layer, [show], at: 1.99).isShown)
-        #expect(state(layer, [show], at: 2).isShown)
+        let away = move(layer, to: Vec2(200, 0), at: 0, for: 1)
+        #expect(state(layer, [show], at: 0).isShown)
+        #expect(state(layer, [away, show], at: 0.5).isShown)
+        #expect(state(layer, [away, show], at: 2).isShown)
     }
 
     @Test func hideAndShowSwitchInTurn() {
@@ -183,8 +184,9 @@ private func near(_ a: Vec2, _ b: Vec2, _ tolerance: Double = 1e-9) -> Bool {
         let layer = square()
         let show = Action(target: layer.id, start: 1, duration: 0, spec: .visibility(VisibilityAction(isVisible: true)))
         let entrance = fade(layer, from: 0, to: 1, at: 3, for: 1)
-        // Shown at 1s as designed, until the fade starts from nothing at 3s.
-        #expect(!state(layer, [show, entrance], at: 0.5).isShown)
+        // Shown as designed, until the fade starts from nothing at 3s.
+        #expect(state(layer, [show, entrance], at: 0.5).isShown)
+        #expect(state(layer, [show, entrance], at: 0.5).opacity == 1)
         #expect(state(layer, [show, entrance], at: 2.99).isShown)
         #expect(state(layer, [show, entrance], at: 2.99).opacity == 1)
         #expect(state(layer, [show, entrance], at: 3).opacity == 0)

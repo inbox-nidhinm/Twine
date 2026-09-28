@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "A Show hides nothing before it", changes: [
+            "A Show no longer hides a layer before it. A layer is shown until something hides it, so everything that happens before a Show still plays. To make a layer appear later, put a Hide at the start or use an In preset.",
+        ]),
         .init(date: "28 September 2026", title: "Show and Hide always count", changes: [
             "A Show or Hide is kept whatever presets or other actions come before or after it.",
             "A layer shown before an In preset stays as designed until the preset starts, then plays it, rather than waiting unseen from the start of the scene.",

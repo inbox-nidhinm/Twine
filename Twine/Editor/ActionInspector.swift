@@ -767,7 +767,7 @@ private struct ValueFields: View {
                 }
             }
         }
-        .help("Hides or shows the layer at the action's start. A layer whose first one is Show stays hidden until it.")
+        .help("Hides or shows the layer at the action's start. A Show brings back a layer that was hidden or faded out.")
     }
 
     // MARK: Shared

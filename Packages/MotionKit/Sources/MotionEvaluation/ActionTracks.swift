@@ -362,7 +362,6 @@ public struct ActionTracks: Sendable {
             case .reveal:
                 state.reveal = Reveal(walk(state.reveal.box, steps(list, { _ in nil }, Self.revealPart), at: time))
             case .size: state.size = walk(state.size, list.compactMap(Self.sizeStep), at: time)
-            // Its own first step decides what shows before it, so it holds as ever.
             case .visibility: state.isShown = MotionEvaluation.walk(1, Self.visibilitySteps(list), at: time) > 0.5
             // Only what the layer has: a Colour on a layer with no fill does nothing.
             case .fill: if let fill = state.fill { state.fill = walk(fill, list.compactMap(Self.fillStep), at: time) }
@@ -705,18 +704,17 @@ public struct ActionTracks: Sendable {
         }
     }
 
-    /// Visibility walks as 1 (shown) and 0 (hidden), every step instant. The
-    /// first visibility action on a layer starts from the opposite of what it
-    /// sets, so a layer whose first one is a Show is hidden until it: the
-    /// entrance rule, applied to Hide/Show. An In preset shows the layer at
-    /// its start, as a Show does, but leaves what comes before it alone: its
-    /// own parts see to that.
+    /// Visibility walks as 1 (shown) and 0 (hidden), every step instant. A
+    /// layer is shown until something hides it: a Show never reaches back
+    /// before its start (the user's choice on 28 September 2026), so to
+    /// appear later a layer takes a Hide first or an In preset. An In preset
+    /// shows the layer at its start, as a Show does.
     private static func visibilitySteps(_ actions: [Action]) -> [Step<Double>] {
-        actions.enumerated().compactMap { index, a in
+        actions.compactMap { a in
             switch a.spec {
             case .visibility(let v):
                 let end: Double = v.isVisible ? 1 : 0
-                return Step(a, initial: index == 0 ? 1 - end : nil, target: { _ in end })
+                return Step(a, initial: nil, target: { _ in end })
             case .preset:
                 var step = Step<Double>(a, initial: nil, target: { _ in 1 })
                 step.isInstant = true
@@ -875,7 +873,9 @@ struct PartRun<V> {
 ///    along its path adds to the layer's rotation how far its path's
 ///    direction has turned since the Move began, and keeps that turn after
 ///    it ends (`pathTurn`, applied after the walks).
-/// 10. Show and Hide are kept whatever else the layer does. A Show or Hide
+/// 10. Show and Hide are kept whatever else the layer does, and never reach
+///    back before their start: a layer is shown until something hides it.
+///    A Show or Hide
 ///    at or before a channel's first action ends rule 4's exception there
 ///    (`holdsBefore` is when the first one starts): the channel stays as
 ///    designed until the action starts, so a layer shown at 1 s with a Fade

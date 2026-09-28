@@ -302,8 +302,8 @@ public struct ResizeAction: Codable, Sendable, Equatable {
     }
 }
 
-/// Shows or hides the layer at the action's start. A layer whose first
-/// visibility action is a Show stays hidden until it.
+/// Shows or hides the layer at the action's start. A layer is shown until
+/// something hides it, so a Show only brings a layer back.
 public struct VisibilityAction: Codable, Sendable, Equatable {
     public var isVisible: Bool
 

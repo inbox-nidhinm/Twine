@@ -316,7 +316,7 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
         // Shown at 1s, then a Fade In at 3s: shown as designed until 3s.
         let fadeIn = bar(Presets.preset(.fadeIn), on: layer, at: 3)
         let shown = [visibility(true, at: 1), fadeIn]
-        #expect(!state(shown, at: 0.5).isShown)
+        #expect(state(shown, at: 0.5).isShown && near(state(shown, at: 0.5).opacity, 0.5))
         #expect(state(shown, at: 2.99).isShown && near(state(shown, at: 2.99).opacity, 0.5))
         #expect(near(state(shown, at: 3).opacity, 0))
         #expect(near(state(shown, at: fadeIn.end).opacity, 0.5))
