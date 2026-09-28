@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Text in Fill and Stroke", changes: [
+            "The Text section is laid out afresh: the font, then weight and size, then left, centre and right alignment beside Auto or Fixed, with letter spacing and line height behind its settings button. Justify is no longer offered.",
+            "A text's colour is now its Fill, which can be hidden, and a text can have a Stroke round its letters: centred, inside or outside, with its corners in the stroke's settings.",
+            "Words are typed on the canvas; the inspector no longer has a box for them.",
+        ]),
         .init(date: "28 September 2026", title: "Show is a dot", changes: [
             "On the timeline a Show is drawn as a dot and a Hide as a square, so the two tell apart at a glance.",
         ]),

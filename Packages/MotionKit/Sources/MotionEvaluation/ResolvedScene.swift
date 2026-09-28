@@ -242,6 +242,10 @@ public struct ResolvedText: Sendable, Equatable {
     public var lineHeight: Double?
     public var sizing: TextSizing
     public var tabularDigits: Bool
+    /// Whether the letters are filled with `color`; false leaves only the
+    /// stroke.
+    public var showsFill: Bool = true
+    public var stroke: ResolvedTextStroke?
     /// While a text preset moves its letters, words or lines one by one,
     /// each of them, drawn in place of the whole text; empty otherwise.
     public var units: [ResolvedTextUnit] = []
@@ -249,6 +253,21 @@ public struct ResolvedText: Sendable, Equatable {
     public var style: TextStyle {
         TextStyle(fontFamily: fontFamily, fontWeight: fontWeight, fontSize: fontSize, alignment: alignment,
                   letterSpacing: letterSpacing, lineHeight: lineHeight, tabularDigits: tabularDigits)
+    }
+}
+
+/// An outline round a text's letters.
+public struct ResolvedTextStroke: Sendable, Hashable {
+    public var color: RGBA
+    public var width: Double
+    public var alignment: StrokeAlignment
+    public var join: LineJoin
+
+    public init(color: RGBA, width: Double, alignment: StrokeAlignment, join: LineJoin) {
+        self.color = color
+        self.width = width
+        self.alignment = alignment
+        self.join = join
     }
 }
 

@@ -492,4 +492,32 @@ private enum BlendMaths {
         let after = try render(project, at: 1.1)
         #expect(ink(after, in: spans[1].box) > 10)
     }
+
+    @Test func aTextStrokeOutlinesTheLetters() throws {
+        var content = TextContent(text: "I", fontFamily: "SF Pro", fontWeight: 900, fontSize: 48, color: RGBA(1, 0, 0))
+        let size = TextLayout.size(of: content.text, style: TextStyle(content), width: nil)
+        func layer(_ c: TextContent) -> Layer {
+            var l = Layer(name: "T", content: .text(c), size: size, position: Vec2(20, 4))
+            l.transform.anchor = .zero
+            return l
+        }
+        // Where the letter's stem is, filled: the inked columns across its middle.
+        let filled = try render(Project(composition: transparentComposition(), layers: [layer(content)]))
+        let row = Int(4 + size.height / 2)
+        let inked = (0..<64).filter { pixel(filled, $0, row).a > 200 }
+        let left = try #require(inked.first), right = try #require(inked.last)
+        let middle = (left + right) / 2
+        // The fill off and a stroke outside: a ring round the stem, empty inside.
+        content.hidesFill = true
+        content.stroke = Stroke(paint: .color(RGBA(0, 0, 1)), width: 3, alignment: .outside)
+        let outlined = try render(Project(composition: transparentComposition(), layers: [layer(content)]))
+        #expect(pixel(outlined, middle, row).a == 0)
+        #expect(pixel(outlined, left - 2, row).b > 200 && pixel(outlined, left - 2, row).a > 200)
+        #expect(pixel(outlined, right + 2, row).a > 200)
+        // Saved and read back as it was; a shown fill leaves nothing in the file.
+        let data = try JSONEncoder().encode(content)
+        #expect(try JSONDecoder().decode(TextContent.self, from: data) == content)
+        content.hidesFill = nil
+        #expect(!(String(data: try JSONEncoder().encode(content), encoding: .utf8) ?? "").contains("hidesFill"))
+    }
 }

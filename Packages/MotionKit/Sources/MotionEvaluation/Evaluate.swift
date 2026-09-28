@@ -162,6 +162,16 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
         size = TextLayout.size(of: shown.visible, style: resolved.style, width: width)
         textAnchor = TextLayout.anchor(layer.transform.anchor, from: layer.size, to: size, alignment: text.alignment)
         var drawn = resolved
+        drawn.showsFill = text.showsFill
+        if let stroke = text.stroke, stroke.isEnabled, stroke.width > 0 {
+            let color: RGBA
+            switch stroke.paint {
+            case .solid(let c): color = c
+            case .linearGradient(let g), .radialGradient(let g): color = g.stops.first?.color ?? .black
+            case .image: color = .black
+            }
+            drawn.stroke = ResolvedTextStroke(color: color, width: stroke.width, alignment: stroke.alignment, join: stroke.join)
+        }
         if let animation { drawn.units = units(of: shown.text, style: resolved.style, width: width, animation, at: time) }
         content = .text(drawn)
     case .video(let video):

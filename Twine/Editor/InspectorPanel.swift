@@ -261,10 +261,12 @@ struct AlignRow: View {
     }
 }
 
-/// One button in a tray of them: raised, lighter under the pointer.
-private struct TrayButton: View {
+/// One button in a tray of them: raised, lighter under the pointer, and on
+/// `chosen` when it is the choice in force.
+struct TrayButton: View {
     let icon: Icon
     let help: String
+    var isOn = false
     let action: () -> Void
 
     @State private var hovering = false
@@ -273,11 +275,11 @@ private struct TrayButton: View {
     var body: some View {
         Button(action: action) {
             IconView(icon, size: 15)
-                .foregroundStyle(hovering && isEnabled ? Theme.textPrimary : Theme.textSecondary)
+                .foregroundStyle(isOn || (hovering && isEnabled) ? Theme.textPrimary : Theme.textSecondary)
                 .opacity(isEnabled ? 1 : 0.4)
                 .frame(maxWidth: .infinity)
                 .frame(height: Theme.control)
-                .background(hovering && isEnabled ? Theme.panelHover : Theme.panelRaised)
+                .background(isOn ? Theme.chosen : hovering && isEnabled ? Theme.panelHover : Theme.panelRaised)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

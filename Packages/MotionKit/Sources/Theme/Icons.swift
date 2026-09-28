@@ -49,6 +49,9 @@ public enum Icon: String, CaseIterable, Sendable {
     case preset
     case presets
     case settings
+    case textAlignCenter
+    case textAlignLeft
+    case textAlignRight
     case unlink
     case audio
     case eyeSlash
@@ -304,6 +307,24 @@ public enum Icon: String, CaseIterable, Sendable {
             "M7 9V3",
             "M7 18C6.06812 18 5.60218 18 5.23463 17.8478C4.74458 17.6448 4.35523 17.2554 4.15224 16.7654C4 16.3978 4 15.9319 4 15C4 14.0681 4 13.6022 4.15224 13.2346C4.35523 12.7446 4.74458 12.3552 5.23463 12.1522C5.60218 12 6.06812 12 7 12C7.93188 12 8.39782 12 8.76537 12.1522C9.25542 12.3552 9.64477 12.7446 9.84776 13.2346C10 13.6022 10 14.0681 10 15C10 15.9319 10 16.3978 9.84776 16.7654C9.64477 17.2554 9.25542 17.6448 8.76537 17.8478C8.39782 18 7.93188 18 7 18Z",
             "M17 12C17.9319 12 18.3978 12 18.7654 11.8478C19.2554 11.6448 19.6448 11.2554 19.8478 10.7654C20 10.3978 20 9.9319 20 9C20 8.0681 20 7.6022 19.8478 7.2346C19.6448 6.7446 19.2554 6.3552 18.7654 6.1522C18.3978 6 17.9319 6 17 6C16.0681 6 15.6022 6 15.2346 6.1522C14.7446 6.3552 14.3552 6.7446 14.1522 7.2346C14 7.6022 14 8.0681 14 9C14 9.9319 14 10.3978 14.1522 10.7654C14.3552 11.2554 14.7446 11.6448 15.2346 11.8478C15.6022 12 16.0681 12 17 12Z"
+        ]
+        case .textAlignCenter: return [   // Inspector/text-align-center.svg
+            "M3 3H21",
+            "M8 9H16",
+            "M3 15H21",
+            "M8 21H16"
+        ]
+        case .textAlignLeft: return [   // Inspector/text-align-left.svg
+            "M3 3H21",
+            "M3 9H11",
+            "M3 15H21",
+            "M3 21H11"
+        ]
+        case .textAlignRight: return [   // Inspector/text-align-right.svg
+            "M3 3H21",
+            "M13 9H21",
+            "M3 15H21",
+            "M13 21H21"
         ]
         case .unlink: return [   // Inspector/unlink.svg
             "M21.0162 16.0088H19.0124M16.0068 21.0192V19.0151",

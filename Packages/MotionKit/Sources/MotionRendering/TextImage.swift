@@ -16,6 +16,8 @@ struct TextImage {
         let color: RGBA
         let width: Double?
         let scale: CGFloat
+        var showsFill = true
+        var stroke: ResolvedTextStroke? = nil
     }
 
     let image: CGImage?
@@ -30,7 +32,8 @@ struct TextImage {
     /// space (one letter, word or line), a margin taller above and below.
     init(_ key: Key, region: Box? = nil) {
         let set = TextLayout.layout(key.text, style: key.style, width: key.width)
-        margin = ceil(max(key.style.fontSize, 1) * 0.5)
+        // Room for letters that reach past their box, and for a stroke round them.
+        margin = ceil(max(key.style.fontSize, 1) * 0.5 + (key.stroke?.width ?? 0))
         let total: Size2
         // Where the picture's top-left falls in the text's space.
         let left: Double, top: Double
@@ -59,11 +62,76 @@ struct TextImage {
         context.setShouldSmoothFonts(false)
         // Core Graphics counts up from the bottom; the layout counts down
         // from the top.
-        for line in set.lines {
-            if let region, line.top + line.height < region.minY || line.top > region.maxY { continue }
-            context.textPosition = CGPoint(x: line.origin.x - left, y: total.height - (line.origin.y - top))
-            CTLineDraw(line.line, context)
+        let lines = set.lines.filter { line in
+            region.map { line.top + line.height >= $0.minY && line.top <= $0.maxY } ?? true
+        }
+        func baseline(_ line: PositionedLine) -> CGPoint {
+            CGPoint(x: line.origin.x - left, y: total.height - (line.origin.y - top))
+        }
+        func fill() {
+            guard key.showsFill else { return }
+            for line in lines {
+                context.textPosition = baseline(line)
+                CTLineDraw(line.line, context)
+            }
+        }
+        guard let stroke = key.stroke else {
+            fill()
+            image = context.makeImage()
+            return
+        }
+        // The stroke follows the letters' outlines, centred on them, inside
+        // (clipped to them) or outside (clipped away from them), as a
+        // shape's does; the fill goes under it.
+        let outlines = CGMutablePath()
+        for line in lines { Self.addOutlines(of: line.line, at: baseline(line), to: outlines) }
+        context.setStrokeColor(stroke.color.cgColor)
+        context.setLineJoin(stroke.join.cg)
+        context.setMiterLimit(4)
+        func strokeOutlines(_ width: Double) {
+            context.setLineWidth(width)
+            context.addPath(outlines)
+            context.strokePath()
+        }
+        switch stroke.alignment {
+        case .center:
+            fill()
+            strokeOutlines(stroke.width)
+        case .inside:
+            fill()
+            context.saveGState()
+            context.addPath(outlines)
+            context.clip()
+            strokeOutlines(stroke.width * 2)
+            context.restoreGState()
+        case .outside:
+            context.saveGState()
+            context.addRect(CGRect(x: 0, y: 0, width: total.width, height: total.height))
+            context.addPath(outlines)
+            context.clip(using: .evenOdd)
+            strokeOutlines(stroke.width * 2)
+            context.restoreGState()
+            fill()
         }
         image = context.makeImage()
+    }
+
+    /// Every glyph of a set line as an outline, placed from its baseline's
+    /// start, in the picture's own coordinates (y up).
+    private static func addOutlines(of line: CTLine, at origin: CGPoint, to path: CGMutablePath) {
+        for run in (CTLineGetGlyphRuns(line) as? [CTRun]) ?? [] {
+            let attributes = CTRunGetAttributes(run) as NSDictionary
+            guard let value = attributes[kCTFontAttributeName as String] else { continue }
+            let font = value as! CTFont
+            let count = CTRunGetGlyphCount(run)
+            var glyphs = [CGGlyph](repeating: 0, count: count)
+            var positions = [CGPoint](repeating: .zero, count: count)
+            CTRunGetGlyphs(run, CFRange(), &glyphs)
+            CTRunGetPositions(run, CFRange(), &positions)
+            for (glyph, position) in zip(glyphs, positions) {
+                guard let outline = CTFontCreatePathForGlyph(font, glyph, nil) else { continue }
+                path.addPath(outline, transform: CGAffineTransform(translationX: origin.x + position.x, y: origin.y + position.y))
+            }
+        }
     }
 }

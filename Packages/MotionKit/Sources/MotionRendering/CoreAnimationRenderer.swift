@@ -529,7 +529,8 @@ final class Node {
     /// up with the rest exactly as the whole text would.
     private func updateUnits(_ text: ResolvedText, size: Size2) {
         let width = text.sizing == .fixedWidth ? size.width : nil
-        let key = TextImage.Key(text: text.text, style: text.style, color: text.color, width: width, scale: scale)
+        let key = TextImage.Key(text: text.text, style: text.style, color: text.color, width: width, scale: scale,
+                                showsFill: text.showsFill, stroke: text.stroke)
         if unitImages.keys.first.map({ $0.text != key }) ?? false { unitImages = [:] }
         while unitLayers.count > text.units.count { unitLayers.removeLast().holder.removeFromSuperlayer() }
         while unitLayers.count < text.units.count {
@@ -609,7 +610,8 @@ final class Node {
             }
             guard let string else { layer.isHidden = true; continue }
             layer.isHidden = false
-            let key = TextImage.Key(text: string, style: text.style, color: text.color, width: width, scale: scale)
+            let key = TextImage.Key(text: string, style: text.style, color: text.color, width: width, scale: scale,
+                                    showsFill: text.showsFill, stroke: text.stroke)
             if textKeys[i] != key {
                 textKeys[i] = key
                 textImages[i] = TextImage(key)

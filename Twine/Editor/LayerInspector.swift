@@ -46,6 +46,10 @@ struct LayerInspector: View {
             if case .text(let text) = layer.content {
                 PanelDivider()
                 TextSection(layer: layer, text: text, controller: controller)
+                PanelDivider()
+                TextFillSection(layer: layer, text: text, controller: controller)
+                PanelDivider()
+                TextStrokeSection(layer: layer, text: text, controller: controller)
             }
             if layer.isFrame, let look = layer.look {
                 PanelDivider()
@@ -833,7 +837,7 @@ private struct StrokeSettings: View {
 
 /// A paint's colours: one well for a solid colour, a well per end for a
 /// gradient, each with its hex and its opacity.
-private struct PaintEditor: View {
+struct PaintEditor: View {
     let paint: Paint
     let isEnabled: Bool
     let controller: EditorController

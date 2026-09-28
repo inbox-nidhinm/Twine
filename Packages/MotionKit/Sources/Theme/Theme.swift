@@ -177,6 +177,9 @@ public enum Theme {
 
     public static let panelWidth: CGFloat = 232
     public static let labelWidth: CGFloat = 58
+    /// The Text section's right-hand column (size, and Auto or Fixed), so
+    /// the weight menu and the alignment tray get the rest.
+    public static let textSideColumn: CGFloat = 76
     public static let cardWidth: CGFloat = 240
     public static let menuMinWidth: CGFloat = 168
 

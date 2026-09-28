@@ -275,10 +275,15 @@ public struct TextContent: Codable, Sendable, Equatable {
     /// Baseline to baseline in pixels, or nil for the font's own.
     public var lineHeight: Double?
     public var sizing: TextSizing
+    /// True when the fill (`color`) is switched off, leaving only the
+    /// stroke; left out of files while it shows.
+    public var hidesFill: Bool?
+    /// An outline round the letters, solid only; nil for none.
+    public var stroke: Stroke?
 
     public init(text: String, fontFamily: String = "SF Pro", fontWeight: Int = 400, fontSize: Double = 48,
                 color: RGBA = .white, alignment: TextAlignment = .left, letterSpacing: Double = 0,
-                lineHeight: Double? = nil, sizing: TextSizing = .autoWidth) {
+                lineHeight: Double? = nil, sizing: TextSizing = .autoWidth, stroke: Stroke? = nil) {
         self.text = text
         self.fontFamily = fontFamily
         self.fontWeight = fontWeight
@@ -288,7 +293,10 @@ public struct TextContent: Codable, Sendable, Equatable {
         self.letterSpacing = letterSpacing
         self.lineHeight = lineHeight
         self.sizing = sizing
+        self.stroke = stroke
     }
+
+    public var showsFill: Bool { hidesFill != true }
 }
 
 public enum TextAlignment: String, Codable, Sendable, CaseIterable {
