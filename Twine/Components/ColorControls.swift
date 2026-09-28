@@ -60,7 +60,9 @@ struct ColorWell: View {
     }
 }
 
-/// Six hex digits, typed. Commits on return or on losing focus, and puts the
+/// Six hex digits, typed. A click selects them, so typing or pasting
+/// replaces them. Commits on return or on losing focus, filling out a short
+/// entry (`RGBA(typed:)`: `0` is `000000`, `1a` is `1A1A1A`), and puts the
 /// old value back if what was typed is not a colour.
 struct HexField: View {
     let color: RGBA
@@ -90,12 +92,15 @@ struct HexField: View {
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
         .focusRing(focused)
+        .overlay {
+            if !focused { ClickToType { ScrubSurface.focus { focused = true } } }
+        }
     }
 
     private func apply() {
         // The parsed colour, not `color`: that is still the old one until the
         // view updates, and it would come back when the field lost focus.
-        if var parsed = RGBA(hex: text) {
+        if var parsed = RGBA(typed: text) {
             parsed.a = color.a
             if parsed != color { commit(parsed) }
             text = parsed.hex6

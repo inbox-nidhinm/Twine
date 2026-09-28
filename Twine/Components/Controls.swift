@@ -797,6 +797,39 @@ struct ScrubSurface: NSViewRepresentable {
     func updateNSView(_ view: ScrubView, context: Context) { view.surface = self }
 }
 
+/// Laid over a text field while it is not being typed in, so a click
+/// gives it the keyboard with everything in it selected (through
+/// `ScrubSurface.focus`), rather than a caret where the click landed.
+struct ClickToType: NSViewRepresentable {
+    let focus: () -> Void
+
+    func makeNSView(context: Context) -> ClickToTypeView { ClickToTypeView() }
+
+    func updateNSView(_ view: ClickToTypeView, context: Context) { view.focus = focus }
+}
+
+final class ClickToTypeView: NSView {
+    var focus: (() -> Void)?
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.cursorUpdate, .mouseMoved, .activeInKeyWindow, .inVisibleRect],
+                                       owner: self))
+    }
+
+    // Set on every move too, as `ScrubView` does, since SwiftUI puts its
+    // arrow back.
+    override func cursorUpdate(with event: NSEvent) { NSCursor.iBeam.set() }
+    override func mouseMoved(with event: NSEvent) { NSCursor.iBeam.set() }
+
+    override func mouseDown(with event: NSEvent) {}
+
+    override func mouseUp(with event: NSEvent) { focus?() }
+}
+
 final class ScrubView: NSView {
     var surface: ScrubSurface?
 

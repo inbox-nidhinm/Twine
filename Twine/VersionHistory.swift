@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Quicker hex fields", changes: [
+            "Clicking a hex field selects its digits, so typing or pasting replaces them straight away, as number fields already did.",
+            "A short hex code fills out the rest: 0 becomes 000000, 1a becomes 1A1A1A and abc becomes AABBCC.",
+        ]),
         .init(date: "28 September 2026", title: "Linear", changes: [
             "The easing that runs at an even speed is called Linear rather than None.",
         ]),
