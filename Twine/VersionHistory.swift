@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Roomier play controls", changes: [
+            "The timeline's play controls sit further apart, and Loop shows it is on in grey rather than blue, as switches in the inspector do.",
+        ]),
         .init(date: "28 September 2026", title: "Icons a little lighter", changes: [
             "Icon lines are a touch lighter than in the last build: 1.6 points on the tools and playback buttons, and lighter in the same proportion at every other size.",
         ]),

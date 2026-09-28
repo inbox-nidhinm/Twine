@@ -13,9 +13,12 @@ struct BarGlyph: View {
     /// What a hover lifts to. On a raised ground, such as the tools tray, pass
     /// `panelHover`, the next rung up, or the hover would not show.
     var hoverFill: Color = Theme.panelRaised.opacity(0.6)
+    /// What shows the button is on: the accent for tools, `chosen` for a
+    /// switch that is on, as in the inspector.
+    var onFill: Color = Theme.accent
 
     private var fill: Color {
-        if isOn { return Theme.accent }
+        if isOn { return onFill }
         return hovering && !disabled ? hoverFill : .clear
     }
 
@@ -38,6 +41,7 @@ struct BarButton: View {
     var size: CGFloat = Theme.control
     var iconBox: CGFloat = Theme.icon
     var hoverFill: Color = Theme.panelRaised.opacity(0.6)
+    var onFill: Color = Theme.accent
     let action: () -> Void
 
     @State private var hovering = false
@@ -45,7 +49,7 @@ struct BarButton: View {
     var body: some View {
         Button(action: action) {
             BarGlyph(icon: icon, isOn: isOn, hovering: hovering, disabled: disabled,
-                     size: size, iconBox: iconBox, hoverFill: hoverFill)
+                     size: size, iconBox: iconBox, hoverFill: hoverFill, onFill: onFill)
         }
         .buttonStyle(.plain)
         .disabled(disabled)

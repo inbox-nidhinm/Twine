@@ -164,6 +164,8 @@ public enum Theme {
     /// Inside the bottom bar.
     public static let barPad: CGFloat = 6
     public static let barGap: CGFloat = 4
+    /// Between the timeline's play controls.
+    public static let transportGap: CGFloat = 8
     public static let rowGap: CGFloat = 4
     /// The thickness of a progress bar.
     public static let progressBar: CGFloat = 4

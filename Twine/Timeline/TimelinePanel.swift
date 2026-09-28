@@ -58,7 +58,7 @@ private struct TransportBar: View {
     @Bindable var editor: EditorModel
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: Theme.transportGap) {
             BarButton(icon: .jumpStart, help: "Go to the start (Home)") { controller.jumpToStart() }
             BarButton(icon: .stepBack, help: "Previous frame (comma; Shift for ten, Option for the previous action edge)") { controller.step(-1) }
             BarButton(icon: editor.isPlaying ? .pause : .play, help: editor.isPlaying ? "Pause (Space)" : "Play (Space)") {
@@ -67,7 +67,7 @@ private struct TransportBar: View {
             BarButton(icon: .stepForward, help: "Next frame (full stop; Shift for ten, Option for the next action edge)") { controller.step(1) }
             BarButton(icon: .jumpEnd, help: "Go to the end (End)") { controller.jumpToEnd() }
             BarButton(icon: .loop, help: editor.loops ? "Looping: playback starts over at the end" : "Stops at the end",
-                      isOn: editor.loops) { editor.loops.toggle() }
+                      isOn: editor.loops, onFill: Theme.chosen) { editor.loops.toggle() }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
