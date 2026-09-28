@@ -20,8 +20,7 @@ Figma has no icon setting for a plugin run from a folder, so a development plugi
 
 Select a frame or some layers, run the plugin, and press **Copy**. In Twine, press ⌘V. The panel shows a picture of what is selected, with its size and how many layers it holds.
 
-- Into an empty project, the composition takes the copy's size and it lines up exactly.
-- Into a project with layers, it comes in centred, at its exact size.
+- It comes in centred, at its exact size. The composition keeps its own size, empty or not: change it yourself if you want it to match.
 - Text in one style comes in as Twine text. If its font is not on the Mac, a stand-in shows until it is installed, and Twine says which fonts are missing.
 - Skewed layers, frames and text come in as themselves, slanted as in Figma.
 - What Twine cannot hold comes in as a sharp picture Figma drew: text with mixed styles, italics, underlines or lists; angular and diamond gradients; picture filters; luminance masks; skewed layers; FigJam items. Vectors painted region by region come in through Figma's own SVG.

@@ -512,9 +512,9 @@ final class EditorController {
         }
     }
 
-    /// Layers copied with the Twine plugin in Figma, at their exact size.
-    /// Into an empty project the composition takes their size and they line
-    /// up with it; otherwise they come in centred. Their pictures come too.
+    /// Layers copied with the Twine plugin in Figma, at their exact size,
+    /// centred in the composition, which is never resized to fit them (the
+    /// user's choice: they size it themselves). Their pictures come too.
     /// One undo step. Fonts this Mac lacks are named in a notice; the text
     /// shows in a stand-in until they are installed.
     func pasteFromFigma(_ text: String) {
@@ -522,18 +522,10 @@ final class EditorController {
         Task { @MainActor in
             guard let read = try? FigmaImport.read(text) else { return NSSound.beep() }
             var commands: [EditorCommand] = []
-            let offset: Vec2
-            if project.layers.isEmpty {
-                var composition = project.composition
-                composition.width = max(Int(read.bounds.width.rounded()), 1)
-                composition.height = max(Int(read.bounds.height.rounded()), 1)
-                commands.append(.setComposition(composition))
-                offset = Vec2(-read.bounds.minX, -read.bounds.minY)
-            } else {
-                // Whole pixels, so edges that were crisp in Figma stay so.
-                let c = project.composition
-                offset = Vec2((Double(c.width) / 2 - read.bounds.center.x).rounded(), (Double(c.height) / 2 - read.bounds.center.y).rounded())
-            }
+            // Whole pixels, so edges that were crisp in Figma stay so.
+            let c = project.composition
+            let offset = Vec2((Double(c.width) / 2 - read.bounds.center.x).rounded(),
+                              (Double(c.height) / 2 - read.bounds.center.y).rounded())
             for item in read.media where !project.media.contains(where: { $0.contentHash == item.asset.contentHash }) {
                 do { try await document.stage(item.data, as: item.asset.fileName) } catch { return NSSound.beep() }
                 commands.append(.addMedia(item.asset))

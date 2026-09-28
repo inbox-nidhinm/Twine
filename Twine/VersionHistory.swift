@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "The composition keeps its size", changes: [
+            "Pasting from Figma into an empty project no longer resizes the composition to fit. The copy comes in centred at its exact size, and the composition stays as you set it.",
+        ]),
         .init(date: "28 September 2026", title: "Icons in the Effects menu", changes: [
             "The Effects section's add menu shows each effect's icon, as the New Action menu does.",
         ]),
