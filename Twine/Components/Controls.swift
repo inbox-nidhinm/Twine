@@ -128,7 +128,7 @@ extension SliderRow where Accessory == EmptyView {
 
 /// The switch, built from the slider's parts: the same track and the same
 /// white pill, moved to one end or the other. Off sits in the canvas's dark,
-/// on sits in the accent.
+/// on in the inspector's grey for chosen things.
 struct PillToggle: View {
     let isOn: Bool
     let toggle: () -> Void
@@ -143,7 +143,7 @@ struct PillToggle: View {
         Button(action: toggle) {
             ZStack(alignment: isOn ? .trailing : .leading) {
                 RoundedRectangle(cornerRadius: Theme.radiusTrack)
-                    .fill(isOn ? (hovering ? Theme.accentHover : Theme.accent) : Theme.canvas)
+                    .fill(isOn ? (hovering ? Theme.chosenHover : Theme.chosen) : Theme.canvas)
                     .overlay(RoundedRectangle(cornerRadius: Theme.radiusTrack)
                         .strokeBorder(hovering ? Theme.edgeHover : Theme.edge, lineWidth: 1))
                 RoundedRectangle(cornerRadius: Theme.radiusTrack - 1)
@@ -178,7 +178,7 @@ struct ToggleRow: View {
     }
 }
 
-/// A row of mutually exclusive words, one of them lit with the accent.
+/// A row of mutually exclusive words, the chosen one raised in grey.
 /// Unlabelled: it sits under a header that already names it.
 struct SegmentRow<Value: Hashable>: View {
     let selection: Value
@@ -213,7 +213,7 @@ private struct Segment: View {
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
-                    .fill(isOn ? Theme.accent : hovering ? Theme.rowHover : .clear))
+                    .fill(isOn ? Theme.chosen : hovering ? Theme.rowHover : .clear))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -36,8 +36,9 @@ public enum Theme {
     // MARK: Accent (accent/*, row/*)
 
     /// #4C9FEF. Everything that means *selected* or *in hand* reads this: rows,
-    /// the tool in hand, a chosen segment, and the canvas's outlines, handles
-    /// and marquee. One constant, so they cannot disagree.
+    /// the tool in hand, and the canvas's outlines, handles and marquee. One
+    /// constant, so they cannot disagree. The inspector's controls stay out of
+    /// it (they use `chosen`), so the panel reads as one quiet surface.
     public static let accent = Color(red: 0x4C / 255, green: 0x9F / 255, blue: 0xEF / 255)
     /// The accent under the pointer. Lighter rather than darker, because a
     /// step down would read as disabled.
@@ -45,6 +46,12 @@ public enum Theme {
     /// #33506C. A selected row. Mixed by eye rather than as the accent at some
     /// opacity over `panel`, which comes out greyer than the accent reads.
     public static let rowSelected = Color(red: 0x33 / 255, green: 0x50 / 255, blue: 0x6C / 255)
+    /// #5C5C5C. What is chosen inside the inspector: a segment, a switch that
+    /// is on. Grey rather than the accent, so settings never compete with the
+    /// selection on the canvas for attention.
+    public static let chosen = Color(red: 0x5C / 255, green: 0x5C / 255, blue: 0x5C / 255)
+    /// `chosen` under the pointer: a step lighter, as `accentHover` is.
+    public static let chosenHover = Color(red: 0x68 / 255, green: 0x68 / 255, blue: 0x68 / 255)
     /// The row that is current without being selected.
     public static let rowCurrent = accent.opacity(0.22)
     /// A row under the pointer. Translucent so the grain shows through.

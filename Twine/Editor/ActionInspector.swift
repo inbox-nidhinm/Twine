@@ -273,7 +273,7 @@ private struct CurveEditor: View {
                     let x = Double(i) / 80
                     shape.addLine(to: point(x, curve.value(at: x), size))
                 }
-                context.stroke(shape, with: .color(Theme.accent), lineWidth: 2)
+                context.stroke(shape, with: .color(Theme.textPrimary), lineWidth: 2)
 
                 let p1 = point(curve.x1, curve.y1, size), p2 = point(curve.x2, curve.y2, size)
                 var arms = Path()
@@ -283,7 +283,7 @@ private struct CurveEditor: View {
                 for p in [p1, p2] {
                     let dot = Path(ellipseIn: CGRect(x: p.x - 5, y: p.y - 5, width: 10, height: 10))
                     context.fill(dot, with: .color(.white))
-                    context.stroke(dot, with: .color(Theme.accent), lineWidth: 1.5)
+                    context.stroke(dot, with: .color(Theme.canvas), lineWidth: 1.5)
                 }
             }
             .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.canvas))

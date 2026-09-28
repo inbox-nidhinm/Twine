@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "A quieter inspector", changes: [
+            "The inspector no longer uses blue: the chosen tab in a row of choices is a lighter grey, switches that are on sit in the same grey, and the easing curve is drawn in white.",
+            "Blue is kept for the selection on the canvas, the layers panel and the Export button.",
+        ]),
         .init(date: "28 September 2026", title: "Pictures from Figma", changes: [
             "A Figma frame whose background is a picture now pastes in with the picture as its own layer, Background, at the bottom of the frame, so it shows in the layers panel and can be selected, replaced and animated.",
             "Pictures stacked on one layer in Figma come in as the top one only; the ones under it are not copied, which keeps copies and projects smaller.",
