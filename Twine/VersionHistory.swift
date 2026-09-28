@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Icons in the Effects menu", changes: [
+            "The Effects section's add menu shows each effect's icon, as the New Action menu does.",
+        ]),
         .init(date: "28 September 2026", title: "A Show hides nothing before it", changes: [
             "A Show no longer hides a layer before it. A layer is shown until something hides it, so everything that happens before a Show still plays. To make a layer appear later, put a Hide at the start or use an In preset.",
         ]),

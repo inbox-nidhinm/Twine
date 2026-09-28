@@ -1035,20 +1035,20 @@ private struct EffectsSection: View {
         VStack(alignment: .leading, spacing: 8) {
             HeaderRow(title: "Effects") {
                 IconButton(icon: .plus, help: "Add a shadow, a blur, a skew or a tilt") {
-                    var entries: [MenuEntry] = [.item("Drop Shadow") { add(.dropShadow(DropShadow())) }]
+                    var entries: [MenuEntry] = [.item("Drop Shadow", icon: .shadow) { add(.dropShadow(DropShadow())) }]
                     // These follow a shape's outline, so only shapes and
                     // frames have them.
                     if layer.look != nil {
-                        entries.append(.item("Inner Shadow") { add(.innerShadow(DropShadow(offset: Vec2(0, 4), blur: 4))) })
+                        entries.append(.item("Inner Shadow", icon: .innerShadow) { add(.innerShadow(DropShadow(offset: Vec2(0, 4), blur: 4))) })
                     }
-                    entries.append(.item("Layer Blur") { add(.layerBlur(LayerBlur())) })
+                    entries.append(.item("Layer Blur", icon: .layerBlur) { add(.layerBlur(LayerBlur())) })
                     if layer.look != nil {
-                        entries.append(.item("Background Blur") { add(.backgroundBlur(BackgroundBlur())) })
+                        entries.append(.item("Background Blur", icon: .backgroundBlur) { add(.backgroundBlur(BackgroundBlur())) })
                     }
                     if canWarp && !(showsSkew && showsTilt) {
                         entries.append(.separator)
-                        if !showsSkew { entries.append(.item("Skew") { addedSkew = true }) }
-                        if !showsTilt { entries.append(.item("Tilt") { addedTilt = true }) }
+                        if !showsSkew { entries.append(.item("Skew", icon: .skew) { addedSkew = true }) }
+                        if !showsTilt { entries.append(.item("Tilt", icon: .tilt) { addedTilt = true }) }
                     }
                     menus.show(entries, at: CGPoint(x: addFrame.maxX - Theme.menuMinWidth, y: addFrame.maxY + 4))
                 }
