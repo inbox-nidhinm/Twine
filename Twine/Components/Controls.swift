@@ -223,12 +223,14 @@ struct SegmentRow<Value: Hashable>: View {
     let selection: Value
     let options: [Value]
     let title: (Value) -> String
+    /// Drawn in place of each title, which becomes its tooltip.
+    var icon: ((Value) -> Icon)? = nil
     let select: (Value) -> Void
 
     var body: some View {
         HStack(spacing: 2) {
             ForEach(options, id: \.self) { option in
-                Segment(title: title(option), isOn: option == selection) { select(option) }
+                Segment(title: title(option), icon: icon?(option), isOn: option == selection) { select(option) }
             }
         }
         .padding(2)
@@ -239,6 +241,7 @@ struct SegmentRow<Value: Hashable>: View {
 
 private struct Segment: View {
     let title: String
+    var icon: Icon? = nil
     let isOn: Bool
     let action: () -> Void
 
@@ -246,10 +249,16 @@ private struct Segment: View {
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(ThemeFont.label)
+            Group {
+                if let icon {
+                    IconView(icon, size: 15)
+                } else {
+                    Text(title)
+                        .font(ThemeFont.label)
+                        .lineLimit(1)
+                }
+            }
                 .foregroundStyle(isOn ? Color.white : Theme.textSecondary)
-                .lineLimit(1)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
                     .fill(isOn ? Theme.chosen : hovering ? Theme.rowHover : .clear))
@@ -257,6 +266,7 @@ private struct Segment: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .help(icon == nil ? "" : title)
     }
 }
 

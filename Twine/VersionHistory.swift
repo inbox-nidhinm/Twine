@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Arrows for directions, text presets first", changes: [
+            "A preset's From and To show arrows instead of Left, Right, Top and Bottom.",
+            "With text selected, the preset picker shows the Text presets first.",
+        ]),
         .init(date: "28 September 2026", title: "More presets, in groups, and text letter by letter", changes: [
             "The preset picker is in groups: Fade, Scale, Mask, Blur, Emphasis, Text and Sound.",
             "New presets: Shrink, Twist, Move & Scale, Blur & Slide, Blur & Scale, and five Mask presets that reveal the layer inside its own box: Mask Reveal, Mask Center, Mask Resize, Mask & Slide and Mask Shrink. Scale is now called Grow and Rotate is Spin.",

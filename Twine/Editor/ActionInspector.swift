@@ -211,7 +211,7 @@ private struct PresetFields: View {
                     .font(ThemeFont.label)
                     .foregroundStyle(Theme.textSecondary)
                 SegmentRow(selection: settings.direction ?? own.direction ?? .left, options: PresetDirection.allCases,
-                           title: { $0.rawValue.capitalized }) { d in edit("Direction") { $0.direction = d } }
+                           title: { $0.rawValue.capitalized }, icon: Self.arrow) { d in edit("Direction") { $0.direction = d } }
             }
             .help(kind.entering == false ? "Which way it leaves." : "Which side it comes in from.")
         case .distance:
@@ -251,6 +251,16 @@ private struct PresetFields: View {
                 PillToggle(isOn: fades) { edit(fades ? "Stop Fading" : "Fade") { $0.fades = !fades } }
             }
             .help(kind.entering == false ? "Fades out as it goes." : "Fades in as it comes on.")
+        }
+    }
+
+    /// Each side as an arrow pointing to it.
+    private static func arrow(_ side: PresetDirection) -> Icon {
+        switch side {
+        case .left: .arrowLeft
+        case .right: .arrowRight
+        case .top: .arrowUp
+        case .bottom: .arrowDown
         }
     }
 

@@ -70,13 +70,19 @@ struct PresetPicker: View {
 
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
+    /// With text selected, the Text group comes first.
+    private var groups: [PresetGroup] {
+        guard presets.contains(where: \.isText) else { return PresetGroup.allCases }
+        return [.text] + PresetGroup.allCases.filter { $0 != .text }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HeaderRow(title: "Presets") {
                 IconButton(icon: .close, help: "Back to actions") { close() }
             }
             VStack(alignment: .leading, spacing: Theme.panelPad) {
-                ForEach(PresetGroup.allCases, id: \.self) { group in
+                ForEach(groups, id: \.self) { group in
                     let shown = presets.filter { $0.group == group }
                     if !shown.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
