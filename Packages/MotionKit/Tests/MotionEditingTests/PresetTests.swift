@@ -93,7 +93,8 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
         // A sound takes only the sound presets, a shape everything else.
         #expect(Presets.available(for: [sound], in: project) == soundPresets)
         #expect(Presets.available(for: [square()], in: project).count == Presets.library.count - soundPresets.count)
-        #expect(Presets.available(for: [square(), sound], in: project).isEmpty)
+        // A sound among layers that draw is left out rather than emptying the list.
+        #expect(Presets.available(for: [square(), sound], in: project) == Presets.available(for: [square()], in: project))
     }
 
     @Test func soundPresetsSuitOnlyVideoWithSound() {

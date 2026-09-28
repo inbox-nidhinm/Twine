@@ -66,7 +66,12 @@ public enum ActionFactory {
     }
 
     /// Kinds offered for several layers at once: those every one of them takes.
+    /// A sound among layers that draw is left out, as it shares nothing
+    /// with them (it only plays, louder or softer): the others' actions are
+    /// offered, and adding one skips the sound.
     public static func kinds(for layers: [Layer], in project: Project) -> [ActionKind] {
+        let drawn = layers.filter { if case .audio = $0.content { return false } else { return true } }
+        let layers = drawn.isEmpty ? layers : drawn
         guard let first = layers.first else { return [] }
         return layers.dropFirst().reduce(kinds(for: first, in: project)) { shared, layer in
             let allowed = Set(kinds(for: layer, in: project))

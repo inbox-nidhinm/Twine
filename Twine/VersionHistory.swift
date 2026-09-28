@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Actions for several layers", changes: [
+            "Add Action and Add Preset no longer grey out when a sound is selected along with other layers: they offer what the other layers share, each gets its own bar at the playhead, and the sound is left as it is.",
+        ]),
         .init(date: "28 September 2026", title: "Right-click on the canvas", changes: [
             "Right-click (or Control-click) a layer on the canvas for the same menu as the layers panel: rename, duplicate, group, frame, ungroup, solo, lock, hide and delete. Right-click empty canvas to paste. Escape closes the menu.",
             "⌘⌫ ungroups groups and frames, as in Figma, alongside ⇧⌘G. It no longer deletes the selection.",

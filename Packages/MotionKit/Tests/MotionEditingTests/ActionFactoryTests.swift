@@ -77,6 +77,9 @@ import MotionEvaluation
         let project = Project(layers: [square, group])
         #expect(ActionFactory.kinds(for: [square, group], in: project) == ActionFactory.kinds(for: group))
         #expect(ActionFactory.kinds(for: [], in: project).isEmpty)
+        // A sound selected with layers that draw is left out; alone, it keeps its own.
+        #expect(ActionFactory.kinds(for: [square, audio], in: project) == ActionFactory.kinds(for: square))
+        #expect(ActionFactory.kinds(for: [audio, audio], in: project) == [.play, .volume])
     }
 
     @Test func aNewVolumeFadesOutOrIn() {
