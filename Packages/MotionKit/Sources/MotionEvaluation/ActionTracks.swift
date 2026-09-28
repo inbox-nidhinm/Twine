@@ -221,6 +221,8 @@ public struct ActionTracks: Sendable {
     private var presetParts: [UUID: [PresetPart]] = [:]
     /// The layers with a preset on them. Only they take the slower way.
     private var presetLayers: Set<UUID> = []
+    /// The layers with a Move that turns them along its path (rule 9).
+    private var turningLayers: Set<UUID> = []
 
     public init(_ actions: [Action]) {
         for action in actions where action.isEnabled {
@@ -234,6 +236,7 @@ public struct ActionTracks: Sendable {
                 }
             } else {
                 tracks[action.targetLayerID, default: [:]][action.spec.kind.channel, default: []].append(action)
+                if case .move(let m) = action.spec, m.turns { turningLayers.insert(action.targetLayerID) }
             }
         }
         for (layer, channels) in tracks {
@@ -319,7 +322,59 @@ public struct ActionTracks: Sendable {
             case .media: if state.sourceTime != nil { state.sourceTime = Self.sourceTime(list, at: time) }
             }
         }
+        // Rule 9: a Move that turns along its path turns the layer on top of
+        // whatever its rotation is doing.
+        if !turningLayers.isEmpty, turningLayers.contains(layer.id), let all = channels[.position] {
+            let list = including.map { all.filter($0) } ?? all
+            state.rotation += pathTurn(of: layer, list, steps(list, Self.positionStep, Self.positionPart), at: time)
+        }
         return state
+    }
+
+    /// How far the layer has turned by `time` following its turning Moves:
+    /// for each, how much its path's direction has turned from its start to
+    /// where the Move has got to, stopping where a later Move takes over.
+    private func pathTurn(of layer: Layer, _ moves: [Action], _ steps: [Step<Vec2>], at time: Double) -> Double {
+        let design = layer.transform.position
+        var turn = 0.0
+        for (i, action) in moves.enumerated() {
+            guard case .move(let m) = action.spec, m.turns, let curve = m.curve, action.start <= time else { continue }
+            // Where it starts and ends, as the channel has them.
+            let from = walk(design, steps, at: action.start)
+            let to = m.mode == .to ? m.end : from + m.end
+            // It stops when the next Move on the channel starts (rule 6).
+            let next = moves[(i + 1)...].first { $0.start >= action.start && $0.id != action.id }?.start ?? .infinity
+            let until = min(time, next)
+            let p = until >= action.end ? 1 : Self.progress(action, at: until)
+            turn += Self.turning(from: from, to: to, curve: curve, upTo: p)
+        }
+        return turn
+    }
+
+    /// Degrees the direction along a curved path turns from its start to
+    /// `p`, followed in small steps so a path that bends further than half a
+    /// turn is counted whole.
+    static func turning(from: Vec2, to: Vec2, curve: MotionCurve, upTo p: Double) -> Double {
+        let a = from, b = from + curve.startHandle, c = to + curve.endHandle, d = to
+        func direction(_ t: Double) -> Vec2? {
+            // Kept off the very ends, where a handle of zero length leaves no direction.
+            let t = min(max(t, 1e-4), max(p, 1) - 1e-4)
+            let q = 1 - t
+            let v = Vec2(3 * q * q * (b.x - a.x) + 6 * q * t * (c.x - b.x) + 3 * t * t * (d.x - c.x),
+                         3 * q * q * (b.y - a.y) + 6 * q * t * (c.y - b.y) + 3 * t * t * (d.y - c.y))
+            return abs(v.x) + abs(v.y) > 1e-9 ? v : nil
+        }
+        let samples = 24
+        var total = 0.0
+        var last = direction(0)
+        for k in 1...samples {
+            guard let now = direction(p * Double(k) / Double(samples)) else { continue }
+            if let before = last {
+                total += atan2(before.x * now.y - before.y * now.x, before.x * now.x + before.y * now.y)
+            }
+            last = now
+        }
+        return total * 180 / .pi
     }
 
     // MARK: Actions as steps
@@ -684,6 +739,10 @@ struct PartRun<V> {
 /// 8. A preset is one action whose parts are steps on the channels they
 ///    reach, each following these rules. Its values are measured from what
 ///    it finds on each channel when its first part there starts.
+/// 9. The one exception to rule 6's last sentence: a curved Move set to turn
+///    along its path adds to the layer's rotation how far its path's
+///    direction has turned since the Move began, and keeps that turn after
+///    it ends (`pathTurn`, applied after the walks).
 func walk<V: Interpolatable>(_ design: V, _ steps: [Step<V>], at time: Double) -> V {
     guard let first = steps.first else { return design }
     if time < first.start { return first.before(design) }           // rules 1 and 4

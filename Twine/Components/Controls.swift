@@ -284,9 +284,11 @@ struct UnitField: View {
     var body: some View {
         HStack(spacing: 7) {
             if !unit.isEmpty {
+                // Never cut short: the number gives way first.
                 Text(unit)
                     .font(ThemeFont.unit)
                     .foregroundStyle(Theme.textTertiary)
+                    .fixedSize()
             }
             TextField("", text: $text)
                 .textFieldStyle(.plain)
@@ -299,11 +301,14 @@ struct UnitField: View {
                 .onAppear { text = format(value) }
                 // Follows the value unless the field holds typing of its own.
                 .onChange(of: value) { old, now in if !focused || text == format(old) { text = format(now) } }
+            // The unit stays put at the end, typed or not.
+            if !suffix.isEmpty { UnitSuffix(suffix) }
         }
         .padding(.horizontal, 8)
         .frame(height: Theme.control)
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+        .focusRing(focused)
         // A click anywhere in the box, its letter included, starts typing;
         // a drag across it changes the number.
         .overlay {
@@ -314,9 +319,9 @@ struct UnitField: View {
         }
     }
 
+    /// The number alone: its unit is drawn beside it.
     private func format(_ v: Double) -> String {
-        let number = decimals == 0 ? String(Int(v.rounded())) : Self.trimmed(v, decimals)
-        return suffix.isEmpty ? number : "\(number) \(suffix)"
+        decimals == 0 ? String(Int(v.rounded())) : Self.trimmed(v, decimals)
     }
 
     /// Up to `decimals` places, with trailing zeros dropped, so 5 reads `5`
@@ -367,9 +372,11 @@ struct OptionalField: View {
     var body: some View {
         HStack(spacing: 7) {
             if !unit.isEmpty {
+                // Never cut short: the number gives way first.
                 Text(unit)
                     .font(ThemeFont.unit)
                     .foregroundStyle(Theme.textTertiary)
+                    .fixedSize()
             }
             TextField("", text: $text, prompt: Text(format(placeholder)).foregroundStyle(Theme.textTertiary))
                 .textFieldStyle(.plain)
@@ -383,11 +390,13 @@ struct OptionalField: View {
                 .onChange(of: value) { old, now in
                     if !focused || text == (old.map(format) ?? "") { text = now.map(format) ?? "" }
                 }
+            if !suffix.isEmpty { UnitSuffix(suffix) }
         }
         .padding(.horizontal, 8)
         .frame(height: Theme.control)
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+        .focusRing(focused)
         // A click starts typing; a drag changes the number, from the one
         // it falls back to while empty.
         .overlay {
@@ -400,8 +409,7 @@ struct OptionalField: View {
     }
 
     private func format(_ v: Double) -> String {
-        let number = decimals == 0 ? String(Int(v.rounded())) : UnitField.trimmed(v, decimals)
-        return suffix.isEmpty ? number : "\(number) \(suffix)"
+        decimals == 0 ? String(Int(v.rounded())) : UnitField.trimmed(v, decimals)
     }
 
     private func apply() {
@@ -444,14 +452,17 @@ struct LabeledRow<Content: View>: View {
 /// an action's From and To.
 struct StackedRow<Accessory: View, Content: View>: View {
     let label: String
+    /// When set, the name is a menu of these, such as To or By.
+    var menu: [MenuEntry]? = nil
     /// Small, at the end of the name's line, such as a button that empties
     /// the fields.
     @ViewBuilder var accessory: () -> Accessory
     @ViewBuilder var content: () -> Content
 
-    init(label: String, @ViewBuilder accessory: @escaping () -> Accessory,
+    init(label: String, menu: [MenuEntry]? = nil, @ViewBuilder accessory: @escaping () -> Accessory,
          @ViewBuilder content: @escaping () -> Content) {
         self.label = label
+        self.menu = menu
         self.accessory = accessory
         self.content = content
     }
@@ -459,10 +470,14 @@ struct StackedRow<Accessory: View, Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
-                Text(label)
-                    .font(ThemeFont.label)
-                    .foregroundStyle(Theme.textSecondary)
-                    .lineLimit(1)
+                if let menu {
+                    MenuLabel(title: label, entries: menu)
+                } else {
+                    Text(label)
+                        .font(ThemeFont.label)
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
+                }
                 Spacer(minLength: 0)
                 accessory()
             }
@@ -474,8 +489,37 @@ struct StackedRow<Accessory: View, Content: View>: View {
 }
 
 extension StackedRow where Accessory == EmptyView {
-    init(label: String, @ViewBuilder content: @escaping () -> Content) {
-        self.init(label: label, accessory: { EmptyView() }, content: content)
+    init(label: String, menu: [MenuEntry]? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.init(label: label, menu: menu, accessory: { EmptyView() }, content: content)
+    }
+}
+
+/// A row's name that is also a menu: the name with a small chevron, lighter
+/// under the pointer, opening its choices just below it.
+struct MenuLabel: View {
+    let title: String
+    let entries: [MenuEntry]
+
+    @Environment(MenuHost.self) private var menus
+    @State private var frame: CGRect = .zero
+    @State private var hovering = false
+
+    var body: some View {
+        Button {
+            menus.show(entries, at: CGPoint(x: frame.minX, y: frame.maxY + 4))
+        } label: {
+            HStack(spacing: 2) {
+                Text(title)
+                    .font(ThemeFont.label)
+                    .lineLimit(1)
+                IconView(.chevronDown, size: 11)
+            }
+            .foregroundStyle(hovering ? Theme.textPrimary : Theme.textSecondary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
     }
 }
 
@@ -611,6 +655,30 @@ struct HeaderRow<Accessory: View>: View {
         .padding(.leading, Theme.panelPad)
         .padding(.trailing, Theme.panelPad - 4)
         .frame(height: Theme.button)
+    }
+}
+
+/// A number field's unit, such as px or %, fixed at its end.
+struct UnitSuffix: View {
+    let text: String
+
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(text)
+            .font(ThemeFont.label)
+            .foregroundStyle(Theme.textTertiary)
+            .lineLimit(1)
+            .fixedSize()
+    }
+}
+
+extension View {
+    /// A thin line in the accent round a field while it has the keyboard,
+    /// so it is plain which one is being typed in.
+    func focusRing(_ isFocused: Bool) -> some View {
+        overlay(RoundedRectangle(cornerRadius: Theme.radiusControl)
+            .strokeBorder(isFocused ? Theme.accent : .clear, lineWidth: 1))
     }
 }
 

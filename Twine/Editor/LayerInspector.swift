@@ -97,18 +97,16 @@ struct LayerInspector: View {
                     }
                 }
                 .help("Where the anchor point sits, in pixels")
-                HStack(spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
                     UnitField(unit: "R", value: t.rotation, decimals: 1, suffix: "°") { v in
                         controller.edit(layer.id) { l in l.transform.rotation = v }
                     }
                     .help("Rotation in degrees, clockwise")
-                    Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+                    AnchorPicker(chosen: anchorFraction) { fx, fy in
+                        controller.edit(layer.id) { l in moveAnchor(&l, x: l.size.width * fx, y: l.size.height * fy) }
+                    }
+                    .help("The point the layer turns and scales about: a corner, the middle of an edge, or the centre")
                 }
-                HStack(spacing: 8) {
-                    number("AX", t.anchor.x) { l, v in moveAnchor(&l, x: v) }
-                    number("AY", t.anchor.y) { l, v in moveAnchor(&l, y: v) }
-                }
-                .help("The point the layer turns and scales about, in pixels from its top-left")
             }
             .padding(.horizontal, Theme.panelPad)
         }
@@ -186,6 +184,17 @@ struct LayerInspector: View {
                 controller.edit(layer.id) { l in l.keepsProportions.toggle() }
             }
         }
+    }
+
+    /// Where the anchor sits as fractions of the box, when it is on one of
+    /// the nine points the picker offers.
+    private var anchorFraction: (Double, Double)? {
+        let size = layer.size
+        guard size.width > 0, size.height > 0 else { return nil }
+        let fx = t.anchor.x / size.width, fy = t.anchor.y / size.height
+        func snapped(_ f: Double) -> Double? { [0, 0.5, 1].first { abs($0 - f) < 1e-6 } }
+        guard let x = snapped(fx), let y = snapped(fy) else { return nil }
+        return (x, y)
     }
 
     private func keepsProportions(_ l: Layer) -> Bool {
@@ -368,6 +377,63 @@ struct LayerInspector: View {
         UnitField(unit: unit, value: value, decimals: 1, accepts: accepts) { v in
             controller.edit(layer.id) { l in set(&l, v) }
         }
+    }
+}
+
+// MARK: - Anchor
+
+/// The nine places an anchor can go, as a small box: its corners, the
+/// middles of its edges and its centre. The chosen one is filled; an anchor
+/// dragged anywhere else on the canvas leaves none chosen.
+struct AnchorPicker: View {
+    /// Fractions of the box across and down, nil when the anchor is
+    /// elsewhere.
+    let chosen: (Double, Double)?
+    let pick: (Double, Double) -> Void
+
+    private let fractions: [Double] = [0, 0.5, 1]
+    private let cell: CGFloat = 16
+
+    var body: some View {
+        ZStack {
+            // The box the points sit on, from the first point to the last.
+            Rectangle()
+                .strokeBorder(Theme.edge, lineWidth: 1)
+                .padding(cell / 2)
+            VStack(spacing: 0) {
+                ForEach(fractions, id: \.self) { fy in
+                    HStack(spacing: 0) {
+                        ForEach(fractions, id: \.self) { fx in
+                            AnchorDot(isChosen: chosen.map { $0.0 == fx && $0.1 == fy } ?? false) { pick(fx, fy) }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: cell)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(4)
+        .frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+    }
+}
+
+private struct AnchorDot: View {
+    let isChosen: Bool
+    let pick: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: pick) {
+            Circle()
+                .fill(isChosen ? Theme.textPrimary : hovering ? Theme.textSecondary : Theme.textTertiary)
+                .frame(width: isChosen ? 7 : 5, height: isChosen ? 7 : 5)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
     }
 }
 

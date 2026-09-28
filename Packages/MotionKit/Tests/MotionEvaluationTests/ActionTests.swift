@@ -331,3 +331,45 @@ private func near(_ a: Vec2, _ b: Vec2, _ tolerance: Double = 1e-9) -> Bool {
         #expect(state(layer, [a], at: 0.25).position.x > 25)
     }
 }
+
+@Suite struct TurningAlongPathTests {
+    /// Up, across and down: its direction turns half a turn, clockwise.
+    private func arch(_ layer: Layer, turns: Bool) -> Action {
+        let curve = MotionCurve(startHandle: Vec2(0, -100), endHandle: Vec2(0, -100))
+        return Action(target: layer.id, start: 1, duration: 2, easing: .linear,
+                      spec: .move(MoveAction(mode: .by, end: Vec2(200, 0), curve: curve, turnsAlongPath: turns)))
+    }
+
+    @Test func aTurningMoveTurnsTheLayerAsItsPathTurns() {
+        var layer = square()
+        layer.transform.rotation = 10
+        let a = arch(layer, turns: true)
+        #expect(abs(state(layer, [a], at: 0.5).rotation - 10) < 1e-6)
+        #expect(abs(state(layer, [a], at: 1).rotation - 10) < 0.5)
+        #expect(abs(state(layer, [a], at: 2).rotation - 100) < 1)
+        #expect(abs(state(layer, [a], at: 3).rotation - 190) < 1)
+        // And keeps the turn once it has ended.
+        #expect(abs(state(layer, [a], at: 5).rotation - 190) < 1)
+    }
+
+    @Test func itAddsToARotateAction() {
+        let layer = square()
+        let spin = Action(target: layer.id, start: 0, duration: 0, spec: .rotate(RotateAction(mode: .to, end: 45)))
+        #expect(abs(state(layer, [spin, arch(layer, turns: true)], at: 3).rotation - 225) < 1)
+    }
+
+    @Test func onlyATurningCurvedMoveTurns() {
+        let layer = square()
+        #expect(state(layer, [arch(layer, turns: false)], at: 3).rotation == 0)
+        let straight = Action(target: layer.id, start: 1, duration: 2, easing: .linear,
+                              spec: .move(MoveAction(mode: .by, end: Vec2(200, 0), turnsAlongPath: true)))
+        #expect(state(layer, [straight], at: 3).rotation == 0)
+    }
+
+    @Test func turningSurvivesAFile() throws {
+        let m = MoveAction(end: Vec2(1, 2), curve: MotionCurve(startHandle: .zero, endHandle: .zero), turnsAlongPath: true)
+        #expect(try JSONDecoder().decode(MoveAction.self, from: JSONEncoder().encode(m)) == m)
+        let plain = try JSONEncoder().encode(MoveAction(end: Vec2(1, 2)))
+        #expect(!String(decoding: plain, as: UTF8.self).contains("turnsAlongPath"))
+    }
+}

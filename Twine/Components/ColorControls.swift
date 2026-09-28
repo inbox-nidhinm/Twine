@@ -89,6 +89,7 @@ struct HexField: View {
         .frame(height: Theme.control)
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+        .focusRing(focused)
     }
 
     private func apply() {

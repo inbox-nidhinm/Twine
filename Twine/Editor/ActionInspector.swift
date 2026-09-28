@@ -10,6 +10,10 @@ import Theme
 struct ActionInspector: View {
     let controller: EditorController
     let actions: [Action]
+    /// The New Action menu, for adding another action to the selected layers
+    /// without leaving this one.
+    var newActions: [MenuEntry] = []
+    var pickPreset: (() -> Void)? = nil
 
     private var first: Action { actions[0] }
     /// Presets count as one kind only when they are the same preset.
@@ -21,7 +25,12 @@ struct ActionInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HeaderRow(title: actions.count == 1 ? first.name : sameKind ? kindName : "Actions") {}
+            HeaderRow(title: actions.count == 1 ? first.name : sameKind ? kindName : "Actions") {
+                if let pickPreset, !controller.availablePresets.isEmpty {
+                    IconButton(icon: .presets, help: "Add a preset to the layer", action: pickPreset)
+                }
+                if !newActions.isEmpty { AddActionButton(entries: newActions) }
+            }
             VStack(alignment: .leading, spacing: 10) {
                 TimingFields(controller: controller, actions: actions)
                 // A Play runs at the clip's own speed, and a shake keeps its
@@ -48,6 +57,21 @@ struct ActionInspector: View {
                     .padding(Theme.panelPad)
             }
         }
+    }
+}
+
+/// A plus that opens the New Action menu below it, right-aligned to it.
+private struct AddActionButton: View {
+    let entries: [MenuEntry]
+
+    @Environment(MenuHost.self) private var menus
+    @State private var frame: CGRect = .zero
+
+    var body: some View {
+        IconButton(icon: .plus, help: "Add another action to the layer") {
+            menus.show(entries, at: CGPoint(x: frame.maxX - Theme.menuMinWidth, y: frame.maxY + 4))
+        }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
     }
 }
 
@@ -213,18 +237,11 @@ private struct EasingFields: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             MenuRow(label: "Easing", value: shared.map(Self.name) ?? "Mixed", entries: entries)
-            switch shared {
-            case .preset(let preset, let intensity) where preset != .none:
-                SliderRow(label: "Intensity", value: intensity * 100, range: 0...100,
-                          readout: { "\(Int($0.rounded()))%" },
-                          onChange: { v in controller.updateActions { $0.easing = .preset(preset, intensity: v / 100) } },
-                          onBegin: { controller.begin("Easing") },
-                          onEnd: { controller.end() })
-            case .custom(let curve):
+            // A preset is used as it comes, at its own strength (the user
+            // asked for no Intensity); only a custom curve has more to set.
+            if case .custom(let curve) = shared {
                 CurveEditor(curve: curve, controller: controller)
                     .frame(height: 150)
-            default:
-                EmptyView()
             }
         }
     }
@@ -240,10 +257,8 @@ private struct EasingFields: View {
         var list: [MenuEntry] = EasingPreset.allCases.map { preset in
             .item(preset.title, checked: { if case .preset(preset, _) = shared { return true } else { return false } }()) {
                 controller.editActions("Easing") { action in
-                    // A new preset keeps the intensity already chosen.
-                    var intensity = 0.5
-                    if case .preset(_, let i) = action.easing { intensity = i }
-                    action.easing = .preset(preset, intensity: intensity)
+                    // At its own strength: there is no Intensity to set.
+                    action.easing = .preset(preset, intensity: Easing.standardIntensity)
                 }
             }
         }
@@ -381,7 +396,6 @@ private struct ValueFields: View {
 
     @ViewBuilder private func move(_ m: MoveAction) -> some View {
         let from = inherited?.position ?? .zero
-        modeRow(m.mode)
         StackedRow(label: "From", accessory: { clearButton(m.initial != nil) { editMove("Starting Value") { m, _ in m.initial = nil } } }) {
             OptionalField(unit: "X", value: m.initial?.x, placeholder: from.x) { v in
                 editMove("Starting Value") { m, s in m.initial = v.map { Vec2($0, (m.initial ?? s.position).y) } }
@@ -391,7 +405,7 @@ private struct ValueFields: View {
             }
         }
         .help("Where it starts. Empty starts from wherever the layer is when the action begins.")
-        StackedRow(label: m.mode == .to ? "To" : "By") {
+        StackedRow(label: m.mode == .to ? "To" : "By", menu: modeEntries(m.mode)) {
             UnitField(unit: "X", value: m.end.x) { v in editMove("Move") { m, _ in m.end.x = v } }
             UnitField(unit: "Y", value: m.end.y) { v in editMove("Move") { m, _ in m.end.y = v } }
         }
@@ -413,6 +427,18 @@ private struct ValueFields: View {
             }
         }
         .help("Bends the path. Drag its handles on the canvas.")
+        if m.curve != nil {
+            HStack {
+                Text("Rotate along path")
+                    .font(ThemeFont.label)
+                    .foregroundStyle(Theme.textSecondary)
+                Spacer(minLength: 0)
+                PillToggle(isOn: m.turnsAlongPath) {
+                    editMove(m.turnsAlongPath ? "Stop Rotating Along Path" : "Rotate Along Path") { m, _ in m.turnsAlongPath.toggle() }
+                }
+            }
+            .help("Turns the layer as the path turns, from its own angle, as if it were steering along it.")
+        }
     }
 
     private func editMove(_ name: String, _ change: @escaping (inout MoveAction, LayerState) -> Void) {
@@ -427,7 +453,6 @@ private struct ValueFields: View {
 
     @ViewBuilder private func scale(_ s: ScaleAction) -> some View {
         let from = inherited?.scale ?? .one
-        modeRow(s.mode)
         StackedRow(label: "From", accessory: { clearButton(s.initial != nil) { editScale("Starting Value") { s, _ in s.initial = nil } } }) {
             if s.isLinked {
                 OptionalField(unit: "S", value: s.initial.map { $0.x * 100 }, placeholder: from.x * 100, decimals: 1, suffix: "%") { v in
@@ -443,7 +468,7 @@ private struct ValueFields: View {
             }
         }
         .help("The scale it starts at. Empty starts from the layer's scale when the action begins.")
-        StackedRow(label: s.mode == .to ? "To" : "By") {
+        StackedRow(label: s.mode == .to ? "To" : "By", menu: modeEntries(s.mode)) {
             if s.isLinked {
                 UnitField(unit: "S", value: s.end.x * 100, decimals: 1, suffix: "%") { v in
                     editScale("Scale") { s, _ in s.end = Vec2(v / 100, v / 100) }
@@ -473,14 +498,13 @@ private struct ValueFields: View {
     // MARK: Rotate
 
     @ViewBuilder private func rotate(_ r: RotateAction) -> some View {
-        modeRow(r.mode)
         StackedRow(label: "From", accessory: { clearButton(r.initial != nil) { editRotate("Starting Value") { $0.initial = nil } } }) {
             OptionalField(unit: "R", value: r.initial, placeholder: inherited?.rotation ?? 0, decimals: 1, suffix: "°") { v in
                 editRotate("Starting Value") { $0.initial = v }
             }
         }
         .help("The angle it starts at. Empty starts from the layer's angle when the action begins.")
-        StackedRow(label: r.mode == .to ? "To" : "By") {
+        StackedRow(label: r.mode == .to ? "To" : "By", menu: modeEntries(r.mode)) {
             UnitField(unit: "R", value: r.end, decimals: 1, suffix: "°") { v in editRotate("Rotate") { $0.end = v } }
         }
         .help(r.mode == .to ? "The angle it ends at. 720° spins twice." : "How far it turns. Negative turns anticlockwise.")
@@ -498,7 +522,6 @@ private struct ValueFields: View {
 
     @ViewBuilder private func skew(_ k: SkewAction) -> some View {
         let from = inherited?.skew ?? .zero
-        modeRow(k.mode)
         StackedRow(label: "From", accessory: { clearButton(k.initial != nil) { editSkew("Starting Value") { k, _ in k.initial = nil } } }) {
             OptionalField(unit: "X", value: k.initial?.x, placeholder: from.x, decimals: 1, suffix: "°") { v in
                 editSkew("Starting Value") { k, s in k.initial = v.map { Vec2($0, (k.initial ?? s.skew).y) } }
@@ -508,7 +531,7 @@ private struct ValueFields: View {
             }
         }
         .help("The slant it starts at. Empty starts from the layer's slant when the action begins.")
-        StackedRow(label: k.mode == .to ? "To" : "By") {
+        StackedRow(label: k.mode == .to ? "To" : "By", menu: modeEntries(k.mode)) {
             UnitField(unit: "X", value: k.end.x, decimals: 1, suffix: "°") { v in editSkew("Skew") { k, _ in k.end.x = v } }
             UnitField(unit: "Y", value: k.end.y, decimals: 1, suffix: "°") { v in editSkew("Skew") { k, _ in k.end.y = v } }
         }
@@ -527,7 +550,6 @@ private struct ValueFields: View {
 
     @ViewBuilder private func tilt(_ t: TiltAction) -> some View {
         let from = inherited?.tilt ?? .none
-        modeRow(t.mode)
         StackedRow(label: "From", accessory: { clearButton(t.initial != nil) { editTilt("Starting Value") { t, _ in t.initial = nil } } }) {
             OptionalField(unit: "X", value: t.initial?.x, placeholder: from.x, decimals: 1, suffix: "°") { v in
                 editTilt("Starting Value") { t, s in t.initial = v.map { Tilt(x: $0, y: (t.initial ?? s.tilt).y, depth: t.end.depth) } }
@@ -537,7 +559,7 @@ private struct ValueFields: View {
             }
         }
         .help("The tilt it starts at. Empty starts from the layer's tilt when the action begins.")
-        StackedRow(label: t.mode == .to ? "To" : "By") {
+        StackedRow(label: t.mode == .to ? "To" : "By", menu: modeEntries(t.mode)) {
             UnitField(unit: "X", value: t.end.x, decimals: 1, suffix: "°") { v in editTilt("Tilt") { t, _ in t.end.x = v } }
             UnitField(unit: "Y", value: t.end.y, decimals: 1, suffix: "°") { v in editTilt("Tilt") { t, _ in t.end.y = v } }
         }
@@ -644,14 +666,18 @@ private struct ValueFields: View {
 
     // MARK: Shared
 
-    private func modeRow(_ mode: ActionMode) -> some View {
-        SegmentRow(selection: mode, options: ActionMode.allCases, title: { $0 == .to ? "To" : "By" }) { new in
-            controller.editActions("Change Mode") { a in
-                guard let state = controller.inheritedState(for: a) else { return }
-                a = ActionGeometry.switchingMode(a, to: new, from: state)
+    /// To ends at a fixed value; By changes the starting value by an
+    /// amount. Chosen from the end row's name.
+    private func modeEntries(_ mode: ActionMode) -> [MenuEntry] {
+        ActionMode.allCases.map { new in
+            .item(new == .to ? "To" : "By", checked: new == mode) {
+                guard new != mode else { return }
+                controller.editActions("Change Mode") { a in
+                    guard let state = controller.inheritedState(for: a) else { return }
+                    a = ActionGeometry.switchingMode(a, to: new, from: state)
+                }
             }
         }
-        .help("To ends at a fixed value. By changes the value it starts from by an amount, so it follows the layer wherever it is designed.")
     }
 
     /// Empties the starting value, so it inherits again. Beside the row's

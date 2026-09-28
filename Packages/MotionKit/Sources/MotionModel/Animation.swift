@@ -11,7 +11,10 @@ public enum Easing: Sendable, Equatable {
     case custom(CubicBezier)
 
     /// What a new action gets.
-    public static let `default` = Easing.preset(.smooth, intensity: 0.5)
+    public static let `default` = Easing.preset(.smooth, intensity: standardIntensity)
+    /// The strength a preset is used at when it is picked. The inspector no
+    /// longer sets one; actions made before keep theirs.
+    public static let standardIntensity = 0.5
     /// Constant speed.
     public static let linear = Easing.preset(.none, intensity: 0)
 }

@@ -166,6 +166,7 @@ private struct TextBox: View {
             .frame(minHeight: Theme.control * 2, maxHeight: Theme.control * 5)
             .fixedSize(horizontal: false, vertical: true)
             .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+            .focusRing(focused)
             .onAppear { draft = text }
             .onChange(of: text) { _, now in if !focused { draft = now } }
             .onChange(of: draft) { _, now in
@@ -216,6 +217,7 @@ private struct FontList: View {
                 .padding(.horizontal, 8)
                 .frame(height: Theme.control)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+                .focusRing(searching)
                 .onAppear { searching = true }
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {

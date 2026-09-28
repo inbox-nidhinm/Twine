@@ -301,6 +301,23 @@ final class CanvasNSView: NSView {
 
     // MARK: The overlay
 
+    /// Each selected shape's own outline, in view points, as the user asked,
+    /// so its shape shows however it is drawn. Not while its points are
+    /// being edited (they draw it), nor while it is tilted (a flat outline
+    /// would not follow the perspective).
+    private func selectedShapeOutlines(in scene: ResolvedScene, skipping editing: UUID?) -> CGPath? {
+        let path = CGMutablePath()
+        let o = origin
+        for id in selection where id != editing {
+            guard let layer = scene.layer(id), case .shape(let shape) = layer.content, !isTilted(id, in: scene),
+                  let w = scene.worldTransform(of: id) else { continue }
+            let toView = CGAffineTransform(a: w.a * zoom, b: w.b * zoom, c: w.c * zoom, d: w.d * zoom,
+                                           tx: w.tx * zoom + o.x, ty: w.ty * zoom + o.y)
+            path.addPath(shape.path.cgPath, transform: toView)
+        }
+        return path.isEmpty ? nil : path
+    }
+
     func redrawOverlay() {
         guard let scene, let controller else { return }
         var outlines: [[CGPoint]] = []
@@ -360,6 +377,7 @@ final class CanvasNSView: NSView {
         overlay.update(outlines: outlines, union: union, handles: handles, anchor: anchor,
                        hover: textSession == nil ? hover : nil, hoverIsSelected: hovered.map(selection.contains) ?? false,
                        marquee: drag?.marqueeRect, motion: motionOverlay())
+        overlay.updateShapes(selectedShapeOutlines(in: scene, skipping: editingPoints))
         let marks = snapMarks()
         overlay.updateSnap(lines: marks.lines, gaps: marks.gaps)
         updateTextOverlay()

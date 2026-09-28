@@ -631,6 +631,7 @@ private struct WordsField: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
             .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+            .focusRing(focused)
             .onAppear { draft = text }
             .onChange(of: text) { _, now in if !focused { draft = now } }
             .onSubmit { if draft != text { commit(draft) } }

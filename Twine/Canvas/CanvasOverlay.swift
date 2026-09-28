@@ -14,6 +14,10 @@ nonisolated final class CanvasOverlay: CALayer {
     /// The dark edge under the hover line.
     private let hoverEdge = CAShapeLayer()
     private let outlines = CAShapeLayer()
+    /// The selected shapes' own outlines, in the selection's colour, so a
+    /// shape stays readable when blurred, faded or drawn in the canvas's
+    /// colour.
+    private let shapes = CAShapeLayer()
     private let union = CAShapeLayer()
     private let handles = CAShapeLayer()
     private let anchor = CAShapeLayer()
@@ -66,7 +70,7 @@ nonisolated final class CanvasOverlay: CALayer {
     private func commonInit() {
         anchorPoint = .zero
         actions = Self.none
-        for l in [cropHolder, textSelection, hoverEdge, hover, cropLine, outlines, union, marquee, motion, motionArms, anchor, handles,
+        for l in [cropHolder, textSelection, hoverEdge, hover, cropLine, shapes, outlines, union, marquee, motion, motionArms, anchor, handles,
                   cropHandles, motionStart, motionEnd, motionHandles, textMarked, caret, guides, gapLines,
                   pathLine, pathRubber, pathArms, pathHandles, pathPoints, pathSelected] {
             l.anchorPoint = .zero
@@ -74,7 +78,7 @@ nonisolated final class CanvasOverlay: CALayer {
             l.contentsScale = 2
             addSublayer(l)
         }
-        for l in [hover, outlines, union] {
+        for l in [hover, outlines, shapes, union] {
             l.fillColor = nil
             l.strokeColor = Self.accent
             l.lineWidth = 1
@@ -337,6 +341,14 @@ nonisolated final class CanvasOverlay: CALayer {
 
     override var frame: CGRect {
         didSet { for l in sublayers ?? [] where !(l is CATextLayer) { l.frame = bounds } }
+    }
+
+    /// The selected shapes' outlines, in view points.
+    func updateShapes(_ path: CGPath?) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        shapes.path = path
+        CATransaction.commit()
     }
 
     func update(outlines boxes: [[CGPoint]], union unionBox: [CGPoint]?, handles points: [CGPoint],

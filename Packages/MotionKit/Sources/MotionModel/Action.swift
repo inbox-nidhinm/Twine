@@ -196,13 +196,43 @@ public struct MoveAction: Codable, Sendable, Equatable {
     public var end: Vec2
     /// A curved motion path. Nil moves in a straight line.
     public var curve: MotionCurve?
+    /// Whether the layer turns as a curved path turns, from its own angle,
+    /// as if steering along it. Only a curved path turns.
+    public var turnsAlongPath: Bool
 
-    public init(mode: ActionMode = .by, initial: Vec2? = nil, end: Vec2, curve: MotionCurve? = nil) {
+    public init(mode: ActionMode = .by, initial: Vec2? = nil, end: Vec2, curve: MotionCurve? = nil,
+                turnsAlongPath: Bool = false) {
         self.mode = mode
         self.initial = initial
         self.end = end
         self.curve = curve
+        self.turnsAlongPath = turnsAlongPath
     }
+
+    private enum CodingKeys: String, CodingKey { case mode, initial, end, curve, turnsAlongPath }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        mode = try c.decode(ActionMode.self, forKey: .mode)
+        initial = try c.decodeIfPresent(Vec2.self, forKey: .initial)
+        end = try c.decode(Vec2.self, forKey: .end)
+        curve = try c.decodeIfPresent(MotionCurve.self, forKey: .curve)
+        // Arrived after the first moves.
+        turnsAlongPath = try c.decodeIfPresent(Bool.self, forKey: .turnsAlongPath) ?? false
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(mode, forKey: .mode)
+        try c.encodeIfPresent(initial, forKey: .initial)
+        try c.encode(end, forKey: .end)
+        try c.encodeIfPresent(curve, forKey: .curve)
+        // Left out when off, so older files read the same.
+        if turnsAlongPath { try c.encode(turnsAlongPath, forKey: .turnsAlongPath) }
+    }
+
+    /// Whether it turns the layer: set to, and curved.
+    public var turns: Bool { turnsAlongPath && curve != nil }
 }
 
 /// The two handles of a curved motion path, as offsets: the first from where

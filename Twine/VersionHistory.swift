@@ -23,6 +23,15 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Inspector list, part two", changes: [
+            "Easing is just the curve you pick: the Intensity slider is gone.",
+            "To or By is chosen from a small menu on the row's name.",
+            "A curved Move can Rotate along path, turning the layer as the path turns, from its own angle.",
+            "With an action selected, the + and preset buttons in its header add another action or a preset to the layer.",
+            "The field you are typing in has a thin blue outline, and units such as px, % and ° sit fixed at the end of each field.",
+            "A selected shape shows its own outline in blue on the canvas, so you can see its shape even when it is blurred or faded.",
+            "The anchor is picked from nine points, the corners, the middles of the edges and the centre, beside rotation.",
+        ]),
         .init(date: "28 September 2026", title: "Drag to change numbers", changes: [
             "Drag across any number field to change it, as in Figma: positions, sizes, scale, corner radius, angles, percentages, an action's From, To and By, and the rest. Shift moves ten times as fast, Option a tenth as fast, and each drag undoes in one step. A click still lets you type, with the number selected.",
             "An action's From, To and By have their names above the fields, so the fields take the whole width and long numbers show in full.",
