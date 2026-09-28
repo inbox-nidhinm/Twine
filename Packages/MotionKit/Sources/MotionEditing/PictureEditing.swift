@@ -139,8 +139,8 @@ public enum PictureEditing {
     public static func croppingResize(_ original: Layer, to resized: Layer) -> Layer {
         guard let (_, paint) = original.picture, paint.mode == .crop else { return resized }
         let t = original.transform, n = resized.transform
-        let before = Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation)
-        let after = Affine.layer(position: n.position, anchor: n.anchor, scale: n.scale, rotation: n.rotation)
+        let before = Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation, skew: t.skew)
+        let after = Affine.layer(position: n.position, anchor: n.anchor, scale: n.scale, rotation: n.rotation, skew: n.skew)
         guard let inverse = before.inverted else { return resized }
         let shift = inverse.apply(after.apply(.zero))
         let crop = ImagePlacement.crop(paint.crop, from: original.size, to: resized.size, shift: shift)

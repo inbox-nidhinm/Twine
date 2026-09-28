@@ -152,6 +152,12 @@ public struct Transform: Codable, Sendable, Equatable {
     public var isScaleLinked: Bool
     /// Degrees, clockwise.
     public var rotation: Double
+    /// Degrees each way, after scale and before rotation: `x` slants the
+    /// layer's sides (its bottom moves right for a positive angle), `y` its
+    /// top and bottom (its right side moves down).
+    public var skew: Vec2
+    /// A turn in depth, around the anchor, seen in perspective. See `Tilt`.
+    public var tilt: Tilt
 
     public init(position: Vec2, anchor: Vec2) {
         self.position = position
@@ -159,7 +165,58 @@ public struct Transform: Codable, Sendable, Equatable {
         self.scale = .one
         self.isScaleLinked = true
         self.rotation = 0
+        self.skew = .zero
+        self.tilt = .none
     }
+
+    private enum CodingKeys: String, CodingKey { case position, anchor, scale, isScaleLinked, rotation, skew, tilt }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        position = try c.decode(Vec2.self, forKey: .position)
+        anchor = try c.decode(Vec2.self, forKey: .anchor)
+        scale = try c.decode(Vec2.self, forKey: .scale)
+        isScaleLinked = try c.decode(Bool.self, forKey: .isScaleLinked)
+        rotation = try c.decode(Double.self, forKey: .rotation)
+        // Files from before skew and tilt have neither.
+        skew = try c.decodeIfPresent(Vec2.self, forKey: .skew) ?? .zero
+        tilt = try c.decodeIfPresent(Tilt.self, forKey: .tilt) ?? .none
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(position, forKey: .position)
+        try c.encode(anchor, forKey: .anchor)
+        try c.encode(scale, forKey: .scale)
+        try c.encode(isScaleLinked, forKey: .isScaleLinked)
+        try c.encode(rotation, forKey: .rotation)
+        // Left out when the layer is straight, so most files stay as they were.
+        if skew != .zero { try c.encode(skew, forKey: .skew) }
+        if tilt != .none { try c.encode(tilt, forKey: .tilt) }
+    }
+}
+
+/// A layer turned in depth around its anchor, as a card tipping back or
+/// turning side to side, and seen in perspective. `x` tips it around a
+/// level line through the anchor (its top goes away for a positive angle),
+/// `y` turns it around an upright line (its right side goes away). `depth`
+/// is how far away the viewer is, in pixels: nearer looks more dramatic.
+public struct Tilt: AnimatableValue {
+    public var x: Double
+    public var y: Double
+    public var depth: Double
+
+    public init(x: Double, y: Double, depth: Double = Tilt.defaultDepth) {
+        self.x = x
+        self.y = y
+        self.depth = depth
+    }
+
+    public static let defaultDepth = 1200.0
+    public static let none = Tilt(x: 0, y: 0)
+
+    /// Whether it turns at all; the depth alone changes nothing.
+    public var isTilted: Bool { x != 0 || y != 0 }
 }
 
 public enum LayerContent: Sendable, Equatable {

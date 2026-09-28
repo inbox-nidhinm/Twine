@@ -152,7 +152,7 @@ extension CanvasNSView {
                 parentWorld = world
             }
             let t = layer.transform
-            return Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation).then(parentWorld)
+            return Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation, skew: t.skew).then(parentWorld)
         case .action(let id):
             guard let action = controller.project.actions.first(where: { $0.id == id }) else { return nil }
             let end = evaluate(controller.project, at: action.end)

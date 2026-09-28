@@ -325,10 +325,12 @@ final class CanvasNSView: NSView {
             handles = CanvasHandles.positions(for: endBox.box, isLine: endBox.isLine)
         } else if selection.count == 1, let id = selection.first, id != editingPoints, !controller.isLocked(id), !animating,
            let corners = scene.worldCorners(of: id), let layer = scene.layer(id),
-           let world = scene.worldTransform(of: id) {
+           let world = scene.worldProjection(of: id) {
             let view = corners.map(compositionToView)
-            handles = CanvasHandles.positions(for: view, isLine: isLine(layer))
-            if !animating { anchor = compositionToView(world.apply(layer.anchor)) }
+            // A tilted layer's outline follows its perspective; handles
+            // would not, so it is sized in the inspector.
+            if !isTilted(id, in: scene) { handles = CanvasHandles.positions(for: view, isLine: isLine(layer)) }
+            if !animating, let a = world.apply(layer.anchor) { anchor = compositionToView(a) }
         } else if selection.count > 1 {
             let points = outlines.flatMap { $0 }
             if let first = points.first {
@@ -419,16 +421,16 @@ final class CanvasNSView: NSView {
         let tolerance = 5 / zoom
         for id in selection {
             guard let mask = scene.mask(id), !controller.isLocked(id),
-                  let world = scene.worldTransform(of: id), let inverse = world.inverted else { continue }
-            if hits(mask, at: inverse.apply(point).cg, tolerance: tolerance / max(sqrt(abs(world.determinant)), 1e-6)) {
+                  let world = scene.worldProjection(of: id), let local = world.inverted?.apply(point) else { continue }
+            if hits(mask, at: local.cg, tolerance: tolerance / max(sqrt(abs(world.determinant)), 1e-6)) {
                 return id
             }
         }
         for resolved in scene.layers.reversed() {
             // A plain group draws nothing of its own; a frame does.
+            // Through what is drawn, tilts and all, so a click lands on what it sees.
             guard resolved.content != .group || resolved.frame != nil, !controller.isLocked(resolved.id),
-                  let world = scene.worldTransform(of: resolved.id), let inverse = world.inverted else { continue }
-            let local = inverse.apply(point).cg
+                  let world = scene.worldProjection(of: resolved.id), let local = world.inverted?.apply(point)?.cg else { continue }
             // Scale the tolerance into the layer's space, so it is the same
             // few screen points whatever the layer's own scale.
             let localTolerance = tolerance / max(sqrt(abs(world.determinant)), 1e-6)
@@ -475,11 +477,13 @@ final class CanvasNSView: NSView {
         var layer: ResolvedLayer? = resolved
         var point = Vec2(Double(local.x), Double(local.y))
         while let current = layer {
-            if let mask = current.mask, let source = scene.mask(mask.layerID), let inverse = mask.transform.inverted {
-                let inside = hits(source, at: inverse.apply(point).cg, tolerance: 0)
+            if let mask = current.mask, let source = scene.mask(mask.layerID), let inverse = mask.transform.inverted,
+               let inMask = inverse.apply(point) {
+                let inside = hits(source, at: inMask.cg, tolerance: 0)
                 if inside == mask.isInverted { return false }
             }
-            point = current.transform.apply(point)
+            guard let up = current.projection.apply(point) else { return false }
+            point = up
             layer = current.parentID.flatMap { scene.layer($0) }
             if let parent = layer, parent.clipsContent {
                 let inside = parent.frame.map { $0.path.cgPath.contains(point.cg) }
@@ -584,7 +588,7 @@ final class CanvasNSView: NSView {
 
         // A handle of the one selected layer comes first, before the layers
         // under it, so a handle over another shape still resizes.
-        if selection.count == 1, let id = selection.first, !controller.isLocked(id), !animating,
+        if selection.count == 1, let id = selection.first, !controller.isLocked(id), !animating, !isTilted(id, in: scene),
            let layer = controller.project.layer(withID: id), let resolved = scene.layer(id),
            let corners = scene.worldCorners(of: id), let world = scene.worldTransform(of: id) {
             let view = corners.map(compositionToView)
@@ -867,7 +871,7 @@ final class CanvasNSView: NSView {
     /// sits upright on screen, since a turned box has no edges to line up.
     private func snapped(_ layer: Layer, handle: Int, parentWorld: Affine) -> Snapping.Result? {
         let t = layer.transform
-        let world = Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation).then(parentWorld)
+        let world = Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation, skew: t.skew).then(parentWorld)
         guard abs(world.b) < 1e-9, abs(world.c) < 1e-9,
               let box = Box(around: Box(origin: .zero, size: layer.size).corners.map(world.apply)) else { return nil }
         let left = [0, 6, 7].contains(handle), right = [2, 3, 4].contains(handle)
@@ -1129,7 +1133,7 @@ final class CanvasNSView: NSView {
             view = end.box
             line = end.isLine
         } else {
-            guard let corners = scene.worldCorners(of: id), let resolved = scene.layer(id) else { return Cursors.arrow.set() }
+            guard !isTilted(id, in: scene), let corners = scene.worldCorners(of: id), let resolved = scene.layer(id) else { return Cursors.arrow.set() }
             view = corners.map(compositionToView)
             line = isLine(resolved)
         }
@@ -1200,6 +1204,18 @@ final class CanvasNSView: NSView {
         guard case .pan = drag else { return }
         drag = nil
         (spaceHeld ? Cursors.hand : Cursors.arrow).set()
+    }
+
+    /// Whether a layer, or a group or frame it sits in, is tilted: its
+    /// outline follows the perspective, but the handles' flat maths would
+    /// not, so they hide and it is sized in the inspector.
+    func isTilted(_ id: UUID, in scene: ResolvedScene) -> Bool {
+        var current = scene.layer(id)
+        while let layer = current {
+            if layer.tilt.isTilted { return true }
+            current = layer.parentID.flatMap { scene.layer($0) }
+        }
+        return false
     }
 
     // MARK: Right-click

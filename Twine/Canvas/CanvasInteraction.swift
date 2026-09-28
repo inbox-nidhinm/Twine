@@ -246,8 +246,8 @@ enum CanvasGeometry {
         let t = layer.transform
         let size = layer.size
         let anchor = t.anchor, scale = t.scale
-        let rotation = t.rotation, position = t.position
-        let old = Affine.layer(position: position, anchor: anchor, scale: scale, rotation: rotation)
+        let rotation = t.rotation, position = t.position, skew = t.skew
+        let old = Affine.layer(position: position, anchor: anchor, scale: scale, rotation: rotation, skew: skew)
         guard let inverse = old.inverted else { return layer }
         let local = inverse.apply(pointer)
 
@@ -280,7 +280,7 @@ enum CanvasGeometry {
         var edited = layer
         if layer.isGroup && !layer.isFrame {
             let newScale = Vec2(w > 0 ? scale.x * nw / w : scale.x, h > 0 ? scale.y * nh / h : scale.y)
-            let turned = Affine.layer(position: .zero, anchor: .zero, scale: newScale, rotation: rotation)
+            let turned = Affine.layer(position: .zero, anchor: .zero, scale: newScale, rotation: rotation, skew: skew)
             let offset = turned.applyToVector(Vec2(fixedOld.x - anchor.x, fixedOld.y - anchor.y))
             edited.transform.scale = newScale
             edited.transform.position = Vec2(pinned.x - offset.x, pinned.y - offset.y)
@@ -300,7 +300,7 @@ enum CanvasGeometry {
     static func movedAnchor(_ layer: Layer, to pointer: Vec2) -> Layer {
         let t = layer.transform
         let old = Affine.layer(position: t.position, anchor: t.anchor,
-                               scale: t.scale, rotation: t.rotation)
+                               scale: t.scale, rotation: t.rotation, skew: t.skew)
         guard let inverse = old.inverted else { return layer }
         let anchor = inverse.apply(pointer)
         var edited = layer

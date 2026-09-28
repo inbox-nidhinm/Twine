@@ -73,6 +73,8 @@ public enum ActionSpec: Sendable, Equatable {
     case path(PathAction)
     case play(PlayAction)
     case volume(VolumeAction)
+    case skew(SkewAction)
+    case tilt(TiltAction)
     /// A ready-made animation on one bar: several properties at once, with
     /// the settings its preset offers. See `PresetAction`.
     case preset(PresetAction)
@@ -101,6 +103,8 @@ public enum ActionSpec: Sendable, Equatable {
         case .path: return .path
         case .play: return .play
         case .volume: return .volume
+        case .skew: return .skew
+        case .tilt: return .tilt
         case .preset: return .preset
         }
     }
@@ -113,6 +117,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     case letterSpacing, lineHeight, counter, changeText
     case arc, star, path
     case play, volume
+    case skew, tilt
     /// Added from Add Preset, never from Add Action.
     case preset
 
@@ -140,6 +145,8 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .path: return "Path"
         case .play: return "Play"
         case .volume: return "Volume"
+        case .skew: return "Skew"
+        case .tilt: return "Tilt"
         case .preset: return "Preset"
         }
     }
@@ -147,7 +154,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     /// The group it is listed under when adding an action.
     public var category: ActionCategory {
         switch self {
-        case .move, .scale, .rotate, .opacity, .resize, .visibility: return .transform
+        case .move, .scale, .rotate, .opacity, .resize, .visibility, .skew, .tilt: return .transform
         case .color, .stroke, .trim, .cornerRadius, .shadow: return .style
         case .layerBlur, .backgroundBlur: return .blur
         case .letterSpacing, .lineHeight, .counter, .changeText: return .text
@@ -517,6 +524,34 @@ public struct VolumeAction: Codable, Sendable, Equatable {
     }
 }
 
+/// Skew angles in degrees, each way (see `Transform.skew`). In By mode
+/// `end` is added to the skew it starts from.
+public struct SkewAction: Codable, Sendable, Equatable {
+    public var mode: ActionMode
+    public var initial: Vec2?
+    public var end: Vec2
+
+    public init(mode: ActionMode = .to, initial: Vec2? = nil, end: Vec2) {
+        self.mode = mode
+        self.initial = initial
+        self.end = end
+    }
+}
+
+/// A turn in depth (see `Tilt`). In By mode the angles of `end` are added to
+/// those it starts from; its depth is always where it ends.
+public struct TiltAction: Codable, Sendable, Equatable {
+    public var mode: ActionMode
+    public var initial: Tilt?
+    public var end: Tilt
+
+    public init(mode: ActionMode = .to, initial: Tilt? = nil, end: Tilt) {
+        self.mode = mode
+        self.initial = initial
+        self.end = end
+    }
+}
+
 /// A preset on one bar. It remembers which preset it is and the settings
 /// the inspector shows for it; what it does to the layer is worked out when
 /// it plays (`PresetRecipe`, in MotionEvaluation), from the layer as it is
@@ -568,7 +603,7 @@ extension ActionSpec: Codable {
     private enum CodingKeys: String, CodingKey {
         case type, move, scale, rotate, opacity, resize, visibility
         case color, stroke, trim, cornerRadius, shadow, layerBlur, backgroundBlur
-        case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume, preset
+        case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume, skew, tilt, preset
     }
 
     public init(from decoder: Decoder) throws {
@@ -596,6 +631,8 @@ extension ActionSpec: Codable {
         case .path: self = .path(try c.decode(PathAction.self, forKey: .path))
         case .play: self = .play(try c.decode(PlayAction.self, forKey: .play))
         case .volume: self = .volume(try c.decode(VolumeAction.self, forKey: .volume))
+        case .skew: self = .skew(try c.decode(SkewAction.self, forKey: .skew))
+        case .tilt: self = .tilt(try c.decode(TiltAction.self, forKey: .tilt))
         case .preset: self = .preset(try c.decode(PresetAction.self, forKey: .preset))
         }
     }
@@ -626,6 +663,8 @@ extension ActionSpec: Codable {
         case .path(let v): try c.encode(v, forKey: .path)
         case .play(let v): try c.encode(v, forKey: .play)
         case .volume(let v): try c.encode(v, forKey: .volume)
+        case .skew(let v): try c.encode(v, forKey: .skew)
+        case .tilt(let v): try c.encode(v, forKey: .tilt)
         case .preset(let v): try c.encode(v, forKey: .preset)
         }
     }

@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Skew and tilt", changes: [
+            "New Skew and Tilt actions: Skew slants a layer each way, and Tilt turns it in depth, back and forth or side to side, seen in perspective, with a Depth setting for how strong the perspective looks. Half a turn shows its back.",
+            "Layers can be designed skewed or tilted too: Skew and Tilt fields in the Layer section, under rotation, which the actions animate from.",
+            "Skewed and tilted layers export exactly as they show. Their outline on the canvas follows their shape, and clicks land on what is drawn. A tilted layer shows no resize handles; set its size in the inspector.",
+            "Playback works out each frame about a tenth faster.",
+        ]),
         .init(date: "28 September 2026", title: "Magnetic timeline", changes: [
             "Moving or trimming a bar in the timeline lines it up softly with the start or end of bars on the rows you can see, the playhead and the scene's start and end.",
             "A guide line shows what it lined up with, the trackpad gives a small bump as it catches, and it holds gently until pulled a little further.",

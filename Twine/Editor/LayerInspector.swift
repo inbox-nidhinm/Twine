@@ -118,6 +118,35 @@ struct LayerInspector: View {
                     .help("Rotation in degrees, clockwise")
                 }
                 HStack(spacing: 8) {
+                    UnitField(unit: "Skew X", value: t.skew.x, decimals: 1, suffix: "°") { v in
+                        controller.edit(layer.id) { l in l.transform.skew.x = v }
+                    }
+                    .help("Slants its sides, so the bottom moves across")
+                    UnitField(unit: "Skew Y", value: t.skew.y, decimals: 1, suffix: "°") { v in
+                        controller.edit(layer.id) { l in l.transform.skew.y = v }
+                    }
+                    .help("Slants its top and bottom, so the right side moves down")
+                }
+                HStack(spacing: 8) {
+                    UnitField(unit: "Tilt X", value: t.tilt.x, decimals: 1, suffix: "°") { v in
+                        controller.edit(layer.id) { l in l.transform.tilt.x = v }
+                    }
+                    .help("Tips it back in perspective around a level line through its anchor, the top going away")
+                    UnitField(unit: "Tilt Y", value: t.tilt.y, decimals: 1, suffix: "°") { v in
+                        controller.edit(layer.id) { l in l.transform.tilt.y = v }
+                    }
+                    .help("Turns it in perspective around an upright line through its anchor, the right side going away")
+                }
+                // Depth only matters once it is tilted.
+                if t.tilt.isTilted {
+                    HStack(spacing: 8) {
+                        UnitField(unit: "Depth", value: t.tilt.depth, decimals: 0, suffix: "px", accepts: { $0 > 1 }) { v in
+                            controller.edit(layer.id) { l in l.transform.tilt.depth = v }
+                        }
+                        .help("How far away it is seen from. Nearer makes the perspective stronger.")
+                    }
+                }
+                HStack(spacing: 8) {
                     scaleFields
                 }
                 HStack(spacing: 8) {
@@ -187,7 +216,7 @@ struct LayerInspector: View {
         let newAnchor = Vec2(size.width > 0 ? anchor.x / size.width * target.width : anchor.x,
                              size.height > 0 ? anchor.y / size.height * target.height : anchor.y)
         let old = Affine.layer(position: l.transform.position, anchor: anchor,
-                               scale: l.transform.scale, rotation: l.transform.rotation)
+                               scale: l.transform.scale, rotation: l.transform.rotation, skew: l.transform.skew)
         let topLeft = old.apply(.zero)
         let offset = old.applyToVector(Vec2(-newAnchor.x, -newAnchor.y))
         l.size = target
@@ -205,7 +234,7 @@ struct LayerInspector: View {
         let anchor = l.transform.anchor
         let target = Vec2(x ?? anchor.x, y ?? anchor.y)
         let old = Affine.layer(position: l.transform.position, anchor: anchor,
-                               scale: l.transform.scale, rotation: l.transform.rotation)
+                               scale: l.transform.scale, rotation: l.transform.rotation, skew: l.transform.skew)
         l.transform.anchor = target
         l.transform.position = old.apply(target)
     }

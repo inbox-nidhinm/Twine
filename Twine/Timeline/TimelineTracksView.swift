@@ -790,6 +790,8 @@ extension ActionKind {
         case .path: return .pen
         case .play: return .play
         case .volume: return .speaker
+        case .skew: return .skew
+        case .tilt: return .tilt
         case .preset: return .preset
         }
     }

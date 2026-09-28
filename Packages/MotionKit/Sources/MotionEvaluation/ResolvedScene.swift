@@ -67,11 +67,27 @@ public struct ResolvedScene: Sendable, Equatable {
         return transform
     }
 
+    /// From a layer's own space into composition space as it is drawn,
+    /// through every group, tilts and all. Clicks and outlines follow this;
+    /// editing works in `worldTransform`, which is flat.
+    public func worldProjection(of id: UUID) -> Projective? {
+        guard let layer = layer(id) else { return nil }
+        var transform = layer.projection
+        var parent = layer.parentID
+        while let pid = parent, let p = self.layer(pid) {
+            transform = transform.then(p.projection)
+            parent = p.parentID
+        }
+        return transform
+    }
+
     /// The layer's box in composition space: its four corners, in order from
-    /// the top-left, after rotation and scale.
+    /// the top-left, after rotation, scale, skew and tilt. Nil when a corner
+    /// is turned past the viewer.
     public func worldCorners(of id: UUID) -> [Vec2]? {
-        guard let layer = layer(id), let world = worldTransform(of: id) else { return nil }
-        return Box(origin: .zero, size: layer.size).corners.map(world.apply)
+        guard let layer = layer(id), let world = worldProjection(of: id) else { return nil }
+        let corners = Box(origin: .zero, size: layer.size).corners.compactMap(world.apply)
+        return corners.count == 4 ? corners : nil
     }
 
     /// What the layer covers on screen, as an upright box in composition
@@ -126,6 +142,13 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
     /// has no mask, or its mask is switched off or hidden, which (as in
     /// Figma) shows the layer whole.
     public var mask: ResolvedMask?
+    /// Skew and tilt, boxed when there are any (see `Warp`).
+    public var warp: Warp = .none
+    /// Degrees each way (see `Transform.skew`).
+    public var skew: Vec2 { warp.skew }
+    /// A turn in depth (see `Tilt`), which `transform` leaves out and
+    /// `projection` has.
+    public var tilt: Tilt { warp.tilt }
 
     /// A shape's fills, strokes and outline, or a frame's.
     public var look: ResolvedShape? {
@@ -136,9 +159,15 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
     /// The first drop shadow, the one the Shadow action drives.
     public var shadow: ResolvedShadow? { shadows.first }
 
-    /// From the layer's own space into its parent's.
+    /// From the layer's own space into its parent's, flat: everything but a
+    /// tilt. What editing works in.
     public var transform: Affine {
-        .layer(position: position, anchor: anchor, scale: scale, rotation: rotation)
+        .layer(position: position, anchor: anchor, scale: scale, rotation: rotation, skew: skew)
+    }
+
+    /// From the layer's own space into its parent's as drawn, tilt and all.
+    public var projection: Projective {
+        .layer(position: position, anchor: anchor, scale: scale, rotation: rotation, skew: skew, tilt: tilt)
     }
 }
 
@@ -234,10 +263,10 @@ public struct ResolvedMask: Sendable, Equatable {
     /// Shows the layer where the mask is empty rather than where it draws.
     public var isInverted: Bool
     /// From the mask's own space into the masked layer's, through whatever
-    /// groups either sits in.
-    public var transform: Affine
+    /// groups either sits in, tilts and all.
+    public var transform: Projective
 
-    public init(layerID: UUID, isInverted: Bool, transform: Affine) {
+    public init(layerID: UUID, isInverted: Bool, transform: Projective) {
         self.layerID = layerID
         self.isInverted = isInverted
         self.transform = transform

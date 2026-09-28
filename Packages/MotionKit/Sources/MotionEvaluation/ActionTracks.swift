@@ -9,6 +9,7 @@ public enum Channel: String, Hashable, Sendable, CaseIterable {
     case fill, stroke, trim, cornerRadius, shadow, layerBlur, backgroundBlur
     case letterSpacing, lineHeight, text, arc, star, path
     case media, volume
+    case skew, tilt
 }
 
 extension ActionKind {
@@ -35,6 +36,8 @@ extension ActionKind {
         case .path: return .path
         case .play: return .media
         case .volume: return .volume
+        case .skew: return .skew
+        case .tilt: return .tilt
         // A preset reaches several; `ActionTracks` asks its recipe which.
         case .preset: return .position
         }
@@ -90,6 +93,18 @@ public struct LayerState: Sendable, Equatable {
     public var scale: Vec2
     /// Degrees, clockwise, never wrapped.
     public var rotation: Double
+    /// Skew and tilt, boxed when there are any (see `Warp`).
+    public var warp: Warp
+    /// Degrees each way (see `Transform.skew`).
+    public var skew: Vec2 {
+        get { warp.skew }
+        set { warp = Warp(skew: newValue, tilt: warp.tilt) }
+    }
+    /// A turn in depth (see `Tilt`).
+    public var tilt: Tilt {
+        get { warp.tilt }
+        set { warp = Warp(skew: warp.skew, tilt: newValue) }
+    }
     /// Not clamped here, so an overshooting fade still reads true; the scene
     /// clamps it to 0...1 for drawing.
     public var opacity: Double
@@ -131,6 +146,7 @@ public struct LayerState: Sendable, Equatable {
         position = layer.transform.position
         scale = layer.transform.scale
         rotation = layer.transform.rotation
+        warp = Warp(skew: layer.transform.skew, tilt: layer.transform.tilt)
         opacity = layer.opacity
         size = layer.size
         isShown = true
@@ -172,6 +188,28 @@ public struct LayerState: Sendable, Equatable {
             case .backgroundBlur(let b): backgroundBlur = b
             }
         }
+    }
+}
+
+/// A layer's skew and tilt, kept out of line: most layers have neither, and
+/// carrying five more numbers in every layer's state made each frame's
+/// evaluation measurably slower.
+public enum Warp: Sendable, Equatable {
+    case none
+    indirect case warped(skew: Vec2, tilt: Tilt)
+
+    public init(skew: Vec2, tilt: Tilt) {
+        self = skew == .zero && tilt == .none ? .none : .warped(skew: skew, tilt: tilt)
+    }
+
+    public var skew: Vec2 {
+        if case .warped(let skew, _) = self { return skew }
+        return .zero
+    }
+
+    public var tilt: Tilt {
+        if case .warped(_, let tilt) = self { return tilt }
+        return .none
     }
 }
 
@@ -218,7 +256,7 @@ public struct ActionTracks: Sendable {
 
     /// `layer` at `time`, with every action on it applied.
     public func state(of layer: Layer, at time: Double) -> LayerState {
-        state(of: layer, at: time) { _ in true }
+        state(of: layer, at: time, including: nil)
     }
 
     /// What an action picks up from when it has no initial value of its own:
@@ -234,44 +272,53 @@ public struct ActionTracks: Sendable {
         return state(of: layer, at: action.start) { $0.spec.kind.channel != channel || earlier.contains($0.id) }
     }
 
-    private func state(of layer: Layer, at time: Double, including: (Action) -> Bool) -> LayerState {
+    /// `including` picks which actions count; nil is all of them, the way
+    /// playback asks, which then copies no lists.
+    private func state(of layer: Layer, at time: Double, including: ((Action) -> Bool)?) -> LayerState {
         var state = LayerState(design: layer)
         guard let channels = tracks[layer.id] else { return state }
         let presets = !presetParts.isEmpty && presetLayers.contains(layer.id)
         func steps<V>(_ actions: [Action], _ plain: (Action) -> Step<V>?, _ part: (PresetEffect) -> PartRun<V>?) -> [Step<V>] {
             presets ? self.steps(actions, plain, part) : actions.compactMap(plain)
         }
-        func list(_ channel: Channel) -> [Action] { (channels[channel] ?? []).filter(including) }
-
-        state.position = walk(state.position, steps(list(.position), Self.positionStep, Self.positionPart), at: time)
-        state.scale = walk(state.scale, steps(list(.scale), Self.scaleStep, Self.scalePart), at: time)
-        state.rotation = walk(state.rotation, steps(list(.rotation), Self.rotationStep, Self.rotationPart), at: time)
-        state.opacity = walk(state.opacity, steps(list(.opacity), Self.opacityStep, Self.opacityPart), at: time)
-        state.size = walk(state.size, list(.size).compactMap(Self.sizeStep), at: time)
-        state.isShown = walk(1, Self.visibilitySteps(list(.visibility)), at: time) > 0.5
-        // Only what the layer has: a Colour on a layer with no fill does nothing.
-        if let fill = state.fill { state.fill = walk(fill, list(.fill).compactMap(Self.fillStep), at: time) }
-        if let stroke = state.stroke { state.stroke = walk(stroke, list(.stroke).compactMap(Self.strokeStep), at: time) }
-        if let trim = state.trim { state.trim = walk(trim, list(.trim).compactMap(Self.trimStep), at: time) }
-        if let radii = state.cornerRadii {
-            state.cornerRadii = walk(radii, list(.cornerRadius).compactMap(Self.cornerStep), at: time)
+        // Only the channels the layer has actions on: every other one stays
+        // as designed, which is what walking no actions gives. Most layers
+        // have one or two of the two dozen.
+        for (channel, all) in channels {
+            let list = including.map { all.filter($0) } ?? all
+            guard !list.isEmpty else { continue }
+            switch channel {
+            case .position: state.position = walk(state.position, steps(list, Self.positionStep, Self.positionPart), at: time)
+            case .scale: state.scale = walk(state.scale, steps(list, Self.scaleStep, Self.scalePart), at: time)
+            case .rotation: state.rotation = walk(state.rotation, steps(list, Self.rotationStep, Self.rotationPart), at: time)
+            case .opacity: state.opacity = walk(state.opacity, steps(list, Self.opacityStep, Self.opacityPart), at: time)
+            case .skew: state.skew = walk(state.skew, list.compactMap(Self.skewStep), at: time)
+            case .tilt: state.tilt = walk(state.tilt, list.compactMap(Self.tiltStep), at: time)
+            case .size: state.size = walk(state.size, list.compactMap(Self.sizeStep), at: time)
+            case .visibility: state.isShown = walk(1, Self.visibilitySteps(list), at: time) > 0.5
+            // Only what the layer has: a Colour on a layer with no fill does nothing.
+            case .fill: if let fill = state.fill { state.fill = walk(fill, list.compactMap(Self.fillStep), at: time) }
+            case .stroke: if let stroke = state.stroke { state.stroke = walk(stroke, list.compactMap(Self.strokeStep), at: time) }
+            case .trim: if let trim = state.trim { state.trim = walk(trim, list.compactMap(Self.trimStep), at: time) }
+            case .cornerRadius:
+                if let radii = state.cornerRadii { state.cornerRadii = walk(radii, list.compactMap(Self.cornerStep), at: time) }
+            case .shadow: state.shadow = walk(state.shadow, list.compactMap(Self.shadowStep), at: time)
+            case .layerBlur: state.layerBlur = walk(state.layerBlur, steps(list, Self.layerBlurStep, Self.layerBlurPart), at: time)
+            case .backgroundBlur:
+                state.backgroundBlur = walk(state.backgroundBlur, list.compactMap(Self.backgroundBlurStep), at: time)
+            case .letterSpacing:
+                if let spacing = state.letterSpacing { state.letterSpacing = walk(spacing, list.compactMap(Self.letterSpacingStep), at: time) }
+            case .lineHeight:
+                if let height = state.lineHeight { state.lineHeight = walk(height, list.compactMap(Self.lineHeightStep), at: time) }
+            case .text: if let shown = state.text { state.text = Self.shownText(design: shown.text, list, at: time) }
+            case .arc: if let arc = state.arc { state.arc = walk(arc, list.compactMap(Self.arcStep), at: time) }
+            case .star: if let star = state.star { state.star = walk(star, list.compactMap(Self.starStep), at: time) }
+            case .path: if let path = state.path { state.path = walk(path, list.compactMap(Self.pathStep), at: time) }
+            case .volume:
+                if let volume = state.volume { state.volume = walk(volume, steps(list, Self.volumeStep, Self.volumePart), at: time) }
+            case .media: if state.sourceTime != nil { state.sourceTime = Self.sourceTime(list, at: time) }
+            }
         }
-        state.shadow = walk(state.shadow, list(.shadow).compactMap(Self.shadowStep), at: time)
-        state.layerBlur = walk(state.layerBlur, steps(list(.layerBlur), Self.layerBlurStep, Self.layerBlurPart), at: time)
-        state.backgroundBlur = walk(state.backgroundBlur, list(.backgroundBlur).compactMap(Self.backgroundBlurStep),
-                                    at: time)
-        if let spacing = state.letterSpacing {
-            state.letterSpacing = walk(spacing, list(.letterSpacing).compactMap(Self.letterSpacingStep), at: time)
-        }
-        if let height = state.lineHeight {
-            state.lineHeight = walk(height, list(.lineHeight).compactMap(Self.lineHeightStep), at: time)
-        }
-        if let shown = state.text { state.text = Self.shownText(design: shown.text, list(.text), at: time) }
-        if let arc = state.arc { state.arc = walk(arc, list(.arc).compactMap(Self.arcStep), at: time) }
-        if let star = state.star { state.star = walk(star, list(.star).compactMap(Self.starStep), at: time) }
-        if let path = state.path { state.path = walk(path, list(.path).compactMap(Self.pathStep), at: time) }
-        if let volume = state.volume { state.volume = walk(volume, steps(list(.volume), Self.volumeStep, Self.volumePart), at: time) }
-        if state.sourceTime != nil { state.sourceTime = Self.sourceTime(list(.media), at: time) }
         return state
     }
 
@@ -355,6 +402,17 @@ public struct ActionTracks: Sendable {
     private static func rotationStep(_ a: Action) -> Step<Double>? {
         guard case .rotate(let r) = a.spec else { return nil }
         return Step(a, initial: r.initial, target: r.mode == .to ? { _ in r.end } : { $0 + r.end })
+    }
+
+    private static func skewStep(_ a: Action) -> Step<Vec2>? {
+        guard case .skew(let k) = a.spec else { return nil }
+        return Step(a, initial: k.initial, target: k.mode == .to ? { _ in k.end } : { $0 + k.end })
+    }
+
+    private static func tiltStep(_ a: Action) -> Step<Tilt>? {
+        guard case .tilt(let t) = a.spec else { return nil }
+        return Step(a, initial: t.initial,
+                    target: t.mode == .to ? { _ in t.end } : { Tilt(x: $0.x + t.end.x, y: $0.y + t.end.y, depth: t.end.depth) })
     }
 
     private static func opacityStep(_ a: Action) -> Step<Double>? {

@@ -341,6 +341,8 @@ private struct ValueFields: View {
             case .opacity(let o): opacity(o)
             case .resize(let r): resize(r)
             case .visibility(let v): visibility(v)
+            case .skew(let k): skew(k)
+            case .tilt(let t): tilt(t)
             default: StyleValueFields(controller: controller, action: action, inherited: inherited)
             }
         }
@@ -465,6 +467,78 @@ private struct ValueFields: View {
             guard case .rotate(var r) = a.spec else { return }
             change(&r)
             a.spec = .rotate(r)
+        }
+    }
+
+    // MARK: Skew
+
+    @ViewBuilder private func skew(_ k: SkewAction) -> some View {
+        let from = inherited?.skew ?? .zero
+        modeRow(k.mode)
+        LabeledRow(label: "From") {
+            OptionalField(unit: "X", value: k.initial?.x, placeholder: from.x, decimals: 1, suffix: "°") { v in
+                editSkew("Starting Value") { k, s in k.initial = v.map { Vec2($0, (k.initial ?? s.skew).y) } }
+            }
+            OptionalField(unit: "Y", value: k.initial?.y, placeholder: from.y, decimals: 1, suffix: "°") { v in
+                editSkew("Starting Value") { k, s in k.initial = v.map { Vec2((k.initial ?? s.skew).x, $0) } }
+            }
+            clearButton(k.initial != nil) { editSkew("Starting Value") { k, _ in k.initial = nil } }
+        }
+        .help("The slant it starts at. Empty starts from the layer's slant when the action begins.")
+        LabeledRow(label: k.mode == .to ? "To" : "By") {
+            UnitField(unit: "X", value: k.end.x, decimals: 1, suffix: "°") { v in editSkew("Skew") { k, _ in k.end.x = v } }
+            UnitField(unit: "Y", value: k.end.y, decimals: 1, suffix: "°") { v in editSkew("Skew") { k, _ in k.end.y = v } }
+            Color.clear.frame(width: Theme.control)
+        }
+        .help("X slants its sides, so the bottom moves across; Y slants its top and bottom, so the right side moves down.")
+    }
+
+    private func editSkew(_ name: String, _ change: @escaping (inout SkewAction, LayerState) -> Void) {
+        controller.editActions(name) { a in
+            guard case .skew(var k) = a.spec, let state = controller.inheritedState(for: a) else { return }
+            change(&k, state)
+            a.spec = .skew(k)
+        }
+    }
+
+    // MARK: Tilt
+
+    @ViewBuilder private func tilt(_ t: TiltAction) -> some View {
+        let from = inherited?.tilt ?? .none
+        modeRow(t.mode)
+        LabeledRow(label: "From") {
+            OptionalField(unit: "X", value: t.initial?.x, placeholder: from.x, decimals: 1, suffix: "°") { v in
+                editTilt("Starting Value") { t, s in t.initial = v.map { Tilt(x: $0, y: (t.initial ?? s.tilt).y, depth: t.end.depth) } }
+            }
+            OptionalField(unit: "Y", value: t.initial?.y, placeholder: from.y, decimals: 1, suffix: "°") { v in
+                editTilt("Starting Value") { t, s in t.initial = v.map { Tilt(x: (t.initial ?? s.tilt).x, y: $0, depth: t.end.depth) } }
+            }
+            clearButton(t.initial != nil) { editTilt("Starting Value") { t, _ in t.initial = nil } }
+        }
+        .help("The tilt it starts at. Empty starts from the layer's tilt when the action begins.")
+        LabeledRow(label: t.mode == .to ? "To" : "By") {
+            UnitField(unit: "X", value: t.end.x, decimals: 1, suffix: "°") { v in editTilt("Tilt") { t, _ in t.end.x = v } }
+            UnitField(unit: "Y", value: t.end.y, decimals: 1, suffix: "°") { v in editTilt("Tilt") { t, _ in t.end.y = v } }
+            Color.clear.frame(width: Theme.control)
+        }
+        .help("X tips it back around a level line through its anchor, the top going away; Y turns it around an upright line, the right side going away. 180° shows its back.")
+        LabeledRow(label: "Depth") {
+            UnitField(value: t.end.depth, decimals: 0, suffix: "px", accepts: { $0 > 1 }) { v in
+                editTilt("Depth") { t, _ in
+                    t.end.depth = v
+                    t.initial?.depth = v
+                }
+            }
+            Color.clear.frame(width: Theme.control)
+        }
+        .help("How far away it is seen from. Nearer makes the perspective stronger.")
+    }
+
+    private func editTilt(_ name: String, _ change: @escaping (inout TiltAction, LayerState) -> Void) {
+        controller.editActions(name) { a in
+            guard case .tilt(var t) = a.spec, let state = controller.inheritedState(for: a) else { return }
+            change(&t, state)
+            a.spec = .tilt(t)
         }
     }
 

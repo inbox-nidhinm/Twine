@@ -514,7 +514,7 @@ private struct Reader {
         let toUser = boxUnits ? own.then(Affine.scale(Vec2(userBounds.width, userBounds.height)))
             .then(.translation(Vec2(userBounds.minX, userBounds.minY))) : own
         let t = layer.transform
-        guard let intoLayer = Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation).inverted,
+        guard let intoLayer = Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation, skew: t.skew).inverted,
               layer.size.width > 0, layer.size.height > 0 else { return .solid(stops[0].color) }
         func unit(_ p: Vec2) -> Vec2 {
             let local = intoLayer.apply(ctm.apply(toUser.apply(p)))

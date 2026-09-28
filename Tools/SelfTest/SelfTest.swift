@@ -189,6 +189,15 @@ enum SelfTest {
             case "add":
                 // Adds an action of a kind, by name, as the Add Action menu does.
                 if let kind = ActionKind(rawValue: parts[1]) { controller.addAction(kind) } else { log("unknown kind \(parts[1])") }
+            case "warp":
+                // Sets the selected layer's skew and tilt, as the Layer fields do: warp SX SY TX TY.
+                let v = parts.dropFirst().compactMap(Double.init)
+                if v.count == 4, let id = controller.selection.first {
+                    controller.edit(id) { l in
+                        l.transform.skew = Vec2(v[0], v[1])
+                        l.transform.tilt = Tilt(x: v[2], y: v[3], depth: l.transform.tilt.depth)
+                    }
+                } else { log("warp needs four numbers and a selection") }
             case "preset":
                 // Adds a preset by its id (`slide-in`...), as the Add Preset menu does.
                 if let kind = PresetKind(rawValue: parts[1]) { controller.addPreset(Presets.preset(kind)) } else { log("unknown preset \(parts[1])") }

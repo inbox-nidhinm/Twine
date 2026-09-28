@@ -22,8 +22,10 @@ public enum Icon: String, CaseIterable, Sendable {
     case rotate
     case scale
     case shadow
+    case skew
     case stagger
     case stroke
+    case tilt
     case trim
     case alignBottom
     case alignCenterX
@@ -175,6 +177,9 @@ public enum Icon: String, CaseIterable, Sendable {
             "M4.5 4.5 H15 V15 H4.5 Z",
             "M18.5 8 V18.5 H8"
         ]
+        case .skew: return [   // Actions/skew.svg
+            "M9 5 H20 L15 19 H4 Z"
+        ]
         case .stagger: return [   // Actions/stagger.svg
             "M4 7 H10",
             "M8 12 H14",
@@ -183,6 +188,10 @@ public enum Icon: String, CaseIterable, Sendable {
         case .stroke: return [   // Actions/stroke.svg
             "M4.5 7 C4.5 5.6 5.6 4.5 7 4.5 H17 C18.4 4.5 19.5 5.6 19.5 7 V17 C19.5 18.4 18.4 19.5 17 19.5 H7 C5.6 19.5 4.5 18.4 4.5 17 Z",
             "M8.5 8.5 H15.5 V15.5 H8.5 Z"
+        ]
+        case .tilt: return [   // Actions/tilt.svg
+            "M8 6 H16 L20 18 H4 Z",
+            "M6 12 H18"
         ]
         case .trim: return [   // Actions/trim.svg
             "M12 5 C15.9 5 19 8.1 19 12 C19 15.9 15.9 19 12 19 C8.1 19 5 15.9 5 12",

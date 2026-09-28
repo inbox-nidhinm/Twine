@@ -286,7 +286,7 @@ private final class Node {
         // The anchor point stays at the layer's origin and the whole local
         // transform goes in the matrix, so a layer of zero width or height
         // (a line) still turns about its real anchor.
-        container.transform = layer.transform.caTransform
+        container.transform = layer.projection.caTransform
         container.opacity = Float(layer.opacity)
 
         if !ignoresBlend, layer.blendMode != blend {
@@ -1004,6 +1004,24 @@ extension ResolvedPaint {
         case .radial: return "radial"
         case .image(let image): return image.tiles ? "tiles" : "image"
         }
+    }
+}
+
+extension Projective {
+    /// The same transform as a Core Animation matrix, on the flat plane the
+    /// layer is drawn in: the perspective row becomes its fourth column.
+    public var caTransform: CATransform3D {
+        var m = CATransform3DIdentity
+        m.m11 = a
+        m.m12 = b
+        m.m14 = px
+        m.m21 = c
+        m.m22 = d
+        m.m24 = py
+        m.m41 = tx
+        m.m42 = ty
+        m.m44 = w
+        return m
     }
 }
 

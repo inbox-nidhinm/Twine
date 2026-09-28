@@ -339,7 +339,7 @@ public enum PathEditing {
         let fraction = Vec2(layer.size.width > 0 ? t.anchor.x / layer.size.width : 0.5,
                             layer.size.height > 0 ? t.anchor.y / layer.size.height : 0.5)
         let anchor = Vec2(fraction.x * size.width, fraction.y * size.height)
-        let old = Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation)
+        let old = Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation, skew: t.skew)
         var edited = layer
         edited.transform.anchor = anchor
         edited.transform.position = old.apply(origin + anchor)

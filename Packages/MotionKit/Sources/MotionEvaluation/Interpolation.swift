@@ -18,6 +18,12 @@ extension Double: Interpolatable {
     public static func interpolate(_ a: Double, _ b: Double, _ t: Double) -> Double { lerp(a, b, t) }
 }
 
+extension Tilt: Interpolatable {
+    public static func interpolate(_ a: Tilt, _ b: Tilt, _ t: Double) -> Tilt {
+        Tilt(x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), depth: lerp(a.depth, b.depth, t))
+    }
+}
+
 extension Vec2: Interpolatable {
     public static func interpolate(_ a: Vec2, _ b: Vec2, _ t: Double) -> Vec2 {
         Vec2(lerp(a.x, b.x, t), lerp(a.y, b.y, t))

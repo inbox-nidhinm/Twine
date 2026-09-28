@@ -82,7 +82,7 @@ public enum Arrangement {
         guard let group = project.layer(withID: id), group.isGroup,
               let location = project.location(of: id) else { throw EditorError.notFound(id) }
         let g = group.transform
-        let groupTransform = Affine.layer(position: g.position, anchor: g.anchor, scale: g.scale, rotation: g.rotation)
+        let groupTransform = Affine.layer(position: g.position, anchor: g.anchor, scale: g.scale, rotation: g.rotation, skew: g.skew)
         let rotation = g.rotation, scale = g.scale, opacity = group.opacity
 
         let children = group.children.map { child -> Layer in
@@ -158,7 +158,7 @@ public enum Arrangement {
     static func designWorld(of id: UUID?, in project: Project) -> Affine {
         guard let id, let layer = project.layer(withID: id) else { return .identity }
         let t = layer.transform
-        return Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation)
+        return Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation, skew: t.skew)
             .then(designWorld(of: project.location(of: id)?.parentID, in: project))
     }
 
@@ -186,7 +186,7 @@ public enum Arrangement {
     /// The layer's designed box in its parent's space.
     public static func box(of layer: Layer) -> Box? {
         let t = layer.transform
-        let transform = Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation)
+        let transform = Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation, skew: t.skew)
         return Box(around: Box(origin: .zero, size: layer.size).corners.map(transform.apply))
     }
 }

@@ -121,10 +121,10 @@ private struct WorldTransforms {
         return result
     }
 
-    mutating func transform(of id: UUID) -> Affine? {
+    mutating func transform(of id: UUID) -> Projective? {
         guard let layer = resolved(id) else { return nil }
-        guard let parent = layer.parentID else { return layer.transform }
-        return transform(of: parent).map { layer.transform.then($0) }
+        guard let parent = layer.parentID else { return layer.projection }
+        return transform(of: parent).map { layer.projection.then($0) }
     }
 }
 
@@ -218,7 +218,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
                          clipsContent: clips, frame: frame,
                          // Filled in once every layer is resolved, since a
                          // mask can sit anywhere in the tree.
-                         mask: nil)
+                         mask: nil, warp: state.warp)
 }
 
 /// The shape with its actions applied: the first fill's paint, the first
