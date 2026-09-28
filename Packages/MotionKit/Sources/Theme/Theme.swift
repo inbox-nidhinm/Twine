@@ -181,6 +181,8 @@ public enum Theme {
     /// the weight menu and the alignment tray get the rest.
     public static let textSideColumn: CGFloat = 76
     public static let cardWidth: CGFloat = 240
+    /// How tall the easing card's grid of tiles is before it scrolls.
+    public static let easingGridHeight: CGFloat = 468
     public static let menuMinWidth: CGFloat = 168
 
     /// The bottom bar's full height: one bar row inside its padding.

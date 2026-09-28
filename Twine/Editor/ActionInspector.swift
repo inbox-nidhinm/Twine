@@ -367,49 +367,69 @@ private struct EasingFields: View {
     let controller: EditorController
     let actions: [Action]
 
+    @Environment(MenuHost.self) private var menus
+    @State private var frame: CGRect = .zero
+    @State private var hovering = false
+
     private var shared: Easing? {
         let first = actions[0].easing
         return actions.allSatisfy { $0.easing == first } ? first : nil
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            MenuRow(label: "Easing", value: shared.map(Self.name) ?? "Mixed", entries: entries)
-            // A preset is used as it comes, at its own strength (the user
-            // asked for no Intensity); only a custom curve has more to set.
-            if case .custom(let curve) = shared {
-                CurveEditor(curve: curve, controller: controller)
-                    .frame(height: 150)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Easing")
+                .font(ThemeFont.label)
+                .foregroundStyle(Theme.textSecondary)
+                .lineLimit(1)
+            // A real button, so a click always lands.
+            Button(action: open) {
+                HStack(spacing: 8) {
+                    if let shared {
+                        EasingPath(easing: shared, low: -0.5, high: 1.5)
+                            .stroke(Theme.textSecondary, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                            .frame(width: 10, height: 20)
+                    }
+                    Text(shared?.title ?? "Mixed")
+                        .font(ThemeFont.label)
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    IconView(.chevronDown, size: 13)
+                        .foregroundStyle(Theme.textTertiary)
+                }
+                .padding(.horizontal, 8)
+                .frame(height: Theme.panelRow + 4)
+                .frame(maxWidth: .infinity)
+                .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
+                    .fill(hovering ? Theme.panelHover : Theme.panelRaised))
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .onHover { hovering = $0 }
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+        }
+        .padding(.vertical, 2)
+    }
+
+    /// The easing card, beside the inspector towards the canvas, level with
+    /// the row.
+    private func open() {
+        let inspectorLeft = frame.minX - Theme.panelPad
+        menus.showPopup(at: CGPoint(x: inspectorLeft - Theme.floatGap - Theme.cardWidth, y: frame.minY - 40)) {
+            EasingCard(controller: controller)
         }
     }
 
-    static func name(_ easing: Easing) -> String {
-        switch easing {
+}
+
+extension Easing {
+    /// Its name in the inspector and on the easing card.
+    var title: String {
+        switch self {
         case .preset(let preset, _): return preset.title
         case .custom: return "Custom"
         }
-    }
-
-    private func entries() -> [MenuEntry] {
-        var list: [MenuEntry] = EasingPreset.allCases.map { preset in
-            .item(preset.title, checked: { if case .preset(preset, _) = shared { return true } else { return false } }()) {
-                controller.editActions("Easing") { action in
-                    // At its own strength: there is no Intensity to set.
-                    action.easing = .preset(preset, intensity: Easing.standardIntensity)
-                }
-            }
-        }
-        list.append(.separator)
-        list.append(.item("Custom", checked: { if case .custom = shared { return true } else { return false } }()) {
-            controller.editActions("Easing") { action in
-                // Starts from the curve the preset was making, so nothing jumps.
-                if case .preset(let p, let i) = action.easing {
-                    action.easing = .custom(p == .spring ? .easeInOut : p.curve(intensity: i))
-                }
-            }
-        })
-        return list
     }
 }
 
@@ -418,90 +438,16 @@ extension EasingPreset {
         switch self {
         case .none: return "None"
         case .smooth: return "Smooth"
+        case .natural: return "Natural"
         case .slowDown: return "Slow down"
         case .accelerate: return "Accelerate"
         case .overshoot: return "Overshoot"
-        case .spring: return "Spring"
+        // Jitter's name for it; files still say spring.
+        case .spring: return "Elastic"
+        case .bounce: return "Bounce"
+        case .impulse: return "Impulse"
+        case .swing: return "Swing"
         }
-    }
-}
-
-/// The custom timing curve, time across and progress up, with its two
-/// handles to drag. Room above and below leaves space for overshoot.
-private struct CurveEditor: View {
-    let curve: CubicBezier
-    let controller: EditorController
-
-    @State private var grabbed: Int?
-
-    private let lowest = -0.3, highest = 1.3
-    private let pad: CGFloat = 10
-
-    var body: some View {
-        GeometryReader { geo in
-            let size = geo.size
-            Canvas { context, _ in
-                let a = point(0, 1, size), b = point(1, 0, size)
-                context.stroke(Path(CGRect(x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y)),
-                               with: .color(Theme.border), lineWidth: 1)
-                var diagonal = Path()
-                diagonal.move(to: point(0, 0, size))
-                diagonal.addLine(to: point(1, 1, size))
-                context.stroke(diagonal, with: .color(Theme.border), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-
-                var shape = Path()
-                shape.move(to: point(0, 0, size))
-                for i in 1...80 {
-                    let x = Double(i) / 80
-                    shape.addLine(to: point(x, curve.value(at: x), size))
-                }
-                context.stroke(shape, with: .color(Theme.textPrimary), lineWidth: 2)
-
-                let p1 = point(curve.x1, curve.y1, size), p2 = point(curve.x2, curve.y2, size)
-                var arms = Path()
-                arms.move(to: point(0, 0, size)); arms.addLine(to: p1)
-                arms.move(to: point(1, 1, size)); arms.addLine(to: p2)
-                context.stroke(arms, with: .color(Theme.textTertiary), lineWidth: 1)
-                for p in [p1, p2] {
-                    let dot = Path(ellipseIn: CGRect(x: p.x - 5, y: p.y - 5, width: 10, height: 10))
-                    context.fill(dot, with: .color(.white))
-                    context.stroke(dot, with: .color(Theme.canvas), lineWidth: 1.5)
-                }
-            }
-            .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.canvas))
-            .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0)
-                .onChanged { g in
-                    if grabbed == nil {
-                        let p1 = point(curve.x1, curve.y1, size), p2 = point(curve.x2, curve.y2, size)
-                        grabbed = hypot(g.startLocation.x - p1.x, g.startLocation.y - p1.y)
-                            <= hypot(g.startLocation.x - p2.x, g.startLocation.y - p2.y) ? 1 : 2
-                        controller.begin("Easing Curve")
-                    }
-                    let v = value(at: g.location, size)
-                    var c = curve
-                    if grabbed == 1 { c.x1 = v.x; c.y1 = v.y } else { c.x2 = v.x; c.y2 = v.y }
-                    controller.updateActions { $0.easing = .custom(c) }
-                }
-                .onEnded { _ in
-                    grabbed = nil
-                    controller.end()
-                })
-        }
-        .help("Drag the handles. Across is time, up is how far along the action is.")
-    }
-
-    private func point(_ x: Double, _ y: Double, _ size: CGSize) -> CGPoint {
-        CGPoint(x: pad + x * (size.width - pad * 2),
-                y: pad + (highest - y) / (highest - lowest) * (size.height - pad * 2))
-    }
-
-    /// Handles keep to the square's width, since time cannot run backwards
-    /// inside an action, but can go well above and below it.
-    private func value(at p: CGPoint, _ size: CGSize) -> (x: Double, y: Double) {
-        let x = (p.x - pad) / (size.width - pad * 2)
-        let y = highest - (p.y - pad) / (size.height - pad * 2) * (highest - lowest)
-        return (min(max(x, 0), 1), min(max(y, -1), 2))
     }
 }
 

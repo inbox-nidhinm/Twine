@@ -23,6 +23,13 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "The easing card", changes: [
+            "Easing is picked from a card of tiles beside the inspector, each showing its curve. Under the pointer, a tile plays a small box moving with that easing.",
+            "Picking a tile keeps the card open. Clicking the picked tile again shows its graph and an Intensity slider.",
+            "Custom opens its graph straight away, with both handles to drag and its four numbers to type.",
+            "New easings: Natural, Bounce, Impulse and Swing. Spring is now called Elastic.",
+            "Every easing is the designer's own curve at the standard intensity of 50.",
+        ]),
         .init(date: "28 September 2026", title: "Long layer names on the timeline", changes: [
             "On the timeline, a long layer name is cut short so the action's or preset's name always shows beside it.",
         ]),

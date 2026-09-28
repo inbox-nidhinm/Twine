@@ -16,43 +16,86 @@ extension Easing {
 }
 
 extension EasingPreset {
-    /// Each preset's shape at an intensity from 0 to 1. The curves run from
-    /// gentle at 0 to strong at 1, and 0.5 is a sensible middle.
+    /// Each preset's shape at an intensity from 0 to 1. At the standard 0.5
+    /// it is exactly the designer's curve (the user's values, 28 September
+    /// 2026); lower fades it towards a straight line, reaching one at 0;
+    /// higher makes it stronger.
     public func progress(_ u: Double, intensity: Double) -> Double {
         let i = min(max(intensity, 0), 1)
         switch self {
-        case .none: return u
-        case .smooth, .slowDown, .accelerate, .overshoot: return curve(intensity: i).value(at: u)
-        case .spring: return Self.spring(intensity: i).normalizedProgress(u)
+        case .none:
+            return u
+        case .smooth, .natural, .slowDown, .accelerate:
+            // Up to the standard, the bezier itself, its handles drawn in
+            // towards the line. Past it, towards the curve applied twice,
+            // which is stronger and still never leaves 0...1.
+            guard i > 0.5, let own = designCurve else { return curve(intensity: i).value(at: u) }
+            let once = own.value(at: u)
+            return once + (own.value(at: once) - once) * (i - 0.5) * 2
+        case .bounce:
+            // It falls as it does at the standard; intensity sets how deep
+            // it bounces off the end, none at 0 and twice as deep at 1.
+            let p = Self.sampled(EasingTables.bounce, at: u)
+            guard u > Self.bounceLanding else { return p }
+            return 1 - (1 - p) * i * 2
+        case .spring, .overshoot, .impulse, .swing:
+            // How far it strays from a straight line, none at 0 and twice
+            // the standard's at 1.
+            guard let table else { return u }
+            return u + (Self.sampled(table, at: u) - u) * i * 2
         }
     }
 
-    /// The bezier a curve preset makes. Smooth, Slow down and Accelerate
-    /// blend from a straight line at intensity 0 to a strong exponential
-    /// curve at 1. Overshoot raises its first handle above the end value,
-    /// further the higher the intensity.
-    public func curve(intensity i: Double) -> CubicBezier {
-        func blend(_ strong: CubicBezier) -> CubicBezier {
-            let a = CubicBezier.linear
-            return CubicBezier(a.x1 + (strong.x1 - a.x1) * i, a.y1 + (strong.y1 - a.y1) * i,
-                               a.x2 + (strong.x2 - a.x2) * i, a.y2 + (strong.y2 - a.y2) * i)
-        }
+    /// Whether the preset is a bezier, which `curve` gives exactly; the
+    /// others are lists of points, so a custom curve starts from a plain ease.
+    public var isCurve: Bool { designCurve != nil || self == .none }
+
+    /// The designer's bezier, for the presets that are one.
+    private var designCurve: CubicBezier? {
         switch self {
-        case .none, .spring: return .linear
-        case .smooth: return blend(CubicBezier(0.87, 0, 0.13, 1))
-        case .slowDown: return blend(CubicBezier(0.16, 1, 0.3, 1))
-        case .accelerate: return blend(CubicBezier(0.7, 0, 0.84, 0))
-        case .overshoot: return CubicBezier(0.34, 1 + 1.2 * i, 0.64, 1)
+        case .smooth: return CubicBezier(0.5, 0, 0, 1)
+        case .natural: return CubicBezier(0.8, 0, 0.2, 1)
+        case .slowDown: return CubicBezier(0, 0, 0, 1)
+        case .accelerate: return CubicBezier(1, 0, 1, 1)
+        default: return nil
         }
     }
 
-    /// Critically damped (no bounce) at intensity 0, down to very little
-    /// damping at 1. Stiffness only sets the natural speed, which fitting the
-    /// motion to the action's duration cancels out.
-    static func spring(intensity i: Double) -> Spring {
-        let zeta = 1 - 0.92 * i
-        let stiffness = 100.0
-        return Spring(stiffness: stiffness, damping: 2 * zeta * stiffness.squareRoot(), mass: 1)
+    /// The designer's list of points, for the presets that are one.
+    private var table: [Double]? {
+        switch self {
+        case .spring: return EasingTables.elastic
+        case .bounce: return EasingTables.bounce
+        case .overshoot: return EasingTables.overshoot
+        case .impulse: return EasingTables.impulse
+        case .swing: return EasingTables.swing
+        default: return nil
+        }
+    }
+
+    /// When Bounce first reaches the end, a third of the way through.
+    private static let bounceLanding = Double(EasingTables.bounce.firstIndex { $0 > 0.98 } ?? 0)
+        / Double(EasingTables.bounce.count - 1)
+
+    /// A list's value at `u`, joining its points with straight lines, as
+    /// CSS's `linear()` does.
+    static func sampled(_ table: [Double], at u: Double) -> Double {
+        let position = min(max(u, 0), 1) * Double(table.count - 1)
+        let k = min(Int(position), table.count - 2)
+        let f = position - Double(k)
+        return table[k] + (table[k + 1] - table[k]) * f
+    }
+
+    /// The bezier a curve preset makes, up to the standard intensity: its
+    /// handles drawn from the straight line at 0 to the designer's at 0.5.
+    /// Past it the preset is no bezier, so this stays at the designer's. A
+    /// preset that is no bezier gives the straight line.
+    public func curve(intensity i: Double) -> CubicBezier {
+        guard let own = designCurve else { return .linear }
+        let t = min(max(i, 0), 0.5) * 2
+        let a = CubicBezier.linear
+        return CubicBezier(a.x1 + (own.x1 - a.x1) * t, a.y1 + (own.y1 - a.y1) * t,
+                           a.x2 + (own.x2 - a.x2) * t, a.y2 + (own.y2 - a.y2) * t)
     }
 }
 

@@ -48,21 +48,32 @@ extension Easing: Codable {
     }
 }
 
-/// The named feels offered for an action. A short list for now; more can be
-/// added without changing the file format, since presets are stored by name.
+/// The named feels offered for an action, Jitter's list. More can be added
+/// without changing the file format, since presets are stored by name.
 public enum EasingPreset: String, Codable, Sendable, CaseIterable {
     /// Constant speed. Intensity does nothing.
     case none
     /// Eases in and out.
     case smooth
+    /// Eases in and out more gently than Smooth, as things move by
+    /// themselves.
+    case natural
     /// Starts fast and eases into the end value.
     case slowDown
     /// Starts slowly and speeds up into the end value.
     case accelerate
     /// Passes the end value and settles back onto it.
     case overshoot
-    /// Springs into place, bouncing more as intensity rises.
+    /// Springs into place, bouncing more as intensity rises. Shown as
+    /// Elastic, Jitter's name for it.
     case spring
+    /// Falls onto the end value and bounces on it, as a dropped ball does,
+    /// higher as intensity rises.
+    case bounce
+    /// Pulls back the other way first, then goes.
+    case impulse
+    /// Pulls back first, then passes the end value and settles onto it.
+    case swing
 }
 
 /// A CSS-style timing curve from (0, 0) to (1, 1) through two control points.
@@ -85,8 +96,8 @@ public struct CubicBezier: Codable, Sendable, Hashable {
     public static let easeInOut = CubicBezier(0.42, 0, 0.58, 1)
 }
 
-/// A damped spring released from 0 towards 1. The spring preset uses it for
-/// its shape, fitted to the action's duration.
+/// A damped spring released from 0 towards 1, fitted to a duration. The
+/// Elastic preset used it before it took the designer's own list of points.
 public struct Spring: Codable, Sendable, Hashable {
     public var stiffness: Double
     public var damping: Double
