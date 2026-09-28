@@ -6,7 +6,8 @@ import Theme
 /// Animate mode's inspector. It never shows design properties: with actions
 /// selected it shows their fields; with only layers selected it offers the
 /// actions they can take and the presets, added at the playhead; an
-/// action's header offers the same, to add another without leaving it.
+/// action's header and the foot of its fields offer the same, to add
+/// another without leaving it.
 /// With nothing selected it is empty.
 struct AnimationInspector: View {
     let controller: EditorController

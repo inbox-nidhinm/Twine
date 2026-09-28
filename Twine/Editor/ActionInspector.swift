@@ -60,6 +60,15 @@ struct ActionInspector: View {
                     .gridBody()
                     .padding(.vertical, Theme.panelPad)
             }
+
+            // At the end, another action or preset for the same layers, so
+            // there is no need to pick the layer again.
+            if !newActions.isEmpty || pickPreset != nil {
+                PanelDivider()
+                ActionTiles(newActions: newActions,
+                            hasPresets: pickPreset != nil && !controller.availablePresets.isEmpty) { pickPreset?() }
+                    .padding(Theme.panelPad)
+            }
         }
     }
 }

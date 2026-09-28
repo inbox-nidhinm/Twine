@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Add another from an action", changes: [
+            "An action's settings end with New Action and Select Preset, so you can add another to the same layer straight away.",
+        ]),
         .init(date: "28 September 2026", title: "The composition keeps its size", changes: [
             "Pasting from Figma into an empty project no longer resizes the composition to fit. The copy comes in centred at its exact size, and the composition stays as you set it.",
         ]),
