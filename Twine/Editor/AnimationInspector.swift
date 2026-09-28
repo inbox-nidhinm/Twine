@@ -49,12 +49,13 @@ struct AnimationInspector: View {
 }
 
 extension AnimationInspector {
-    /// Grouped under Transform, Style and Blur, leaving out empty groups.
+    /// Grouped under Transform, Style and Blur, leaving out empty groups,
+    /// each with its action's icon.
     private func actionEntries(_ kinds: [ActionKind]) -> [MenuEntry] {
         ActionCategory.allCases.flatMap { category -> [MenuEntry] in
             let items = kinds.filter { $0.category == category }
             guard !items.isEmpty else { return [] }
-            return [.header(category.title)] + items.map { kind in .item(kind.defaultName) { controller.addAction(kind) } }
+            return [.header(category.title)] + items.map { kind in .item(kind.defaultName, icon: kind.icon) { controller.addAction(kind) } }
         }
     }
 }

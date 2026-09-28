@@ -6,7 +6,9 @@ import Theme
 /// One line of the app's own menu.
 struct MenuEntry: Identifiable {
     enum Kind {
-        case item(title: String, checked: Bool, disabled: Bool, action: () -> Void)
+        /// `icon` is drawn where a tick would go, for menus of things with
+        /// icons of their own, such as the kinds of action.
+        case item(title: String, icon: Icon?, checked: Bool, disabled: Bool, action: () -> Void)
         case separator
         /// A small label naming the group of items under it.
         case header(String)
@@ -15,9 +17,9 @@ struct MenuEntry: Identifiable {
     let id = UUID()
     let kind: Kind
 
-    static func item(_ title: String, checked: Bool = false, disabled: Bool = false,
+    static func item(_ title: String, icon: Icon? = nil, checked: Bool = false, disabled: Bool = false,
                      _ action: @escaping () -> Void) -> MenuEntry {
-        MenuEntry(kind: .item(title: title, checked: checked, disabled: disabled, action: action))
+        MenuEntry(kind: .item(title: title, icon: icon, checked: checked, disabled: disabled, action: action))
     }
 
     static let separator = MenuEntry(kind: .separator)
@@ -127,8 +129,8 @@ private struct MenuCard: View {
                         .foregroundStyle(Theme.textTertiary)
                         .padding(.horizontal, 6)
                         .frame(height: Theme.control, alignment: .bottomLeading)
-                case let .item(title, checked, disabled, action):
-                    MenuItemRow(title: title, checked: checked, disabled: disabled) {
+                case let .item(title, icon, checked, disabled, action):
+                    MenuItemRow(title: title, icon: icon, checked: checked, disabled: disabled) {
                         close()
                         action()
                     }
@@ -143,6 +145,7 @@ private struct MenuCard: View {
 
 private struct MenuItemRow: View {
     let title: String
+    let icon: Icon?
     let checked: Bool
     let disabled: Bool
     let action: () -> Void
@@ -152,8 +155,12 @@ private struct MenuItemRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                IconView(.check, size: 13)
-                    .opacity(checked ? 1 : 0)
+                if let icon {
+                    IconView(icon, size: 15)
+                } else {
+                    IconView(.check, size: 13)
+                        .opacity(checked ? 1 : 0)
+                }
                 Text(title)
                     .font(ThemeFont.label)
                     .lineLimit(1)
