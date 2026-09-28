@@ -29,6 +29,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `click X Y`, `rclick X Y` | A click or right-click |
 | `qclick X Y`, `qrclick X Y` | The same, sent through the app's event queue like a real click: needed for right-click menus over SwiftUI views (home screen cards and folders), which look at the current event |
 | `drag X1 Y1 X2 Y2` | A drag in ten steps |
+| `scroll X Y DY` | Scrolls the scroll view under the point DY points further down its content (negative goes back up), as a wheel would |
 | `down X Y`, `to X Y`, `up X Y` | A held drag, a step at a time, for screenshots mid-drag |
 | `open X Y`, `pick X Y` | Clicks until the app's menu opens, or closes |
 | `key K` | `space`, `enter`, `del`, `left`, `right`, `comma`, `stop`, `esc`, or a letter |
@@ -53,7 +54,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `offers` | Logs what Add Action and Add Preset offer for the selection |
 | `add KIND` | Adds an action by its kind's name (`move`, `path`, `volume`...), as the Add Action menu does |
 | `warp SX SY TX TY` | Sets the selected layer's skew and tilt, as the Layer fields do |
-| `preset ID`, `split`, `sample T` | Adds a preset by its id (`slide-in`, `shake`...), as Add Preset does; Split into Actions on the selected bars; logs the selected layers' position and opacity at time T |
+| `preset ID`, `split`, `sample T` | Adds a preset by its id (`slide-in`, `shake`, a Text one as `text-letters-rise`...), as the picker does; Split into Actions on the selected bars; logs the selected layers' position and opacity at time T |
 | `cursor` | Logs which of the app's pointers is current |
 | `perfpreview S` | The export panel's preview playing for S seconds (open the panel first with `call exportmovie`) |
 | `perfplay S`, `perfscrub N`, `perfdrag N`, `perfdragat X Y N`, `perfselect N` | Timings (`PERF` lines): playback frame rate, seek, canvas drag, drag at a point, select |

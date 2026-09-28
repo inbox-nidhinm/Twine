@@ -123,6 +123,21 @@ enum SelfTest {
             case "type": for c in parts[1] { key(String(c), 0) }
             case "clear": for _ in 0..<14 { key("\u{7f}", 51); key("\u{f728}", 117) }
             case "click": mouse(.leftMouseDown, n[0], n[1]); mouse(.leftMouseUp, n[0], n[1])
+            case "scroll":
+                // The scroll view under the point, moved by DY points down
+                // its content, as a wheel would.
+                var v = (window as? ChromelessWindow)?.viewUnder(NSPoint(x: n[0], y: window.contentView!.bounds.height - n[1]))
+                while let view = v, !(view is NSScrollView) { v = view.superview }
+                if let scroll = v as? NSScrollView {
+                    let clip = scroll.contentView
+                    var origin = clip.bounds.origin
+                    origin.y += clip.isFlipped ? n[2] : -n[2]
+                    clip.scroll(to: origin)
+                    scroll.reflectScrolledClipView(clip)
+                    log("SCROLL to \(Int(origin.y))")
+                } else {
+                    log("SCROLL no scroll view")
+                }
             case "rclick": mouse(.rightMouseDown, n[0], n[1]); mouse(.rightMouseUp, n[0], n[1])
             case "qrclick", "qclick":
                 // Through the app's event queue, as a real click comes, so
@@ -199,8 +214,14 @@ enum SelfTest {
                     }
                 } else { log("warp needs four numbers and a selection") }
             case "preset":
-                // Adds a preset by its id (`slide-in`...), as the Add Preset menu does.
-                if let kind = PresetKind(rawValue: parts[1]) { controller.addPreset(Presets.preset(kind)) } else { log("unknown preset \(parts[1])") }
+                // Adds a preset by its id (`slide-in`, `text-letters-rise`...), as the picker does.
+                if let preset = Presets.library.first(where: { $0.id == parts[1] }) {
+                    controller.addPreset(preset)
+                } else if let kind = PresetKind(rawValue: parts[1]) {
+                    controller.addPreset(Presets.preset(kind))
+                } else {
+                    log("unknown preset \(parts[1])")
+                }
             case "split":
                 // Split into Actions, from the timeline's right-click menu.
                 controller.splitSelectedPresets()
