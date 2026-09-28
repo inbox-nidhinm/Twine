@@ -126,6 +126,7 @@ struct ShortcutsCard: View {
                 s("Start, end", "Home", "End"),
             ]),
             Group(title: "Timeline", items: [
+                s("Select the actions between", "⇧", "click"),
                 s("Move actions a frame", "←→", "⇧←→"),
                 s("Trim both ends", "⌥", "drag end"),
                 s("Pan", "⌥", "drag"),

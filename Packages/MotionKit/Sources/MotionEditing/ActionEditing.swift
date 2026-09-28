@@ -113,6 +113,18 @@ public enum ActionEditing {
         return a
     }
 
+    /// Several actions trimmed together from the same end by the same time,
+    /// as dragging one of them trims them all: each edge moves `delta`, and
+    /// each action keeps to its own limits (a frame at least, never before
+    /// zero, its file's ends). Instant ones have no length and are left out.
+    public static func trimmed(_ actions: [Action], startEdge: Bool, by delta: Double, symmetric: Bool,
+                               rate: FrameRate, mediaLength: (Action) -> Double? = { _ in nil }) -> [Action] {
+        actions.filter { !$0.isInstant }.map { a in
+            trimmed(a, startEdge: startEdge, to: (startEdge ? a.start : a.end) + delta, symmetric: symmetric,
+                    rate: rate, mediaLength: mediaLength(a))
+        }
+    }
+
     /// The actions, in the order given, starting `gap` seconds apart from the
     /// first one's start.
     public static func staggered(_ actions: [Action], gap: Double, rate: FrameRate) -> [Action] {

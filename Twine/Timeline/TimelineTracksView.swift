@@ -62,6 +62,9 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
     /// ends) and of the bar being dragged.
     private var snap: (time: Double, target: CGFloat?, dragged: CGFloat)?
     private var lastSelection: Set<UUID> = []
+    /// The action last clicked without Shift, where a Shift-click's run of
+    /// rows starts.
+    private var rangeAnchor: UUID?
     private var lastReveal = 0
     private var renaming: (id: UUID, field: NSTextField)?
     /// The row whose label is under the pointer, which shows its eye and
@@ -89,7 +92,8 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
 
     private enum Drag {
         case move(originals: [Action], anchor: Action, startX: Double)
-        case trim(original: Action, startEdge: Bool, startX: Double)
+        /// Every selected bar with a length trims with the one grabbed.
+        case trim(originals: [Action], anchor: Action, startEdge: Bool, startX: Double)
         case reorder(action: Action, began: Bool)
         case marquee(start: CGPoint, current: CGPoint, base: Set<UUID>)
         case pan(startX: Double, startTime: Double)
@@ -436,6 +440,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         let p = convert(event.locationInWindow, from: nil)
         let flags = event.modifierFlags
         let extending = flags.contains(.shift) || flags.contains(.command)
+        let ranging = flags.contains(.shift) && !flags.contains(.command)
 
         guard let index = rowIndex(at: p.y) else { return startEmptyDrag(at: p, event: event) }
         let row = rows[index]
@@ -446,7 +451,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         if p.x < gutter {
             if eyeRect(row).contains(p), hoveredLabel == index { return controller.toggleEnabled(action) }
             if event.clickCount == 2 { return beginRename(row) }
-            pick(action, extending: extending)
+            pick(action, extending: extending, ranging: ranging)
             if !extending { drag = .reorder(action: action, began: false) }
             needsDisplay = true
             return
@@ -455,10 +460,11 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         let rect = barRect(action, in: row)
         guard rect.insetBy(dx: -Self.edgeHit, dy: 0).contains(p) else { return startEmptyDrag(at: p, event: event) }
         if event.clickCount == 2 { return beginRename(row) }
-        guard pick(action, extending: extending) else { return }
+        guard pick(action, extending: extending, ranging: ranging) else { return }
 
         if !extending, let startEdge = trimEdge(at: p, of: action, rect: rect) {
-            drag = .trim(original: action, startEdge: startEdge, startX: p.x)
+            let originals = controller.selectedActions.filter { !$0.isInstant }
+            drag = .trim(originals: originals, anchor: action, startEdge: startEdge, startX: p.x)
             controller.begin("Change Timing")
         } else {
             let originals = controller.selectedActions
@@ -468,12 +474,21 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         needsDisplay = true
     }
 
-    /// Selects an action as a click does: on its own, or with Shift or
-    /// Command, added or taken away. Returns whether it ends up selected.
+    /// Selects an action as a click does: on its own; with Command, added or
+    /// taken away; with Shift, every row from the last one clicked to this
+    /// one added. Returns whether it ends up selected.
     @discardableResult
-    private func pick(_ action: Action, extending: Bool) -> Bool {
+    private func pick(_ action: Action, extending: Bool, ranging: Bool = false) -> Bool {
         guard let controller else { return false }
         var selected = Set(controller.selectedActions.map(\.id))
+        if ranging, let from = rangeAnchor.flatMap({ id in rows.firstIndex { $0.action.id == id } }),
+           selected.contains(rows[from].action.id),
+           let to = rows.firstIndex(where: { $0.action.id == action.id }) {
+            for row in rows[min(from, to)...max(from, to)] { selected.insert(row.action.id) }
+            controller.selectActions(selected)
+            return true
+        }
+        rangeAnchor = action.id
         if extending {
             if selected.contains(action.id) { selected.remove(action.id) } else { selected.insert(action.id) }
             if selected.isEmpty { controller.deselectActions() } else { controller.selectActions(selected) }
@@ -562,14 +577,14 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
             }
             controller.update(.updateActions(changed))
 
-        case .trim(let original, let startEdge, let startX):
-            let edge = startEdge ? original.start : original.end
-            let target = edge + snapped((p.x - startX) / viewport.pointsPerSecond, edges: [edge], ignoring: [original.id],
-                                        row: rows.first { $0.action.id == original.id }?.y, event: event)
-            let trimmed = ActionEditing.trimmed(original, startEdge: startEdge, to: target,
+        case .trim(let originals, let anchor, let startEdge, let startX):
+            let edge = startEdge ? anchor.start : anchor.end
+            let delta = snapped((p.x - startX) / viewport.pointsPerSecond, edges: [edge], ignoring: Set(originals.map(\.id)),
+                                row: rows.first { $0.action.id == anchor.id }?.y, event: event)
+            let trimmed = ActionEditing.trimmed(originals, startEdge: startEdge, by: delta,
                                                 symmetric: event.modifierFlags.contains(.option), rate: rate,
-                                                mediaLength: controller.asset(ofLayer: original.targetLayerID)?.duration)
-            controller.update(.updateActions([trimmed]))
+                                                mediaLength: { controller.asset(ofLayer: $0.targetLayerID)?.duration })
+            controller.update(.updateActions(trimmed))
 
         case .marquee(let start, _, let base):
             self.drag = .marquee(start: start, current: p, base: base)

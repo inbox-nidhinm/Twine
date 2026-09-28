@@ -57,6 +57,20 @@ import MotionEvaluation
         #expect(early.start == 0 && early.end == 2)
     }
 
+    @Test func severalTrimTogetherEachWithinItsOwnLimits() {
+        let a = action(1, 1), b = action(0.5, 0.5)
+        let hide = Action(target: square.id, start: 2, duration: 0, spec: .visibility(VisibilityAction(isVisible: false)))
+        // Every end moves by the same time; an instant one has no end to move.
+        let longer = ActionEditing.trimmed([a, b, hide], startEdge: false, by: 0.5, symmetric: false, rate: rate)
+        #expect(longer.map(\.id) == [a.id, b.id])
+        #expect(longer.map(\.end) == [2.5, 1.5])
+        #expect(longer.map(\.start) == [1, 0.5])
+        // Pulled earlier, the start stops at zero for the one that reaches it.
+        let earlier = ActionEditing.trimmed([a, b], startEdge: true, by: -0.75, symmetric: false, rate: rate)
+        #expect(earlier.map(\.start) == [0.25, 0])
+        #expect(earlier.map(\.end) == [2, 1])
+    }
+
     @Test func optionTrimsBothEndsAroundTheMiddle() {
         let a = action(1, 1)
         let wider = ActionEditing.trimmed(a, startEdge: false, to: 2.5, symmetric: true, rate: rate)
