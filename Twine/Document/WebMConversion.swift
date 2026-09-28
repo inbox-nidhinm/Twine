@@ -33,6 +33,7 @@ enum WebMConversion {
     /// A movie made from `url`, in a temporary folder.
     static func convert(_ url: URL) async throws -> URL {
         guard let ffmpeg = tool("ffmpeg") else { throw Failure.noFFmpeg }
+        let stopsBefore = stops.withLock { $0 }
         let video = await probe(url)
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Twine WebM", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -49,6 +50,12 @@ enum WebMConversion {
         var reason = ""
         for settings in attempts {
             let (status, errors) = try await run(ffmpeg, input + settings + [out.path])
+            // Stopped, it is not tried the other way: that started ffmpeg
+            // again for a project already closed.
+            guard stops.withLock({ $0 }) == stopsBefore else {
+                try? FileManager.default.removeItem(at: out)
+                throw CancellationError()
+            }
             if status == 0, FileManager.default.fileExists(atPath: out.path) { return out }
             reason = errors
             try? FileManager.default.removeItem(at: out)
@@ -70,7 +77,9 @@ enum WebMConversion {
 
     /// Runs a tool to the end without holding up the main thread, and
     /// returns its exit status with what it printed (its errors, or with
-    /// `readsOutput`, its output).
+    /// `readsOutput`, its output). What it prints is read while it runs:
+    /// read only at the end, a damaged file's stream of errors filled the
+    /// pipe, ffmpeg waited to write, and the import never finished.
     private static func run(_ tool: URL, _ arguments: [String], readsOutput: Bool = false) async throws -> (Int32, String) {
         try await withCheckedThrowingContinuation { continuation in
             let process = Process()
@@ -79,11 +88,36 @@ enum WebMConversion {
             let pipe = Pipe()
             if readsOutput { process.standardOutput = pipe } else { process.standardError = pipe }
             process.standardInput = FileHandle.nullDevice
-            process.terminationHandler = { finished in
-                let text = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-                continuation.resume(returning: (finished.terminationStatus, text))
+            do { try process.run() } catch { return continuation.resume(throwing: error) }
+            running.withLock { $0[ObjectIdentifier(process)] = process }
+            DispatchQueue.global(qos: .userInitiated).async {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                running.withLock { $0[ObjectIdentifier(process)] = nil }
+                continuation.resume(returning: (process.terminationStatus, String(decoding: data, as: UTF8.self)))
             }
-            do { try process.run() } catch { continuation.resume(throwing: error) }
         }
+    }
+
+    nonisolated private static let running = Locked<[ObjectIdentifier: Process]>([:])
+    /// How many times conversions have been stopped.
+    nonisolated private static let stops = Locked(0)
+
+    /// Stops every conversion under way, for a project that is closing.
+    static func stopAll() {
+        stops.withLock { $0 += 1 }
+        running.withLock { $0.values.forEach { $0.terminate() } }
+    }
+}
+
+/// A value shared between threads, one at a time.
+nonisolated final class Locked<Value>: @unchecked Sendable {
+    private var value: Value
+    private let lock = NSLock()
+    init(_ value: Value) { self.value = value }
+    func withLock<T>(_ body: (inout Value) -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return body(&value)
     }
 }

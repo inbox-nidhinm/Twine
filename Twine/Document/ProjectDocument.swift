@@ -80,21 +80,61 @@ final class ProjectDocument: NSDocument {
             media.preferredFilename = ProjectFormat.mediaFolderName
             root.addFileWrapper(media)
         }
-        // Files imported since the last save join the package now. Each is
-        // read from its staged copy as it is written, never held in memory.
-        let staged = MainActor.assumeIsolated { () -> [(String, URL)] in
-            (store?.project.media ?? []).compactMap { asset in stagedMedia[asset.fileName].map { (asset.fileName, $0) } }
+        // Files imported this session are cloned into the written package
+        // once it is written (`write(to:ofType:for:originalContentsURL:)`),
+        // rather than carried in the wrapper, which copied every byte on the
+        // main thread: three seconds of frozen app for an 844 MB video. One
+        // cloned by an earlier save is taken into the wrapper from the saved
+        // package, as a file read from there is, so it is linked across as
+        // the rest of the media is, never copied again.
+        let saved = MainActor.assumeIsolated { () -> [String] in
+            (store?.project.media ?? []).map(\.fileName)
         }
-        if let folder = root.fileWrappers?[ProjectFormat.mediaFolderName] {
-            for (name, url) in staged where folder.fileWrappers?[name] == nil {
-                if let file = try? FileWrapper(url: url, options: []) {
-                    file.preferredFilename = name
-                    folder.addFileWrapper(file)
-                }
+        if let folder = root.fileWrappers?[ProjectFormat.mediaFolderName],
+           let savedFolder = fileURL?.appendingPathComponent(ProjectFormat.mediaFolderName) {
+            for name in saved where folder.fileWrappers?[name] == nil {
+                let file = savedFolder.appendingPathComponent(name)
+                guard FileManager.default.fileExists(atPath: file.path),
+                      let wrapper = try? FileWrapper(url: file, options: []) else { continue }
+                wrapper.preferredFilename = name
+                folder.addFileWrapper(wrapper)
             }
         }
         package = root
         return root
+    }
+
+    /// Writes the package, then clones into it every file the project uses
+    /// that it does not yet hold: those imported since it was last saved,
+    /// from their staged copies, and any the wrapper did not carry, from the
+    /// package as it was. On the Mac's own drive a clone takes no time and
+    /// no space. A file found in neither place is left out, with a notice.
+    nonisolated override func write(to url: URL, ofType typeName: String, for saveOperation: NSDocument.SaveOperationType,
+                                    originalContentsURL: URL?) throws {
+        try super.write(to: url, ofType: typeName, for: saveOperation, originalContentsURL: originalContentsURL)
+        let wanted = MainActor.assumeIsolated { () -> [(name: String, staged: URL?, shown: String)] in
+            (store?.project.media ?? []).map { ($0.fileName, stagedMedia[$0.fileName], $0.originalName) }
+        }
+        let fm = FileManager.default
+        let folder = url.appendingPathComponent(ProjectFormat.mediaFolderName)
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        let before = originalContentsURL?.appendingPathComponent(ProjectFormat.mediaFolderName)
+        var lost: [String] = []
+        for (name, staged, shown) in wanted {
+            let target = folder.appendingPathComponent(name)
+            guard !fm.fileExists(atPath: target.path) else { continue }
+            let sources = [staged, before?.appendingPathComponent(name)].compactMap { $0 }
+            guard let source = sources.first(where: { fm.fileExists(atPath: $0.path) }) else {
+                if staged != nil { lost.append(shown) }
+                continue
+            }
+            try fm.copyItem(at: source, to: target)
+        }
+        if !lost.isEmpty {
+            MainActor.assumeIsolated {
+                editorController?.editor.showNotice("Couldn't keep \(lost.joined(separator: ", ")) in the project.")
+            }
+        }
     }
 
     // MARK: Media
@@ -125,6 +165,7 @@ final class ProjectDocument: NSDocument {
 
     /// Copies `source` aside under `fileName`, on a worker thread.
     func stage(_ source: URL, as fileName: String) async throws {
+        guard !isClosed else { throw CancellationError() }
         let folder = stagingFolder
         let target = folder.appendingPathComponent(fileName)
         try await Task.detached(priority: .userInitiated) {
@@ -138,6 +179,7 @@ final class ProjectDocument: NSDocument {
     /// Writes `data` aside under `fileName`, as `stage` copies a file: for
     /// pictures that come inside another file, such as an SVG's.
     func stage(_ data: Data, as fileName: String) async throws {
+        guard !isClosed else { throw CancellationError() }
         let folder = stagingFolder
         let target = folder.appendingPathComponent(fileName)
         try await Task.detached(priority: .userInitiated) {
@@ -162,6 +204,7 @@ final class ProjectDocument: NSDocument {
 
     private func scheduleSaveSoon() {
         saveSoon?.invalidate()
+        guard !isClosed else { return }
         let timer = Timer(timeInterval: 1, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
@@ -176,9 +219,17 @@ final class ProjectDocument: NSDocument {
         saveSoon = timer
     }
 
+    /// Set once closed, when nothing may be staged or saved any more.
+    private(set) var isClosed = false
+
     override func close() {
         saveSoon?.invalidate()
+        isClosed = true
         super.close()
+        // The copies made aside are in the package now, or were never
+        // wanted; left in the temporary folder, they piled up by the
+        // gigabyte, one folder a session.
+        if !stagedMedia.isEmpty { try? FileManager.default.removeItem(at: stagingFolder) }
     }
 
     /// The editor showing this document, whose pictures the thumbnail
@@ -189,14 +240,43 @@ final class ProjectDocument: NSDocument {
 
     /// Saves anything not yet saved, then closes: for when the window turns
     /// to something else rather than closing, which would have saved itself.
+    ///
+    /// A save that fails keeps the project open and asks, on the window,
+    /// whether to try again or close without saving: closing anyway lost
+    /// the changes without a word.
     func closeAfterSaving(then: @escaping () -> Void) {
         guard hasUnautosavedChanges || isDocumentEdited else {
             close()
             return then()
         }
-        autosave(withImplicitCancellability: false) { [weak self] _ in
-            self?.close()
-            then()
+        autosave(withImplicitCancellability: false) { [weak self] error in
+            MainActor.assumeIsolated {
+                guard let self else { return then() }
+                guard let error else {
+                    self.close()
+                    return then()
+                }
+                self.askAfterFailedSave(error, then: then)
+            }
+        }
+    }
+
+    private func askAfterFailedSave(_ error: Error, then: @escaping () -> Void) {
+        let alert = NSAlert()
+        alert.messageText = "\u{201C}\(name)\u{201D} couldn't be saved."
+        let nsError = error as NSError
+        alert.informativeText = [nsError.localizedDescription, nsError.localizedFailureReason]
+            .compactMap { $0 }.joined(separator: " ")
+        alert.addButton(withTitle: "Try Again")
+        alert.addButton(withTitle: "Close Without Saving")
+        alert.beginSheetModal(for: MainWindow.window) { [weak self] response in
+            guard let self else { return then() }
+            if response == .alertFirstButtonReturn {
+                self.closeAfterSaving(then: then)
+            } else {
+                self.close()
+                then()
+            }
         }
     }
 

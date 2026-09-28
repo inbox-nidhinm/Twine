@@ -42,6 +42,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     func leave(then: @escaping () -> Void) {
         menus.dismiss()
         controller.finishEditing()
+        controller.closeDown()
         controller.stop()
         editor.exports.cancel()
         let document = document as? ProjectDocument
@@ -58,6 +59,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     func windowWillClose(_ notification: Notification) {
         menus.dismiss()
         controller.finishEditing()
+        controller.closeDown()
         editor.exports.cancel()
     }
 

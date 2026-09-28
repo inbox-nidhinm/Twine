@@ -136,6 +136,7 @@ final class EditorController {
     /// rather than failing silently.
     @discardableResult
     func perform(_ command: EditorCommand) -> Bool {
+        guard !isClosed else { return false }
         do {
             try store.perform(command)
             return true
@@ -190,10 +191,12 @@ final class EditorController {
     var scrubbing: Scrubbing { Scrubbing(begin: { [weak self] in self?.beginScrub($0) }, end: { [weak self] in self?.end() }) }
 
     func update(_ layers: [Layer]) {
+        guard !isClosed else { return }
         try? store.updateContinuousChange(layerUpdate(layers))
     }
 
     func update(_ command: EditorCommand) {
+        guard !isClosed else { return }
         try? store.updateContinuousChange(command)
     }
 
@@ -205,6 +208,7 @@ final class EditorController {
     /// save: otherwise quitting or a crash mid-sentence would find nothing
     /// edited and lose the words.
     func type(_ layers: [Layer], joining key: String) {
+        guard !isClosed else { return }
         try? store.perform(.batch([layerUpdate(layers)], name: "Edit Text"), joining: key)
         document?.updateChangeCount(.changeDone)
     }
@@ -214,6 +218,17 @@ final class EditorController {
     func finishEditing() {
         canvas?.endTextEditing()
         end()
+    }
+
+    /// Set once the project has closed: an import still under way when it
+    /// closes finishes into nothing, rather than changing a project that
+    /// is gone, whose next save could write over a fresh copy of it.
+    private(set) var isClosed = false
+
+    /// Closes the editor to changes, stopping conversions under way.
+    func closeDown() {
+        isClosed = true
+        WebMConversion.stopAll()
     }
 
     func cancel() { store.cancelContinuousChange() }
@@ -513,11 +528,15 @@ final class EditorController {
         let composition = project.composition
         let center = point ?? Vec2(Double(composition.width) / 2, Double(composition.height) / 2)
         let name = url.deletingPathExtension().lastPathComponent
+        let fitting = composition.size
         Task { @MainActor in
-            guard let data = try? Data(contentsOf: url),
-                  let read = try? SVGImport.read(data, name: name, center: center, fitting: composition.size) else {
-                return NSSound.beep()
+            // Read on a worker thread: a large drawing takes a while, and the
+            // app should not freeze meanwhile.
+            let reading = Task.detached(priority: .userInitiated) { () -> SVGImport.Result? in
+                guard let data = try? Data(contentsOf: url) else { return nil }
+                return try? SVGImport.read(data, name: name, center: center, fitting: fitting)
             }
+            guard let read = await reading.value else { return NSSound.beep() }
             let result = read.reusing(project.media)
             var commands: [EditorCommand] = []
             for item in result.media {
@@ -537,7 +556,9 @@ final class EditorController {
     func pasteFromFigma(_ text: String) {
         guard let document else { return }
         Task { @MainActor in
-            guard let read = try? FigmaImport.read(text) else { return NSSound.beep() }
+            // Read on a worker thread, pictures and all, as an SVG is.
+            guard let read = await Task.detached(priority: .userInitiated, operation: { try? FigmaImport.read(text) }).value
+            else { return NSSound.beep() }
             var commands: [EditorCommand] = []
             // Whole pixels, so edges that were crisp in Figma stay so.
             let c = project.composition

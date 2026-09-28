@@ -628,7 +628,11 @@ enum SelfTest {
                 }
                 log(line)
             case "save":
-                (window.windowController?.document as? NSDocument)?.autosave(withImplicitCancellability: false) { _ in }
+                // Saving runs on the main thread, so its time is how long the app froze.
+                let began = Date()
+                (window.windowController?.document as? NSDocument)?.autosave(withImplicitCancellability: false) { _ in
+                    log("SAVE \(Int(Date().timeIntervalSince(began) * 1000)) ms")
+                }
             case "waitexport":
                 func poll() {
                     if controller.editor.exports.isExporting { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { poll() } } else { next() }

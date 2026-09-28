@@ -39,7 +39,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `hover X Y`, `rhover X Y`, `chover X Y` | Pointer moves handed straight to the timeline tracks, the ruler or the canvas (`chover` logs `HOVER`) |
 | `call NAME` | `duplicate`, `shortcuts`, `copy`, `paste`, `undo`, `focuscanvas`, `copyeasing`, `pasteeasing`, `exportmovie` (opens the export panel; again, exports), `exportframe`, `staggermenu`, `group`, `frameselection` |
 | `savepanel PATH`, `waitexport` | Fills and closes a save panel, waits for an export |
-| `import PATH`, `save` | Imports media (an `.svg` comes in as layers), saves |
+| `import PATH`, `save` | Imports media (an `.svg` comes in as layers), saves (logging `SAVE` with how long the save held the main thread) |
 | `actions`, `spec`, `text` | Logs every action, the selected actions' specs, the selected text layer |
 | `path`, `path xy` | Logs the selected shape's points, style and box, and whether its points are showing or being drawn; `xy` adds each point's and handle's place in the window, to click on |
 | `moveproject NAME FOLDER`, `showfolder FOLDER` | Moves a home screen project into a folder (`-` for out of one), as a drop does; shows a folder (`-` for All Projects) |

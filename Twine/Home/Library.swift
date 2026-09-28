@@ -42,6 +42,9 @@ final class Library {
 
     func count(in folder: Folder) -> Int { items.filter { $0.folder == folder.url }.count }
 
+    /// What each project's files held when last read, by when it was saved.
+    @ObservationIgnored private var read: [URL: (modified: Date, composition: Composition?, thumbnail: NSImage?)] = [:]
+
     func refresh() {
         let fm = FileManager.default
         try? Creations.ensureFolder()
@@ -64,10 +67,18 @@ final class Library {
             let document = url.appendingPathComponent(ProjectFormat.documentFileName)
             let modified = (try? document.resourceValues(forKeys: [.contentModificationDateKey]))?
                 .contentModificationDate ?? .distantPast
+            // Read again only when saved since: the whole document is read
+            // for its size, which with many projects stuttered each time
+            // the window came to the front.
+            if let known = read[url], known.modified == modified {
+                return Item(url: url, modified: modified, composition: known.composition, thumbnail: known.thumbnail, folder: folder)
+            }
             let thumb = NSImage(contentsOf: url.appendingPathComponent(ProjectFormat.thumbnailFileName))
-            return Item(url: url, modified: modified, composition: (try? Creations.read(url))?.composition,
-                        thumbnail: thumb, folder: folder)
+            let composition = (try? Creations.read(url))?.composition
+            read[url] = (modified, composition, thumb)
+            return Item(url: url, modified: modified, composition: composition, thumbnail: thumb, folder: folder)
         }
+        read = read.filter { url, _ in projects.contains { $0.0 == url } }
         // Most recently touched first: the thing you were last working on is
         // the thing you are most likely coming back for.
         items = made.sorted { $0.modified > $1.modified }

@@ -23,6 +23,15 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Steadier saving and importing", changes: [
+            "Saving after importing a large video no longer freezes Twine: an 844 MB clip took three seconds to save, and now takes a tenth of one.",
+            "If a project can't be saved when you leave it, Twine says so and offers to try again, rather than closing it and losing the changes.",
+            "A file that can't be kept in the project is named in a notice rather than dropped without a word.",
+            "A damaged WebM can no longer leave its conversion stuck, and leaving a project stops a conversion still under way.",
+            "An import still finishing when you leave a project no longer changes it after it has closed.",
+            "Large SVGs and Figma pastes are read without freezing the app, and the home screen reads only projects saved since it last looked.",
+            "The copies Twine makes of imported files are cleared away when the project closes, instead of piling up.",
+        ]),
         .init(date: "29 September 2026", title: "Copies, masks and undo", changes: [
             "Duplicating, pasting or Option-dragging a layer keeps its blend mode and its width and height link.",
             "A layer and its mask duplicated or pasted together come out as a new pair: the copy is masked by the mask's copy, not the original.",
