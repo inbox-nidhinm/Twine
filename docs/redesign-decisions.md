@@ -7,7 +7,7 @@ Answers to the audit questions for the Jitter-style redesign (26 September 2026)
 - Export (MP4 H.264, ProRes 4444, HEVC with alpha, current-frame PNG) is built right after redesign milestone 5, so real videos come as early as possible.
 - Text layers are built at the start of milestone 7; image, video and audio layers at the start of milestone 8.
 - Masks, snapping and alignment, and the pen tool from the original brief come after milestone 8.
-- Presets are postponed. When they return they are made of actions.
+- Presets are postponed. When they return they are made of actions. (Superseded on 28 September 2026: a preset is one bar with its settings in the inspector, as in Jitter, and can be split into its actions.)
 
 ## Model and evaluation
 

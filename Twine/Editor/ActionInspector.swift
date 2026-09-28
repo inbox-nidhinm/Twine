@@ -12,26 +12,131 @@ struct ActionInspector: View {
     let actions: [Action]
 
     private var first: Action { actions[0] }
-    private var sameKind: Bool { actions.allSatisfy { $0.spec.kind == first.spec.kind } }
+    /// Presets count as one kind only when they are the same preset.
+    private var sameKind: Bool { actions.allSatisfy { $0.spec.kind == first.spec.kind && $0.preset == first.preset } }
+
+    private var kindName: String {
+        first.preset.map { Presets.preset($0.preset).name } ?? first.spec.kind.defaultName
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HeaderRow(title: actions.count == 1 ? first.name : sameKind ? first.spec.kind.defaultName : "Actions") {}
+            HeaderRow(title: actions.count == 1 ? first.name : sameKind ? kindName : "Actions") {}
             VStack(alignment: .leading, spacing: 10) {
                 TimingFields(controller: controller, actions: actions)
-                // A Play runs at the clip's own speed, so it has no easing.
-                if actions.contains(where: { !$0.isInstant && $0.spec.kind != .play }) {
+                // A Play runs at the clip's own speed, and a shake keeps its
+                // jolts' own easing, so neither has any.
+                if actions.contains(where: { !$0.isInstant && $0.spec.kind != .play
+                                             && $0.preset.map { PresetRecipe.usesEasing($0.preset) } ?? true }) {
                     EasingFields(controller: controller, actions: actions)
                 }
             }
             .padding(.horizontal, Theme.panelPad)
             .padding(.bottom, Theme.panelPad)
 
-            if sameKind {
+            if sameKind, let settings = first.preset {
+                // A preset with nothing to set but its timing shows nothing more.
+                if !Presets.controls(for: settings.preset).isEmpty {
+                    PanelDivider()
+                    PresetFields(controller: controller, settings: settings)
+                        .padding(Theme.panelPad)
+                }
+            } else if sameKind {
                 PanelDivider()
                 ValueFields(controller: controller, action: first, inherited: controller.inheritedState(for: first))
                     .padding(Theme.panelPad)
             }
+        }
+    }
+}
+
+extension Action {
+    /// A preset bar's settings, nil for any other action.
+    var preset: PresetAction? {
+        if case .preset(let p) = spec { return p }
+        return nil
+    }
+}
+
+// MARK: - Presets
+
+/// What a preset offers to set, below its timing and easing: only the
+/// settings that preset uses, each starting at the preset's own value.
+private struct PresetFields: View {
+    let controller: EditorController
+    let settings: PresetAction
+
+    private var kind: PresetKind { settings.preset }
+    private var own: PresetAction { PresetRecipe.defaults(kind) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Presets.controls(for: kind), id: \.self) { control in
+                row(control)
+            }
+        }
+    }
+
+    @ViewBuilder private func row(_ control: PresetControl) -> some View {
+        switch control {
+        case .direction:
+            // Its name above, as Easing's is: four choices need the width.
+            VStack(alignment: .leading, spacing: 6) {
+                Text(kind == .slideOut ? "To" : "From")
+                    .font(ThemeFont.label)
+                    .foregroundStyle(Theme.textSecondary)
+                SegmentRow(selection: settings.direction ?? own.direction ?? .left, options: PresetDirection.allCases,
+                           title: { $0.rawValue.capitalized }) { d in edit("Direction") { $0.direction = d } }
+            }
+            .help(kind == .slideOut ? "Which way it leaves." : "Which side it comes in from.")
+        case .distance:
+            LabeledRow(label: kind == .bounce ? "Height" : "Distance") {
+                UnitField(value: settings.distance ?? own.distance ?? 0, decimals: 0, suffix: "px", accepts: { $0 >= 0 }) { v in
+                    edit("Distance") { $0.distance = v }
+                }
+                Color.clear.frame(width: Theme.control)
+            }
+            .help(kind == .shake ? "How far it shakes each way." : kind == .bounce ? "How high it bounces." : "How far it travels.")
+        case .scale:
+            LabeledRow(label: kind == .pulse ? "Peak" : kind == .scaleOut ? "To" : "From") {
+                UnitField(value: (settings.scale ?? own.scale ?? 1) * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 }) { v in
+                    edit("Scale") { $0.scale = v / 100 }
+                }
+                Color.clear.frame(width: Theme.control)
+            }
+            .help(kind == .pulse ? "How big it grows before settling back."
+                  : kind == .scaleOut ? "The size it shrinks to, of its own." : "The size it grows from, of its own.")
+        case .angle:
+            LabeledRow(label: "Angle") {
+                UnitField(value: settings.angle ?? own.angle ?? 0, decimals: 0, suffix: "°") { v in edit("Angle") { $0.angle = v } }
+                Color.clear.frame(width: Theme.control)
+            }
+            .help(kind == .wiggle ? "How far it tips each way." : "How far it turns on the way in. Negative turns the other way.")
+        case .blur:
+            LabeledRow(label: "Blur") {
+                UnitField(value: settings.blur ?? own.blur ?? 0, decimals: 0, accepts: { $0 >= 0 }) { v in edit("Blur") { $0.blur = v } }
+                Color.clear.frame(width: Theme.control)
+            }
+            .help(kind == .blurOut ? "How blurred it ends." : "How blurred it starts.")
+        case .fades:
+            HStack {
+                Text("Fade")
+                    .font(ThemeFont.label)
+                    .foregroundStyle(Theme.textSecondary)
+                Spacer(minLength: 0)
+                let fades = settings.fades ?? own.fades ?? true
+                PillToggle(isOn: fades) { edit(fades ? "Stop Fading" : "Fade") { $0.fades = !fades } }
+            }
+            .help(PresetCategory.entrance == Presets.preset(kind).category ? "Fades in as it comes on." : "Fades out as it goes.")
+        }
+    }
+
+    /// Changes every selected bar of this preset together.
+    private func edit(_ name: String, _ change: @escaping (inout PresetAction) -> Void) {
+        controller.editActions(name) { a in
+            guard case .preset(var p) = a.spec, p.preset == kind else { return }
+            change(&p)
+            a.spec = .preset(p)
         }
     }
 }

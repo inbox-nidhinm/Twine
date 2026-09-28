@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Presets on one bar", changes: [
+            "A preset now goes on as one bar in the timeline, as in Jitter. Click it to set everything it offers in the inspector: its timing and easing, and settings such as where a slide comes from, how far it travels, how big a pop starts and whether it fades.",
+            "Slide In and Slide Out are one preset each, with a From or To choice of left, right, top or bottom.",
+            "Dragging a preset bar's ends stretches the whole preset, fades and all.",
+            "Right-click a preset bar in the timeline and choose Split into Actions to edit its parts one by one. Presets added before this stay as separate actions.",
+        ]),
         .init(date: "28 September 2026", title: "Actions for several layers", changes: [
             "Add Action and Add Preset no longer grey out when a sound is selected along with other layers: they offer what the other layers share, each gets its own bar at the playhead, and the sound is left as it is.",
         ]),

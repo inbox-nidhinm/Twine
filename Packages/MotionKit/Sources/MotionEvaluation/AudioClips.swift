@@ -65,7 +65,7 @@ public func audioClips(_ project: Project) -> [AudioClip] {
         case .video(let v): (mediaID, volume, muted) = (v.mediaID, min(v.volume, 1), v.isMuted)
         default: continue
         }
-        let fades = (tracks[layer.id] ?? []).filter { $0.spec.kind == .volume }
+        let fades = (tracks[layer.id] ?? []).filter { $0.drives(.volume) }
         let envelope = fades.isEmpty ? [] : volumeEnvelope(of: layer, fades)
         guard !muted, volume > 0 || envelope.contains(where: { $0.volume > 0 }), let asset = assets[mediaID],
               asset.kind == .audio || asset.hasAudio else { continue }

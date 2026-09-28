@@ -189,6 +189,20 @@ enum SelfTest {
             case "add":
                 // Adds an action of a kind, by name, as the Add Action menu does.
                 if let kind = ActionKind(rawValue: parts[1]) { controller.addAction(kind) } else { log("unknown kind \(parts[1])") }
+            case "preset":
+                // Adds a preset by its id (`slide-in`...), as the Add Preset menu does.
+                if let kind = PresetKind(rawValue: parts[1]) { controller.addPreset(Presets.preset(kind)) } else { log("unknown preset \(parts[1])") }
+            case "split":
+                // Split into Actions, from the timeline's right-click menu.
+                controller.splitSelectedPresets()
+            case "sample":
+                // The selected layers' position and opacity at a time, as the canvas shows them.
+                let t = Double(parts[1]) ?? 0
+                let tracks = ActionTracks(controller.project.actions)
+                log("SAMPLE t=\(parts[1]) " + controller.selectedLayers.map { l in
+                    let st = tracks.state(of: l, at: t)
+                    return "\(l.name)@\(Int(st.position.x.rounded())),\(Int(st.position.y.rounded())) o=\(String(format: "%.2f", st.opacity))"
+                }.joined(separator: " "))
             case "offers":
                 // What Add Action and Add Preset offer for the selection.
                 log("OFFERS actions=\(controller.availableActions.map(\.rawValue)) presets=\(controller.availablePresets.map(\.name))")

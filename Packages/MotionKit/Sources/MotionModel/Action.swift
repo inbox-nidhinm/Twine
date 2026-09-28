@@ -73,6 +73,9 @@ public enum ActionSpec: Sendable, Equatable {
     case path(PathAction)
     case play(PlayAction)
     case volume(VolumeAction)
+    /// A ready-made animation on one bar: several properties at once, with
+    /// the settings its preset offers. See `PresetAction`.
+    case preset(PresetAction)
 
     public var kind: ActionKind {
         switch self {
@@ -98,6 +101,7 @@ public enum ActionSpec: Sendable, Equatable {
         case .path: return .path
         case .play: return .play
         case .volume: return .volume
+        case .preset: return .preset
         }
     }
 }
@@ -109,6 +113,8 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     case letterSpacing, lineHeight, counter, changeText
     case arc, star, path
     case play, volume
+    /// Added from Add Preset, never from Add Action.
+    case preset
 
     public var defaultName: String {
         switch self {
@@ -134,6 +140,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .path: return "Path"
         case .play: return "Play"
         case .volume: return "Volume"
+        case .preset: return "Preset"
         }
     }
 
@@ -146,6 +153,8 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .letterSpacing, .lineHeight, .counter, .changeText: return .text
         case .arc, .star, .path: return .shape
         case .play, .volume: return .media
+        // Never listed: presets have a menu of their own.
+        case .preset: return .transform
         }
     }
 }
@@ -508,11 +517,58 @@ public struct VolumeAction: Codable, Sendable, Equatable {
     }
 }
 
+/// A preset on one bar. It remembers which preset it is and the settings
+/// the inspector shows for it; what it does to the layer is worked out when
+/// it plays (`PresetRecipe`, in MotionEvaluation), from the layer as it is
+/// when the bar starts, so it suits a layer wherever it is. Stretching the
+/// bar stretches every part of it together. A setting left empty is the
+/// preset's own default; only those the preset uses mean anything.
+public struct PresetAction: Codable, Sendable, Equatable {
+    public var preset: PresetKind
+    /// Where a slide comes from, or goes to.
+    public var direction: PresetDirection?
+    /// Pixels: how far a slide, drop, bounce or shake travels.
+    public var distance: Double?
+    /// 1 is 100%: where a scale starts (entrances), ends (exits) or peaks
+    /// (Pulse).
+    public var scale: Double?
+    /// Degrees: how far a rotation turns.
+    public var angle: Double?
+    /// Figma's pixels: how blurred it starts or ends.
+    public var blur: Double?
+    /// Whether it fades as it moves.
+    public var fades: Bool?
+
+    public init(preset: PresetKind, direction: PresetDirection? = nil, distance: Double? = nil, scale: Double? = nil,
+                angle: Double? = nil, blur: Double? = nil, fades: Bool? = nil) {
+        self.preset = preset
+        self.direction = direction
+        self.distance = distance
+        self.scale = scale
+        self.angle = angle
+        self.blur = blur
+        self.fades = fades
+    }
+}
+
+/// Every preset there is. The raw values are what files store.
+public enum PresetKind: String, Codable, Sendable, CaseIterable {
+    case fadeIn = "fade-in", slideIn = "slide-in", scalePop = "scale-pop", rotateIn = "rotate-in"
+    case blurIn = "blur-in", dropIn = "drop-in"
+    case fadeOut = "fade-out", slideOut = "slide-out", scaleOut = "scale-out", blurOut = "blur-out"
+    case fadeSoundIn = "fade-sound-in", fadeSoundOut = "fade-sound-out"
+    case pulse, bounce, shake, wiggle
+}
+
+public enum PresetDirection: String, Codable, Sendable, CaseIterable {
+    case left, right, top, bottom
+}
+
 extension ActionSpec: Codable {
     private enum CodingKeys: String, CodingKey {
         case type, move, scale, rotate, opacity, resize, visibility
         case color, stroke, trim, cornerRadius, shadow, layerBlur, backgroundBlur
-        case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume
+        case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume, preset
     }
 
     public init(from decoder: Decoder) throws {
@@ -540,6 +596,7 @@ extension ActionSpec: Codable {
         case .path: self = .path(try c.decode(PathAction.self, forKey: .path))
         case .play: self = .play(try c.decode(PlayAction.self, forKey: .play))
         case .volume: self = .volume(try c.decode(VolumeAction.self, forKey: .volume))
+        case .preset: self = .preset(try c.decode(PresetAction.self, forKey: .preset))
         }
     }
 
@@ -569,6 +626,7 @@ extension ActionSpec: Codable {
         case .path(let v): try c.encode(v, forKey: .path)
         case .play(let v): try c.encode(v, forKey: .play)
         case .volume(let v): try c.encode(v, forKey: .volume)
+        case .preset(let v): try c.encode(v, forKey: .preset)
         }
     }
 }

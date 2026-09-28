@@ -35,6 +35,8 @@ extension ActionKind {
         case .path: return .path
         case .play: return .media
         case .volume: return .volume
+        // A preset reaches several; `ActionTracks` asks its recipe which.
+        case .preset: return .position
         }
     }
 }
@@ -177,10 +179,24 @@ public struct LayerState: Sendable, Equatable {
 /// channel, ready to be evaluated at any moment, including between frames.
 public struct ActionTracks: Sendable {
     private var tracks: [UUID: [Channel: [Action]]] = [:]
+    /// Each preset's parts, worked out once.
+    private var presetParts: [UUID: [PresetPart]] = [:]
+    /// The layers with a preset on them. Only they take the slower way.
+    private var presetLayers: Set<UUID> = []
 
     public init(_ actions: [Action]) {
         for action in actions where action.isEnabled {
-            tracks[action.targetLayerID, default: [:]][action.spec.kind.channel, default: []].append(action)
+            if case .preset(let p) = action.spec {
+                // On every property it reaches, as one action there.
+                let parts = PresetRecipe.parts(p)
+                presetParts[action.id] = parts
+                presetLayers.insert(action.targetLayerID)
+                for channel in Set(parts.map(\.effect.channel)) {
+                    tracks[action.targetLayerID, default: [:]][channel, default: []].append(action)
+                }
+            } else {
+                tracks[action.targetLayerID, default: [:]][action.spec.kind.channel, default: []].append(action)
+            }
         }
         for (layer, channels) in tracks {
             for (channel, list) in channels {
@@ -210,6 +226,9 @@ public struct ActionTracks: Sendable {
     /// its channel applied. The inspector shows this as the placeholder for
     /// an empty starting value.
     public func inheritedState(for action: Action, of layer: Layer) -> LayerState {
+        // A preset picks up the layer as it is when it starts, on every
+        // property it reaches.
+        if case .preset = action.spec { return state(of: layer, at: action.start) { $0.id != action.id } }
         let channel = action.spec.kind.channel
         let earlier = Set((tracks[layer.id]?[channel] ?? []).prefix { $0.id != action.id }.map(\.id))
         return state(of: layer, at: action.start) { $0.spec.kind.channel != channel || earlier.contains($0.id) }
@@ -218,12 +237,16 @@ public struct ActionTracks: Sendable {
     private func state(of layer: Layer, at time: Double, including: (Action) -> Bool) -> LayerState {
         var state = LayerState(design: layer)
         guard let channels = tracks[layer.id] else { return state }
+        let presets = !presetParts.isEmpty && presetLayers.contains(layer.id)
+        func steps<V>(_ actions: [Action], _ plain: (Action) -> Step<V>?, _ part: (PresetEffect) -> PartRun<V>?) -> [Step<V>] {
+            presets ? self.steps(actions, plain, part) : actions.compactMap(plain)
+        }
         func list(_ channel: Channel) -> [Action] { (channels[channel] ?? []).filter(including) }
 
-        state.position = walk(state.position, list(.position).compactMap(Self.positionStep), at: time)
-        state.scale = walk(state.scale, list(.scale).compactMap(Self.scaleStep), at: time)
-        state.rotation = walk(state.rotation, list(.rotation).compactMap(Self.rotationStep), at: time)
-        state.opacity = walk(state.opacity, list(.opacity).compactMap(Self.opacityStep), at: time)
+        state.position = walk(state.position, steps(list(.position), Self.positionStep, Self.positionPart), at: time)
+        state.scale = walk(state.scale, steps(list(.scale), Self.scaleStep, Self.scalePart), at: time)
+        state.rotation = walk(state.rotation, steps(list(.rotation), Self.rotationStep, Self.rotationPart), at: time)
+        state.opacity = walk(state.opacity, steps(list(.opacity), Self.opacityStep, Self.opacityPart), at: time)
         state.size = walk(state.size, list(.size).compactMap(Self.sizeStep), at: time)
         state.isShown = walk(1, Self.visibilitySteps(list(.visibility)), at: time) > 0.5
         // Only what the layer has: a Colour on a layer with no fill does nothing.
@@ -234,7 +257,7 @@ public struct ActionTracks: Sendable {
             state.cornerRadii = walk(radii, list(.cornerRadius).compactMap(Self.cornerStep), at: time)
         }
         state.shadow = walk(state.shadow, list(.shadow).compactMap(Self.shadowStep), at: time)
-        state.layerBlur = walk(state.layerBlur, list(.layerBlur).compactMap(Self.layerBlurStep), at: time)
+        state.layerBlur = walk(state.layerBlur, steps(list(.layerBlur), Self.layerBlurStep, Self.layerBlurPart), at: time)
         state.backgroundBlur = walk(state.backgroundBlur, list(.backgroundBlur).compactMap(Self.backgroundBlurStep),
                                     at: time)
         if let spacing = state.letterSpacing {
@@ -247,12 +270,73 @@ public struct ActionTracks: Sendable {
         if let arc = state.arc { state.arc = walk(arc, list(.arc).compactMap(Self.arcStep), at: time) }
         if let star = state.star { state.star = walk(star, list(.star).compactMap(Self.starStep), at: time) }
         if let path = state.path { state.path = walk(path, list(.path).compactMap(Self.pathStep), at: time) }
-        if let volume = state.volume { state.volume = walk(volume, list(.volume).compactMap(Self.volumeStep), at: time) }
+        if let volume = state.volume { state.volume = walk(volume, steps(list(.volume), Self.volumeStep, Self.volumePart), at: time) }
         if state.sourceTime != nil { state.sourceTime = Self.sourceTime(list(.media), at: time) }
         return state
     }
 
     // MARK: Actions as steps
+
+    /// A channel's steps: each action's, and each part a preset has there,
+    /// in order of start (ties keep the actions' order).
+    private func steps<V>(_ actions: [Action], _ plain: (Action) -> Step<V>?,
+                          _ part: (PresetEffect) -> PartRun<V>?) -> [Step<V>] {
+        var out: [Step<V>] = []
+        var parted = false
+        for action in actions {
+            // Only presets are looked up: hashing every action's id on every
+            // frame cost a tenth of evaluation.
+            if case .preset = action.spec, let parts = presetParts[action.id] {
+                for p in parts { if let run = part(p.effect) { out.append(Step(action, part: p, run: run)); parted = true } }
+            } else if let step = plain(action) {
+                out.append(step)
+            }
+        }
+        guard parted else { return out }
+        return out.enumerated().sorted { ($0.element.start, $0.offset) < ($1.element.start, $1.offset) }.map(\.element)
+    }
+
+    // What each preset effect does on its channel, from the value when it
+    // starts (`inherited`), the value when the preset first reached the
+    // channel (`own`) and the design value.
+
+    private static func positionPart(_ e: PresetEffect) -> PartRun<Vec2>? {
+        guard case .move(let by, let entering) = e else { return nil }
+        return PartRun(holds: entering) { inherited, own, _ in entering ? (own + by, own) : (inherited, inherited + by) }
+    }
+
+    private static func scalePart(_ e: PresetEffect) -> PartRun<Vec2>? {
+        guard case .scale(let from, let to) = e else { return nil }
+        return PartRun(holds: from != nil) { inherited, own, _ in
+            (from.map { Vec2(own.x * $0, own.y * $0) } ?? inherited, Vec2(own.x * (to ?? 1), own.y * (to ?? 1)))
+        }
+    }
+
+    private static func rotationPart(_ e: PresetEffect) -> PartRun<Double>? {
+        guard case .rotate(let by, let entering) = e else { return nil }
+        return PartRun(holds: entering) { inherited, own, _ in entering ? (own - by, own) : (inherited, inherited + by) }
+    }
+
+    private static func opacityPart(_ e: PresetEffect) -> PartRun<Double>? {
+        guard case .opacity(let from, let to) = e else { return nil }
+        // A layer faded right out has nothing of its own to come back to, so
+        // it comes back to its design, or all the way.
+        return PartRun(holds: from != nil) { inherited, own, design in
+            (from ?? inherited, to ?? (own > 0.01 ? own : design > 0.01 ? design : 1))
+        }
+    }
+
+    private static func layerBlurPart(_ e: PresetEffect) -> PartRun<Double>? {
+        guard case .blur(let from, let to) = e else { return nil }
+        return PartRun(holds: from != nil) { inherited, _, _ in (from ?? inherited, to) }
+    }
+
+    private static func volumePart(_ e: PresetEffect) -> PartRun<Double>? {
+        guard case .volume(let from, let to) = e else { return nil }
+        return PartRun(holds: from != nil) { inherited, own, design in
+            (from ?? inherited, to ?? min(own > 0.01 ? own : design > 0.01 ? design : 1, 1))
+        }
+    }
 
     private static func positionStep(_ a: Action) -> Step<Vec2>? {
         guard case .move(let m) = a.spec else { return nil }
@@ -457,6 +541,11 @@ struct Step<V: Interpolatable> {
     /// Straight unless a Move is curved.
     var travel: ((V, V, Double) -> V)?
 
+    /// For a preset's part, how it works out its values; nil for any other
+    /// step. Boxed, so ordinary steps stay small: a larger step made every
+    /// frame's evaluation a third slower.
+    var part: PartBox<V>?
+
     init(_ action: Action, initial: V?, target: @escaping (V) -> V, travel: ((V, V, Double) -> V)? = nil) {
         start = action.start
         duration = action.duration
@@ -465,6 +554,48 @@ struct Step<V: Interpolatable> {
         self.initial = initial
         self.target = target
         self.travel = travel
+    }
+
+    init(_ action: Action, part: PresetPart, run: PartRun<V>) {
+        start = action.start + part.start * action.duration
+        duration = part.duration * action.duration
+        isInstant = duration <= 0
+        easing = part.easing ?? action.easing
+        initial = nil
+        target = { $0 }
+        self.part = PartBox(run: run, group: action.id)
+    }
+
+    /// What it shows before it starts, as the first step on its channel:
+    /// an explicit starting value holds from the start of the scene.
+    func before(_ design: V) -> V {
+        if let run = part?.run { return run.holds ? run.resolve(design, design, design).from : design }
+        return initial ?? design
+    }
+}
+
+/// A preset part's run and the preset it belongs to, whose parts on one
+/// channel share what the preset found there.
+final class PartBox<V> {
+    let run: PartRun<V>
+    let group: UUID
+
+    init(run: PartRun<V>, group: UUID) {
+        self.run = run
+        self.group = group
+    }
+}
+
+/// A preset part's start and end on its channel, from the value it
+/// inherits, the value its preset found there and the design value.
+/// `holds` when it sets where it starts, as an explicit initial value does.
+struct PartRun<V> {
+    var holds: Bool
+    var resolve: (_ inherited: V, _ own: V, _ design: V) -> (from: V, to: V)
+
+    init(holds: Bool, _ resolve: @escaping (_ inherited: V, _ own: V, _ design: V) -> (from: V, to: V)) {
+        self.holds = holds
+        self.resolve = resolve
     }
 }
 
@@ -492,14 +623,25 @@ struct Step<V: Interpolatable> {
 ///    different channels never interfere.
 /// 7. Instant actions (zero duration, and every Hide/Show) jump to their end
 ///    value at their start, with no easing.
+/// 8. A preset is one action whose parts are steps on the channels they
+///    reach, each following these rules. Its values are measured from what
+///    it finds on each channel when its first part there starts.
 func walk<V: Interpolatable>(_ design: V, _ steps: [Step<V>], at time: Double) -> V {
     guard let first = steps.first else { return design }
-    if time < first.start { return first.initial ?? design }        // rules 1 and 4
+    if time < first.start { return first.before(design) }           // rules 1 and 4
 
     var current: (step: Step<V>, from: V, to: V)?
+    var found: [UUID: V] = [:]
     for step in steps {
         guard step.start <= time else { break }                      // rule 4: not started yet
         let inherited = current.map { value(of: $0, at: step.start) } ?? design
+        if let part = step.part {                                     // rule 8
+            let own: V
+            if let seen = found[part.group] { own = seen } else { own = inherited; found[part.group] = inherited }
+            let (from, to) = part.run.resolve(inherited, own, design)
+            current = (step, from, to)
+            continue
+        }
         let from = step.initial ?? inherited                          // rule 3
         current = (step, from, step.target(from))                     // rule 6: it takes over
     }

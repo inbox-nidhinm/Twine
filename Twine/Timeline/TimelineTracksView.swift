@@ -366,7 +366,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
               let peaks = controller.waveforms.peaks(for: asset.id, at: controller.document?.mediaURL(for: asset.id)),
               !peaks.isEmpty, action.duration > 0 else { return }
         var level: ((Double) -> Double)?
-        let fades = controller.project.actions(on: action.targetLayerID).filter { $0.isEnabled && $0.spec.kind == .volume }
+        let fades = controller.project.actions(on: action.targetLayerID).filter { $0.isEnabled && $0.drives(.volume) }
         if !fades.isEmpty, let layer = controller.project.layer(withID: action.targetLayerID) {
             let envelope = volumeEnvelope(of: layer, fades)
             let design = LayerState(design: layer).volume ?? 1
@@ -611,6 +611,7 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
             .item("Stagger…", disabled: controller.selectedActions.count < 2) {
                 menus.showPopup(at: origin) { StaggerCard(controller: controller) { menus.dismiss() } }
             },
+            .item("Split into Actions", disabled: !controller.canSplitPresets) { controller.splitSelectedPresets() },
             .separator,
             .item("Show Only Selected Layers", checked: editor.timelineOnlySelected) { editor.timelineOnlySelected.toggle() },
             .item("Show Times as Frames", checked: editor.showsFrames) { editor.showsFrames.toggle() },
@@ -740,6 +741,7 @@ extension ActionKind {
         case .path: return .pen
         case .play: return .play
         case .volume: return .speaker
+        case .preset: return .preset
         }
     }
 }

@@ -531,19 +531,38 @@ final class EditorController {
 
     var availablePresets: [Preset] { Presets.available(for: selectedLayers, in: project) }
 
-    /// Applies a preset to every selected layer at the playhead: its actions
-    /// go on new rows at the bottom, selected and played, as Add Action's do.
+    /// Applies a preset to every selected layer that can take it, at the
+    /// playhead: one bar each, on new rows at the bottom, selected and
+    /// played, as Add Action's are. Its settings are in the inspector.
     func addPreset(_ preset: Preset) {
-        let tracks = ActionTracks(project.actions)
-        let layers = selectedLayers.filter { layer in
-            let kinds = Set(ActionFactory.kinds(for: layer, in: project))
-            return preset.steps.allSatisfy { kinds.contains($0.effect.kind) }
-        }
-        let made = layers.flatMap { layer in
-            Presets.actions(preset, for: layer, at: editor.time, state: tracks.state(of: layer, at: editor.time),
-                            frameRate: frameRate)
-        }
+        let layers = selectedLayers.filter { Presets.available(for: [$0], in: project).contains(preset) }
+        let made = layers.map { Presets.action(preset, for: $0, at: editor.time, frameRate: frameRate) }
         insertAndShow(made, name: preset.name)
+    }
+
+    /// Whether any selected action is a preset bar, which Split into Actions
+    /// can take apart.
+    var canSplitPresets: Bool {
+        selectedActions.contains { if case .preset = $0.spec { return true } else { return false } }
+    }
+
+    /// Swaps each selected preset bar for the ordinary actions it is made of,
+    /// playing the same, in one undo step, and selects them.
+    func splitSelectedPresets() {
+        let tracks = ActionTracks(project.actions)
+        var removed: Set<UUID> = []
+        var added: [Action] = []
+        for action in selectedActions {
+            guard let layer = project.layer(withID: action.targetLayerID),
+                  let parts = Presets.split(action, of: layer, from: tracks.inheritedState(for: action, of: layer),
+                                            frameRate: frameRate) else { continue }
+            removed.insert(action.id)
+            added += parts
+        }
+        guard !removed.isEmpty else { return NSSound.beep() }
+        if perform(.batch([.deleteActions(removed), .insertActions(added)], name: "Split into Actions")) {
+            selectActions(Set(added.map(\.id)))
+        }
     }
 
     /// Puts new actions on rows at the bottom, selects them, brings their

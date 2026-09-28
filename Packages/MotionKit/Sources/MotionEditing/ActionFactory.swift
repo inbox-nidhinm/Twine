@@ -165,6 +165,9 @@ public enum ActionFactory {
             // Fades the sound out, or in to its own level when it is silent.
             let level = state.volume ?? 1
             spec = .volume(VolumeAction(end: level > 0.01 ? 0 : 1))
+        case .preset:
+            // Presets come from `Presets.action`; this is only for completeness.
+            spec = .preset(PresetRecipe.defaults(.fadeIn))
         }
         // Counting a hundred numbers in half a second is a blur; a counter
         // gets long enough to read.

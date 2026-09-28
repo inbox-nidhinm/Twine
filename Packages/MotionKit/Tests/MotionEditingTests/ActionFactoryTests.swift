@@ -34,8 +34,9 @@ import MotionEvaluation
         let video = Layer(name: "V", content: .video(VideoContent(mediaID: UUID())), size: Size2(10, 10), position: .zero)
         let pen = PathEditing.reshaped(star, to: PathEditing.path(of: star)!).layer
         let layers = [stroked, text, ellipse, star, video, pen]
-        // Between them, every kind is offered somewhere.
-        #expect(Set(layers.flatMap { ActionFactory.kinds(for: $0, hasSound: true) }) == Set(ActionKind.allCases))
+        // Between them, every kind is offered somewhere, but presets, which
+        // Add Preset offers instead.
+        #expect(Set(layers.flatMap { ActionFactory.kinds(for: $0, hasSound: true) }) == Set(ActionKind.allCases).subtracting([.preset]))
         for layer in layers {
             // Volume is heard, not seen; it has a test of its own.
             for kind in ActionFactory.kinds(for: layer) where kind != .volume {

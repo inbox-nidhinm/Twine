@@ -52,6 +52,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `picture` | Logs the selected picture or video: file, mode, crop, turns, actions, whether it is being cropped, and while cropping the picture's and the box's corners in the window, to drag |
 | `offers` | Logs what Add Action and Add Preset offer for the selection |
 | `add KIND` | Adds an action by its kind's name (`move`, `path`, `volume`...), as the Add Action menu does |
+| `preset ID`, `split`, `sample T` | Adds a preset by its id (`slide-in`, `shake`...), as Add Preset does; Split into Actions on the selected bars; logs the selected layers' position and opacity at time T |
 | `cursor` | Logs which of the app's pointers is current |
 | `perfpreview S` | The export panel's preview playing for S seconds (open the panel first with `call exportmovie`) |
 | `perfplay S`, `perfscrub N`, `perfdrag N`, `perfdragat X Y N`, `perfselect N` | Timings (`PERF` lines): playback frame rate, seek, canvas drag, drag at a point, select |
