@@ -232,7 +232,12 @@ public struct ActionTracks: Sendable {
     private var textPresets: [UUID: [TextPreset]] = [:]
 
     public init(_ actions: [Action]) {
+        // In presets, which show their layer as a Show does (rule 10).
+        var entrances: [UUID: [Action]] = [:]
         for action in actions where action.isEnabled {
+            if case .preset(let p) = action.spec, p.preset.entering == true, !p.preset.isSound {
+                entrances[action.targetLayerID, default: []].append(action)
+            }
             if case .preset(let p) = action.spec, p.unit != nil {
                 textPresets[action.targetLayerID, default: []].append(TextPreset(action, p))
             } else if case .preset(let p) = action.spec {
@@ -247,6 +252,10 @@ public struct ActionTracks: Sendable {
                 tracks[action.targetLayerID, default: [:]][action.spec.kind.channel, default: []].append(action)
                 if case .move(let m) = action.spec, m.turns { turningLayers.insert(action.targetLayerID) }
             }
+        }
+        // Only where there is a Show or Hide for them to answer to.
+        for (layer, list) in entrances where tracks[layer]?[.visibility] != nil {
+            tracks[layer]?[.visibility]?.append(contentsOf: list)
         }
         for (layer, channels) in tracks {
             for (channel, list) in channels {
@@ -265,8 +274,23 @@ public struct ActionTracks: Sendable {
     /// there, so handing over shows nothing.
     public func textAnimation(of layer: UUID, at time: Double) -> TextAnimation? {
         guard !textPresets.isEmpty, let list = textPresets[layer], let first = list.first else { return nil }
-        let current = list.last { $0.action.start <= time } ?? first
-        return TextAnimation(current)
+        let visibility = tracks[layer]?[.visibility]
+        guard let current = list.last(where: { $0.action.start <= time }) else {
+            // Before the first, as it will start, unless a Show or Hide comes
+            // first (rule 10).
+            return Self.firstShowOrHide(visibility) <= first.action.start ? nil : TextAnimation(first)
+        }
+        // A Show after it has ended brings back letters it faded right out.
+        let revives = visibility?.contains {
+            if case .visibility(let v) = $0.spec { return v.isVisible && $0.start >= current.action.end && $0.start <= time }
+            return false
+        } ?? false
+        return TextAnimation(current, revives: revives)
+    }
+
+    /// When a layer's first Show or Hide starts, or never.
+    private static func firstShowOrHide(_ visibility: [Action]?) -> Double {
+        visibility?.first { $0.spec.kind == .visibility }?.start ?? .infinity
     }
 
     /// The same, for a text layer only: anything else draws whole.
@@ -313,6 +337,12 @@ public struct ActionTracks: Sendable {
         func steps<V>(_ actions: [Action], _ plain: (Action) -> Step<V>?, _ part: (PresetEffect) -> PartRun<V>?) -> [Step<V>] {
             presets ? self.steps(actions, plain, part) : actions.compactMap(plain)
         }
+        // Show and Hide reach other channels (rule 10), when there are any.
+        let visibility = channels[.visibility].map { all in including.map { all.filter($0) } ?? all }
+        let holdsBefore = Self.firstShowOrHide(visibility)
+        func walk<V>(_ design: V, _ steps: [Step<V>], at time: Double) -> V {
+            MotionEvaluation.walk(design, steps, at: time, holdsBefore: holdsBefore)
+        }
         // Only the channels the layer has actions on: every other one stays
         // as designed, which is what walking no actions gives. Most layers
         // have one or two of the two dozen.
@@ -323,13 +353,17 @@ public struct ActionTracks: Sendable {
             case .position: state.position = walk(state.position, steps(list, Self.positionStep, Self.positionPart), at: time)
             case .scale: state.scale = walk(state.scale, steps(list, Self.scaleStep, Self.scalePart), at: time)
             case .rotation: state.rotation = walk(state.rotation, steps(list, Self.rotationStep, Self.rotationPart), at: time)
-            case .opacity: state.opacity = walk(state.opacity, steps(list, Self.opacityStep, Self.opacityPart), at: time)
+            case .opacity:
+                var run = steps(list, Self.opacityStep, Self.opacityPart)
+                if let visibility { run = Self.withShows(run, visibility, design: layer.opacity) }
+                state.opacity = walk(state.opacity, run, at: time)
             case .skew: state.skew = walk(state.skew, list.compactMap(Self.skewStep), at: time)
             case .tilt: state.tilt = walk(state.tilt, steps(list, Self.tiltStep, Self.tiltPart), at: time)
             case .reveal:
                 state.reveal = Reveal(walk(state.reveal.box, steps(list, { _ in nil }, Self.revealPart), at: time))
             case .size: state.size = walk(state.size, list.compactMap(Self.sizeStep), at: time)
-            case .visibility: state.isShown = walk(1, Self.visibilitySteps(list), at: time) > 0.5
+            // Its own first step decides what shows before it, so it holds as ever.
+            case .visibility: state.isShown = MotionEvaluation.walk(1, Self.visibilitySteps(list), at: time) > 0.5
             // Only what the layer has: a Colour on a layer with no fill does nothing.
             case .fill: if let fill = state.fill { state.fill = walk(fill, list.compactMap(Self.fillStep), at: time) }
             case .stroke: if let stroke = state.stroke { state.stroke = walk(stroke, list.compactMap(Self.strokeStep), at: time) }
@@ -344,7 +378,8 @@ public struct ActionTracks: Sendable {
                 if let spacing = state.letterSpacing { state.letterSpacing = walk(spacing, list.compactMap(Self.letterSpacingStep), at: time) }
             case .lineHeight:
                 if let height = state.lineHeight { state.lineHeight = walk(height, list.compactMap(Self.lineHeightStep), at: time) }
-            case .text: if let shown = state.text { state.text = Self.shownText(design: shown.text, list, at: time) }
+            case .text:
+                if let shown = state.text { state.text = Self.shownText(design: shown.text, list, at: time, holdsBefore: holdsBefore) }
             case .arc: if let arc = state.arc { state.arc = walk(arc, list.compactMap(Self.arcStep), at: time) }
             case .star: if let star = state.star { state.star = walk(star, list.compactMap(Self.starStep), at: time) }
             case .path: if let path = state.path { state.path = walk(path, list.compactMap(Self.pathStep), at: time) }
@@ -612,10 +647,11 @@ public struct ActionTracks: Sendable {
     /// place of numbers: actions in start order, each taking over from the
     /// text showing when it starts, and a first Counter with its own From
     /// showing that number from the start of the scene.
-    static func shownText(design: String, _ actions: [Action], at time: Double) -> ShownText {
+    static func shownText(design: String, _ actions: [Action], at time: Double,
+                          holdsBefore: Double = .infinity) -> ShownText {
         guard let first = actions.first else { return ShownText(text: design) }
         if time < first.start {
-            if case .counter(let c) = first.spec, let from = c.from {
+            if first.start < holdsBefore, case .counter(let c) = first.spec, let from = c.from {
                 return ShownText(text: Counting(c, base: design).text(for: from), isCounting: true)
             }
             return ShownText(text: design)
@@ -672,13 +708,44 @@ public struct ActionTracks: Sendable {
     /// Visibility walks as 1 (shown) and 0 (hidden), every step instant. The
     /// first visibility action on a layer starts from the opposite of what it
     /// sets, so a layer whose first one is a Show is hidden until it: the
-    /// entrance rule, applied to Hide/Show.
+    /// entrance rule, applied to Hide/Show. An In preset shows the layer at
+    /// its start, as a Show does, but leaves what comes before it alone: its
+    /// own parts see to that.
     private static func visibilitySteps(_ actions: [Action]) -> [Step<Double>] {
         actions.enumerated().compactMap { index, a in
-            guard case .visibility(let v) = a.spec else { return nil }
-            let end: Double = v.isVisible ? 1 : 0
-            return Step(a, initial: index == 0 ? 1 - end : nil, target: { _ in end })
+            switch a.spec {
+            case .visibility(let v):
+                let end: Double = v.isVisible ? 1 : 0
+                return Step(a, initial: index == 0 ? 1 - end : nil, target: { _ in end })
+            case .preset:
+                var step = Step<Double>(a, initial: nil, target: { _ in 1 })
+                step.isInstant = true
+                return step
+            default:
+                return nil
+            }
         }
+    }
+
+    /// The opacity channel's steps with a step for each Show among
+    /// `visibility`, which brings back a layer faded right out (rule 10).
+    /// A Show goes before anything starting with it.
+    private static func withShows(_ steps: [Step<Double>], _ visibility: [Action], design: Double) -> [Step<Double>] {
+        let back = design > 0.01 ? design : 1
+        let shows = visibility.compactMap { a -> Step<Double>? in
+            guard case .visibility(let v) = a.spec, v.isVisible else { return nil }
+            return Step(a, revive: { $0 <= 0.01 ? back : nil })
+        }
+        guard !shows.isEmpty else { return steps }
+        var out: [Step<Double>] = []
+        out.reserveCapacity(steps.count + shows.count)
+        var i = 0
+        for show in shows {
+            while i < steps.count, steps[i].start < show.start { out.append(steps[i]); i += 1 }
+            out.append(show)
+        }
+        out.append(contentsOf: steps[i...])
+        return out
     }
 }
 
@@ -723,6 +790,18 @@ struct Step<V: Interpolatable> {
         self.part = PartBox(run: run, group: action.id)
     }
 
+    /// A Show on the opacity channel (rule 10): `revive` gives the value it
+    /// brings back, or nil to leave the channel as it is.
+    init(_ show: Action, revive: @escaping (V) -> V?) {
+        start = show.start
+        duration = 0
+        isInstant = true
+        easing = show.easing
+        initial = nil
+        target = { $0 }
+        part = PartBox(revive: revive)
+    }
+
     /// What it shows before it starts, as the first step on its channel:
     /// an explicit starting value holds from the start of the scene.
     func before(_ design: V) -> V {
@@ -732,14 +811,23 @@ struct Step<V: Interpolatable> {
 }
 
 /// A preset part's run and the preset it belongs to, whose parts on one
-/// channel share what the preset found there.
+/// channel share what the preset found there. A Show on the opacity
+/// channel is boxed here too, as `revive`, to keep steps small.
 final class PartBox<V> {
     let run: PartRun<V>
     let group: UUID
+    let revive: ((V) -> V?)?
 
     init(run: PartRun<V>, group: UUID) {
         self.run = run
         self.group = group
+        revive = nil
+    }
+
+    init(revive: @escaping (V) -> V?) {
+        run = PartRun(holds: false) { inherited, _, _ in (inherited, inherited) }
+        group = UUID()
+        self.revive = revive
     }
 }
 
@@ -787,15 +875,32 @@ struct PartRun<V> {
 ///    along its path adds to the layer's rotation how far its path's
 ///    direction has turned since the Move began, and keeps that turn after
 ///    it ends (`pathTurn`, applied after the walks).
-func walk<V: Interpolatable>(_ design: V, _ steps: [Step<V>], at time: Double) -> V {
+/// 10. Show and Hide are kept whatever else the layer does. A Show or Hide
+///    at or before a channel's first action ends rule 4's exception there
+///    (`holdsBefore` is when the first one starts): the channel stays as
+///    designed until the action starts, so a layer shown at 1 s with a Fade
+///    In at 3 s shows until 3 s, then fades in. A Show brings back a layer
+///    faded right out, at its design opacity (or 100%, if that is 0%),
+///    leaving where it is and how big alone; at any other opacity it leaves
+///    the channel alone, so a fade running through it carries on. An In
+///    preset shows its layer when it starts, as a Show does, so one after a
+///    Hide plays.
+func walk<V: Interpolatable>(_ design: V, _ steps: [Step<V>], at time: Double,
+                             holdsBefore: Double = .infinity) -> V {
     guard let first = steps.first else { return design }
-    if time < first.start { return first.before(design) }           // rules 1 and 4
+    if time < first.start {                                           // rules 1, 4 and 10
+        return first.start < holdsBefore ? first.before(design) : design
+    }
 
     var current: (step: Step<V>, from: V, to: V)?
     var found: [UUID: V] = [:]
     for step in steps {
         guard step.start <= time else { break }                      // rule 4: not started yet
         let inherited = current.map { value(of: $0, at: step.start) } ?? design
+        if let revive = step.part?.revive {                           // rule 10
+            if let back = revive(inherited) { current = (step, back, back) }
+            continue
+        }
         if let part = step.part {                                     // rule 8
             let own: V
             if let seen = found[part.group] { own = seen } else { own = inherited; found[part.group] = inherited }

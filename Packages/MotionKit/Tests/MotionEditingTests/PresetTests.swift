@@ -307,6 +307,55 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
         #expect(near(states[4].opacity, 0.5) && states[0].opacity == 0)
     }
 
+    @Test func showAndHideAreKeptWhateverPresetsDo() {
+        let layer = square()
+        func visibility(_ shown: Bool, at time: Double) -> Action {
+            Action(target: layer.id, start: time, duration: 0, spec: .visibility(VisibilityAction(isVisible: shown)))
+        }
+        func state(_ actions: [Action], at time: Double) -> LayerState { ActionTracks(actions).state(of: layer, at: time) }
+        // Shown at 1s, then a Fade In at 3s: shown as designed until 3s.
+        let fadeIn = bar(Presets.preset(.fadeIn), on: layer, at: 3)
+        let shown = [visibility(true, at: 1), fadeIn]
+        #expect(!state(shown, at: 0.5).isShown)
+        #expect(state(shown, at: 2.99).isShown && near(state(shown, at: 2.99).opacity, 0.5))
+        #expect(near(state(shown, at: 3).opacity, 0))
+        #expect(near(state(shown, at: fadeIn.end).opacity, 0.5))
+        // A Slide Out, then a Show: the opacity comes back, the place does not.
+        let slideOut = bar(Presets.preset(.slideOut), on: layer, at: 1)
+        let back = [slideOut, visibility(true, at: 3)]
+        #expect(near(state(back, at: 2.5).opacity, 0))
+        #expect(near(state(back, at: 3).opacity, 0.5))
+        #expect(state(back, at: 3).position == state(back, at: 2.5).position)
+        #expect(state(back, at: 3).position != layer.transform.position)
+        // Hidden at 1s, then a Fade In at 3s: it plays, and shows the layer.
+        let hidden = [visibility(false, at: 1), fadeIn]
+        #expect(state(hidden, at: 0.5).isShown && near(state(hidden, at: 0.5).opacity, 0.5))
+        #expect(!state(hidden, at: 2.99).isShown)
+        #expect(state(hidden, at: 3).isShown)
+        #expect(near(state(hidden, at: fadeIn.end).opacity, 0.5))
+        // An Out preset after a Hide leaves it hidden.
+        let fadeOut = bar(Presets.preset(.fadeOut), on: layer, at: 3)
+        #expect(!state([visibility(false, at: 1), fadeOut], at: 3.1).isShown)
+    }
+
+    @Test func aShowBringsBackLettersFadedOut() {
+        let text = Layer(name: "T", content: .text(TextContent(text: "abc")), size: Size2(100, 40), position: .zero)
+        var settings = PresetRecipe.defaults(.fadeOut)
+        settings.unit = .letters
+        let out = Action(target: text.id, start: 1, duration: 1, easing: .preset(.none, intensity: 0), spec: .preset(settings))
+        let show = Action(target: text.id, start: 3, duration: 0, spec: .visibility(VisibilityAction(isVisible: true)))
+        let tracks = ActionTracks([out, show])
+        #expect(tracks.textAnimation(of: text.id, at: 2.5)?.states(count: 3, at: 2.5).allSatisfy { $0.opacity == 0 } == true)
+        #expect(tracks.textAnimation(of: text.id, at: 3)?.states(count: 3, at: 3).allSatisfy { $0.opacity == 1 } == true)
+        // Letters waiting on an entrance after a Show wait as designed.
+        var entering = PresetRecipe.defaults(.fadeIn)
+        entering.unit = .letters
+        let fadeIn = Action(target: text.id, start: 3, duration: 1, easing: .preset(.none, intensity: 0), spec: .preset(entering))
+        let early = Action(target: text.id, start: 1, duration: 0, spec: .visibility(VisibilityAction(isVisible: true)))
+        #expect(ActionTracks([early, fadeIn]).textAnimation(of: text.id, at: 2) == nil)
+        #expect(ActionTracks([fadeIn]).textAnimation(of: text.id, at: 2) != nil)
+    }
+
     @Test func aDelayTooLongForTheTextIsShortened() {
         var settings = PresetRecipe.defaults(.fadeIn)
         settings.unit = .letters

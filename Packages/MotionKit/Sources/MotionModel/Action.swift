@@ -647,6 +647,22 @@ public enum PresetKind: String, Codable, Sendable, CaseIterable {
     case pulse, bounce, shake, wiggle
 }
 
+extension PresetKind {
+    /// True for one that brings a layer (or a sound) on, false for one that
+    /// takes it off, nil for one that leaves it where it was.
+    public var entering: Bool? {
+        switch self {
+        case .fadeIn, .slideIn, .scalePop, .rotateIn, .blurIn, .dropIn, .fadeSoundIn, .shrinkIn, .twistIn, .moveScaleIn,
+             .maskRevealIn, .maskCenterIn, .maskResizeIn, .maskSlideIn, .maskShrinkIn, .blurSlideIn, .blurScaleIn: true
+        case .fadeOut, .slideOut, .scaleOut, .rotateOut, .blurOut, .dropOut, .fadeSoundOut, .shrinkOut, .twistOut, .moveScaleOut,
+             .maskRevealOut, .maskCenterOut, .maskResizeOut, .maskSlideOut, .maskShrinkOut, .blurSlideOut, .blurScaleOut: false
+        case .pulse, .bounce, .shake, .wiggle: nil
+        }
+    }
+
+    public var isSound: Bool { self == .fadeSoundIn || self == .fadeSoundOut }
+}
+
 /// What of a text moves on its own in a preset.
 public enum TextUnit: String, Codable, Sendable, CaseIterable {
     case letters, words, lines

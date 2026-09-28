@@ -104,20 +104,6 @@ extension PresetKind {
         case .pulse, .bounce, .shake, .wiggle: nil
         }
     }
-
-    /// True for one that brings a layer (or a sound) on, false for one that
-    /// takes it off, nil for one that leaves it where it was.
-    public var entering: Bool? {
-        switch self {
-        case .fadeIn, .slideIn, .scalePop, .rotateIn, .blurIn, .dropIn, .fadeSoundIn, .shrinkIn, .twistIn, .moveScaleIn,
-             .maskRevealIn, .maskCenterIn, .maskResizeIn, .maskSlideIn, .maskShrinkIn, .blurSlideIn, .blurScaleIn: true
-        case .fadeOut, .slideOut, .scaleOut, .rotateOut, .blurOut, .dropOut, .fadeSoundOut, .shrinkOut, .twistOut, .moveScaleOut,
-             .maskRevealOut, .maskCenterOut, .maskResizeOut, .maskSlideOut, .maskShrinkOut, .blurSlideOut, .blurScaleOut: false
-        case .pulse, .bounce, .shake, .wiggle: nil
-        }
-    }
-
-    public var isSound: Bool { self == .fadeSoundIn || self == .fadeSoundOut }
 }
 
 /// A setting a preset shows in the inspector.

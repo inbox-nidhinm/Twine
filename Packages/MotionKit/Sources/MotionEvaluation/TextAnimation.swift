@@ -34,9 +34,13 @@ struct TextPreset: Sendable {
 public struct TextAnimation: Sendable {
     public let unit: TextUnit
     let preset: TextPreset
+    /// A Show came after the preset ended: letters it faded right out are
+    /// back, where it left them (rule 10 in `walk`).
+    let revives: Bool
 
-    init(_ preset: TextPreset) {
+    init(_ preset: TextPreset, revives: Bool = false) {
         self.preset = preset
+        self.revives = revives
         unit = preset.settings.unit ?? .letters
     }
 
@@ -71,7 +75,9 @@ public struct TextAnimation: Sendable {
         return ranks.map { rank in
             let local = time - action.start - rank * delay
             let t = each > 0 ? local * stretch : (local >= 0 ? action.duration : -1)
-            return preset.tracks.state(of: Self.stand, at: t)
+            var state = preset.tracks.state(of: Self.stand, at: t)
+            if revives, state.opacity <= 0.01 { state.opacity = 1 }
+            return state
         }
     }
 

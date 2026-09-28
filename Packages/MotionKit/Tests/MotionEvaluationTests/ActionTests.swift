@@ -179,6 +179,44 @@ private func near(_ a: Vec2, _ b: Vec2, _ tolerance: Double = 1e-9) -> Bool {
         #expect(state(layer, [hide, show], at: 3).isShown)
     }
 
+    @Test func anEntranceAfterAShowOrHideHoldsNothingBeforeIt() {
+        let layer = square()
+        let show = Action(target: layer.id, start: 1, duration: 0, spec: .visibility(VisibilityAction(isVisible: true)))
+        let entrance = fade(layer, from: 0, to: 1, at: 3, for: 1)
+        // Shown at 1s as designed, until the fade starts from nothing at 3s.
+        #expect(!state(layer, [show, entrance], at: 0.5).isShown)
+        #expect(state(layer, [show, entrance], at: 2.99).isShown)
+        #expect(state(layer, [show, entrance], at: 2.99).opacity == 1)
+        #expect(state(layer, [show, entrance], at: 3).opacity == 0)
+        #expect(state(layer, [show, entrance], at: 3.5).opacity == 0.5)
+        // The same before a Hide: the layer is as designed until it hides.
+        let hide = Action(target: layer.id, start: 1, duration: 0, spec: .visibility(VisibilityAction(isVisible: false)))
+        #expect(state(layer, [hide, entrance], at: 0.5).opacity == 1)
+        // With no Show or Hide first, an entrance still holds from the start.
+        let later = Action(target: layer.id, start: 5, duration: 0, spec: .visibility(VisibilityAction(isVisible: false)))
+        #expect(state(layer, [later, entrance], at: 0.5).opacity == 0)
+    }
+
+    @Test func aShowBringsBackALayerFadedRightOut() {
+        var layer = square()
+        layer.opacity = 0.8
+        let out = fade(layer, to: 0, at: 1, for: 1)
+        let away = move(layer, to: Vec2(200, 0), at: 1, for: 1)
+        let show = Action(target: layer.id, start: 3, duration: 0, spec: .visibility(VisibilityAction(isVisible: true)))
+        let all = [out, away, show]
+        #expect(state(layer, all, at: 2.5).opacity == 0)
+        #expect(state(layer, all, at: 3).opacity == 0.8)
+        // Only the opacity comes back.
+        #expect(state(layer, all, at: 3).position == Vec2(700, 500))
+        // What comes after starts from it.
+        let again = fade(layer, to: 0, at: 4, for: 1)
+        #expect(abs(state(layer, all + [again], at: 4.5).opacity - 0.4) < 1e-9)
+        // A fade still running when the Show comes carries on.
+        let slow = fade(layer, to: 0, at: 2, for: 2)
+        #expect(state(layer, [slow, show], at: 3.5).opacity > 0.1)
+        #expect(state(layer, [slow, show], at: 4).opacity == 0)
+    }
+
     @Test func aHiddenGroupHidesItsChildren() {
         let child = square("Child")
         let group = Layer(name: "G", content: .group(GroupContent(children: [child])), size: Size2(10, 10), position: .zero)

@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Show and Hide always count", changes: [
+            "A Show or Hide is kept whatever presets or other actions come before or after it.",
+            "A layer shown before an In preset stays as designed until the preset starts, then plays it, rather than waiting unseen from the start of the scene.",
+            "A Show after a fade out brings the layer back to its opacity. Where it is and how big it is stay as the preset left them.",
+            "An In preset after a Hide shows the layer again as it plays.",
+        ]),
         .init(date: "28 September 2026", title: "Memory let go", changes: [
             "Pictures, videos and waveforms that no layer uses any more are let go from memory a second after you stop editing, so deleting a big picture gives its memory back. Undo brings it back from the project.",
             "Saving no longer reads every picture again to draw the project's thumbnail.",
