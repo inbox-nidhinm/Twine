@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Long layer names on the timeline", changes: [
+            "On the timeline, a long layer name is cut short so the action's or preset's name always shows beside it.",
+        ]),
         .init(date: "28 September 2026", title: "Clean letter by letter animation", changes: [
             "Text presets set to letters, words or lines no longer drag slivers of the lines above and below along with each piece, which made text look doubled and glitchy.",
             "Letters that reach past their own box, such as an f or an italic's tail, are no longer cut off while they move.",

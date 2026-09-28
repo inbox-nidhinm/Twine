@@ -341,17 +341,27 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         let room = gutter - 16 - (showsEye ? Self.eyeBox + 12 : 12)
         ctx.saveGState()
         ctx.clip(to: CGRect(x: 16, y: row.y, width: max(room, 0), height: TimelineRow.height))
+        let truncating = NSMutableParagraphStyle()
+        truncating.lineBreakMode = .byTruncatingTail
         let layerAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12, weight: .medium),
-                                                              .foregroundColor: primary]
-        let actionAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: secondary]
-        let layerName = row.layerName as NSString
+                                                              .foregroundColor: primary, .paragraphStyle: truncating]
+        let actionAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: secondary,
+                                                               .paragraphStyle: truncating]
+        let layerName = row.layerName as NSString, actionName = action.name as NSString
         let textY = row.y + (TimelineRow.height - 15) / 2
-        layerName.draw(at: CGPoint(x: 16, y: textY), withAttributes: layerAttributes)
-        var cursor = 16 + layerName.size(withAttributes: layerAttributes).width + 7
+        // The action's name always shows: a long layer name gives way to
+        // it, cut short, though never to less than a third of the room.
+        let dotGap = 17.0
+        let actionWidth = ceil(actionName.size(withAttributes: actionAttributes).width)
+        let layerWidth = min(ceil(layerName.size(withAttributes: layerAttributes).width),
+                             max(room - dotGap - actionWidth, room * 0.35))
+        layerName.draw(in: CGRect(x: 16, y: textY, width: layerWidth, height: 17), withAttributes: layerAttributes)
+        var cursor = 16 + layerWidth + 7
         ctx.setFillColor(secondary.cgColor)
         ctx.fillEllipse(in: CGRect(x: cursor, y: row.y + TimelineRow.height / 2 - 1.5, width: 3, height: 3))
         cursor += 10
-        (action.name as NSString).draw(at: CGPoint(x: cursor, y: textY), withAttributes: actionAttributes)
+        actionName.draw(in: CGRect(x: cursor, y: textY, width: max(16 + room - cursor, 0), height: 17),
+                        withAttributes: actionAttributes)
         ctx.restoreGState()
         if showsEye {
             let eye = eyeRect(row).insetBy(dx: 4, dy: 4)
