@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Skew from Figma", changes: [
+            "Layers skewed in Figma paste in as editable Twine layers, slanted exactly as in Figma, instead of pictures: shapes, frames with everything inside them, vectors and text.",
+        ]),
         .init(date: "28 September 2026", title: "Skew and tilt", changes: [
             "New Skew and Tilt actions: Skew slants a layer each way, and Tilt turns it in depth, back and forth or side to side, seen in perspective, with a Depth setting for how strong the perspective looks. Half a turn shows its back.",
             "Layers can be designed skewed or tilted too: Skew and Tilt fields in the Layer section, under rotation, which the actions animate from.",

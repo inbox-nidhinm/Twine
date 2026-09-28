@@ -52,6 +52,36 @@ private func near(_ a: Double, _ b: Double, _ e: Double = 1e-6) -> Bool { abs(a 
         #expect(near(layer.transform.rotation, -30))
     }
 
+    @Test func skewedLayersLandExactly() throws {
+        // Figma's own matrix for a turned, slanted and mirrored layer: every
+        // corner must land where Figma puts it.
+        let m = [0.8, -0.35, 0.9, 0.55, 40.0, 70.0]
+        let json = payload(##"{"kind": "rectangle", "name": "R", "transform": [\##(m.map { "\($0)" }.joined(separator: ", "))], "width": 60, "height": 30}"##)
+        let layer = try #require(try FigmaImport.read(json).layers.first)
+        #expect(layer.transform.skew.x != 0 && layer.transform.skew.y == 0)
+        let scene = evaluateDesign(Project(layers: [layer]))
+        let corners = try #require(scene.worldCorners(of: layer.id))
+        let expected = [(0.0, 0.0), (60.0, 0.0), (60.0, 30.0), (0.0, 30.0)].map { (x, y) in
+            Vec2(m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5])
+        }
+        for (got, want) in zip(corners, expected) {
+            #expect(near(got.x, want.x, 1e-6) && near(got.y, want.y, 1e-6), "\(got) against \(want)")
+        }
+        // A skewed frame keeps its skew, and what is inside lands where Figma
+        // has it, through the frame's slant.
+        let frame = payload(##"""
+        {"kind": "frame", "name": "F", "transform": [1, 0, 0.5, 1, 100, 100], "width": 100, "height": 50, "children": [
+         {"kind": "rectangle", "name": "In", "transform": [1, 0, 0.5, 1, 120, 110], "width": 20, "height": 20}]}
+        """##)
+        let f = try #require(try FigmaImport.read(frame).layers.first)
+        guard case .group(let g) = f.content, let child = g.children.first else { Issue.record("no frame"); return }
+        #expect(near(f.transform.skew.x, atan(0.5) * 180 / .pi))
+        #expect(near(child.transform.skew.x, 0))
+        let inner = evaluateDesign(Project(layers: [f]))
+        let c = try #require(inner.worldCorners(of: child.id))
+        #expect(near(c[2].x, 120 + 20 + 0.5 * 20, 1e-6) && near(c[2].y, 130, 1e-6))
+    }
+
     @Test func aMaskMasksWhatIsInFrontOfIt() throws {
         let json = payload(##"""
         {"kind": "group", "name": "G", "transform": [1, 0, 0, 1, 0, 0], "width": 50, "height": 50, "children": [

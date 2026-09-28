@@ -142,6 +142,84 @@
      ]
     },
     {
+     "name": "Slanted",
+     "visible": true,
+     "locked": false,
+     "opacity": 1,
+     "blend": "PASS_THROUGH",
+     "transform": [
+      1,
+      0,
+      0.4,
+      1,
+      300,
+      60
+     ],
+     "width": 40,
+     "height": 20,
+     "kind": "rectangle",
+     "radii": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "fills": [
+      {
+       "type": "SOLID",
+       "visible": true,
+       "opacity": 1,
+       "color": {
+        "r": 1,
+        "g": 0,
+        "b": 0,
+        "a": 1
+       }
+      }
+     ]
+    },
+    {
+     "name": "Sheared",
+     "visible": true,
+     "locked": false,
+     "opacity": 1,
+     "blend": "PASS_THROUGH",
+     "transform": [
+      1,
+      0,
+      0.3,
+      1,
+      300,
+      100
+     ],
+     "width": 80,
+     "height": 32,
+     "kind": "text",
+     "text": {
+      "characters": "Hello",
+      "family": "Inter",
+      "style": "Semi Bold",
+      "size": 24,
+      "letterSpacing": -0.48,
+      "lineHeight": 32,
+      "align": "CENTER",
+      "autoResize": "WIDTH_AND_HEIGHT"
+     },
+     "fills": [
+      {
+       "type": "SOLID",
+       "visible": true,
+       "opacity": 1,
+       "color": {
+        "r": 0.1,
+        "g": 0.1,
+        "b": 0.1,
+        "a": 1
+       }
+      }
+     ]
+    },
+    {
      "name": "Icon",
      "visible": true,
      "locked": false,

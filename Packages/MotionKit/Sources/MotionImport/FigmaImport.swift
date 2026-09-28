@@ -269,7 +269,9 @@ private struct FigmaBuilder {
     }
 
     /// A layer placed so its box, in its own space, lands where `local` puts
-    /// it: the anchor at the box's centre.
+    /// it: the anchor at the box's centre. Any matrix is a rotation of a
+    /// skew of a scale, which is Twine's order, so a skewed layer lands
+    /// exactly: what the turn and the two scales leave is a skew across.
     private func place(_ layer: inout Layer, local: Affine, box: Box) {
         let sx = hypot(local.a, local.b)
         let det = local.determinant
@@ -279,6 +281,10 @@ private struct FigmaBuilder {
         let sy = sx > 1e-9 ? det / sx : 1
         layer.transform.scale = Vec2(sx, sy)
         layer.transform.isScaleLinked = abs(sx - abs(sy)) < 1e-9
+        // The second column, turned back, is (tan(skew) · sy, sy).
+        let slant = abs(det) > 1e-12 ? (local.a * local.c + local.b * local.d) / det : 0
+        let skew = atan(slant) * 180 / .pi
+        layer.transform.skew = Vec2(abs(skew) < 1e-6 ? 0 : skew, 0)
         layer.transform.position = local.apply(box.center)
     }
 

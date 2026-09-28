@@ -73,6 +73,10 @@ const card = node("FRAME", {
     textNode({ name: "Title", absoluteTransform: translate(250, 70), width: 80, height: 32 }),
     textNode({ name: "Mixed", absoluteTransform: translate(250, 110), width: 80, height: 32 }, [{}, {}]),
     textNode({ name: "Leaning", absoluteTransform: translate(250, 150), width: 80, height: 32, fontName: { family: "Inter", style: "Italic" } }),
+    // Slanted by Figma's transform: Twine holds skew, so these stay a shape and text.
+    node("RECTANGLE", { name: "Slanted", absoluteTransform: [[1, 0.4, 300], [0, 1, 60]], width: 40, height: 20,
+      topLeftRadius: 0, topRightRadius: 0, bottomRightRadius: 0, bottomLeftRadius: 0, cornerSmoothing: 0, fills: [solid(1, 0, 0)] }),
+    textNode({ name: "Sheared", absoluteTransform: [[1, 0.3, 300], [0, 1, 100]], width: 80, height: 32 }),
     node("VECTOR", {
       name: "Icon", absoluteTransform: translate(130, 160), width: 24, height: 24, fills: [solid(0.3, 0.6, 0.9)],
       vectorPaths: [{ windingRule: "EVENODD", data: "M0 0 L24 0 L24 24 L0 24 Z M6 6 L18 6 L18 18 L6 18 Z" }],
@@ -126,14 +130,15 @@ vm.runInNewContext(code, { figma: figma, __html__: "", console: console, Math: M
   assert.strictEqual(payload.format, "twine.figma");
   const frame = payload.nodes[0];
   const kinds = frame.children.map(function (c) { return c.name + ":" + c.kind; });
-  assert.deepStrictEqual(kinds, ["Photo:rectangle", "Title:text", "Mixed:picture", "Leaning:picture", "Icon:vector",
+  assert.deepStrictEqual(kinds, ["Photo:rectangle", "Title:text", "Mixed:picture", "Leaning:picture", "Slanted:rectangle", "Sheared:text", "Icon:vector",
     "Painted Regions:svg", "Masked:group", "Rule:line", "Note:picture"]);
   assert.deepStrictEqual(frame.fills.map(function (f) { return f.type; }).join(), "SOLID", "the angular gradient is left out");
   assert.deepStrictEqual(frame.effects.map(function (e) { return e.type; }).join(), "DROP_SHADOW", "noise is left out");
   assert(payload.warnings.some(function (w) { return w.indexOf("Card") === 0; }), "the left-out gradient is said");
   assert.ok(payload.images["photo-hash"], "the photo travels with the copy");
   assert.strictEqual(frame.children[1].text.letterSpacing, -0.48);
-  assert.strictEqual(frame.children[6].children[0].isMask, true);
+  assert.strictEqual(frame.children[8].children[0].isMask, true);
+  assert.deepStrictEqual(frame.children[4].transform, [1, 0, 0.4, 1, 300, 60], "the slant travels in the transform");
   const percents = messages.filter(function (m) { return m.type === "progress"; }).map(function (m) { return m.percent; });
   assert(percents.length > 1 && percents.every(function (p, i) { return i === 0 || p > percents[i - 1]; }), "progress only rises");
   fs.writeFileSync(path.join(__dirname, "sample-payload.json"), JSON.stringify(payload, null, 1));

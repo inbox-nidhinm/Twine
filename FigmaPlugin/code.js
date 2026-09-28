@@ -5,7 +5,8 @@
 // whatever holds it. What Twine cannot hold is flattened here, while Figma
 // can still draw it: as a picture Figma renders (mixed text styles, italics,
 // angular gradients, picture filters and the like), or as Figma's own SVG
-// (vectors whose regions are painted differently, or that skew). Picture
+// (vectors whose regions are painted differently). Skewed layers travel as
+// they are: Twine holds skew. Picture
 // fills travel with the copy, once each. The whole copy is one line of JSON
 // on the clipboard, which Twine recognises by its `format`.
 //
@@ -216,8 +217,6 @@ function flattenAs(node) {
     "POLYGON", "STAR", "LINE", "VECTOR", "BOOLEAN_OPERATION", "TEXT"];
   if (known.indexOf(node.type) < 0) return "picture";
   const isContainer = ["FRAME", "COMPONENT", "COMPONENT_SET", "INSTANCE", "SECTION", "GROUP"].indexOf(node.type) >= 0;
-  // A skewed layer cannot be placed; a skewed vector can be drawn through it.
-  if (skews(node.absoluteTransform)) return isContainer || node.type === "TEXT" ? "picture" : "svg";
   // A luminance mask inside: the whole of it, as drawn.
   if (isContainer && node.children.some(function (c) { return c.isMask && c.maskType === "LUMINANCE"; })) return "picture";
   if (node.type === "TEXT") return textFits(node) ? null : "picture";
@@ -236,12 +235,6 @@ function flattenAs(node) {
 function isFlattened(node) {
   const as = flattenAs(node);
   return as === "picture" || as === "svg";
-}
-
-function skews(t) {
-  const a = t[0][0], b = t[1][0], c = t[0][1], d = t[1][1];
-  const sx = Math.hypot(a, b), sy = Math.hypot(c, d);
-  return Math.abs(a * c + b * d) > 1e-4 * sx * sy;
 }
 
 /// Paints Twine draws: solid colours, linear and radial gradients, and
