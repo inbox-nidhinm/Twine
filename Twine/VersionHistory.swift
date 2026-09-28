@@ -23,6 +23,13 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Faster masks, sturdier export", changes: [
+            "Scenes with a mask play much faster: a thousand layers and one mask took 45 ms a frame to work out, and now take under 2 ms.",
+            "An export that fails part way stops reading its sounds too, and can no longer wait for ever on a sound that will never finish.",
+            "A video that fails to restart after a jump tries again on the next frame, rather than showing nothing.",
+            "Shapes with pictures and inner shadows or background blur redraw less when nothing about them has changed, and texts stay laid out while a Counter runs.",
+            "The home screen's thumbnails keep open only the current project's videos.",
+        ]),
         .init(date: "29 September 2026", title: "Steadier saving and importing", changes: [
             "Saving after importing a large video no longer freezes Twine: an 844 MB clip took three seconds to save, and now takes a tenth of one.",
             "If a project can't be saved when you leave it, Twine says so and offers to try again, rather than closing it and losing the changes.",

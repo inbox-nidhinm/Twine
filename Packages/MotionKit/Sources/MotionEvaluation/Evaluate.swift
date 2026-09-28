@@ -28,9 +28,13 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks) -
     let soloing = all.contains { $0.isSoloed }
     // A layer used as another's mask stops drawing on its own, and draws
     // only through the layers it masks.
-    let maskSources = project.maskSourceIDs
+    let maskSources = Set(all.compactMap { $0.mask?.layerID })
     let pictures = project.pictureSizes
     var out: [ResolvedLayer] = []
+    /// The masks of the layers in `out`, by their place there, noted on the
+    /// way rather than looked up afterwards: that searched the whole
+    /// project for every layer, every frame, once any mask existed.
+    var masked: [(index: Int, mask: MaskReference)] = []
 
     func hasSoloedDescendant(_ layer: Layer) -> Bool {
         layer.children.contains { $0.isSoloed || hasSoloedDescendant($0) }
@@ -46,6 +50,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks) -
             guard state.isShown else { continue }
             guard let resolved = resolve(layer, state: state, parent: parent, pictures: pictures,
                                          animation: tracks.textAnimation(of: layer, at: time), time: time) else { continue }
+            if let mask = layer.mask { masked.append((out.count, mask)) }
             out.append(resolved)
             if layer.isGroup { walk(layer.children, parent: layer.id, soloedAbove: soloed) }
         }
@@ -53,7 +58,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks) -
     walk(project.layers, parent: nil, soloedAbove: false)
 
     if !maskSources.isEmpty {
-        var world = WorldTransforms(project: project, tracks: tracks, time: time, pictures: pictures, known: out)
+        var world = WorldTransforms(all: all, tracks: tracks, time: time, pictures: pictures, known: out)
         var masks: [ResolvedLayer] = []
         for id in maskSources {
             guard let layer = world.resolved(id) else { continue }
@@ -63,8 +68,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks) -
             masks.append(source)
         }
         let shown = Set(masks.map(\.id))
-        for i in out.indices {
-            guard let reference = project.layer(withID: out[i].id)?.mask else { continue }
+        for (i, reference) in masked {
             if shown.contains(reference.layerID), let from = world.transform(of: reference.layerID),
                let into = world.transform(of: out[i].id)?.inverted {
                 out[i].mask = ResolvedMask(layerID: reference.layerID, isInverted: reference.isInverted,
@@ -75,7 +79,8 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks) -
         }
         // In drawing order, so the scene is the same whatever order the set
         // gives.
-        let order = Dictionary(uniqueKeysWithValues: all.enumerated().map { ($1.id, $0) })
+        // A damaged file may repeat an id; the first place counts.
+        let order = Dictionary(all.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
         masks.sort { order[$0.id, default: 0] < order[$1.id, default: 0] }
         let background = project.composition.background
         return ResolvedScene(time: time, size: project.composition.size,
@@ -94,18 +99,24 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks) -
 /// from the layers already in the scene, and resolves others (a mask, the
 /// groups a mask sits in) as they are asked for.
 private struct WorldTransforms {
-    let project: Project
     let tracks: ActionTracks
     let time: Double
     let pictures: [UUID: Size2]
     private var cache: [UUID: ResolvedLayer?] = [:]
+    /// Every layer and its parent, found once rather than by searching the
+    /// tree for each mask.
+    private var layers: [UUID: Layer] = [:]
+    private var parents: [UUID: UUID] = [:]
 
-    init(project: Project, tracks: ActionTracks, time: Double, pictures: [UUID: Size2], known: [ResolvedLayer]) {
-        self.project = project
+    init(all: [Layer], tracks: ActionTracks, time: Double, pictures: [UUID: Size2], known: [ResolvedLayer]) {
         self.tracks = tracks
         self.time = time
         self.pictures = pictures
         for layer in known { cache[layer.id] = layer }
+        for layer in all {
+            if layers[layer.id] == nil { layers[layer.id] = layer }
+            for child in layer.children { parents[child.id] = layer.id }
+        }
     }
 
     /// The layer as it stands at `time`, or nil if it, or a group it sits
@@ -113,8 +124,8 @@ private struct WorldTransforms {
     mutating func resolved(_ id: UUID) -> ResolvedLayer? {
         if let known = cache[id] { return known }
         var result: ResolvedLayer?
-        let parent = project.location(of: id)?.parentID
-        if let layer = project.layer(withID: id), layer.isVisible, parent.map({ resolved($0) != nil }) ?? true {
+        let parent = parents[id]
+        if let layer = layers[id], layer.isVisible, parent.map({ resolved($0) != nil }) ?? true {
             let state = tracks.state(of: layer, at: time)
             if state.isShown {
                 result = resolve(layer, state: state, parent: parent, pictures: pictures,

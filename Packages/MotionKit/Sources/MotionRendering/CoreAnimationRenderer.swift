@@ -237,6 +237,17 @@ final class Node {
     private var outlineLook: ResolvedShape?
     private var outlinePath: CGPath?
     private var innerShadowLayers: [InnerShadowLayer] = []
+    /// The last shape's area, which for an even-odd path is a boolean
+    /// operation: shapes with a picture are updated every frame, still or
+    /// not, and worked this out again for their inner shadows and backdrop.
+    private var areaCache: (shape: ResolvedShape, area: CGPath)?
+
+    private func area(of shape: ResolvedShape) -> CGPath {
+        if let areaCache, areaCache.shape == shape { return areaCache.area }
+        let area = shape.area
+        areaCache = (shape, area)
+        return area
+    }
     /// A mask's own node leaves its compositing to the mask, whatever the
     /// mask layer's blend mode.
     var ignoresBlend = false
@@ -453,7 +464,7 @@ final class Node {
         while innerShadowLayers.count > list.count { innerShadowLayers.removeLast().holder.removeFromSuperlayer() }
         while innerShadowLayers.count < list.count { innerShadowLayers.append(InnerShadowLayer(scale: scale)) }
         guard let shape, !list.isEmpty else { return }
-        let path = shape.area
+        let path = area(of: shape)
         for (layer, shadow) in zip(innerShadowLayers, list) {
             layer.update(shadow, path: path, strength: strength, bounds: CGRect(origin: .zero, size: size.cg))
         }
@@ -476,7 +487,7 @@ final class Node {
         backdropShown = true
         backdrop.frame = CGRect(origin: .zero, size: size.cg)
         backdropMask.frame = backdrop.bounds
-        backdropMask.path = shape.area
+        backdropMask.path = area(of: shape)
         backdrop.opacity = Float(blur.blend)
         if blur.radius != backdropRadius {
             backdropRadius = blur.radius
@@ -1018,7 +1029,13 @@ private final class InnerShadowLayer {
         holder.addSublayer(caster)
     }
 
+    /// What it was last drawn from, so an unchanged shadow is not cut out
+    /// again (a spread is a boolean operation on the path).
+    private var drawn: (shadow: ResolvedShadow, path: CGPath, strength: Double, bounds: CGRect)?
+
     func update(_ shadow: ResolvedShadow, path: CGPath, strength: Double, bounds: CGRect) {
+        if let drawn, drawn.shadow == shadow, drawn.strength == strength, drawn.bounds == bounds, drawn.path == path { return }
+        drawn = (shadow, path, strength, bounds)
         holder.frame = bounds
         clip.frame = holder.bounds
         clip.path = path
@@ -1062,10 +1079,7 @@ private enum Shadows {
 enum Blending {
     static func filter(for mode: BlendMode) -> Any? {
         guard mode != .normal else { return nil }
-        if let name = coreAnimationName(mode), let type = NSClassFromString("CAFilter") as? NSObject.Type,
-           let made = type.perform(NSSelectorFromString("filterWithType:"), with: name)?.takeUnretainedValue() {
-            return made
-        }
+        if let name = coreAnimationName(mode), let made = PrivateFilter.make(name) { return made }
         return CIFilter(name: coreImageName(mode))
     }
 

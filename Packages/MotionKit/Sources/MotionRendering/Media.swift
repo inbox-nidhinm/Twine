@@ -164,6 +164,11 @@ final class VideoFrames {
 
     private func restart(at t: Double) {
         reader?.cancelReading()
+        // Let go of the old reader first: were the new one not to start,
+        // the cancelled one would stay, never restarting, and the layer
+        // would show nothing until a jump back.
+        reader = nil
+        output = nil
         current = nil
         pending = nil
         image = nil

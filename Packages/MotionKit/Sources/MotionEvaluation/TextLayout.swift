@@ -116,9 +116,27 @@ public enum TextLayout {
     }
 
     private static let fonts = Mutex<[FontKey: Unchecked]>([:])
-    private static let layouts = Mutex<[LayoutKey: LaidOut]>([:])
-    /// Enough for every text in a busy scene, several times over; past it
-    /// the cache starts again rather than growing without end.
+    /// Two generations: when the newer fills, it becomes the older and a
+    /// fresh one starts, and anything found in the older is carried into the
+    /// newer. So texts in use stay laid out while a Counter or a spacing
+    /// action makes a new entry every frame; emptying the whole cache when
+    /// full laid every text in the scene out again every eight seconds.
+    private struct Generations: Sendable {
+        var current: [LayoutKey: LaidOut] = [:]
+        var previous: [LayoutKey: LaidOut] = [:]
+
+        mutating func insert(_ value: LaidOut, for key: LayoutKey) {
+            if current.count >= layoutLimit {
+                previous = current
+                current = [:]
+            }
+            current[key] = value
+        }
+    }
+
+    private static let layouts = Mutex(Generations())
+    /// Enough for every text in a busy scene, several times over, in each
+    /// generation.
     private static let layoutLimit = 512
 
     private static func makeFont(_ style: TextStyle) -> CTFont {
@@ -169,12 +187,15 @@ public enum TextLayout {
     /// The lines of `text`, placed in its box.
     public static func layout(_ text: String, style: TextStyle, width: Double?) -> (lines: [PositionedLine], size: Size2) {
         let key = LayoutKey(text: text, style: style, width: width)
-        if let known = layouts.withLock({ $0[key] }) { return (known.lines, known.size) }
-        let made = setLines(text, style: style, width: width)
-        layouts.withLock { cache in
-            if cache.count >= layoutLimit { cache.removeAll() }
-            cache[key] = LaidOut(lines: made.lines, size: made.size)
+        let known = layouts.withLock { g -> LaidOut? in
+            if let hit = g.current[key] { return hit }
+            guard let old = g.previous[key] else { return nil }
+            g.insert(old, for: key)
+            return old
         }
+        if let known { return (known.lines, known.size) }
+        let made = setLines(text, style: style, width: width)
+        layouts.withLock { $0.insert(LaidOut(lines: made.lines, size: made.size), for: key) }
         return made
     }
 

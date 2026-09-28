@@ -182,49 +182,57 @@ public enum Exporter {
         guard writer.startWriting() else { throw failure() }
         writer.startSession(atSourceTime: .zero)
         sound?.start(job: job)
+        // However the frames stop, the sound's reader stops with them and
+        // the half-written movie goes: a failed frame used to leave the
+        // sound reading its files on its own queue.
+        do {
+            for frame in 0..<timing.frameCount {
+                while !input.isReadyForMoreMediaData {
+                    if job.isCancelled || writer.status == .failed { break }
+                    Thread.sleep(forTimeInterval: 0.001)
+                }
+                if job.isCancelled {
+                    sound?.cancel()
+                    writer.cancelWriting()
+                    throw ExportError.cancelled
+                }
+                guard writer.status == .writing else { throw failure() }
 
-        for frame in 0..<timing.frameCount {
-            while !input.isReadyForMoreMediaData {
-                if job.isCancelled || writer.status == .failed { break }
-                Thread.sleep(forTimeInterval: 0.001)
+                var made: CVPixelBuffer?
+                guard let pool = adaptor.pixelBufferPool,
+                      CVPixelBufferPoolCreatePixelBuffer(nil, pool, &made) == kCVReturnSuccess, let buffer = made
+                else { throw ExportError.failed("There wasn't enough memory for the next frame.") }
+                renderer.render(evaluate(project, at: timing.time(ofFrame: frame)), into: buffer)
+                if settings.format.keepsTransparency { unpremultiply(buffer) }
+                describe(buffer)
+                guard adaptor.append(buffer, withPresentationTime: timing.presentationTime(ofFrame: frame)) else {
+                    throw failure()
+                }
+                progress(Double(frame + 1) / Double(timing.frameCount))
             }
+
+            input.markAsFinished()
+            sound?.wait(until: { job.isCancelled || writer.status != .writing })
             if job.isCancelled {
-                sound?.cancel()
                 writer.cancelWriting()
                 throw ExportError.cancelled
             }
-            guard writer.status == .writing else { throw failure() }
-
-            var made: CVPixelBuffer?
-            guard let pool = adaptor.pixelBufferPool,
-                  CVPixelBufferPoolCreatePixelBuffer(nil, pool, &made) == kCVReturnSuccess, let buffer = made
-            else { throw ExportError.failed("There wasn't enough memory for the next frame.") }
-            renderer.render(evaluate(project, at: timing.time(ofFrame: frame)), into: buffer)
-            if settings.format.keepsTransparency { unpremultiply(buffer) }
-            describe(buffer)
-            guard adaptor.append(buffer, withPresentationTime: timing.presentationTime(ofFrame: frame)) else {
-                throw failure()
+            // A movie missing its sound is not finished.
+            if let problem = sound?.failure {
+                writer.cancelWriting()
+                throw ExportError.failed(problem)
             }
-            progress(Double(frame + 1) / Double(timing.frameCount))
+            // The last frame lasts one frame, not until the movie's first.
+            writer.endSession(atSourceTime: timing.duration)
+            let done = DispatchSemaphore(value: 0)
+            writer.finishWriting { done.signal() }
+            done.wait()
+            guard writer.status == .completed else { throw failure() }
+        } catch {
+            sound?.cancel()
+            if writer.status == .writing { writer.cancelWriting() }
+            throw error
         }
-
-        input.markAsFinished()
-        sound?.wait()
-        if job.isCancelled {
-            writer.cancelWriting()
-            throw ExportError.cancelled
-        }
-        // A movie missing its sound is not finished.
-        if let problem = sound?.failure {
-            writer.cancelWriting()
-            throw ExportError.failed(problem)
-        }
-        // The last frame lasts one frame, not until the movie's first.
-        writer.endSession(atSourceTime: timing.duration)
-        let done = DispatchSemaphore(value: 0)
-        writer.finishWriting { done.signal() }
-        done.wait()
-        guard writer.status == .completed else { throw failure() }
     }
 
     static func isMOV(_ format: ExportFormat) -> Bool { format.fileExtension == "mov" }

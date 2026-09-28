@@ -331,6 +331,9 @@ enum Thumbnail {
             renderer = OffscreenRenderer(pixelWidth: width, pixelHeight: height)
         }
         located = media
+        // Only this project's videos stay open: kept across projects, the
+        // readers of every video thumbnailed in a session piled up.
+        videos.keep(only: Set(project.media.map(\.id)))
         renderer?.media = ThumbnailMedia(pictures: pictures, videos: videos)
         defer { renderer?.media = nil }
         guard let image = renderer?.image(of: evaluate(project, at: 0)) else { return nil }

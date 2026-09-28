@@ -16,14 +16,23 @@ import CoreImage
 /// deeply it is nested. Neither is in the public headers. Both are looked up
 /// by name, and if either is ever missing, layer blur falls back to Core
 /// Image and background blur is left out, rather than anything failing.
+/// Core Animation's private `CAFilter` of one type, or nil when the system
+/// has no such class or no way to make one: checked first, so a macOS that
+/// dropped the method would fall back rather than crash on the call.
+enum PrivateFilter {
+    static func make(_ type: String) -> NSObject? {
+        let selector = NSSelectorFromString("filterWithType:")
+        guard let kind = NSClassFromString("CAFilter") as? NSObject.Type, kind.responds(to: selector) else { return nil }
+        return kind.perform(selector, with: type)?.takeUnretainedValue() as? NSObject
+    }
+}
+
 enum Blur {
     /// A filter for a layer's `filters`, blurring by `amount` as Figma
     /// measures it: twice the Gaussian's standard deviation.
     static func filter(amount: Double) -> Any {
         let sigma = max(amount, 0) / 2
-        if let type = NSClassFromString("CAFilter") as? NSObject.Type,
-           let made = type.perform(NSSelectorFromString("filterWithType:"), with: "gaussianBlur")?
-               .takeUnretainedValue() as? NSObject {
+        if let made = PrivateFilter.make("gaussianBlur") {
             made.setValue(sigma, forKey: "inputRadius")
             // Not `inputNormalizeEdges`: set, it stops the filter drawing
             // anything at all in CARenderer.
@@ -46,8 +55,9 @@ enum Compositing {
     /// For a layer's `compositingFilter`: clears whatever is underneath
     /// where the layer draws, by as much as it draws. Nil if the system
     /// does not have it, in which case an inverted mask draws as a plain one.
-    static func destinationOut() -> Any? {
-        guard let type = NSClassFromString("CAFilter") as? NSObject.Type else { return nil }
-        return type.perform(NSSelectorFromString("filterWithType:"), with: "destOut")?.takeUnretainedValue()
-    }
+    static func destinationOut() -> Any? { punch }
+
+    /// Made once: the filter never changes, and every inverted mask made
+    /// its own on every update.
+    nonisolated(unsafe) private static let punch: Any? = PrivateFilter.make("destOut")
 }

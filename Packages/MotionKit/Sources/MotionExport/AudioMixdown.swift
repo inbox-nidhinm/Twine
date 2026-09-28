@@ -137,10 +137,17 @@ final class AudioMixdown: @unchecked Sendable {
         reader.cancelReading()
     }
 
-    /// Waits until every sample is written, or reading stopped.
-    func wait() {
+    /// Waits until every sample is written or reading stopped, or until
+    /// `stopped` says the export has (cancelled, or the writer failed), when
+    /// the writer may never ask for more and the wait would last for ever.
+    func wait(until stopped: () -> Bool) {
         guard started else { return }
-        done.wait()
+        while done.wait(timeout: .now() + 0.1) == .timedOut {
+            if stopped() {
+                cancel()
+                return
+            }
+        }
     }
 
     /// The interleaved samples a reader handed over.

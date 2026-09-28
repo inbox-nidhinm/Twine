@@ -25,7 +25,7 @@ final class Waveforms {
         guard let url, !reading.contains(mediaID) else { return nil }
         reading.insert(mediaID)
         Task.detached(priority: .utility) {
-            let read = Self.read(url)
+            let read = await Self.read(url)
             await MainActor.run {
                 self.peaks[mediaID] = read
                 self.onChange()
@@ -34,20 +34,16 @@ final class Waveforms {
         return nil
     }
 
-    nonisolated private static func read(_ url: URL) -> [Float] {
+    /// The tracks are awaited, not waited for: a task blocked on a
+    /// semaphore for another task holds one of the few shared threads, and
+    /// enough sounds read at once could leave none to finish the loading.
+    nonisolated private static func read(_ url: URL) async -> [Float] {
         let asset = AVURLAsset(url: url)
-        let semaphore = DispatchSemaphore(value: 0)
-        let box = TrackBox()
-        let job = AssetBox(asset: asset)
-        Task.detached {
-            box.tracks = (try? await job.asset.loadTracks(withMediaType: .audio)) ?? []
-            semaphore.signal()
-        }
-        semaphore.wait()
+        let tracks = (try? await asset.loadTracks(withMediaType: .audio)) ?? []
         // Every sound track mixed, as export hears them.
-        guard !box.tracks.isEmpty, let reader = try? AVAssetReader(asset: asset) else { return [] }
+        guard !tracks.isEmpty, let reader = try? AVAssetReader(asset: asset) else { return [] }
         let rate = 8000.0
-        let output = AVAssetReaderAudioMixOutput(audioTracks: box.tracks, audioSettings: [
+        let output = AVAssetReaderAudioMixOutput(audioTracks: tracks, audioSettings: [
             AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: rate, AVNumberOfChannelsKey: 1,
             AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false,
             AVLinearPCMIsNonInterleaved: false,
@@ -77,12 +73,4 @@ final class Waveforms {
         let loudestPeak = result.max() ?? 0
         return loudestPeak > 0 ? result.map { $0 / loudestPeak } : result
     }
-}
-
-nonisolated private final class TrackBox: @unchecked Sendable {
-    var tracks: [AVAssetTrack] = []
-}
-
-nonisolated private struct AssetBox: @unchecked Sendable {
-    let asset: AVURLAsset
 }

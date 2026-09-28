@@ -238,3 +238,29 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
         #expect(shape.strokes[0].alignment == .center)
     }
 }
+
+@Suite struct MaskPlacingTests {
+    @Test func eachMaskedLayerGetsItsOwnMaskThroughItsGroups() {
+        let first = rect("First mask", at: Vec2(10, 10)), second = rect("Second mask", at: Vec2(300, 300))
+        var a = rect("A"), b = rect("B"), plain = rect("Plain")
+        a.mask = MaskReference(layerID: first.id)
+        b.mask = MaskReference(layerID: second.id, isInverted: true)
+        var group = Layer(name: "G", content: .group(GroupContent(children: [b, plain])), size: Size2(400, 400),
+                          position: Vec2(200, 200))
+        group.transform.rotation = 30
+        let scene = evaluate(Project(layers: [first, a, group, second]), at: 0)
+        #expect(scene.layer(a.id)?.mask?.layerID == first.id)
+        #expect(scene.layer(b.id)?.mask?.layerID == second.id && scene.layer(b.id)?.mask?.isInverted == true)
+        #expect(scene.layer(plain.id)?.mask == nil && scene.layer(group.id)?.mask == nil)
+        // The mask in the composition, carried into the turned group's child.
+        #expect(scene.layer(b.id)?.mask?.transform != .identity)
+    }
+
+    @Test func aRepeatedIDDoesNotCrash() {
+        let mask = rect("Mask")
+        var masked = rect("Masked")
+        masked.mask = MaskReference(layerID: mask.id)
+        // A damaged file with the same layer twice.
+        _ = evaluate(Project(layers: [mask, masked, masked]), at: 0)
+    }
+}
