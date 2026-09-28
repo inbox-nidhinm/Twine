@@ -15,6 +15,8 @@ public enum ExportError: LocalizedError, Equatable {
     case cancelled
     case noGPU
     case tooLarge(format: ExportFormat, width: Int, height: Int)
+    /// Sounds in the composition that could not be read, by name.
+    case soundUnreadable([String])
     case failed(String)
 
     public var errorDescription: String? {
@@ -22,6 +24,7 @@ public enum ExportError: LocalizedError, Equatable {
         case .cancelled: "The export was cancelled."
         case .noGPU: "The export couldn't start."
         case .tooLarge: "The export is too large for this format."
+        case .soundUnreadable: "The sound couldn't be read."
         case .failed: "The export couldn't be finished."
         }
     }
@@ -33,6 +36,8 @@ public enum ExportError: LocalizedError, Equatable {
         case .tooLarge(let format, let width, let height):
             "\(format.title) can't encode a \(width) × \(height) picture. Try a smaller size, or "
                 + (format == .h264 ? "HEVC or ProRes." : "ProRes.")
+        case .soundUnreadable(let names):
+            "\(names.joined(separator: ", ")) couldn't be heard: \(names.count == 1 ? "its file is" : "their files are") missing or unreadable. Nothing was exported, so no movie is missing its sound."
         case .failed(let reason): reason
         }
     }
@@ -155,9 +160,10 @@ public enum Exporter {
         renderer.media = library
 
         // The sound, mixed from its clips and read alongside the frames.
+        let names = Dictionary(project.media.map { ($0.id, $0.originalName) }, uniquingKeysWith: { a, _ in a })
         let sound = settings.includesAudio
-            ? AudioMixdown(clips: audioClips(project), media: media, start: timing.startTime,
-                           duration: timing.duration.seconds, compressed: !isMOV(settings.format))
+            ? try AudioMixdown(clips: audioClips(project), media: media, names: names, start: timing.startTime,
+                               duration: timing.duration.seconds, compressed: !isMOV(settings.format))
             : nil
         if let sound {
             guard writer.canAdd(sound.input) else { throw ExportError.failed("The sound couldn't be added to the movie.") }
@@ -207,6 +213,11 @@ public enum Exporter {
         if job.isCancelled {
             writer.cancelWriting()
             throw ExportError.cancelled
+        }
+        // A movie missing its sound is not finished.
+        if let problem = sound?.failure {
+            writer.cancelWriting()
+            throw ExportError.failed(problem)
         }
         // The last frame lasts one frame, not until the movie's first.
         writer.endSession(atSourceTime: timing.duration)

@@ -139,6 +139,27 @@ private func barHeight(_ buffer: CVPixelBuffer) -> Int {
     return (0..<h).filter { base[$0 * row + 32 * 4 + 1] > 128 }.count
 }
 
+/// The loudest sample in the movie's sound, either channel.
+private func peak(of url: URL) async throws -> Float {
+    let asset = AVURLAsset(url: url)
+    let track = try #require(try await asset.loadTracks(withMediaType: .audio).first)
+    let reader = try AVAssetReader(asset: asset)
+    let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+        AVFormatIDKey: kAudioFormatLinearPCM, AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true,
+        AVLinearPCMIsNonInterleaved: false, AVSampleRateKey: 48000, AVNumberOfChannelsKey: 2,
+    ])
+    reader.add(output)
+    reader.startReading()
+    var loudest: Float = 0
+    while let buffer = output.copyNextSampleBuffer(), let block = CMSampleBufferGetDataBuffer(buffer) {
+        let length = CMBlockBufferGetDataLength(block)
+        var chunk = [Float](repeating: 0, count: length / 4)
+        CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: length, destination: &chunk)
+        loudest = max(loudest, chunk.map(abs).max() ?? 0)
+    }
+    return loudest
+}
+
 /// The loudness of each tenth of a second of the movie's sound.
 private func loudness(of url: URL) async throws -> [Double] {
     let asset = AVURLAsset(url: url)
@@ -188,6 +209,45 @@ private func loudness(of url: URL) async throws -> [Double] {
         #expect(abs(out[20] - 30) <= 1)
         // After: resting on the last frame it played, file frame 20.
         #expect(abs(out[29] - 40) <= 1)
+    }
+
+    @Test func loudOverlappingSoundsAreKeptUnderTheCeiling() async throws {
+        let sound = try tone(seconds: 2)
+        defer { try? FileManager.default.removeItem(at: sound) }
+        let asset = MediaAsset(kind: .audio, fileName: "t.wav", originalName: "t.wav", contentHash: "o", duration: 2)
+        // Three copies of a tone at half of full scale, all at once: 1.5 together.
+        var layers: [Layer] = []
+        var actions: [Action] = []
+        for i in 0..<3 {
+            let layer = Layer(name: "Tone \(i)", content: .audio(AudioContent(mediaID: asset.id)), size: Size2(0, 0), position: .zero)
+            layers.append(layer)
+            actions.append(Action(target: layer.id, start: 0, duration: 2, spec: .play(PlayAction())))
+        }
+        let project = Project(composition: Composition(width: 64, height: 64, frameRate: .fps30, duration: 2),
+                              layers: layers, actions: actions, media: [asset])
+        for (format, room) in [(ExportFormat.proRes422, Float(0.01)), (.h264, 0.06)] {
+            let url = temporaryURL(format.fileExtension)
+            defer { try? FileManager.default.removeItem(at: url) }
+            try Exporter.export(project, settings: ExportSettings(format: format), to: url, media: [asset.id: sound])
+            let loudest = try await peak(of: url)
+            // AAC may overshoot a little between samples; PCM keeps it exactly.
+            #expect(loudest <= PeakLimiter.defaultCeiling + room, "\(format): \(loudest)")
+            #expect(loudest > 0.8, "still loud, \(format)")
+        }
+    }
+
+    @Test func aSoundThatCannotBeReadStopsTheExport() throws {
+        let asset = MediaAsset(kind: .audio, fileName: "gone.wav", originalName: "Voiceover.wav", contentHash: "g", duration: 2)
+        let layer = Layer(name: "Voice", content: .audio(AudioContent(mediaID: asset.id)), size: Size2(0, 0), position: .zero)
+        let play = Action(target: layer.id, start: 0, duration: 1, spec: .play(PlayAction()))
+        let project = Project(composition: Composition(width: 64, height: 64, frameRate: .fps30, duration: 1),
+                              layers: [layer], actions: [play], media: [asset])
+        let url = temporaryURL("mp4")
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(throws: ExportError.soundUnreadable(["Voiceover.wav"])) {
+            try Exporter.export(project, settings: ExportSettings(format: .h264), to: url, media: [:])
+        }
+        #expect(!FileManager.default.fileExists(atPath: url.path))
     }
 
     @Test func soundIsHeardOnlyDuringItsPlayBar() async throws {

@@ -193,11 +193,36 @@ final class VideoFrames {
             VTCreateCGImageFromCVPixelBuffer(buffer, options: nil, imageOut: &made)
             image = made
         } else {
-            var turned = CIImage(cvPixelBuffer: buffer, options: [.colorSpace: sRGB]).transformed(by: transform)
-            turned = turned.transformed(by: CGAffineTransform(translationX: -turned.extent.minX, y: -turned.extent.minY))
-            image = context.createCGImage(turned, from: turned.extent, format: .BGRA8, colorSpace: sRGB)
+            image = context.createCGImage(Self.upright(CIImage(cvPixelBuffer: buffer, options: [.colorSpace: sRGB]),
+                                                       transform: transform),
+                                          from: CGRect(origin: .zero, size: Self.uprightSize(buffer, transform)),
+                                          format: .BGRA8, colorSpace: sRGB)
         }
         return image
+    }
+}
+
+extension VideoFrames {
+    /// A frame turned the way the file says it should show.
+    ///
+    /// The file's transform is written for pixels counted from the top-left,
+    /// y running down, as AVFoundation counts them; Core Image counts from
+    /// the bottom-left, y running up. Applied as it is, a quarter turn came
+    /// out upside down (both ways round), so it is applied between two flips:
+    /// into the file's way of counting, turned, and back.
+    static func upright(_ frame: CIImage, transform: CGAffineTransform) -> CIImage {
+        let height = frame.extent.height
+        var turned = frame.transformed(by: CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: height))
+            .transformed(by: transform)
+        turned = turned.transformed(by: CGAffineTransform(translationX: -turned.extent.minX, y: -turned.extent.minY))
+        return turned.transformed(by: CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: turned.extent.height))
+    }
+
+    /// The size of a frame once turned.
+    static func uprightSize(_ buffer: CVPixelBuffer, _ transform: CGAffineTransform) -> CGSize {
+        let box = CGRect(x: 0, y: 0, width: CVPixelBufferGetWidth(buffer), height: CVPixelBufferGetHeight(buffer))
+            .applying(transform)
+        return CGSize(width: abs(box.width).rounded(), height: abs(box.height).rounded())
     }
 }
 

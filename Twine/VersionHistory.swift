@@ -23,6 +23,14 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Sound, phone videos, WebM and undo", changes: [
+            "Portrait videos from a phone no longer come in upside down.",
+            "Exported sound never clips: loud clips that overlap are held just under full volume, and quieter sound is left exactly as it was.",
+            "Every sound track in a file is heard, not only the first.",
+            "An export stops with a clear message naming any sound it cannot read, instead of making a movie without it.",
+            "WebM videos can be imported, converted with the ffmpeg installed on this Mac. Transparency is kept.",
+            "Undo keeps the last 200 steps, and on very large projects drops the oldest sooner so it never takes more than about 512 MB.",
+        ]),
         .init(date: "28 September 2026", title: "Text in Fill and Stroke", changes: [
             "The Text section is laid out afresh: the font, then weight and size, then left, centre and right alignment beside Auto or Fixed, with letter spacing and line height behind its settings button. Justify is no longer offered.",
             "A text's colour is now its Fill, which can be hidden, and a text can have a Stroke round its letters: centred, inside or outside, with its corners in the stroke's settings.",

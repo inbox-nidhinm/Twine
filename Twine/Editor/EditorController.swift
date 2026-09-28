@@ -306,13 +306,24 @@ final class EditorController {
             // Play bars go at the bottom of the timeline, in import order.
             var nextRow = ActionFactory.nextRowOrder(in: project)
             for url in urls {
-                guard var asset = await MediaImport.describe(url) else { skipped = true; continue }
-                if let existing = known.first(where: { $0.contentHash == asset.contentHash }) {
-                    asset = existing
+                let asset: MediaAsset
+                if WebMConversion.isWebM(url) {
+                    guard let brought = await bringInWebM(url, known: known) else { continue }
+                    asset = brought.asset
+                    if brought.isNew {
+                        commands.append(.addMedia(asset))
+                        known.append(asset)
+                    }
                 } else {
-                    do { try await document.stage(url, as: asset.fileName) } catch { skipped = true; continue }
-                    commands.append(.addMedia(asset))
-                    known.append(asset)
+                    guard var described = await MediaImport.describe(url) else { skipped = true; continue }
+                    if let existing = known.first(where: { $0.contentHash == described.contentHash }) {
+                        described = existing
+                    } else {
+                        do { try await document.stage(url, as: described.fileName) } catch { skipped = true; continue }
+                        commands.append(.addMedia(described))
+                        known.append(described)
+                    }
+                    asset = described
                 }
                 let name = url.deletingPathExtension().lastPathComponent
                 let layer = LayerFactory.media(asset, center: Vec2(center.x + offset, center.y + offset),
@@ -353,6 +364,10 @@ final class EditorController {
     /// whether it is new to the project. Nil, with a beep, for a file of
     /// another kind than `kind` or one that will not open.
     private func bringIn(_ url: URL, as kind: MediaKind) async -> (asset: MediaAsset, isNew: Bool)? {
+        if WebMConversion.isWebM(url) {
+            guard kind == .video else { NSSound.beep(); return nil }
+            return await bringInWebM(url, known: project.media)
+        }
         guard let document, let described = await MediaImport.describe(url), described.kind == kind else {
             NSSound.beep()
             return nil
@@ -363,6 +378,32 @@ final class EditorController {
             return nil
         }
         return (described, true)
+    }
+
+    /// A WebM made into a movie macOS can open (`WebMConversion`) and staged,
+    /// or the one already in the project from the same file: it is known by
+    /// the WebM's own fingerprint, so importing it again converts nothing.
+    /// What goes wrong is said in a notice.
+    private func bringInWebM(_ url: URL, known: [MediaAsset]) async -> (asset: MediaAsset, isNew: Bool)? {
+        guard let document, let hash = await MediaImport.fingerprint(url) else { NSSound.beep(); return nil }
+        if let existing = known.first(where: { $0.contentHash == hash }) { return (existing, false) }
+        editor.showNotice("Converting \(url.lastPathComponent)…")
+        do {
+            let movie = try await WebMConversion.convert(url)
+            defer { try? FileManager.default.removeItem(at: movie) }
+            guard var asset = await MediaImport.describe(movie) else {
+                editor.showNotice("\(url.lastPathComponent) was converted but couldn't be opened.")
+                return nil
+            }
+            asset.originalName = url.lastPathComponent
+            asset.contentHash = hash
+            try await document.stage(movie, as: asset.fileName)
+            editor.notice = nil
+            return (asset, true)
+        } catch {
+            editor.showNotice(error.localizedDescription)
+            return nil
+        }
     }
 
     /// Swaps a picture's or a video's file for another chosen in a panel,

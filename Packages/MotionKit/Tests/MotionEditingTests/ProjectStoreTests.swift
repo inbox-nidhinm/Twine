@@ -12,10 +12,41 @@ import MotionModel
 
     /// Grouping by event needs a running event loop, which tests do not have.
     /// The store opens and closes its own groups, so nothing else changes.
-    private func makeStore(_ project: Project = Project()) -> ProjectStore {
+    private func makeStore(_ project: Project = Project(), budget: Int = ProjectStore.undoBudget) -> ProjectStore {
         let undo = UndoManager()
         undo.groupsByEvent = false
-        return ProjectStore(project: project, undoManager: undo)
+        return ProjectStore(project: project, undoManager: undo, undoBudget: budget)
+    }
+
+    private func undoCount(_ store: ProjectStore) -> Int {
+        var n = 0
+        while store.undoManager.canUndo { store.undoManager.undo(); n += 1 }
+        return n
+    }
+
+    @Test func atMostTwoHundredStepsCanBeUndone() throws {
+        let store = makeStore()
+        let a = shape("A")
+        try store.perform(.insertLayers([a], parentID: nil, index: nil))
+        for i in 0..<210 { try store.perform(.renameLayer(a.id, "N\(i)")) }
+        #expect(undoCount(store) == ProjectStore.undoSteps)
+        // The oldest went: the layer is still there, named by the tenth rename.
+        #expect(store.project.layers.map(\.name) == ["N9"])
+    }
+
+    @Test func theOldestStepsGoWhenTheHistoryOutgrowsItsBudget() throws {
+        let a = shape("A")
+        let step = ProjectStore.cost(of: Project(layers: [a]), against: Project(layers: [shape("B")]))
+        // Room for five renames of a one-layer project.
+        let store = makeStore(Project(layers: [a]), budget: step * 5)
+        for i in 0..<12 { try store.perform(.renameLayer(a.id, "N\(i)")) }
+        #expect(undoCount(store) == 5)
+        #expect(store.project.layers.map(\.name) == ["N6"])
+        // Redo still runs the whole way back.
+        var redone = 0
+        while store.undoManager.canRedo { store.undoManager.redo(); redone += 1 }
+        #expect(redone == 5)
+        #expect(store.project.layers.map(\.name) == ["N11"])
     }
 
     @Test func commandsUndoAndRedo() throws {

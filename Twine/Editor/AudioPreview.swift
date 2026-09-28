@@ -89,7 +89,8 @@ final class AudioPreview {
         player?.pause()
         player = nil
         let media = Dictionary(project.media.compactMap { a in locate(a.id).map { (a.id, $0) } }, uniquingKeysWith: { a, _ in a })
-        guard let mix = AudioComposition(clips: clips, media: media) else { self.mix = nil; return }
+        let mix = AudioComposition(clips: clips, media: media)
+        guard !mix.isEmpty else { self.mix = nil; return }
         self.mix = mix
         length = mix.composition.duration.seconds
         let item = AVPlayerItem(asset: mix.composition)

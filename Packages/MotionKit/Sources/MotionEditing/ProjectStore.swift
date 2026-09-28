@@ -25,9 +25,24 @@ public final class ProjectStore {
     /// ordinary edit, such as dragging across a number field.
     @ObservationIgnored private var foldsCommands = false
 
-    public init(project: Project, undoManager: UndoManager) {
+    /// At most this many steps can be undone (the user's choice, 28 September
+    /// 2026; After Effects allows 99, Photoshop keeps 50).
+    public static let undoSteps = 200
+    /// And the history keeps no more than about this much memory: past it,
+    /// the oldest steps go first. A net for huge projects; ordinary ones never
+    /// reach it.
+    public static let undoBudget = 512 * 1024 * 1024
+    @ObservationIgnored private let budget: Int
+    /// What each step keeps alive, oldest first, for the steps that can be
+    /// undone and those that can be redone.
+    @ObservationIgnored private var undoCosts: [Int] = []
+    @ObservationIgnored private var redoCosts: [Int] = []
+
+    public init(project: Project, undoManager: UndoManager, undoBudget: Int = ProjectStore.undoBudget) {
         self.project = project
         self.undoManager = undoManager
+        self.budget = undoBudget
+        undoManager.levelsOfUndo = Self.undoSteps
     }
 
     /// Applies one command as one undo step. A command that changes nothing
@@ -48,6 +63,8 @@ public final class ProjectStore {
         foldsCommands = false
         self.project = project
         undoManager.removeAllActions(withTarget: self)
+        undoCosts = []
+        redoCosts = []
     }
 
     // MARK: Continuous changes
@@ -101,11 +118,49 @@ public final class ProjectStore {
         }
         undoManager.setActionName(name)
         undoManager.endUndoGrouping()
+        // A new step clears what could be redone, as the undo manager does.
+        undoCosts.append(Self.cost(of: before, against: project))
+        redoCosts = []
+        if undoCosts.count > Self.undoSteps { undoCosts.removeFirst(undoCosts.count - Self.undoSteps) }
+        trimToBudget()
+    }
+
+    /// Roughly what a snapshot keeps alive that the project does not share:
+    /// the lists that changed, copied whole. Snapshots share everything
+    /// else, and pictures and videos are files, never copied. Paths and words
+    /// inside a layer are not counted, so a huge pasted drawing counts as
+    /// less than it is.
+    static func cost(of before: Project, against after: Project) -> Int {
+        var bytes = 1024
+        if before.layers != after.layers { bytes += before.allLayers.count * MemoryLayout<Layer>.stride }
+        if before.actions != after.actions { bytes += before.actions.count * MemoryLayout<Action>.stride }
+        return bytes
+    }
+
+    /// Drops the oldest steps until the history fits the budget, always
+    /// keeping the latest. The undo manager removes its oldest steps when its
+    /// limit is lowered, so the limit is lowered for a moment and put back.
+    private func trimToBudget() {
+        var total = undoCosts.reduce(0, +) + redoCosts.reduce(0, +)
+        var drop = 0
+        while total > budget, drop < undoCosts.count - 1 {
+            total -= undoCosts[drop]
+            drop += 1
+        }
+        guard drop > 0 else { return }
+        undoManager.levelsOfUndo = undoCosts.count - drop
+        undoManager.levelsOfUndo = Self.undoSteps
+        undoCosts.removeFirst(drop)
     }
 
     /// Undo and redo are the same operation in opposite directions: swap in
     /// the other snapshot and register the one being left as its own reverse.
     private func restore(_ snapshot: Project, name: String) {
+        if undoManager.isUndoing, let cost = undoCosts.popLast() {
+            redoCosts.append(cost)
+        } else if undoManager.isRedoing, let cost = redoCosts.popLast() {
+            undoCosts.append(cost)
+        }
         let leaving = project
         project = snapshot
         undoManager.registerUndo(withTarget: self) { store in
