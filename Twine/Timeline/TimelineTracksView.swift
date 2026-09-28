@@ -360,7 +360,9 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         ctx.saveGState()
         ctx.clip(to: CGRect(x: gutter, y: row.y, width: bounds.width - gutter, height: TimelineRow.height))
         ctx.setAlpha(dimmed ? 0.4 : 1)
-        let radius = action.isInstant ? 3 : 6.0
+        // A Show is a dot and a Hide a square, so the two read apart at a glance.
+        let shows: Bool = { if case .visibility(let v) = action.spec { return v.isVisible } else { return false } }()
+        let radius = shows ? rect.width / 2 : action.isInstant ? 3 : 6.0
         let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
         ctx.addPath(path)
         ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.panelHover).cgColor)

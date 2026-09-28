@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Show is a dot", changes: [
+            "On the timeline a Show is drawn as a dot and a Hide as a square, so the two tell apart at a glance.",
+        ]),
         .init(date: "28 September 2026", title: "Smaller play controls", changes: [
             "The timeline's play controls are smaller, turn white under the pointer, and the pause button shows white while playing.",
         ]),
