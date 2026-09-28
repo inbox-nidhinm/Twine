@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Safer typing and imports", changes: [
+            "Words typed on the canvas are kept when you go Home, open another project, close the window or quit before you finish typing. They were lost before.",
+            "An SVG that refers to itself, nests or repeats past what any drawing needs, or holds numbers too large to draw is refused or read safely, rather than crashing Twine.",
+            "An SVG can no longer pull a file from the Mac, or a web address, into the drawing.",
+            "A Figma paste with extreme values reads safely too: stars and polygons keep at most 60 points, and anything placed impossibly far away is left out.",
+        ]),
         .init(date: "28 September 2026", title: "Tidier inspector sections", changes: [
             "An empty section, such as Stroke, Effects or Mask with nothing added, has its name centred between its lines.",
             "The last section in the layer inspector has a line under it too.",

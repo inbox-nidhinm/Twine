@@ -36,10 +36,12 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         if let window { TrafficLights.retry(in: window) }
     }
 
-    /// Gives the window up to the home screen or another project: playback,
-    /// menus and any export stop, and the project closes once it has saved.
+    /// Gives the window up to the home screen or another project: typing
+    /// finishes, playback, menus and any export stop, and the project closes
+    /// once it has saved.
     func leave(then: @escaping () -> Void) {
         menus.dismiss()
+        controller.finishEditing()
         controller.stop()
         editor.exports.cancel()
         let document = document as? ProjectDocument
@@ -55,6 +57,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     /// the app.
     func windowWillClose(_ notification: Notification) {
         menus.dismiss()
+        controller.finishEditing()
         editor.exports.cancel()
     }
 

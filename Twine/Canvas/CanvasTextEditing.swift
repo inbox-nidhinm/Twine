@@ -198,7 +198,7 @@ extension CanvasNSView: NSTextInputClient, NSMenuItemValidation {
         l.name = EditorController.textName(renaming: l.name, from: old, to: session.text.text)
         content.text = session.text.text
         l.content = .text(content)
-        controller.update([l])
+        controller.type([l])
         inputContext?.invalidateCharacterCoordinates()
         window?.invalidateCursorRects(for: self)
         restartCaret()

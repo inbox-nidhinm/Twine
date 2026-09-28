@@ -12,7 +12,7 @@ enum SVGPictures {
     /// PNG, and the box it covers in the SVG's own units. Nil when it draws
     /// nothing.
     static func draw(_ svg: String, size: Size2, scale: Double) -> (png: Data, box: Box)? {
-        guard let image = NSImage(data: Data(svg.utf8)) else { return nil }
+        guard size.width.isFinite, size.height.isFinite, scale.isFinite, let image = NSImage(data: Data(svg.utf8)) else { return nil }
         // At most 8192 pixels a side, however large the drawing.
         let s = min(scale, 8192 / max(size.width, size.height, 1))
         let w = Int((size.width * s).rounded(.up)), h = Int((size.height * s).rounded(.up))

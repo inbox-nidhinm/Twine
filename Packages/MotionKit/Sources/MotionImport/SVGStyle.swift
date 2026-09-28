@@ -54,8 +54,8 @@ struct SVGStyle {
     /// 0 to 1, from a number or a percentage.
     func fraction(_ name: String) -> Double {
         guard let text = values[name] else { return 1 }
-        if text.hasSuffix("%"), let v = Double(text.dropLast()) { return min(max(v / 100, 0), 1) }
-        return min(max(Double(text) ?? 1, 0), 1)
+        if text.hasSuffix("%"), let v = SVGNumber.sane(Double(text.dropLast())) { return min(max(v / 100, 0), 1) }
+        return min(max(SVGNumber.sane(Double(text)) ?? 1, 0), 1)
     }
 }
 
@@ -92,11 +92,23 @@ enum SVGNumber {
     static func parse(_ text: String) -> Double? {
         var t = text.trimmed
         for unit in ["px", "pt", "em"] where t.hasSuffix(unit) {
-            let value = Double(t.dropLast(unit.count))
+            let value = sane(Double(t.dropLast(unit.count)))
             return unit == "pt" ? value.map { $0 * 4 / 3 } : unit == "em" ? value.map { $0 * 16 } : value
         }
         if t.hasSuffix("%") { t.removeLast() }
-        return Double(t)
+        return sane(Double(t))
+    }
+
+    /// The largest number a file may use. Far past any real drawing (maps
+    /// in metres reach the millions), and small enough that the sums made
+    /// with it stay finite, so nothing downstream meets an infinity.
+    static let limit = 1e9
+
+    /// A number read from a file, or nil if it is `nan`, `inf` or past
+    /// `limit`, which Swift's own reading accepts.
+    static func sane(_ value: Double?) -> Double? {
+        guard let value, value.isFinite, abs(value) <= limit else { return nil }
+        return value
     }
 
     /// A list of numbers split by spaces or commas.
@@ -124,13 +136,13 @@ enum SVGColor {
             let parts = inner.split(whereSeparator: { $0 == "," || $0 == " " }).map(String.init)
             guard parts.count >= 3 else { return nil }
             func channel(_ s: String, max: Double) -> Double {
-                s.hasSuffix("%") ? (Double(s.dropLast()) ?? 0) / 100 : (Double(s) ?? 0) / max
+                s.hasSuffix("%") ? (SVGNumber.sane(Double(s.dropLast())) ?? 0) / 100 : (SVGNumber.sane(Double(s)) ?? 0) / max
             }
             let alpha = parts.count > 3 ? channel(parts[3], max: 1) : 1
             if t.hasPrefix("rgb") {
                 return RGBA(channel(parts[0], max: 255), channel(parts[1], max: 255), channel(parts[2], max: 255), alpha)
             }
-            let h = (Double(parts[0].replacingOccurrences(of: "deg", with: "")) ?? 0) / 360
+            let h = (SVGNumber.sane(Double(parts[0].replacingOccurrences(of: "deg", with: ""))) ?? 0) / 360
             return hsl(h, channel(parts[1], max: 100), channel(parts[2], max: 100), alpha)
         }
         if t == "transparent" { return .clear }

@@ -199,6 +199,22 @@ final class EditorController {
 
     func end() { store.endContinuousChange() }
 
+    /// A step of typing on the canvas. Typing is one continuous change,
+    /// recorded only when it ends, so each step also tells the document it
+    /// has something to save: otherwise quitting or a crash mid-sentence
+    /// would find nothing edited and lose the words.
+    func type(_ layers: [Layer]) {
+        update(layers)
+        document?.updateChangeCount(.changeDone)
+    }
+
+    /// Finishes what is half done on the canvas, typing above all, so it is
+    /// an undo step in the project before the editor gives up the window.
+    func finishEditing() {
+        canvas?.endTextEditing()
+        end()
+    }
+
     func cancel() { store.cancelContinuousChange() }
 
     // MARK: Playback

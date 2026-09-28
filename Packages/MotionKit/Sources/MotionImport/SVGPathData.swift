@@ -121,7 +121,10 @@ struct NumberScanner {
             }
         }
         guard digits else { i = start; return nil }
-        return Double(String(chars[start..<i]))
+        // Past the limit counts as malformed, so a path stops there, as a
+        // browser stops at a mistake.
+        guard let value = SVGNumber.sane(Double(String(chars[start..<i]))) else { i = start; return nil }
+        return value
     }
 }
 
@@ -204,6 +207,7 @@ struct PathBuilder {
         var delta = angle((x1 - cx1) / rx, (y1 - cy1) / ry, (-x1 - cx1) / rx, (-y1 - cy1) / ry)
         if !sweep && delta > 0 { delta -= 2 * .pi }
         if sweep && delta < 0 { delta += 2 * .pi }
+        guard delta.isFinite, theta1.isFinite, cx.isFinite, cy.isFinite, rx.isFinite, ry.isFinite else { return line(to: p) }
         let segments = max(1, Int((abs(delta) / (.pi / 2)).rounded(.up)))
         let step = delta / Double(segments)
         let k = 4 / 3 * tan(step / 4)

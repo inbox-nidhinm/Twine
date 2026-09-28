@@ -69,7 +69,7 @@ enum SVGFilters {
             func attr(_ n: String) -> String? { step.attribute(forName: n)?.stringValue }
             switch name {
             case "feOffset":
-                offset = Vec2(Double(attr("dx") ?? "0") ?? 0, Double(attr("dy") ?? "0") ?? 0)
+                offset = Vec2(SVGNumber.sane(Double(attr("dx") ?? "0")) ?? 0, SVGNumber.sane(Double(attr("dy") ?? "0")) ?? 0)
             case "feGaussianBlur":
                 deviation = SVGNumber.list(attr("stdDeviation") ?? "0").first ?? 0
             case "feMorphology":

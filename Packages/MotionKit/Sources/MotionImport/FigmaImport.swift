@@ -132,6 +132,10 @@ public struct FigmaPayload: Codable, Sendable {
 
 /// The plugin's copy made into Twine layers.
 public enum FigmaImport {
+    /// The most sides or points a pasted polygon or star keeps, as many as
+    /// the inspector offers.
+    static let maxPoints = 60
+
     public struct Result: Sendable {
         /// The selected layers, back to front, placed in Figma's page space.
         public var layers: [Layer]
@@ -159,7 +163,7 @@ public enum FigmaImport {
               payload.format == FigmaPayload.formatName else { throw ReadError.notAPayload }
         guard payload.version <= 1 else { throw ReadError.newerVersion }
         var builder = FigmaBuilder(images: payload.images)
-        let layers = builder.layers(payload.nodes, parent: .identity)
+        let layers = Finite.layers(builder.layers(payload.nodes, parent: .identity))
         let boxes = layers.compactMap(Arrangement.box(of:))
         guard let first = boxes.first else { throw ReadError.empty }
         return Result(layers: layers, bounds: boxes.dropFirst().reduce(first) { $0.union($1) },
@@ -237,9 +241,9 @@ private struct FigmaBuilder {
             let arc = node.arc.map { EllipseArc(start: $0.start * 180 / .pi, end: $0.end * 180 / .pi, innerRadius: $0.inner) } ?? .full
             layer = shape(.ellipse(arc: arc.isWhole && arc.innerRadius == 0 ? .full : arc), node, size: size, closed: true)
         case "polygon":
-            layer = shape(.polygon(sides: max(node.count ?? 3, 3)), node, size: size, closed: true)
+            layer = shape(.polygon(sides: min(max(node.count ?? 3, 3), FigmaImport.maxPoints)), node, size: size, closed: true)
         case "star":
-            layer = shape(.star(points: max(node.count ?? 5, 3), innerRadius: node.inner ?? 0.4,
+            layer = shape(.star(points: min(max(node.count ?? 5, 3), FigmaImport.maxPoints), innerRadius: node.inner ?? 0.4,
                                 cornerRadius: node.radii?.first ?? 0), node, size: size, closed: true)
         case "line":
             layer = shape(.line, node, size: Size2(size.width, 0), closed: false)
@@ -399,7 +403,10 @@ private struct FigmaBuilder {
                 }
             default: p.mode = .fill
             }
-            if p.mode != .crop { p.quarterTurns = Int(((paint.rotation ?? 0) / 90).rounded()) }
+            // Only the turn within a full circle counts, so a huge angle
+            // cannot overflow a whole number.
+            let quarters = ((paint.rotation ?? 0) / 90).rounded().truncatingRemainder(dividingBy: 4)
+            if p.mode != .crop, quarters.isFinite { p.quarterTurns = Int(quarters) }
             return .image(p)
         default:
             return nil

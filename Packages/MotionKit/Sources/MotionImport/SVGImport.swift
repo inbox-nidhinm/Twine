@@ -36,17 +36,106 @@ public enum SVGImport {
 
     public enum ReadError: Error, Equatable {
         case notSVG
+        /// The file declares entities that read other files or grow into
+        /// others, which could pull a file from the Mac into the drawing or
+        /// swell a few bytes into gigabytes.
+        case entities
+        /// Nested, or repeated through `use`, past what any drawing needs.
+        case tooComplex
     }
+
+    /// How deep elements may nest, counting each `use` as a level.
+    static let maxDepth = 256
+    /// How many elements may be read, counting each one a `use` repeats.
+    static let maxElements = 100_000
 
     /// Reads `data` as an SVG. The frame is named `name`, centred on
     /// `center`, and shrunk to fit `fitting` if it is larger. Pictures are
     /// drawn at `pictureScale` times their size.
     public static func read(_ data: Data, name: String, center: Vec2 = .zero, fitting: Size2? = nil,
                             pictureScale: Double = 2) throws -> Result {
-        guard let document = try? XMLDocument(data: data, options: [.nodePreserveWhitespace]),
+        guard !declaresRiskyEntities(data) else { throw ReadError.entities }
+        guard nesting(of: data, limit: maxDepth) <= maxDepth else { throw ReadError.tooComplex }
+        guard let document = try? XMLDocument(data: data, options: [.nodePreserveWhitespace, .nodeLoadExternalEntitiesNever]),
               let root = document.rootElement(), root.localName == "svg" else { throw ReadError.notSVG }
         var reader = Reader(document: document, root: root, pictureScale: pictureScale)
-        return reader.read(name: name, center: center, fitting: fitting)
+        let result = reader.read(name: name, center: center, fitting: fitting)
+        guard !reader.tooComplex else { throw ReadError.tooComplex }
+        return result
+    }
+
+    /// Whether the file declares an entity that is a file or a web address
+    /// (`SYSTEM`, `PUBLIC`), a parameter entity, or one made of others.
+    /// Plain text entities, which Illustrator writes, are fine.
+    static func declaresRiskyEntities(_ data: Data) -> Bool {
+        let opening = Data("<!ENTITY".utf8), close = UInt8(ascii: ">")
+        var from = data.startIndex
+        while let found = data.range(of: opening, in: from..<data.endIndex) {
+            let end = data[found.upperBound...].firstIndex(of: close) ?? data.endIndex
+            let body = String(decoding: data[found.upperBound..<end], as: UTF8.self)
+            if body.contains("%") || body.contains("&") || body.contains("SYSTEM") || body.contains("PUBLIC") { return true }
+            from = end
+        }
+        return false
+    }
+
+    /// How deep the file's elements nest, counted from its bytes before any
+    /// XML reader sees them: the system's reader recurses, and a file nested
+    /// a hundred thousand deep overflows its stack and crashes. Counting
+    /// stops once past `limit`.
+    static func nesting(of data: Data, limit: Int) -> Int {
+        data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) -> Int in
+            let b = raw.bindMemory(to: UInt8.self)
+            let n = b.count
+            let lt = UInt8(ascii: "<"), gt = UInt8(ascii: ">"), slash = UInt8(ascii: "/")
+            /// Where `end` next finishes from `start`, or the end of the file.
+            func after(_ end: String, from start: Int) -> Int {
+                let e = Array(end.utf8)
+                var j = start
+                while j + e.count <= n {
+                    if b[j] == e[0], (1..<e.count).allSatisfy({ b[j + $0] == e[$0] }) { return j + e.count }
+                    j += 1
+                }
+                return n
+            }
+            func starts(_ text: String, at i: Int) -> Bool {
+                let t = Array(text.utf8)
+                return i + t.count <= n && (0..<t.count).allSatisfy { b[i + $0] == t[$0] }
+            }
+            var i = 0, depth = 0, deepest = 0
+            while i < n {
+                guard b[i] == lt, i + 1 < n else { i += 1; continue }
+                if b[i + 1] == slash {
+                    depth -= 1
+                    i = after(">", from: i + 2)
+                } else if b[i + 1] == UInt8(ascii: "?") {
+                    i = after("?>", from: i + 2)
+                } else if starts("<!--", at: i) {
+                    i = after("-->", from: i + 4)
+                } else if starts("<![CDATA[", at: i) {
+                    i = after("]]>", from: i + 9)
+                } else if b[i + 1] == UInt8(ascii: "!") {
+                    i = after(">", from: i + 2)
+                } else {
+                    // An opening tag, to its end past any quoted values.
+                    var j = i + 1, quote: UInt8 = 0
+                    while j < n {
+                        let c = b[j]
+                        if quote != 0 { if c == quote { quote = 0 } }
+                        else if c == UInt8(ascii: "\"") || c == UInt8(ascii: "'") { quote = c }
+                        else if c == gt { break }
+                        j += 1
+                    }
+                    if j < n, b[j - 1] != slash {
+                        depth += 1
+                        deepest = max(deepest, depth)
+                        if deepest > limit { return deepest }
+                    }
+                    i = j + 1
+                }
+            }
+            return deepest
+        }
     }
 }
 
@@ -99,6 +188,13 @@ private struct Reader {
     /// A background blur Figma wrote as a `foreignObject` before the shape
     /// it belongs to.
     private var pendingBackgroundBlur: Double?
+    /// The elements a `use` is drawing now, so one that reaches itself
+    /// stops rather than going round for ever.
+    private var expanding: Set<ObjectIdentifier> = []
+    private var depth = 0
+    private var visited = 0
+    /// Set once the file nests or repeats past the limits; reading stops.
+    private(set) var tooComplex = false
 
     init(document: XMLDocument, root: XMLElement, pictureScale: Double) {
         self.document = document
@@ -136,7 +232,7 @@ private struct Reader {
         var frame = LayerFactory.frame(in: Box(origin: Vec2(center.x - viewport.width / 2, center.y - viewport.height / 2), size: viewport),
                                        name: name)
         frame.look = ShapeContent(geometry: .rectangle(cornerRadii: .zero))
-        frame.children = children
+        frame.children = Finite.layers(children)
         return SVGImport.Result(layer: frame, media: media, pictureCount: pictureCount)
     }
 
@@ -153,6 +249,13 @@ private struct Reader {
     /// The layers for one element, back to front: a mask it needs first,
     /// then the element's own.
     private mutating func walk(_ element: XMLElement, ctm parent: Affine, parentStyle: SVGStyle) -> [Layer] {
+        visited += 1
+        guard !tooComplex, visited <= SVGImport.maxElements, depth < SVGImport.maxDepth else {
+            tooComplex = true
+            return []
+        }
+        depth += 1
+        defer { depth -= 1 }
         let name = element.localName ?? ""
         let style = SVGStyle.of(element, parent: parentStyle, sheet: sheet)
         if style["display"] == "none" { return [] }
@@ -170,7 +273,10 @@ private struct Reader {
             layers = group(walkChildren(of: element, ctm: Affine.translation(Vec2(x, y)).then(ctm), style: style),
                            named: element, fallback: "Group")
         case "use":
-            guard let target = reference(attr(element, "href") ?? attr(element, "xlink:href")) else { return [] }
+            guard let target = reference(attr(element, "href") ?? attr(element, "xlink:href")),
+                  !expanding.contains(ObjectIdentifier(target)), !Self.contains(target, element) else { return [] }
+            expanding.insert(ObjectIdentifier(target))
+            defer { expanding.remove(ObjectIdentifier(target)) }
             let moved = Affine.translation(Vec2(number(element, "x"), number(element, "y"))).then(ctm)
             if target.localName == "symbol" {
                 layers = group(walkChildren(of: target, ctm: moved, style: SVGStyle.of(target, parent: style, sheet: sheet)),
@@ -591,6 +697,16 @@ private struct Reader {
     }
 
     // MARK: Clipping, masking, filters
+
+    /// Whether `element` is `outer` or inside it.
+    private static func contains(_ outer: XMLElement, _ element: XMLElement) -> Bool {
+        var node: XMLNode? = element
+        while let n = node {
+            if n === outer { return true }
+            node = n.parent
+        }
+        return false
+    }
 
     private func reference(_ text: String?) -> XMLElement? {
         guard var t = text?.trimmed, !t.isEmpty else { return nil }
