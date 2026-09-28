@@ -57,6 +57,10 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
     private(set) var rows: [TimelineRow] = []
 
     private var drag: Drag?
+    /// What the dragged bar is lined up with, drawn as a guide: the time,
+    /// and the row of the bar it met (nil for the playhead or the scene's
+    /// ends) and of the bar being dragged.
+    private var snap: (time: Double, target: CGFloat?, dragged: CGFloat)?
     private var lastSelection: Set<UUID> = []
     private var lastReveal = 0
     private var renaming: (id: UUID, field: NSTextField)?
@@ -68,6 +72,10 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
 
     /// How near, in points, a dragged time jumps to something worth lining up with.
     static let snapDistance = 6.0
+    /// How far, in points, a snapped edge must be pulled to come free: a
+    /// little more than it took to catch, so it holds softly rather than
+    /// flickering at the edge.
+    static let releaseDistance = 9.0
     static let edgeHit = 5.0
     /// On a bar long enough to keep a middle to grab, a trim reaches this
     /// far in from each end, so the handle drawn there is all trim.
@@ -270,6 +278,19 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         if px >= gutter {
             ctx.setFillColor(NSColor(Theme.playhead).cgColor)
             ctx.fill(CGRect(x: px - 0.5, y: 0, width: 1, height: bounds.height))
+        }
+
+        // The snap guide: from the bar it met to the one being dragged, or
+        // through the whole view for the playhead and the scene's ends.
+        if let snap {
+            let gx = x(for: snap.time).rounded() + 0.5
+            let span: ClosedRange<CGFloat> = snap.target.map {
+                min($0, snap.dragged)...(max($0, snap.dragged) + TimelineRow.height)
+            } ?? visibleRect.minY...visibleRect.maxY
+            if gx >= gutter {
+                ctx.setFillColor(NSColor(Theme.guide).cgColor)
+                ctx.fill(CGRect(x: gx - 0.5, y: span.lowerBound, width: 1, height: span.upperBound - span.lowerBound))
+            }
         }
 
         if case .marquee(let a, let b, _) = drag {
@@ -508,7 +529,8 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         case .move(let originals, let anchor, let startX):
             let ids = Set(originals.map(\.id))
             let edges = anchor.isInstant ? [anchor.start] : [anchor.start, anchor.end]
-            let delta = snapped((p.x - startX) / viewport.pointsPerSecond, edges: edges, ignoring: ids)
+            let delta = snapped((p.x - startX) / viewport.pointsPerSecond, edges: edges, ignoring: ids,
+                                row: rows.first { $0.action.id == anchor.id }?.y, event: event)
             // Times from where the drag began; rows as they are now.
             let rowsNow = Dictionary(controller.project.actions.map { ($0.id, $0.rowOrder) }, uniquingKeysWith: { a, _ in a })
             var edited = Dictionary(uniqueKeysWithValues: ActionEditing.moved(originals, by: delta, rate: rate).map { moved -> (UUID, Action) in
@@ -540,7 +562,8 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
 
         case .trim(let original, let startEdge, let startX):
             let edge = startEdge ? original.start : original.end
-            let target = edge + snapped((p.x - startX) / viewport.pointsPerSecond, edges: [edge], ignoring: [original.id])
+            let target = edge + snapped((p.x - startX) / viewport.pointsPerSecond, edges: [edge], ignoring: [original.id],
+                                        row: rows.first { $0.action.id == original.id }?.y, event: event)
             let trimmed = ActionEditing.trimmed(original, startEdge: startEdge, to: target,
                                                 symmetric: event.modifierFlags.contains(.option), rate: rate,
                                                 mediaLength: controller.asset(ofLayer: original.targetLayerID)?.duration)
@@ -574,25 +597,51 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
             Cursors.arrow.set()
         }
         self.drag = nil
+        snap = nil
         needsDisplay = true
     }
 
     /// A time difference nudged so one of `edges` lands exactly on the
-    /// playhead, the scene's start or end, or another action's start or end,
-    /// when it comes within a few points of one.
-    private func snapped(_ delta: Double, edges: [Double], ignoring: Set<UUID>) -> Double {
-        guard let controller, let viewport else { return delta }
-        var targets = [controller.editor.time, controller.duration, 0]
-        for a in controller.project.actions where !ignoring.contains(a.id) { targets += [a.start, a.end] }
-        var best = delta
-        var nearest = Self.snapDistance / viewport.pointsPerSecond
+    /// playhead, the scene's start or end, or the start or end of a bar on a
+    /// row in view, when it comes within a few points of one: a soft magnet.
+    /// Once caught it holds until pulled a little further, and the trackpad
+    /// bumps as it catches. Command, or the canvas's Snapping switch, lets
+    /// the bar move freely. `row` is the dragged bar's, for the guide.
+    private func snapped(_ delta: Double, edges: [Double], ignoring: Set<UUID>, row: CGFloat?, event: NSEvent) -> Double {
+        guard let controller, let viewport, controller.editor.snaps, !event.modifierFlags.contains(.command) else {
+            snap = nil
+            return delta
+        }
+        let pps = viewport.pointsPerSecond
+        let dragged = row ?? 0
+        // Held: it stays until an edge is pulled past the release distance.
+        if let held = snap, let edge = edges.first(where: { abs(held.time - ($0 + delta)) < Self.releaseDistance / pps }) {
+            snap = (held.time, held.target, dragged)
+            return held.time - edge
+        }
+        var targets: [(time: Double, row: CGFloat?)] = [(controller.editor.time, nil), (controller.duration, nil), (0, nil)]
+        let visible = visibleRect
+        for r in rows where r.y + TimelineRow.height > visible.minY && r.y < visible.maxY && !ignoring.contains(r.action.id) {
+            targets.append((r.action.start, r.y))
+            if !r.action.isInstant { targets.append((r.action.end, r.y)) }
+        }
+        var best: (delta: Double, time: Double, row: CGFloat?)?
+        var nearest = Self.snapDistance / pps
         for edge in edges {
-            for target in targets where abs(target - (edge + delta)) < nearest {
-                nearest = abs(target - (edge + delta))
-                best = target - edge
+            for target in targets where abs(target.time - (edge + delta)) < nearest {
+                nearest = abs(target.time - (edge + delta))
+                best = (target.time - edge, target.time, target.row)
             }
         }
-        return best
+        guard let best else {
+            snap = nil
+            return delta
+        }
+        if snap?.time != best.time {
+            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        }
+        snap = (best.time, best.row, dragged)
+        return best.delta
     }
 
     // MARK: Right-click

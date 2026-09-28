@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Magnetic timeline", changes: [
+            "Moving or trimming a bar in the timeline lines it up softly with the start or end of bars on the rows you can see, the playhead and the scene's start and end.",
+            "A guide line shows what it lined up with, the trackpad gives a small bump as it catches, and it holds gently until pulled a little further.",
+            "Hold ⌘ while dragging to move a bar freely. The canvas's Snapping switch turns timeline snapping off too.",
+        ]),
         .init(date: "28 September 2026", title: "Presets on one bar", changes: [
             "A preset now goes on as one bar in the timeline, as in Jitter. Click it to set everything it offers in the inspector: its timing and easing, and settings such as where a slide comes from, how far it travels, how big a pop starts and whether it fades.",
             "Slide In and Slide Out are one preset each, with a From or To choice of left, right, top or bottom.",
