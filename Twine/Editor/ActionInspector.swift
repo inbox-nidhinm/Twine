@@ -25,10 +25,10 @@ struct ActionInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if let pickPreset, !controller.availablePresets.isEmpty {
+                BackToPresets(action: pickPreset)
+            }
             HeaderRow(title: actions.count == 1 ? first.name : sameKind ? kindName : "Actions") {
-                if let pickPreset, !controller.availablePresets.isEmpty {
-                    IconButton(icon: .presets, help: "Add a preset to the layer", action: pickPreset)
-                }
                 if !newActions.isEmpty { AddActionButton(entries: newActions) }
             }
             VStack(alignment: .leading, spacing: 10) {
@@ -61,6 +61,30 @@ struct ActionInspector: View {
                     .padding(.vertical, Theme.panelPad)
             }
         }
+    }
+}
+
+/// Back to the preset picker, over the action's name, to pick another.
+private struct BackToPresets: View {
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                IconView(.chevronLeft, size: 13)
+                Text("Back to Presets")
+                    .font(ThemeFont.label)
+            }
+            .foregroundStyle(hovering ? Theme.textPrimary : Theme.textSecondary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("Picks a preset to add to the layer at the playhead")
+        .padding(.horizontal, Theme.panelPad)
+        .frame(height: Theme.button, alignment: .bottomLeading)
     }
 }
 

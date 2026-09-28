@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Back to Presets", changes: [
+            "An action's settings have Back to Presets at the top, in place of the presets button beside its name.",
+        ]),
         .init(date: "28 September 2026", title: "Arrows for directions, text presets first", changes: [
             "A preset's From and To show arrows instead of Left, Right, Top and Bottom.",
             "With text selected, the preset picker shows the Text presets first.",
