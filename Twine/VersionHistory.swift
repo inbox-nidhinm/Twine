@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Pictures from Figma", changes: [
+            "A Figma frame whose background is a picture now pastes in with the picture as its own layer, Background, at the bottom of the frame, so it shows in the layers panel and can be selected, replaced and animated.",
+            "Pictures stacked on one layer in Figma come in as the top one only; the ones under it are not copied, which keeps copies and projects smaller.",
+            "The Fill section shows and edits a layer's top fill, the one you see, and the Colour action changes that one too.",
+            "The Figma plugin's percentage no longer steps back while it copies pictures.",
+        ]),
         .init(date: "28 September 2026", title: "Figma plugin, Twine's look", changes: [
             "The Figma plugin now looks like Twine: a dark panel with a picture of what is selected, its size and how many layers it holds, and a blue Copy button.",
             "While it copies, the percentage and a progress bar show in the preview; once copied, a check shows in its corner.",

@@ -20,7 +20,7 @@ import MotionEditing
         #expect(card.isFrame && card.name == "Card" && card.size == Size2(320, 200))
         #expect(r.bounds == Box(minX: 100, minY: 50, maxX: 420, maxY: 250))
         let names = card.children.map(\.name)
-        #expect(names == ["Photo", "Title", "Mixed", "Leaning", "Slanted", "Sheared", "Icon", "Painted Regions", "Masked", "Rule", "Note"])
+        #expect(names == ["Photo", "Title", "Mixed", "Leaning", "Slanted", "Sheared", "Icon", "Painted Regions", "Masked", "Rule", "Note", "Stacked"])
         let photo = card.children[0]
         #expect(photo.picture?.paint.mode == .fill && photo.transform.position == Vec2(76, 56))
         guard case .text(let title) = card.children[1].content else { Issue.record("title is not text"); return }

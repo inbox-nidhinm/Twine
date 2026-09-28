@@ -433,6 +433,53 @@
       20,
       20
      ]
+    },
+    {
+     "name": "Stacked",
+     "visible": true,
+     "locked": false,
+     "opacity": 1,
+     "blend": "PASS_THROUGH",
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      340,
+      200
+     ],
+     "width": 60,
+     "height": 40,
+     "kind": "frame",
+     "children": [],
+     "fills": [
+      {
+       "type": "SOLID",
+       "visible": true,
+       "opacity": 1,
+       "color": {
+        "r": 0,
+        "g": 0,
+        "b": 0,
+        "a": 1
+       }
+      },
+      {
+       "type": "IMAGE",
+       "visible": true,
+       "opacity": 1,
+       "image": "top",
+       "scaleMode": "FILL",
+       "rotation": 0
+      }
+     ],
+     "radii": [
+      6,
+      6,
+      6,
+      6
+     ],
+     "clips": true
     }
    ],
    "effects": [
@@ -493,7 +540,8 @@
   }
  ],
  "images": {
-  "photo-hash": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR4nGP4z8DwHwQZ/gMAG/0D/eqA0WQAAAAASUVORK5CYII="
+  "photo-hash": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR4nGP4z8DwHwQZ/gMAG/0D/eqA0WQAAAAASUVORK5CYII=",
+  "top": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR4nGP4z8DwHwQZ/gMAG/0D/eqA0WQAAAAASUVORK5CYII="
  },
  "warnings": [
   "Card is painted with a gradient Twine lacks, which was left out."

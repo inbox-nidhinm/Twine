@@ -219,10 +219,12 @@ private struct FigmaBuilder {
             if node.kind == "frame" {
                 var frame = LayerFactory.frame(in: Box(origin: .zero, size: size), name: node.name)
                 if case .group(var g) = frame.content {
-                    g.children = children
+                    var look = fills(node)
+                    let corners = radii(node)
+                    // Children are stored back to front: the picture goes behind them all.
+                    g.children = (background(of: &look, size: size, radii: corners).map { [$0] } ?? []) + children
                     g.clipsContent = node.clips ?? false
-                    g.frame = FrameStyle(fills: fills(node), strokes: strokes(node, closed: true),
-                                         cornerRadii: radii(node))
+                    g.frame = FrameStyle(fills: look, strokes: strokes(node, closed: true), cornerRadii: corners)
                     frame.content = .group(g)
                 }
                 layer = frame
@@ -318,10 +320,32 @@ private struct FigmaBuilder {
 
     // MARK: Paints
 
+    /// A layer's fills, bottom first, with one picture at most: the topmost
+    /// shown (or the topmost, when none is). Pictures stacked under it cannot
+    /// be seen through it, so they are left out, as the plugin leaves them out
+    /// of the copy.
     private mutating func fills(_ node: FigmaPayload.Node) -> [Fill] {
-        (node.fills ?? []).compactMap { paint in
-            self.paint(paint).map { Fill(isEnabled: paint.visible ?? true, paint: $0) }
+        let paints = node.fills ?? []
+        let top = paints.lastIndex { $0.type == "IMAGE" && $0.visible != false } ?? paints.lastIndex { $0.type == "IMAGE" }
+        return paints.enumerated().compactMap { i, paint in
+            guard paint.type != "IMAGE" || i == top else { return nil }
+            return self.paint(paint).map { Fill(isEnabled: paint.visible ?? true, paint: $0) }
         }
+    }
+
+    /// A frame's picture background as a layer of its own, at the bottom of
+    /// the frame, the frame's size and corners, so it shows in the layers
+    /// panel and can be picked, replaced and animated. Fills Figma drew over
+    /// the picture (a tint) go with it; those under it stay the frame's.
+    /// Nil, and the fills unchanged, when the frame has no picture.
+    private func background(of fills: inout [Fill], size: Size2, radii: CornerRadii) -> Layer? {
+        guard let i = fills.lastIndex(where: { $0.paint.isImage }) else { return nil }
+        let lifted = Array(fills[i...])
+        fills.removeSubrange(i...)
+        var layer = Layer(name: "Background", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: radii), fills: lifted)),
+                          size: size, position: Vec2(size.width / 2, size.height / 2))
+        layer.transform.anchor = Vec2(size.width / 2, size.height / 2)
+        return layer
     }
 
     private mutating func strokes(_ node: FigmaPayload.Node, closed: Bool) -> [Stroke] {

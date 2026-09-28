@@ -37,7 +37,14 @@ public struct ShapeContent: Codable, Sendable, Equatable {
     /// Where the first picture is among the fills, if there is one: the
     /// picture the inspector shows, Replace changes and crop moves.
     public var pictureIndex: Int? {
-        fills.firstIndex { $0.paint.isImage }
+        fills.lastIndex { $0.paint.isImage }
+    }
+
+    /// The fill on top, the one that shows: what the inspector's Fill
+    /// section edits and a Colour action changes. Fills are stored bottom
+    /// first.
+    public var topFillIndex: Int? {
+        fills.isEmpty ? nil : fills.count - 1
     }
 }
 

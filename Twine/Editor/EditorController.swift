@@ -399,7 +399,7 @@ final class EditorController {
             guard let (asset, isNew) = await bringIn(url, as: .image),
                   var layer = project.layer(withID: id), var shape = layer.look else { return }
             let paint = Paint.image(ImagePaint(mediaID: asset.id))
-            if shape.fills.isEmpty { shape.fills = [Fill(paint: paint)] } else { shape.fills[0].paint = paint }
+            if let top = shape.topFillIndex { shape.fills[top].paint = paint } else { shape.fills = [Fill(paint: paint)] }
             layer.look = shape
             perform(.batch((isNew ? [.addMedia(asset)] : []) + [.updateLayers([layer])], name: "Image Fill"))
         }
@@ -786,7 +786,7 @@ final class EditorController {
         // when that has a colour, or the composition's background.
         let background = project.composition.background
         var ground: RGBA? = background.isTransparent ? nil : background.color
-        if let parentID, case .solid(let c)? = project.layer(withID: parentID)?.look?.fills.first?.paint { ground = c }
+        if let parentID, case .solid(let c)? = project.layer(withID: parentID)?.look?.fills.last?.paint { ground = c }
         let light = ground.map { ($0.r + $0.g + $0.b) / 3 > 0.5 } ?? true
         let made = LayerFactory.text(at: point, name: LayerFactory.nextName("Text", in: project),
                                      color: light ? LayerFactory.defaultStroke : .white)

@@ -35,13 +35,13 @@ public enum ActionFactory {
             guard let frame = group.frame else { return transform.filter { $0 != .resize } + [.shadow, .layerBlur] }
             // A frame resizes, and has a look to change, as a rectangle does.
             var kinds = transform
-            if let first = frame.fills.first, !first.paint.isImage { kinds.append(.color) }
+            if let top = frame.fills.last, !top.paint.isImage { kinds.append(.color) }
             if !frame.strokes.isEmpty { kinds.append(.stroke) }
             return kinds + [.cornerRadius, .shadow, .layerBlur, .backgroundBlur]
         case .shape(let shape):
             var kinds = transform
             // A picture has no colour to change.
-            if let first = shape.fills.first, !first.paint.isImage { kinds.append(.color) }
+            if let top = shape.fills.last, !top.paint.isImage { kinds.append(.color) }
             if !shape.strokes.isEmpty { kinds += [.stroke, .trim] }
             if case .rectangle = shape.geometry { kinds.append(.cornerRadius) }
             kinds += [.shadow, .layerBlur, .backgroundBlur]

@@ -230,7 +230,7 @@ private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState, pict
     var shape = shape
     var designBounds: Box?
     if case .path(let p) = shape.geometry { designBounds = p.bounds }
-    if let fill = state.fill, !shape.fills.isEmpty { shape.fills[0].paint = fill }
+    if let fill = state.fill, let top = shape.topFillIndex { shape.fills[top].paint = fill }
     if !shape.strokes.isEmpty {
         if let look = state.stroke {
             shape.strokes[0].width = look.width

@@ -99,6 +99,13 @@ const card = node("FRAME", {
     }),
     node("LINE", { name: "Rule", absoluteTransform: translate(116, 190), width: 288, height: 0, strokes: [solid(0, 0, 0)], strokeWeight: 2, strokeCap: "ROUND" }),
     node("STICKY", { name: "Note", absoluteTransform: translate(300, 180), width: 20, height: 20 }),
+    // A background of pictures stacked on a colour: only the top one is kept.
+    node("FRAME", { name: "Stacked", absoluteTransform: translate(340, 200), width: 60, height: 40, clipsContent: true,
+      topLeftRadius: 6, topRightRadius: 6, bottomRightRadius: 6, bottomLeftRadius: 6, cornerRadius: 6, children: [],
+      fills: [solid(0, 0, 0),
+        { type: "IMAGE", visible: true, opacity: 1, imageHash: "under-1", scaleMode: "FILL", rotation: 0, filters: {} },
+        { type: "IMAGE", visible: true, opacity: 1, imageHash: "under-2", scaleMode: "FILL", rotation: 0, filters: { exposure: 0.5 } },
+        { type: "IMAGE", visible: true, opacity: 1, imageHash: "top", scaleMode: "FILL", rotation: 0, filters: {} }] }),
     node("SLICE", { name: "Export Area", absoluteTransform: translate(100, 50), width: 320, height: 200 }),
   ],
 });
@@ -142,11 +149,14 @@ vm.runInNewContext(code, { figma: figma, __html__: "", console: console, Math: M
   const frame = payload.nodes[0];
   const kinds = frame.children.map(function (c) { return c.name + ":" + c.kind; });
   assert.deepStrictEqual(kinds, ["Photo:rectangle", "Title:text", "Mixed:picture", "Leaning:picture", "Slanted:rectangle", "Sheared:text", "Icon:vector",
-    "Painted Regions:svg", "Masked:group", "Rule:line", "Note:picture"]);
+    "Painted Regions:svg", "Masked:group", "Rule:line", "Note:picture", "Stacked:frame"]);
   assert.deepStrictEqual(frame.fills.map(function (f) { return f.type; }).join(), "SOLID", "the angular gradient is left out");
   assert.deepStrictEqual(frame.effects.map(function (e) { return e.type; }).join(), "DROP_SHADOW", "noise is left out");
   assert(payload.warnings.some(function (w) { return w.indexOf("Card") === 0; }), "the left-out gradient is said");
   assert.ok(payload.images["photo-hash"], "the photo travels with the copy");
+  const stacked = frame.children[frame.children.length - 1];
+  assert.deepStrictEqual(stacked.fills.map(function (f) { return f.image || f.type; }), ["SOLID", "top"], "only the top picture is kept");
+  assert(!payload.images["under-1"] && !payload.images["under-2"] && payload.images["top"], "and only it is copied");
   assert.strictEqual(frame.children[1].text.letterSpacing, -0.48);
   assert.strictEqual(frame.children[8].children[0].isMask, true);
   assert.deepStrictEqual(frame.children[4].transform, [1, 0, 0.4, 1, 300, 60], "the slant travels in the transform");

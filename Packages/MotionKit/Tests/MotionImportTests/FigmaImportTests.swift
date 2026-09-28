@@ -82,6 +82,37 @@ private func near(_ a: Double, _ b: Double, _ e: Double = 1e-6) -> Bool { abs(a 
         #expect(near(c[2].x, 120 + 20 + 0.5 * 20, 1e-6) && near(c[2].y, 130, 1e-6))
     }
 
+    @Test func aFramesPictureBackgroundIsALayerAndOnlyTheTopPictureCounts() throws {
+        // As Figma had it: a colour, three pictures stacked on it, and a tint over them all.
+        let picture = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR4nGP4z8DwHwQZ/gMAG/0D/eqA0WQAAAAASUVORK5CYII="
+        let json = payload(##"""
+        {"kind": "frame", "name": "Screen", "transform": [1, 0, 0, 1, 0, 0], "width": 200, "height": 100, "clips": true,
+         "radii": [12, 12, 12, 12],
+         "fills": [{"type": "SOLID", "color": {"r": 0, "g": 0, "b": 0}},
+                   {"type": "IMAGE", "image": "a", "scaleMode": "FILL"},
+                   {"type": "IMAGE", "image": "b", "scaleMode": "FILL"},
+                   {"type": "IMAGE", "image": "c", "scaleMode": "FIT"},
+                   {"type": "SOLID", "color": {"r": 1, "g": 1, "b": 1}, "opacity": 0.2}],
+         "children": [{"kind": "rectangle", "name": "Card", "transform": [1, 0, 0, 1, 20, 20], "width": 40, "height": 20}]}
+        """##, images: ##"{"a": "\##(picture)", "b": "\##(picture)", "c": "\##(picture)"}"##)
+        let r = try FigmaImport.read(json)
+        let frame = try #require(r.layers.first)
+        guard case .group(let g) = frame.content else { Issue.record("no frame"); return }
+        // The colour stays the frame's; the picture, with the tint over it, is a layer behind the rest.
+        #expect(g.frame?.fills.map(\.paint) == [.color(RGBA(0, 0, 0))])
+        #expect(g.children.map(\.name) == ["Background", "Card"])
+        let background = try #require(g.children.first)
+        #expect(background.size == Size2(200, 100) && background.transform.position == Vec2(100, 50))
+        #expect(background.look?.geometry == .rectangle(cornerRadii: CornerRadii(all: 12)))
+        let fills = background.look?.fills ?? []
+        try #require(fills.count == 2, "\(fills.map(\.paint))")
+        #expect(fills[0].paint.imagePaint?.mode == .fit, "only the top picture, in its own mode")
+        #expect(fills[1].paint == .color(RGBA(1, 1, 1, 0.2)))
+        // Only the one picture is kept, and it is the picture fill Replace works on.
+        #expect(r.media.count == 1)
+        #expect(background.picture?.index == 0)
+    }
+
     @Test func aMaskMasksWhatIsInFrontOfIt() throws {
         let json = payload(##"""
         {"kind": "group", "name": "G", "transform": [1, 0, 0, 1, 0, 0], "width": 50, "height": 50, "children": [
@@ -105,13 +136,18 @@ private func near(_ a: Double, _ b: Double, _ e: Double = 1e-6) -> Bool { abs(a 
         {"kind": "rectangle", "name": "P", "transform": [1, 0, 0, 1, 0, 0], "width": 100, "height": 50, "fills": [
           {"type": "GRADIENT_LINEAR", "transform": [1, 0, 0, 1, 0, 0], "stops": [{"position": 0, "color": {"r": 1, "g": 0, "b": 0, "a": 1}}, {"position": 1, "color": {"r": 0, "g": 0, "b": 1, "a": 1}}]},
           {"type": "IMAGE", "image": "h1", "scaleMode": "CROP", "imageTransform": [0.5, 0, 0, 1, 0, 0], "opacity": 0.5},
-          {"type": "IMAGE", "image": "h1", "scaleMode": "FIT", "rotation": 90}]}
+          {"type": "IMAGE", "image": "h1", "scaleMode": "FIT", "rotation": 90}]},
+        {"kind": "rectangle", "name": "Q", "transform": [1, 0, 0, 1, 0, 0], "width": 100, "height": 50, "fills": [
+          {"type": "IMAGE", "image": "h1", "scaleMode": "CROP", "imageTransform": [0.5, 0, 0, 1, 0, 0], "opacity": 0.5}]}
         """##, images: ##"{"h1": "\##(png)"}"##)
         let r = try FigmaImport.read(json)
+        // Of the two pictures stacked on P, only the top one comes in.
         let fills = try #require(r.layers.first?.look?.fills)
+        try #require(fills.count == 2)
         guard case .linearGradient(let g) = fills[0].paint else { Issue.record("no gradient"); return }
         #expect(g.start == Vec2(0, 0.5) && g.end == Vec2(1, 0.5))
-        guard case .image(let crop) = fills[1].paint, case .image(let fit) = fills[2].paint else { Issue.record("no pictures"); return }
+        let alone = try #require(r.layers.last?.look?.fills)
+        guard case .image(let crop) = alone.first?.paint, case .image(let fit) = fills[1].paint else { Issue.record("no pictures"); return }
         #expect(crop.mode == .crop && crop.crop == ImageCrop(x: 0, y: 0, width: 2, height: 1) && crop.opacity == 0.5)
         #expect(fit.mode == .fit && fit.quarterTurns == 1 && fit.mediaID == crop.mediaID)
         #expect(r.media.count == 1)

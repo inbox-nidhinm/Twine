@@ -406,9 +406,10 @@ private struct FillSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HeaderRow(title: "Fill") {
-                if let fill = shape.fills.first {
+                if let top = shape.topFillIndex {
+                    let fill = shape.fills[top]
                     IconButton(icon: fill.isEnabled ? .eye : .eyeSlash, help: fill.isEnabled ? "Hide the fill" : "Show the fill") {
-                        editShape { $0.fills[0].isEnabled.toggle() }
+                        editShape { $0.fills[top].isEnabled.toggle() }
                     }
                 }
                 if shape.fills.isEmpty {
@@ -416,16 +417,18 @@ private struct FillSection: View {
                         editShape { $0.fills = [Fill(paint: .color(LayerFactory.defaultFill))] }
                     }
                 } else {
-                    IconButton(icon: .minus, help: "Remove the fill") { editShape { $0.fills.removeFirst() } }
+                    IconButton(icon: .minus, help: "Remove the fill") { editShape { $0.fills.removeLast() } }
                 }
             }
-            if let fill = shape.fills.first {
+            // The fill on top, the one that shows; any under it stay as they are.
+            if let top = shape.topFillIndex {
+                let fill = shape.fills[top]
                 VStack(alignment: .leading, spacing: 8) {
                     SegmentRow(selection: fill.paint.kindName, options: ["Solid", "Linear", "Radial", "Image"], title: { $0 }) { kind in
                         if kind == "Image" {
                             if !fill.paint.isImage { controller.fillWithPicture(layer.id) }
                         } else {
-                            editShape { $0.fills[0].paint = fill.paint.converted(to: kind) }
+                            editShape { $0.fills[top].paint = fill.paint.converted(to: kind) }
                         }
                     }
                     if let picture = fill.paint.imagePaint {
@@ -433,8 +436,8 @@ private struct FillSection: View {
                     } else {
                         PaintEditor(paint: fill.paint, isEnabled: fill.isEnabled, controller: controller, layer: layer,
                                     title: "Fill",
-                                    change: { paint in editedShape { $0.fills[0].paint = paint } },
-                                    toggle: { editShape { $0.fills[0].isEnabled.toggle() } })
+                                    change: { paint in editedShape { $0.fills[top].paint = paint } },
+                                    toggle: { editShape { $0.fills[top].isEnabled.toggle() } })
                     }
                 }
                 .padding(.horizontal, Theme.panelPad)

@@ -145,7 +145,9 @@ function count(node) {
 function step(context) {
   context.done += 1;
   const percent = Math.min(99, Math.floor((context.done / Math.max(context.total, 1)) * 100));
-  if (percent !== context.lastReported) {
+  // Pictures join the count once the layers are read, which can pull the
+  // share back a little; the panel only ever counts up.
+  if (percent > context.lastReported) {
     context.lastReported = percent;
     figma.ui.postMessage({ type: "progress", percent: percent });
   }
@@ -298,7 +300,7 @@ function isFlattened(node) {
 /// pictures without filters, turned in quarters, blended normally.
 function paintsNeedPicture(node) {
   const lists = [];
-  if ("fills" in node && node.fills !== figma.mixed) lists.push(node.fills);
+  if ("fills" in node && node.fills !== figma.mixed) lists.push(keptPaints(node.fills));
   if ("strokes" in node) lists.push(node.strokes);
   for (const list of lists) {
     for (const p of list) {
@@ -408,9 +410,22 @@ function look(node, context) {
   return out;
 }
 
+/// A layer's fills with only one picture among them: the topmost shown, or
+/// the topmost when none is shown. Pictures stacked under it cannot be seen
+/// through it, so they are not copied (the user's choice).
+function keptPaints(list) {
+  if (!list || list === figma.mixed) return list;
+  let top = -1;
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i].type === "IMAGE" && list[i].visible !== false) { top = i; break; }
+  }
+  if (top < 0) for (let i = list.length - 1; i >= 0; i--) { if (list[i].type === "IMAGE") { top = i; break; } }
+  return list.filter(function (p, i) { return p.type !== "IMAGE" || i === top; });
+}
+
 function paints(list, context) {
   if (!list || list === figma.mixed) return [];
-  return list.map(function (p) {
+  return keptPaints(list).map(function (p) {
     const out = { type: p.type, visible: p.visible !== false, opacity: p.opacity === undefined ? 1 : p.opacity };
     if (p.type === "SOLID") out.color = { r: p.color.r, g: p.color.g, b: p.color.b, a: 1 };
     if (p.type === "GRADIENT_LINEAR" || p.type === "GRADIENT_RADIAL") {

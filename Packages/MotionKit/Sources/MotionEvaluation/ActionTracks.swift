@@ -151,7 +151,7 @@ public struct LayerState: Sendable, Equatable {
         size = layer.size
         isShown = true
         if let shape = layer.look {
-            fill = shape.fills.first?.paint
+            fill = shape.fills.last?.paint
             stroke = shape.strokes.first.map { StrokeLook(width: $0.width, paint: $0.paint) }
             trim = shape.strokes.first.map { TrimRange(start: $0.trimStart, end: $0.trimEnd) }
             switch shape.geometry {
