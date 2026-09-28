@@ -24,8 +24,16 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
 @Suite struct PresetTests {
     @Test func theLibraryIsWellFormed() {
         #expect(Set(Presets.library.map(\.id)).count == Presets.library.count)
-        #expect(Set(Presets.library.map(\.kind)) == Set(PresetKind.allCases))
-        for preset in Presets.library {
+        // Every kind is in the library, itself or as the other half of a pair.
+        let listed = Set(Presets.library.flatMap { [$0.kind] + ($0.kind.reversed.map { [$0] } ?? []) })
+        #expect(listed == Set(PresetKind.allCases))
+        // Pairs are listed by the half that brings a layer on.
+        #expect(Presets.library.allSatisfy { $0.kind.entering != false })
+        for kind in PresetKind.allCases {
+            #expect(kind.reversed?.reversed == kind || kind.reversed == nil, "\(kind)")
+            #expect((kind.reversed == nil) == (kind.entering == nil), "\(kind)")
+        }
+        for preset in PresetKind.allCases.map(Presets.preset) {
             #expect(!PresetRecipe.parts(PresetRecipe.defaults(preset.kind)).isEmpty, "\(preset.name)")
             let length = PresetRecipe.length(preset.kind)
             #expect(length > 0 && length <= 1, "\(preset.name)")
@@ -48,7 +56,7 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
     }
 
     @Test func entrancesLandOnTheLayerAsItWas() {
-        for preset in Presets.library where preset.category == .entrance {
+        for preset in PresetKind.allCases.filter({ $0.entering == true && !$0.isSound }).map(Presets.preset) {
             let layer = square()
             let action = bar(preset, on: layer)
             let tracks = ActionTracks([action])
@@ -64,7 +72,7 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
     }
 
     @Test func exitsLeaveNothingToSee() {
-        for preset in Presets.library where preset.category == .exit {
+        for preset in PresetKind.allCases.filter({ $0.entering == false && !$0.isSound }).map(Presets.preset) {
             let layer = square()
             let action = bar(preset, on: layer)
             let tracks = ActionTracks([action])
@@ -76,7 +84,7 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
     }
 
     @Test func emphasisReturnsTheLayerToWhereItWas() {
-        for preset in Presets.library where preset.category == .emphasis {
+        for preset in PresetKind.allCases.filter({ $0.entering == nil }).map(Presets.preset) {
             let layer = square()
             let action = bar(preset, on: layer)
             let tracks = ActionTracks([action])
@@ -122,7 +130,7 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
     }
 
     @Test func splittingPlaysTheSame() throws {
-        for preset in Presets.library where preset.category != .sound {
+        for preset in PresetKind.allCases.filter({ !$0.isSound }).map(Presets.preset) {
             var layer = square()
             // Something before it on the layer, so the split fixes the right values.
             let earlier = Action(target: layer.id, start: 0, duration: 0.5, spec: .move(MoveAction(mode: .by, end: Vec2(30, 0))))
@@ -162,8 +170,8 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
     @Test func onlyPresetsALayerCanTakeAreOffered() {
         let sound = Layer(name: "Sound", content: .audio(AudioContent(mediaID: UUID())), size: Size2(0, 0), position: .zero)
         let project = Project(layers: [sound, square()])
-        let soundPresets = Presets.library.filter { $0.category == .sound }
-        #expect(soundPresets.count == 2)
+        let soundPresets = Presets.library.filter(\.isSound)
+        #expect(soundPresets.count == 1)
         // A sound takes only the sound presets, a shape everything else.
         #expect(Presets.available(for: [sound], in: project) == soundPresets)
         #expect(Presets.available(for: [square()], in: project).count == Presets.library.count - soundPresets.count)
@@ -178,7 +186,7 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
         let b = Layer(name: "B", content: .video(VideoContent(mediaID: loud.id)), size: Size2(10, 10), position: .zero)
         var project = Project(layers: [a, b])
         project.media = [silent, loud]
-        #expect(!Presets.available(for: [a], in: project).contains { $0.category == .sound })
+        #expect(!Presets.available(for: [a], in: project).contains { $0.isSound })
         #expect(Presets.available(for: [b], in: project).contains { $0.kind == .fadeSoundIn })
         #expect(!ActionFactory.kinds(for: a, in: project).contains(.volume))
         #expect(ActionFactory.kinds(for: b, in: project).contains(.volume))
@@ -204,6 +212,16 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
             #expect(abs((a.start * 30).rounded() - a.start * 30) < 1e-6)
             #expect(abs((a.duration * 30).rounded() - a.duration * 30) < 1e-6)
         }
+    }
+
+    @Test func pairsAreNamedForTheirWay() {
+        #expect(Presets.name(of: .fadeIn) == "Fade In")
+        #expect(Presets.name(of: .fadeOut) == "Fade Out")
+        #expect(Presets.name(of: .scalePop) == "Scale In")
+        #expect(Presets.name(of: .dropOut) == "Drop Out")
+        #expect(Presets.name(of: .fadeSoundOut) == "Sound Fade Out")
+        #expect(Presets.name(of: .shake) == "Shake")
+        #expect(bar(Presets.library[0], on: square()).name == "Fade In")
     }
 
     @Test func eachPresetShowsItsOwnSettings() {

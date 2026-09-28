@@ -70,9 +70,9 @@ public enum PresetRecipe {
         case .slideOut: PresetAction(preset: kind, direction: .right, distance: travel, fades: true)
         case .scalePop: PresetAction(preset: kind, scale: 0, fades: true)
         case .scaleOut: PresetAction(preset: kind, scale: 0, fades: true)
-        case .rotateIn: PresetAction(preset: kind, scale: 0.6, angle: 90, fades: true)
+        case .rotateIn, .rotateOut: PresetAction(preset: kind, scale: 0.6, angle: 90, fades: true)
         case .blurIn, .blurOut: PresetAction(preset: kind, blur: 24, fades: true)
-        case .dropIn: PresetAction(preset: kind, distance: travel * 1.5, fades: true)
+        case .dropIn, .dropOut: PresetAction(preset: kind, distance: travel * 1.5, fades: true)
         case .pulse: PresetAction(preset: kind, scale: 1.12)
         case .bounce: PresetAction(preset: kind, distance: 40)
         case .shake: PresetAction(preset: kind, distance: 12)
@@ -90,7 +90,7 @@ public enum PresetRecipe {
     public static func easing(_ kind: PresetKind) -> Easing {
         switch kind {
         case .slideIn, .rotateIn, .blurIn: slowDown
-        case .slideOut, .blurOut: accelerate
+        case .slideOut, .blurOut, .rotateOut, .dropOut: accelerate
         case .scalePop: .preset(.overshoot, intensity: 0.6)
         case .scaleOut: .preset(.accelerate, intensity: 0.5)
         case .dropIn: .preset(.spring, intensity: 0.5)
@@ -160,12 +160,17 @@ public enum PresetRecipe {
         case .rotateIn:
             return (0.5, [part(.rotate(by: s.angle ?? own.angle ?? 90, entering: true), for: 0.5),
                           part(.scale(from: s.scale ?? own.scale, to: nil), for: 0.5)] + fadeIn(0.3))
+        case .rotateOut:
+            return (0.5, [part(.rotate(by: s.angle ?? own.angle ?? 90, entering: false), for: 0.5),
+                          part(.scale(from: nil, to: s.scale ?? own.scale), for: 0.5)] + fadeOut(at: 0.2, 0.3))
         case .blurIn:
             return (0.5, [part(.blur(from: s.blur ?? own.blur, to: 0), for: 0.5)] + fadeIn(0.4))
         case .blurOut:
             return (0.5, [part(.blur(from: nil, to: s.blur ?? own.blur ?? 24), for: 0.5)] + fadeOut(0.5))
         case .dropIn:
             return (0.8, [part(.move(by: Vec2(0, -distance), entering: true), for: 0.8)] + fadeIn(0.2))
+        case .dropOut:
+            return (0.5, [part(.move(by: Vec2(0, distance), entering: false), for: 0.5)] + fadeOut(at: 0.3, 0.2))
         case .fadeSoundIn:
             return (1, [part(.volume(from: 0, to: nil), for: 1)])
         case .fadeSoundOut:

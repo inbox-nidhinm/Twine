@@ -35,8 +35,9 @@ struct ActionInspector: View {
             .padding(.bottom, Theme.panelPad)
 
             if sameKind, let settings = first.preset {
-                // A preset with nothing to set but its timing shows nothing more.
-                if !Presets.controls(for: settings.preset).isEmpty {
+                // A preset with nothing to set but its timing, and no way to
+                // turn it In or Out, shows nothing more.
+                if !Presets.controls(for: settings.preset).isEmpty || settings.preset.reversed != nil {
                     PanelDivider()
                     PresetFields(controller: controller, settings: settings)
                         .padding(Theme.panelPad)
@@ -71,8 +72,34 @@ private struct PresetFields: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // A preset that brings a layer on turns into its twin that takes
+            // it off, keeping its settings.
+            if let other = kind.reversed {
+                let into = kind.entering == true ? kind : other
+                SegmentRow(selection: kind, options: [into, into.reversed ?? other],
+                           title: { $0.entering == true ? "In" : "Out" }) { turn(to: $0) }
+                    .help("In brings the layer on; Out takes it off.")
+            }
             ForEach(Presets.controls(for: kind), id: \.self) { control in
                 row(control)
+            }
+        }
+    }
+
+    /// Every selected bar of this preset turned the other way. A name, an
+    /// easing or a length still as the preset gave it follows the turn.
+    private func turn(to other: PresetKind) {
+        guard other != kind else { return }
+        let old = kind
+        let rate = controller.project.composition.frameRate
+        controller.editActions(other.entering == true ? "In" : "Out") { a in
+            guard case .preset(var p) = a.spec, p.preset == old else { return }
+            p.preset = other
+            a.spec = .preset(p)
+            if a.name == Presets.name(of: old) { a.name = Presets.name(of: other) }
+            if a.easing == PresetRecipe.easing(old) { a.easing = PresetRecipe.easing(other) }
+            if abs(a.duration - rate.snapped(PresetRecipe.length(old))) < 1e-6 {
+                a.duration = max(rate.snapped(PresetRecipe.length(other)), rate.frameDuration)
             }
         }
     }
@@ -82,13 +109,13 @@ private struct PresetFields: View {
         case .direction:
             // Its name above, as Easing's is: four choices need the width.
             VStack(alignment: .leading, spacing: 6) {
-                Text(kind == .slideOut ? "To" : "From")
+                Text(kind.entering == false ? "To" : "From")
                     .font(ThemeFont.label)
                     .foregroundStyle(Theme.textSecondary)
                 SegmentRow(selection: settings.direction ?? own.direction ?? .left, options: PresetDirection.allCases,
                            title: { $0.rawValue.capitalized }) { d in edit("Direction") { $0.direction = d } }
             }
-            .help(kind == .slideOut ? "Which way it leaves." : "Which side it comes in from.")
+            .help(kind.entering == false ? "Which way it leaves." : "Which side it comes in from.")
         case .distance:
             LabeledRow(label: kind == .bounce ? "Height" : "Distance") {
                 UnitField(value: settings.distance ?? own.distance ?? 0, decimals: 0, suffix: "px", accepts: { $0 >= 0 }) { v in
@@ -98,26 +125,28 @@ private struct PresetFields: View {
             }
             .help(kind == .shake ? "How far it shakes each way." : kind == .bounce ? "How high it bounces." : "How far it travels.")
         case .scale:
-            LabeledRow(label: kind == .pulse ? "Peak" : kind == .scaleOut ? "To" : "From") {
+            LabeledRow(label: kind == .pulse ? "Peak" : kind.entering == false ? "To" : "From") {
                 UnitField(value: (settings.scale ?? own.scale ?? 1) * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 }) { v in
                     edit("Scale") { $0.scale = v / 100 }
                 }
                 Color.clear.frame(width: Theme.control)
             }
             .help(kind == .pulse ? "How big it grows before settling back."
-                  : kind == .scaleOut ? "The size it shrinks to, of its own." : "The size it grows from, of its own.")
+                  : kind.entering == false ? "The size it shrinks to, of its own." : "The size it grows from, of its own.")
         case .angle:
             LabeledRow(label: "Angle") {
                 UnitField(value: settings.angle ?? own.angle ?? 0, decimals: 0, suffix: "°") { v in edit("Angle") { $0.angle = v } }
                 Color.clear.frame(width: Theme.control)
             }
-            .help(kind == .wiggle ? "How far it tips each way." : "How far it turns on the way in. Negative turns the other way.")
+            .help(kind == .wiggle ? "How far it tips each way."
+                  : kind.entering == false ? "How far it turns on the way out. Negative turns the other way."
+                  : "How far it turns on the way in. Negative turns the other way.")
         case .blur:
             LabeledRow(label: "Blur") {
                 UnitField(value: settings.blur ?? own.blur ?? 0, decimals: 0, accepts: { $0 >= 0 }) { v in edit("Blur") { $0.blur = v } }
                 Color.clear.frame(width: Theme.control)
             }
-            .help(kind == .blurOut ? "How blurred it ends." : "How blurred it starts.")
+            .help(kind.entering == false ? "How blurred it ends." : "How blurred it starts.")
         case .fades:
             HStack {
                 Text("Fade")
@@ -127,7 +156,7 @@ private struct PresetFields: View {
                 let fades = settings.fades ?? own.fades ?? true
                 PillToggle(isOn: fades) { edit(fades ? "Stop Fading" : "Fade") { $0.fades = !fades } }
             }
-            .help(PresetCategory.entrance == Presets.preset(kind).category ? "Fades in as it comes on." : "Fades out as it goes.")
+            .help(kind.entering == false ? "Fades out as it goes." : "Fades in as it comes on.")
         }
     }
 

@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "28 September 2026", title: "Presets in pairs", changes: [
+            "Presets are no longer grouped into entrances, exits and emphasis. Fade, Slide, Scale, Rotate, Blur, Drop and Sound Fade are each one preset, with In and Out in its settings; their tiles play the way in, then the way out.",
+            "New: Rotate Out and Drop Out, so every preset that brings a layer on can also take it off.",
+            "Turning a preset from In to Out renames its bar and gives it the Out version's length and easing, unless you changed them.",
+        ]),
         .init(date: "28 September 2026", title: "Presets you can see", changes: [
             "In Animate, a selected layer shows two tiles, New Action and Select Preset, in place of the two menus.",
             "Select Preset opens every preset as a tile that plays it on a small square, grouped into entrances, exits, emphasis and sound, so you can see what each does before picking it. Picking one adds it at the playhead and shows its settings.",

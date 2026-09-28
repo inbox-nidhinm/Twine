@@ -59,8 +59,9 @@ private struct BigTile: View {
     }
 }
 
-/// Every preset the selection can take, grouped by what it does, each on a
-/// tile that plays it, so what you pick is what you saw.
+/// Every preset the selection can take, each on a tile that plays it, so
+/// what you pick is what you saw. A pair (Fade In and Fade Out) is one tile
+/// playing both; it goes on as In and turns to Out in its settings.
 struct PresetPicker: View {
     let presets: [Preset]
     let pick: (Preset) -> Void
@@ -73,24 +74,13 @@ struct PresetPicker: View {
             HeaderRow(title: "Presets") {
                 IconButton(icon: .close, help: "Back to actions") { close() }
             }
-            ForEach(PresetCategory.allCases, id: \.self) { category in
-                let items = presets.filter { $0.category == category }
-                if !items.isEmpty {
-                    Text(category.title)
-                        .font(ThemeFont.label)
-                        .foregroundStyle(Theme.textSecondary)
-                        .padding(.horizontal, Theme.panelPad)
-                        .frame(height: Theme.panelRow, alignment: .bottomLeading)
-                    LazyVGrid(columns: columns, spacing: 10) {
-                        ForEach(items) { preset in
-                            PresetTile(preset: preset) { pick(preset) }
-                        }
-                    }
-                    .padding(.horizontal, Theme.panelPad)
-                    .padding(.top, 6)
-                    .padding(.bottom, Theme.panelPad)
+            LazyVGrid(columns: columns, spacing: 10) {
+                ForEach(presets) { preset in
+                    PresetTile(preset: preset) { pick(preset) }
                 }
             }
+            .padding(.horizontal, Theme.panelPad)
+            .padding(.bottom, Theme.panelPad)
         }
     }
 }
@@ -118,7 +108,8 @@ private struct PresetTile: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help("Adds \(preset.name) at the playhead")
+        .help(preset.kind.reversed == nil ? "Adds \(preset.name) at the playhead"
+              : "Adds \(Presets.name(of: preset.kind)) at the playhead; its settings turn it to \(preset.name) Out")
     }
 }
 
@@ -185,9 +176,10 @@ struct PresetPreview {
     /// The stand-in: a rounded square, so a turn shows as a circle's would not.
     static let side = 128.0
     static let roundness = 0.22
-    /// An empty moment before it plays and a rest after, so each loop reads
-    /// as one go.
+    /// An empty moment before it plays, a hold between a pair's In and Out,
+    /// and a rest after, so each loop reads as one go.
     private static let lead = 0.35
+    private static let hold = 0.5
     private static let rest = 0.7
 
     let layer: Layer
@@ -206,15 +198,20 @@ struct PresetPreview {
 
     private static func make(_ kind: PresetKind) -> PresetPreview {
         let preset = Presets.preset(kind)
-        let isSound = preset.category == .sound
+        let isSound = preset.isSound
         let corner = Vec2((scene - side) / 2, (scene - side) / 2)
         let layer = isSound
             ? Layer(name: preset.name, content: .audio(AudioContent(mediaID: UUID())),
                     size: Size2(side, side), position: Vec2(scene / 2, scene / 2))
             : LayerFactory.shape(.rectangle, in: Box(origin: corner, size: Size2(side, side)), name: preset.name)
-        let action = Presets.action(preset, for: layer, at: lead, frameRate: FrameRate(frames: 60))
-        return PresetPreview(layer: layer, tracks: ActionTracks([action]),
-                             period: lead + action.duration + rest, isSound: isSound)
+        let rate = FrameRate(frames: 60)
+        var actions = [Presets.action(preset, for: layer, at: lead, frameRate: rate)]
+        // A pair plays its way in, then its way out.
+        if let out = kind.reversed {
+            actions.append(Presets.action(Presets.preset(out), for: layer, at: actions[0].end + hold, frameRate: rate))
+        }
+        return PresetPreview(layer: layer, tracks: ActionTracks(actions),
+                             period: (actions.last?.end ?? lead) + rest, isSound: isSound)
     }
 
     func state(at time: Double) -> LayerState { tracks.state(of: layer, at: time) }

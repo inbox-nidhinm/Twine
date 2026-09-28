@@ -591,6 +591,7 @@ public enum PresetKind: String, Codable, Sendable, CaseIterable {
     case fadeIn = "fade-in", slideIn = "slide-in", scalePop = "scale-pop", rotateIn = "rotate-in"
     case blurIn = "blur-in", dropIn = "drop-in"
     case fadeOut = "fade-out", slideOut = "slide-out", scaleOut = "scale-out", blurOut = "blur-out"
+    case rotateOut = "rotate-out", dropOut = "drop-out"
     case fadeSoundIn = "fade-sound-in", fadeSoundOut = "fade-sound-out"
     case pulse, bounce, shake, wiggle
 }
