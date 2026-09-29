@@ -130,6 +130,11 @@ public enum Theme {
 
     /// Every pressable thing in a panel is this tall.
     public static let control: CGFloat = 24
+    /// How far typed text is lifted in its box, in screen pixels: AppKit's
+    /// text field sets its line about half a point lower than a label, so
+    /// a number looked low beside a menu's word (a whole pixel on a 1x
+    /// screen).
+    public static let fieldTextLift: CGFloat = 1
     /// A button with a glyph and a word. One step up from `control`.
     public static let button: CGFloat = control + 8
     /// Tools and other mode switches: the big square button.

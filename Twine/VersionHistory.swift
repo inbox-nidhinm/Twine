@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Centred numbers in fields", changes: [
+            "Numbers and hex codes sit centred in their fields, as the words in menus do. They were a pixel low, most visibly on screens that are not Retina.",
+        ]),
         .init(date: "29 September 2026", title: "Sharp text in scaled frames", changes: [
             "Text inside a frame or group that is scaled up stays sharp, on the canvas and in exports. It was drawn at its own size and stretched, so a Figma frame scaled to 300% had soft words while its shapes stayed crisp.",
         ]),

@@ -81,6 +81,7 @@ struct HexField: View {
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textPrimary)
                 .autocorrectionDisabled()
+                .liftedFieldText()
                 .focused($focused)
                 .onSubmit(apply)
                 .onChange(of: focused) { _, now in if !now { apply() } }

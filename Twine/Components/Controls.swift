@@ -312,6 +312,7 @@ struct UnitField: View {
                 .font(ThemeFont.label)
                 .monospacedDigit()
                 .foregroundStyle(Theme.textPrimary)
+                .liftedFieldText()
                 .focused($focused)
                 .onSubmit(apply)
                 .onChange(of: focused) { _, now in if !now { apply() } }
@@ -405,6 +406,7 @@ struct OptionalField: View {
                 .font(ThemeFont.label)
                 .monospacedDigit()
                 .foregroundStyle(Theme.textPrimary)
+                .liftedFieldText()
                 .focused($focused)
                 .onSubmit(apply)
                 .onChange(of: focused) { _, now in if !now { apply() } }
@@ -702,6 +704,20 @@ struct HeaderRow<Accessory: View>: View {
 }
 
 // MARK: - The inspector's grid
+
+/// Lifts a text field's text by `Theme.fieldTextLift` screen pixels, so what
+/// is typed sits centred in its box as a label's words do.
+private struct LiftedFieldText: ViewModifier {
+    @Environment(\.displayScale) private var scale
+
+    func body(content: Content) -> some View {
+        content.offset(y: -Theme.fieldTextLift / max(scale, 1))
+    }
+}
+
+extension View {
+    func liftedFieldText() -> some View { modifier(LiftedFieldText()) }
+}
 
 extension View {
     /// A section's body on the inspector's grid: its rows start at the
