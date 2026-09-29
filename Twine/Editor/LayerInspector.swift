@@ -491,19 +491,19 @@ private struct SoundSection: View {
             SliderRow(label: "Volume", value: min(volume, 1) * 100, range: 0...100, readout: { "\(Int($0.rounded()))%" },
                       onChange: { v in
                           var l = layer
-                          l.content = Self.with(l.content) { level, _ in level = min(max(v, 0), 100) / 100 }
+                          // There is no mute button (the user asked for the
+                          // slider alone), so moving it brings back a sound
+                          // muted before.
+                          l.content = Self.with(l.content) { level, muted in
+                              level = min(max(v, 0), 100) / 100
+                              muted = false
+                          }
                           controller.update([l])
                       },
                       onBegin: { controller.begin("Volume") },
                       onEnd: { controller.end() })
                 .opacity(isMuted ? 0.4 : 1)
                 .help("100% is the file's own level")
-                .rowButton(alignment: .bottom) {
-                    IconButton(icon: isMuted ? .speakerOff : .speaker, help: isMuted ? "Unmute" : "Mute") {
-                        controller.edit(layer.id) { l in l.content = Self.with(l.content) { $1.toggle() } }
-                    }
-                    .frame(height: Theme.track)
-                }
                 .gridBody()
         }
         .padding(.bottom, Theme.panelPad)

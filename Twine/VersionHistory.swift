@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Volume without mute", changes: [
+            "The Sound section's mute button is gone, in Design and Animate: it is the volume slider alone. A sound muted before comes back as soon as its slider is moved.",
+        ]),
         .init(date: "29 September 2026", title: "Volume in Animate", changes: [
             "In Animate, a selected sound or video with sound shows its Sound section, the volume slider and mute, over its actions, and under the fields when its Play bar is selected. It is the same level as in Design, the one every Volume action starts from.",
         ]),
