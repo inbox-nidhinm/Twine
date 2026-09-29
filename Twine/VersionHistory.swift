@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Fill icons", changes: [
+            "The Solid, Linear, Radial and Image choices for a fill are the designer's icons, with their names as tooltips, in the Fill section and wherever a colour or gradient is picked.",
+            "Icons can draw some of their lines fainter, as the linear icon's dots fade across.",
+        ]),
         .init(date: "29 September 2026", title: "A plainer anchor picker", changes: [
             "The anchor picker beside rotation has no outline, just its nine points, with a little less room around them.",
         ]),

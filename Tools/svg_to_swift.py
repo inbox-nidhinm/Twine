@@ -44,6 +44,8 @@ import sys
 
 VIEWBOX = re.compile(r'viewBox="([^"]*)"')
 D = re.compile(r'\sd="([^"]*)"')
+PATH = re.compile(r'<path\b([^>]*)>')
+OPACITY = re.compile(r'\sopacity="([^"]*)"')
 ALLOWED = set("MLHVCZmlhvcz")
 
 
@@ -66,7 +68,14 @@ def read_paths(path: pathlib.Path, grid: int):
             f"{path}: expected viewBox '0 0 {grid} {grid}', got {box and box.group(1)!r}"
         )
 
-    ds = D.findall(text)
+    ds, opacities = [], []
+    for attributes in PATH.findall(text):
+        d = D.search(attributes)
+        if not d:
+            continue
+        ds.append(d.group(1))
+        o = OPACITY.search(attributes)
+        opacities.append(float(o.group(1)) if o else 1.0)
     if not ds:
         raise SystemExit(f"{path}: no <path d=...> found")
 
@@ -78,7 +87,7 @@ def read_paths(path: pathlib.Path, grid: int):
                     "  The Swift parser implements M L H V C Z. Re-export this icon "
                     "with cubic curves, or extend both this script and IconShape.swift."
                 )
-    return ds
+    return ds, opacities
 
 
 def main():
@@ -133,13 +142,24 @@ def main():
     out += ["", "    /// The subpaths, in the order they are drawn.",
             "    public var data: [String] {", "        switch self {"]
 
+    faded = []
     for name, path, rel in pairs:
-        ds = read_paths(path, grid)
+        ds, opacities = read_paths(path, grid)
         out.append(f"        case .{name}: return [   // {rel}")
         out.append(",\n".join(f'            "{d}"' for d in ds))
         out.append("        ]")
+        if any(o != 1.0 for o in opacities):
+            faded.append((name, opacities))
 
-    out += ["        }", "    }", "}", ""]
+    out += ["        }", "    }", ""]
+    # Only icons with a path drawn fainter than the rest (an `opacity` on the
+    # path) carry a list; every other icon draws each path whole.
+    out += ["    /// Each subpath's opacity, for icons that draw some fainter; nil",
+            "    /// when every path is drawn whole.",
+            "    public var opacities: [Double]? {", "        switch self {"]
+    for name, opacities in faded:
+        out.append(f"        case .{name}: return [{', '.join(repr(o) for o in opacities)}]")
+    out += ["        default: return nil", "        }", "    }", "}", ""]
 
     dest = pathlib.Path(args.out)
     dest.parent.mkdir(parents=True, exist_ok=True)

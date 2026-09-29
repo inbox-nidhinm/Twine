@@ -24,7 +24,8 @@ struct PaintControls: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if allowsGradients {
-                SegmentRow(selection: paint.kindName, options: ["Solid", "Linear", "Radial"], title: { $0 }) { kind in
+                SegmentRow(selection: paint.kindName, options: ["Solid", "Linear", "Radial"], title: { $0 },
+                           icon: Icon.fillKind) { kind in
                     edit.commit(paint.converted(to: kind))
                 }
             }
@@ -145,5 +146,18 @@ struct PaintSwatch: View {
 extension MotionModel.Gradient {
     var swiftUIStops: [SwiftUI.Gradient.Stop] {
         stops.sorted { $0.position < $1.position }.map { SwiftUI.Gradient.Stop(color: $0.color.color, location: $0.position) }
+    }
+}
+
+extension Icon {
+    /// The icon for a kind of fill in the Solid, Linear, Radial and Image
+    /// segments, whose names become their tooltips.
+    static func fillKind(_ kind: String) -> Icon {
+        switch kind {
+        case "Linear": .fillLinear
+        case "Radial": .fillRadial
+        case "Image": .fillImage
+        default: .fillSolid
+        }
     }
 }

@@ -11,10 +11,14 @@ public struct IconShape: Shape {
     public let icon: Icon
     /// On the artwork's own 24-unit grid.
     public var lineWidth: CGFloat
+    /// Only the subpaths drawn at this opacity (see `Icon.opacities`); nil
+    /// for all of them.
+    public var opacity: Double?
 
-    public init(icon: Icon, lineWidth: CGFloat = Theme.iconStroke) {
+    public init(icon: Icon, lineWidth: CGFloat = Theme.iconStroke, opacity: Double? = nil) {
         self.icon = icon
         self.lineWidth = lineWidth
+        self.opacity = opacity
     }
 
     public func path(in rect: CGRect) -> Path {
@@ -24,7 +28,7 @@ public struct IconShape: Shape {
             y: rect.minY + (rect.height - IconPath.grid * scale) / 2
         ).scaledBy(x: scale, y: scale)
 
-        return IconPath.path(for: icon)
+        return IconPath.path(for: icon, opacity: opacity)
             .applying(centred)
             .strokedPath(StrokeStyle(lineWidth: lineWidth * scale, lineCap: .round, lineJoin: .round))
     }
@@ -43,8 +47,20 @@ public struct IconView: View {
     }
 
     public var body: some View {
-        IconShape(icon: icon, lineWidth: lineWidth)
-            .frame(width: size, height: size)
+        Group {
+            if let opacities = icon.opacities {
+                // Paths drawn fainter, such as the dots fading across the
+                // linear fill's icon, each at their own strength.
+                ZStack {
+                    ForEach(Array(Set(opacities)).sorted(), id: \.self) { o in
+                        IconShape(icon: icon, lineWidth: lineWidth, opacity: o).opacity(o)
+                    }
+                }
+            } else {
+                IconShape(icon: icon, lineWidth: lineWidth)
+            }
+        }
+        .frame(width: size, height: size)
     }
 }
 
@@ -55,23 +71,34 @@ enum IconPath {
 
     /// Parsed once per icon and kept. The panels rebuild on every selection
     /// change and there is no reason to parse again.
-    @MainActor private static var cache: [Icon: Path] = [:]
+    private struct Key: Hashable {
+        let icon: Icon
+        let opacity: Double?
+    }
 
-    static func path(for icon: Icon) -> Path {
+    @MainActor private static var cache: [Key: Path] = [:]
+
+    /// The icon's subpaths, or only those drawn at `opacity`.
+    static func path(for icon: Icon, opacity: Double? = nil) -> Path {
         // `Shape.path(in:)` is not main-actor isolated, but SwiftUI only calls
         // it from the main thread. Anywhere else, parse without the cache.
-        guard Thread.isMainThread else { return parse(icon) }
+        guard Thread.isMainThread else { return parse(icon, opacity: opacity) }
         return MainActor.assumeIsolated {
-            if let hit = cache[icon] { return hit }
-            let path = parse(icon)
-            cache[icon] = path
+            let key = Key(icon: icon, opacity: opacity)
+            if let hit = cache[key] { return hit }
+            let path = parse(icon, opacity: opacity)
+            cache[key] = path
             return path
         }
     }
 
-    private static func parse(_ icon: Icon) -> Path {
+    private static func parse(_ icon: Icon, opacity: Double?) -> Path {
         var path = Path()
-        for d in icon.data { append(d, to: &path) }
+        let opacities = icon.opacities
+        for (i, d) in icon.data.enumerated() {
+            if let opacity, (opacities?[i] ?? 1) != opacity { continue }
+            append(d, to: &path)
+        }
         return path
     }
 

@@ -527,7 +527,8 @@ private struct FillSection: View {
             if let top = shape.topFillIndex {
                 let fill = shape.fills[top]
                 VStack(alignment: .leading, spacing: 8) {
-                    SegmentRow(selection: fill.paint.kindName, options: ["Solid", "Linear", "Radial", "Image"], title: { $0 }) { kind in
+                    SegmentRow(selection: fill.paint.kindName, options: ["Solid", "Linear", "Radial", "Image"], title: { $0 },
+                               icon: Icon.fillKind) { kind in
                         if kind == "Image" {
                             if !fill.paint.isImage { controller.fillWithPicture(layer.id) }
                         } else {
