@@ -58,7 +58,18 @@ struct HomeView: View {
             }
         }
         .overlay { MenuLayer() }
+        // Over everything: on a first launch it is the whole of what shows.
+        .overlay {
+            if OnboardingState.shared.isShowing {
+                OnboardingView {
+                    library.selectedFolder = nil
+                    library.refresh()
+                }
+                .transition(.opacity)
+            }
+        }
         .animation(.easeOut(duration: 0.14), value: library.showVersionHistory)
+        .animation(.easeOut(duration: 0.2), value: OnboardingState.shared.isShowing)
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
         .tint(Theme.accent)

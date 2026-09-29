@@ -22,7 +22,7 @@ enum FormerName {
         let fm = FileManager.default
         let documents = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let old = documents.appendingPathComponent(oldFolderName, isDirectory: true)
-        let new = Creations.folder
+        let new = Creations.defaultFolder
         guard fm.fileExists(atPath: old.path), !fm.fileExists(atPath: new.path) else { return }
         try? fm.moveItem(at: old, to: new)
     }

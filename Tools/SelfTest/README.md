@@ -44,6 +44,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `path`, `path xy` | Logs the selected shape's points, style and box, and whether its points are showing or being drawn; `xy` adds each point's and handle's place in the window, to click on |
 | `moveproject NAME FOLDER`, `showfolder FOLDER` | Moves a home screen project into a folder (`-` for out of one), as a drop does; shows a folder (`-` for All Projects) |
 | `library` | Logs the home screen's folders (with counts), which is showing, and every project with its folder |
+| `onboarding` | Raises the onboarding card, as Help > Show Onboarding does (the test copy never shows it by itself); the state line's `onb=` is its page and feature |
 | `home`, `openfile PATH` | Turns the window to the home screen, as the Home button does; opens a project in the window, as the Finder does (never point it at a real project) |
 | `replace PATH`, `fillpicture PATH` | Replace in the inspector, or Image as the fill, with the file handed in rather than chosen in the panel |
 | `mode M`, `turn` | The selected picture's mode (`fill`, `fit`, `crop`, which starts cropping, `tile`) and a quarter turn |

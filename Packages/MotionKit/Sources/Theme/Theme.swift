@@ -233,6 +233,19 @@ public enum Theme {
     public static let exportTitle: CGFloat = 32
     /// The counter's type size, as a share of the preview area's height.
     public static let exportCounterShare: CGFloat = 0.36
+    /// The onboarding card, as Flip's: its size, the panel down its left
+    /// (the artwork takes the rest), the panel's inset, the title's size and
+    /// the buttons at its foot.
+    public static let onboardingCard = CGSize(width: 760, height: 540)
+    public static let onboardingPanel: CGFloat = 290
+    public static let onboardingPad: CGFloat = 24
+    public static let onboardingTitle: CGFloat = 21
+    public static let onboardingButton: CGFloat = 28
+    public static let onboardingRow: CGFloat = 30
+    public static let onboardingFolderRow: CGFloat = 34
+    public static let radiusCard: CGFloat = 12
+    /// Under the onboarding card, darker while a page turns.
+    public static let onboardingShadow = Color.black
     /// How the player and the counter trade places: cubic-bezier(0.5, 0, 0, 1).
     public static let exportEase = Animation.timingCurve(0.5, 0, 0, 1, duration: 0.8)
     /// How the counter slides from one number to the next, on the same curve.

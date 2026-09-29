@@ -71,7 +71,13 @@ struct EditorView: View {
             }
 
             MenuLayer()
+
+            if OnboardingState.shared.isShowing {
+                OnboardingView()
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeOut(duration: 0.2), value: OnboardingState.shared.isShowing)
         .animation(.easeOut(duration: 0.18), value: editor.showLayers)
         .animation(.easeOut(duration: 0.18), value: editor.showInspector)
         .animation(.easeOut(duration: 0.18), value: editor.mode)

@@ -23,6 +23,12 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Onboarding", changes: [
+            "The first time Twine opens, a card introduces it in three pages, as Flip's does: what Twine is, where it keeps your projects, and five things it does. The pages turn like the leaves of a book.",
+            "The second page chooses the folder Twine keeps projects in. Projects already made stay where they are.",
+            "Help > Show Onboarding brings it back. Escape leaves it at any page; Return turns the page.",
+            "The pictures are placeholders for now, ready to be swapped for videos.",
+        ]),
         .init(date: "29 September 2026", title: "Swap From and To", changes: [
             "An action's To row has a button that swaps its From and To, so it plays backwards: a Resize from 300 to 360 becomes one from 360 to 300. An empty From is filled in with where the layer would have started. It works for every action with a start and an end, and a curved Move runs its same path the other way.",
         ]),

@@ -37,7 +37,7 @@ enum SelfTest {
             let shown = MainWindow.window.windowController.map { String(describing: type(of: $0)).replacingOccurrences(of: "WindowController", with: "") } ?? "-"
             let wins = NSApp.windows.filter { $0.isVisible && !($0 is NSPanel) }.count
             let docs = NSDocumentController.shared.documents.map { $0.displayName ?? "?" }
-            return "window=\(shown) wins=\(wins) docs=\(docs) " + "hov=\(controller.editor.hoveredLayer.flatMap { controller.project.layer(withID: $0)?.name } ?? "-") " + p0 + " vstart=\(String(format: "%.3f", e.viewport.start)) pps=\(Int(e.viewport.pointsPerSecond)) layers=\(controller.project.allLayers.count) actions=\(controller.project.actions.map(\.name)) sel=\(controller.selectedLayers.map { "\($0.name)@\(Int($0.transform.position.x)),\(Int($0.transform.position.y))" }) mode=\(e.mode) tool=\(e.tool) time=\(String(format: "%.3f", e.time)) playing=\(e.isPlaying) export=\(e.exports.progress.map { String(format: "%.2f", $0) } ?? "-")/\(e.exports.finished?.lastPathComponent ?? "-") sheet=\(window.attachedSheet != nil) menu=\(menus.isOpen) fr=\(fr.prefix(40))"
+            return "window=\(shown) wins=\(wins) docs=\(docs) " + "hov=\(controller.editor.hoveredLayer.flatMap { controller.project.layer(withID: $0)?.name } ?? "-") " + p0 + " vstart=\(String(format: "%.3f", e.viewport.start)) pps=\(Int(e.viewport.pointsPerSecond)) layers=\(controller.project.allLayers.count) actions=\(controller.project.actions.map(\.name)) sel=\(controller.selectedLayers.map { "\($0.name)@\(Int($0.transform.position.x)),\(Int($0.transform.position.y))" }) mode=\(e.mode) tool=\(e.tool) time=\(String(format: "%.3f", e.time)) playing=\(e.isPlaying) export=\(e.exports.progress.map { String(format: "%.2f", $0) } ?? "-")/\(e.exports.finished?.lastPathComponent ?? "-") sheet=\(window.attachedSheet != nil) menu=\(menus.isOpen) onb=\(OnboardingState.shared.isShowing ? "\(OnboardingState.shared.page)/\(OnboardingState.shared.feature.rawValue)" : "-") fr=\(fr.prefix(40))"
         }
         func mouse(_ type: NSEvent.EventType, _ x: Double, _ y: Double) {
             let p = NSPoint(x: x, y: window.contentView!.bounds.height - y)
@@ -543,6 +543,9 @@ enum SelfTest {
             case "showfolder":
                 let lib = HomeWindowController.shared.library
                 lib.selectedFolder = parts[1] == "-" ? nil : lib.folders.first { $0.name == parts[1] }?.url
+            case "onboarding":
+                // Raises the onboarding card, as Help > Show Onboarding does.
+                OnboardingState.shared.show()
             case "home":
                 // Home, as the layers panel's button does.
                 HomeWindowController.shared.showWindow(nil)

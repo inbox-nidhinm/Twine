@@ -35,6 +35,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HomeWindowController.shared.showWindow(nil)
     }
 
+    @objc func showOnboarding(_ sender: Any?) {
+        OnboardingState.shared.show()
+    }
+
     @objc func showVersionHistory(_ sender: Any?) {
         HomeWindowController.shared.showWindow(nil)
         HomeWindowController.shared.library.showVersionHistory = true

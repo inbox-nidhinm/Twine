@@ -172,6 +172,8 @@ enum MainMenu {
     private static func helpMenu() -> NSMenu {
         let menu = NSMenu(title: "Help")
         menu.addItem(item("Keyboard Shortcuts", #selector(EditorWindowController.toggleShortcuts(_:)), "/"))
+        menu.addItem(.separator())
+        menu.addItem(item("Show Onboarding", #selector(AppDelegate.showOnboarding(_:))))
         return menu
     }
 }
