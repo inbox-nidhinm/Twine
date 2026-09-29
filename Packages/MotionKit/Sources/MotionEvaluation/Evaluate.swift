@@ -180,7 +180,7 @@ private func motion(of layer: Layer, _ resolved: ResolvedLayer, tracks: ActionTr
         return moved.projection
     }
     return MotionSpread(first: placed(at: first), next: placed(at: first + shutter / Double(blur.samples - 1)),
-                        count: blur.samples)
+                        last: placed(at: first + shutter), count: blur.samples, size: resolved.size)
 }
 
 private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures: [UUID: Size2],
@@ -319,9 +319,11 @@ private func units(of text: String, style: TextStyle, width: Double?, _ animatio
             let first = time - shutter / 2
             let from = animation.states(count: spans.count, at: first)
             let next = animation.states(count: spans.count, at: first + shutter / Double(blur.samples - 1))
+            let last = animation.states(count: spans.count, at: first + shutter)
             for i in units.indices {
                 units[i].motion = MotionSpread(first: placed(spans[i], from[i]), next: placed(spans[i], next[i]),
-                                               count: blur.samples)
+                                               last: placed(spans[i], last[i]), count: blur.samples,
+                                               size: Size2(spans[i].box.width, spans[i].box.height))
             }
         }
     }

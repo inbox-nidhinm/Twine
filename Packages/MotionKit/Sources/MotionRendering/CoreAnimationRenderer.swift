@@ -603,9 +603,17 @@ final class Node {
     }
 
     /// Draws the layer as motion blur has it: all it draws, wrapped in copies
-    /// the first time it blurs, and from then on one copy while it is still.
+    /// while it blurs, and unwrapped again once it stops, so a layer that has
+    /// blurred draws exactly as one that never did. The copies draw as one
+    /// picture, so a blend mode inside a group blends only within it while
+    /// it smears.
     private func updateMotion(_ motion: MotionSpread, size: Size2) {
-        guard motion != .none || motionCopies != nil else { return }
+        if motion == .none {
+            guard let copies = motionCopies else { return }
+            container.sublayers = copies.body.sublayers
+            motionCopies = nil
+            return
+        }
         if motionCopies == nil {
             let made = MotionCopies()
             made.body.sublayers = container.sublayers

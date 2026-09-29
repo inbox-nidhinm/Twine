@@ -285,17 +285,36 @@ public enum MotionSpread: Sendable, Equatable {
     case none
     indirect case spread(start: Projective, step: Projective, count: Int)
 
-    /// From the first copy's place and the next one's, or `.none` when they
-    /// are the same place, or the first cannot be undone.
-    public init(first: Projective, next: Projective, count: Int) {
-        let same = abs(first.a - next.a) + abs(first.b - next.b) + abs(first.c - next.c) + abs(first.d - next.d)
-            + abs(first.tx - next.tx) + abs(first.ty - next.ty) + abs(first.px - next.px) + abs(first.py - next.py)
-            + abs(first.w - next.w) < 1e-9
-        guard count > 1, !same, let back = first.inverted else {
+    /// From the first copy's place, the next one's and the last one's, for
+    /// something `size` big: `.none` when they are all one place, when the
+    /// first cannot be undone, or when repeating the first step does not
+    /// land the last copy where it belongs. Motion that is not steady across
+    /// the shutter (a jump, a turn from edge-on) would otherwise throw
+    /// copies far from the layer; it is drawn sharp instead.
+    public init(first: Projective, next: Projective, last: Projective, count: Int, size: Size2) {
+        guard count > 1, let back = first.inverted else {
             self = .none
             return
         }
-        self = .spread(start: first, step: next.then(back), count: count)
+        let step = next.then(back)
+        var reached = first
+        for _ in 1..<count { reached = step.then(reached) }
+        let box = Box(origin: .zero, size: Size2(max(size.width, 1), max(size.height, 1)))
+        var travel = 0.0, miss = 0.0
+        for corner in box.corners {
+            guard let from = first.apply(corner), let to = last.apply(corner), let got = reached.apply(corner) else {
+                self = .none
+                return
+            }
+            travel = max(travel, hypot(to.x - from.x, to.y - from.y))
+            miss = max(miss, hypot(got.x - to.x, got.y - to.y))
+        }
+        // Still, or off by more than a pixel and a fifth of the way.
+        guard travel > 1e-6, miss <= max(1, travel * 0.2) else {
+            self = .none
+            return
+        }
+        self = .spread(start: first, step: step, count: count)
     }
 }
 

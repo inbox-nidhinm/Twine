@@ -56,6 +56,34 @@ private func project(_ layers: [Layer], _ actions: [Action]) -> Project {
         #expect(evaluateDesign(blurred).layer(layer.id)?.motion == MotionSpread.none)
     }
 
+    @Test func motionThatIsNotSteadyIsDrawnSharp() throws {
+        let layer = square()
+        // A second Move with a From of its own jumps there when it starts, at
+        // 2 s: across that shutter the layer is in two places, and one step
+        // repeated would throw copies far past both.
+        var jump = Action(target: layer.id, start: 2, duration: 1, easing: .linear,
+                          spec: .move(MoveAction(mode: .to, initial: Vec2(300, 300), end: Vec2(300, 0))))
+        jump.motionBlur = 1
+        let blurred = project([layer], [move(layer, blur: 1), jump])
+        #expect(evaluate(blurred, at: 2).layer(layer.id)?.motion == MotionSpread.none)
+        // Either side of it, where it glides, it blurs.
+        #expect(evaluate(blurred, at: 2.5).layer(layer.id)?.motion != MotionSpread.none)
+        // A tilt that starts edge-on turns fastest there, far from steady:
+        // no copy may land far from where the layer really goes.
+        var tilt = Action(target: layer.id, start: 0, duration: 1, easing: .preset(.slowDown, intensity: 0.5),
+                          spec: .tilt(TiltAction(mode: .by, initial: Tilt(x: 90, y: 90, depth: 1200), end: Tilt(x: -90, y: -90, depth: 1200))))
+        tilt.motionBlur = 1
+        for frame in 0..<10 {
+            let t = Double(frame) / 10
+            guard case .spread(let start, let step, let count) = evaluate(project([layer], [tilt]), at: t).layer(layer.id)?.motion
+            else { continue }
+            var reached = start
+            for _ in 1..<count { reached = step.then(reached) }
+            let corner = try #require(reached.apply(Vec2(10, 10)))
+            #expect(abs(corner.x) < 60 && abs(corner.y) < 60, "copies thrown to \(corner) at \(t)")
+        }
+    }
+
     @Test func aTurnByAnotherActionStaysSharp() throws {
         let layer = square()
         let turn = Action(target: layer.id, start: 0, duration: 1, easing: .linear,

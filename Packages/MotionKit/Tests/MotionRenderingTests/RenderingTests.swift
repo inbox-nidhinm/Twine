@@ -124,6 +124,31 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
         #expect(pixel(over, 26, 8).r > 245 && pixel(over, 26, 8).g > 25 && pixel(over, 26, 8).g < 80, "\(pixel(over, 26, 8))")
     }
 
+    @Test func aLayerDrawsAsBeforeOnceItsMotionBlurEnds() throws {
+        // A group holding a square and an Overlay layer over it: once its
+        // blur ends it is unwrapped from its copies, and draws exactly as a
+        // group that never blurred.
+        let under = shape(fill: RGBA(0.2, 0.4, 0.8), at: Vec2(0, 0), size: Size2(32, 32))
+        var overlay = shape(fill: RGBA(0.5, 0.5, 0.5), at: Vec2(16, 0), size: Size2(32, 32))
+        overlay.blendMode = .overlay
+        var group = Layer(name: "G", content: .group(GroupContent(children: [under, overlay])),
+                          size: Size2(64, 64), position: .zero)
+        group.transform.anchor = .zero
+        var slide = Action(target: group.id, start: 0, duration: 1, easing: .linear,
+                           spec: .move(MoveAction(mode: .by, end: Vec2(8, 0))))
+        slide.motionBlur = 1
+        let composition = Composition(width: 64, height: 64, frameRate: FrameRate(frames: 10), background: Background(color: RGBA(0.9, 0.3, 0.1)))
+        let project = Project(composition: composition, layers: [group], actions: [slide])
+        let renderer = try #require(OffscreenRenderer(pixelWidth: 64, pixelHeight: 64))
+        _ = renderer.image(of: evaluate(project, at: 0.5))
+        let after = try #require(renderer.image(of: evaluate(project, at: 2)))
+        let fresh = try #require(OffscreenRenderer(pixelWidth: 64, pixelHeight: 64)?.image(of: evaluate(project, at: 2)))
+        for x in [4, 20, 44, 60] {
+            let a = pixel(after, x, 16), b = pixel(fresh, x, 16)
+            #expect(abs(a.r - b.r) <= 1 && abs(a.g - b.g) <= 1 && abs(a.b - b.b) <= 1, "at \(x): \(a) against \(b)")
+        }
+    }
+
     @Test func insideStrokesStayInsideTheShape() throws {
         var layer = shape(fill: nil, at: Vec2(16, 16), size: Size2(32, 32))
         layer.content = .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
