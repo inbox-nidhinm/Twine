@@ -780,13 +780,6 @@ final class EditorController {
         perform(.batch([.updateActions(edited)], name: on ? "Turn On Action" : "Turn Off Action"))
     }
 
-    func renameAction(_ id: UUID, to name: String) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, var action = project.actions.first(where: { $0.id == id }), action.name != trimmed else { return }
-        action.name = trimmed
-        perform(.batch([.updateActions([action])], name: "Rename Action"))
-    }
-
     /// Spaces the selected actions' starts `gap` seconds apart, in the order
     /// their rows run.
     func staggerSelectedActions(gap: Double) {

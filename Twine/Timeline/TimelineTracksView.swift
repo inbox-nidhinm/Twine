@@ -45,10 +45,9 @@ struct ActionTimeline: NSViewRepresentable {
 /// Drag a bar to move it in time, or up and down (or drag its label) to
 /// reorder. Drag an end to change its length (Option for both ends). Click,
 /// Shift- or Command-click, or drag a box to select. The eye that shows on a
-/// hovered label switches an action off. Double-click a label to rename its
-/// action. Right-click for Stagger and what to show. Option-drag empty
+/// hovered label switches an action off. Right-click for Stagger and what to show. Option-drag empty
 /// space, or scroll sideways, to pan; Command-scroll or pinch to zoom.
-final class TimelineTracksView: NSView, NSTextFieldDelegate {
+final class TimelineTracksView: NSView {
     var controller: EditorController? {
         didSet { controller?.waveforms.onChange = { [weak self] in self?.needsDisplay = true } }
     }
@@ -66,7 +65,6 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
     /// rows starts.
     private var rangeAnchor: UUID?
     private var lastReveal = 0
-    private var renaming: (id: UUID, field: NSTextField)?
     /// The row whose label is under the pointer, which shows its eye and
     /// lights up as the layers panel's rows do.
     private var hoveredLabel: Int?
@@ -444,7 +442,6 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
 
     override func mouseDown(with event: NSEvent) {
         guard let controller else { return }
-        endRename(commit: true)
         window?.makeFirstResponder(self)
         controller.editor.focus = .timeline
         let p = convert(event.locationInWindow, from: nil)
@@ -456,11 +453,10 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
         let row = rows[index]
         let action = row.action
 
-        // The label: the eye switches the action off; a double-click
-        // renames it; a drag reorders.
+        // The label: the eye switches the action off; a drag reorders.
+        // Nothing here is renamed: a double-click is two clicks.
         if p.x < gutter {
             if eyeRect(row).contains(p), hoveredLabel == index { return controller.toggleEnabled(action) }
-            if event.clickCount == 2 { return beginRename(row) }
             pick(action, extending: extending, ranging: ranging)
             if !extending { drag = .reorder(action: action, began: false) }
             needsDisplay = true
@@ -469,7 +465,6 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
 
         let rect = barRect(action, in: row)
         guard rect.insetBy(dx: -Self.edgeHit, dy: 0).contains(p) else { return startEmptyDrag(at: p, event: event) }
-        if event.clickCount == 2 { return beginRename(row) }
         guard pick(action, extending: extending, ranging: ranging) else { return }
 
         if !extending, let startEdge = trimEdge(at: p, of: action, rect: rect) {
@@ -692,45 +687,6 @@ final class TimelineTracksView: NSView, NSTextFieldDelegate {
             .item("Show Only Selected Layers", checked: editor.timelineOnlySelected) { editor.timelineOnlySelected.toggle() },
             .item("Show Times as Frames", checked: editor.showsFrames) { editor.showsFrames.toggle() },
         ], at: origin)
-    }
-
-    // MARK: Renaming
-
-    private func beginRename(_ row: TimelineRow) {
-        let field = NSTextField(frame: CGRect(x: 12, y: row.y + 5, width: gutter - 24, height: TimelineRow.height - 10))
-        field.stringValue = row.action.name
-        field.font = NSFont.systemFont(ofSize: 12)
-        field.isBordered = false
-        field.focusRingType = .none
-        field.drawsBackground = true
-        field.backgroundColor = NSColor(Theme.panelRaised)
-        field.textColor = NSColor(Theme.textPrimary)
-        field.delegate = self
-        addSubview(field)
-        renaming = (row.action.id, field)
-        window?.makeFirstResponder(field)
-        field.currentEditor()?.selectAll(nil)
-    }
-
-    func controlTextDidEndEditing(_ obj: Notification) {
-        endRename(commit: true)
-    }
-
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        if selector == #selector(cancelOperation(_:)) {
-            endRename(commit: false)
-            window?.makeFirstResponder(self)
-            return true
-        }
-        return false
-    }
-
-    private func endRename(commit: Bool) {
-        guard let (id, field) = renaming else { return }
-        renaming = nil
-        let name = field.stringValue
-        field.removeFromSuperview()
-        if commit { controller?.renameAction(id, to: name) }
     }
 
     // MARK: Zoom and scroll

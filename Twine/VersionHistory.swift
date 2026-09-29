@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "No renaming in the timeline", changes: [
+            "Double-clicking a row or a bar in the timeline no longer renames the action. It selects it, as one click does. Layers are still renamed in the layers panel.",
+        ]),
         .init(date: "29 September 2026", title: "Double-click to rename", changes: [
             "Double-clicking a layer in the layers panel renames it, as in Figma.",
         ]),
