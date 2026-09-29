@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Sharp text in scaled frames", changes: [
+            "Text inside a frame or group that is scaled up stays sharp, on the canvas and in exports. It was drawn at its own size and stretched, so a Figma frame scaled to 300% had soft words while its shapes stayed crisp.",
+        ]),
         .init(date: "29 September 2026", title: "Fill icons", changes: [
             "The Solid, Linear, Radial and Image choices for a fill are the designer's icons, with their names as tooltips, in the Fill section and wherever a colour or gradient is picked.",
             "Icons can draw some of their lines fainter, as the linear icon's dots fade across.",

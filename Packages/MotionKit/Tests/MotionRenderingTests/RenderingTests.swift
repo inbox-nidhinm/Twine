@@ -198,6 +198,40 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
         #expect(ink(rows: 0..<half) == 0)
     }
 
+    /// A text in a group scaled up is drawn at the size it shows, as sharp
+    /// as the same text set that much bigger. It used to be drawn at its own
+    /// size and stretched, so a frame scaled to 300% had soft words on the
+    /// canvas and in exports.
+    @Test func textInAScaledGroupStaysSharp() throws {
+        func soft(fontSize: Double, groupScale: Double) throws -> (soft: Int, ink: Int) {
+            let content = TextContent(text: "IIII", fontFamily: "SF Pro", fontWeight: 900, fontSize: fontSize, color: RGBA(1, 0, 0))
+            let size = TextLayout.size(of: content.text, style: TextStyle(content), width: nil)
+            var text = Layer(name: "T", content: .text(content), size: size, position: .zero)
+            text.transform.anchor = .zero
+            var group = Layer(name: "G", content: .group(GroupContent(children: [text])), size: size, position: Vec2(4, 4))
+            group.transform.anchor = .zero
+            group.transform.scale = Vec2(groupScale, groupScale)
+            let project = Project(composition: Composition(width: 128, height: 128, background: Background(isTransparent: true)),
+                                  layers: [group])
+            let renderer = try #require(OffscreenRenderer(pixelWidth: 128, pixelHeight: 128))
+            let image = try #require(renderer.image(of: evaluate(project, at: 0)))
+            var soft = 0, ink = 0
+            for y in 0..<128 {
+                for x in 0..<128 {
+                    let a = pixel(image, x, y).a
+                    if a > 128 { ink += 1 }
+                    if a > 30 && a < 225 { soft += 1 }
+                }
+            }
+            return (soft, ink)
+        }
+        let scaled = try soft(fontSize: 10, groupScale: 5)
+        let set = try soft(fontSize: 50, groupScale: 1)
+        #expect(scaled.ink > 200 && set.ink > 200, "both draw the words")
+        #expect(Double(scaled.soft) <= Double(set.soft) * 1.5 + 10,
+                "scaled: \(scaled.soft) soft pixels, set at size: \(set.soft)")
+    }
+
     @Test func spreadGrowsTheShadow() throws {
         func shadowed(spread: Double) throws -> Int {
             var layer = shape(fill: RGBA(1, 1, 1), at: Vec2(16, 16), size: Size2(32, 32))

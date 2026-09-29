@@ -86,6 +86,7 @@ public final class CoreAnimationRenderer: SceneRenderer {
                 nodes[resolved.id] = made
                 return made
             }()
+            if case .text = resolved.content { node.setTextZoom(Self.textZoom(of: resolved, in: scene, scale: contentsScale)) }
             node.update(resolved, media: media)
             seen.insert(resolved.id)
             children[resolved.parentID, default: []].append(node.container)
@@ -120,11 +121,29 @@ public final class CoreAnimationRenderer: SceneRenderer {
                 masks[resolved.id] = m
                 return m
             }()
+            if case .text = source.content { made.node.setTextZoom(Self.textZoom(of: source, in: scene, scale: contentsScale)) }
             made.update(source, mask: mask, bounds: node.container.bounds, media: media)
             if node.container.mask !== made.root { node.container.mask = made.root }
             masked.insert(resolved.id)
         }
         for id in masks.keys where !masked.contains(id) { masks[id] = nil }
+    }
+
+    /// How much bigger than its own size a text is drawn, through its own
+    /// scale and every group's and frame's around it, so its picture can be
+    /// drawn that much finer: a text in a frame scaled to 300% was drawn at
+    /// its own size and stretched, and came out soft on the canvas and in
+    /// exports. Rounded up in steps of about 41% (a half power of two) so a
+    /// Scale action draws the text again a handful of times rather than on
+    /// every frame, never below 1, and held so the picture stays within
+    /// `TextImage.maxSide` pixels.
+    static func textZoom(of layer: ResolvedLayer, in scene: ResolvedScene, scale: CGFloat) -> CGFloat {
+        guard let w = scene.worldTransform(of: layer.id) else { return 1 }
+        let stretch = max(hypot(w.a, w.b), hypot(w.c, w.d))
+        guard stretch.isFinite, stretch > 1.001 else { return 1 }
+        let stepped = pow(2, (log2(stretch) * 2).rounded(.up) / 2)
+        let side = max(layer.size.width, layer.size.height, 1)
+        return CGFloat(max(1, min(stepped, TextImage.maxSide / (side * max(Double(scale), 1)))))
     }
 
     /// Only touches the tree when the order actually changed.
@@ -258,6 +277,11 @@ final class Node {
     private var textLayers: [CALayer] = []
     private var textKeys: [TextImage.Key?] = [nil, nil]
     private var textImages: [TextImage?] = [nil, nil]
+    /// How much bigger than its own size the text shows (see
+    /// `CoreAnimationRenderer.textZoom`); its pictures are drawn that much
+    /// finer than `scale`.
+    private var textZoom: CGFloat = 1
+    private var textScale: CGFloat { scale * textZoom }
     /// A video layer's frame.
     private var mediaLayer: CALayer?
     /// While a text preset moves a text's letters, words or lines one by
@@ -290,6 +314,13 @@ final class Node {
         container.contentsScale = scale
         for p in paintLayers { p.setContentsScale(scale) }
         // Text is a picture drawn at a scale, so it is drawn again.
+        textKeys = [nil, nil]
+    }
+
+    func setTextZoom(_ zoom: CGFloat) {
+        guard zoom != textZoom else { return }
+        textZoom = zoom
+        last = nil
         textKeys = [nil, nil]
     }
 
@@ -541,7 +572,7 @@ final class Node {
     /// up with the rest exactly as the whole text would.
     private func updateUnits(_ text: ResolvedText, size: Size2) {
         let width = text.sizing == .fixedWidth ? size.width : nil
-        let key = TextImage.Key(text: text.text, style: text.style, color: text.color, width: width, scale: scale,
+        let key = TextImage.Key(text: text.text, style: text.style, color: text.color, width: width, scale: textScale,
                                 showsFill: text.showsFill, stroke: text.stroke)
         if unitImages.keys.first.map({ $0.text != key }) ?? false { unitImages = [:] }
         while unitLayers.count > text.units.count { unitLayers.removeLast().holder.removeFromSuperlayer() }
@@ -622,13 +653,13 @@ final class Node {
             }
             guard let string else { layer.isHidden = true; continue }
             layer.isHidden = false
-            let key = TextImage.Key(text: string, style: text.style, color: text.color, width: width, scale: scale,
+            let key = TextImage.Key(text: string, style: text.style, color: text.color, width: width, scale: textScale,
                                     showsFill: text.showsFill, stroke: text.stroke)
             if textKeys[i] != key {
                 textKeys[i] = key
                 textImages[i] = TextImage(key)
                 layer.contents = textImages[i]?.image
-                layer.contentsScale = scale
+                layer.contentsScale = textScale
             }
             guard let image = textImages[i] else { continue }
             let x: Double
@@ -780,7 +811,10 @@ private final class TextUnitLayer {
             holder.filters = unit.blur > 0 ? [Blur.filter(amount: unit.blur)] : nil
         }
         RevealLayers.apply(unit.reveal, size: size, clip: clip, content: content)
-        if (picture.contents as AnyObject?) !== image.image { picture.contents = image.image }
+        if (picture.contents as AnyObject?) !== image.image {
+            picture.contents = image.image
+            picture.contentsScale = image.scale
+        }
         // The picture covers the box and a margin all round it.
         picture.transform = CATransform3DIdentity
         picture.anchorPoint = CGPoint(x: 0.5, y: 0.5)

@@ -20,7 +20,13 @@ struct TextImage {
         var stroke: ResolvedTextStroke? = nil
     }
 
+    /// The longest side, in pixels, a text's picture is drawn to when it is
+    /// shown bigger than its size (see `CoreAnimationRenderer.textZoom`).
+    static let maxSide: Double = 8192
+
     let image: CGImage?
+    /// Pixels per point.
+    let scale: CGFloat
     /// The text's own box, without the margin; for one letter, word or
     /// line, its box with the margin all round.
     let box: Size2
@@ -35,6 +41,7 @@ struct TextImage {
     /// beside it, that reach into its box stay with their own unit, so none
     /// moves off with it.
     init(_ key: Key, unit: (box: Box, characters: NSRange)? = nil) {
+        scale = key.scale
         let set = TextLayout.layout(key.text, style: key.style, width: key.width)
         // Room for letters that reach past their box, and for a stroke round them.
         margin = ceil(max(key.style.fontSize, 1) * 0.5 + (key.stroke?.width ?? 0))
