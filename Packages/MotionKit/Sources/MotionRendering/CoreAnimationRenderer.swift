@@ -21,7 +21,10 @@ public final class CoreAnimationRenderer: SceneRenderer {
     /// Put it in a layer whose coordinates run downward (a flipped view, or a
     /// layer with `isGeometryFlipped`) and scale it with a transform to zoom.
     public let rootLayer = CALayer()
-    private let backgroundLayer = CALayer()
+    /// The layers, over the composition's background as its own colour. The
+    /// background is drawn by this layer rather than by one beside it, so a
+    /// layer's blend mode has it to blend with: a blend only sees what is
+    /// drawn in its own superlayer.
     private let contentLayer = CALayer()
     private var nodes: [UUID: Node] = [:]
     /// Each masked layer's mask, by the masked layer's id. Kept per masked
@@ -54,12 +57,11 @@ public final class CoreAnimationRenderer: SceneRenderer {
     }
 
     public init() {
-        for layer in [rootLayer, backgroundLayer, contentLayer] {
+        for layer in [rootLayer, contentLayer] {
             layer.anchorPoint = .zero
             layer.actions = Node.noActions
         }
         rootLayer.masksToBounds = true
-        rootLayer.addSublayer(backgroundLayer)
         rootLayer.addSublayer(contentLayer)
     }
 
@@ -71,10 +73,9 @@ public final class CoreAnimationRenderer: SceneRenderer {
         let bounds = CGRect(origin: .zero, size: scene.size.cg)
         if rootLayer.bounds != bounds {
             rootLayer.bounds = bounds
-            backgroundLayer.frame = bounds
             contentLayer.frame = bounds
         }
-        backgroundLayer.backgroundColor = scene.background?.cgColor
+        contentLayer.backgroundColor = scene.background?.cgColor
 
         var seen = Set<UUID>()
         var children: [UUID?: [CALayer]] = [:]

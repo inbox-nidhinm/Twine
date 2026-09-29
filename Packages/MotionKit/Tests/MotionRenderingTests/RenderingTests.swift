@@ -394,6 +394,29 @@ private enum BlendMaths {
         }
         #expect(off.isEmpty, "\(off.joined(separator: "; "))")
     }
+
+    /// With nothing behind but the composition's background, a layer blends
+    /// with the background, as in Figma: Overlay or Screen over white is
+    /// white. The background once sat beside the layers rather than under
+    /// them, and on screen every mode then drew the layer as Normal.
+    @Test func blendModesBlendWithTheBackground() throws {
+        let ground = RGBA(0.2, 0.4, 0.8), top = RGBA(0.8, 0.6, 0.2)
+        var off: [String] = []
+        for mode in BlendMode.allCases where mode != .normal {
+            var over = shape(fill: top, at: Vec2(16, 16), size: Size2(32, 32))
+            over.blendMode = mode
+            let project = Project(composition: Composition(width: 64, height: 64, background: Background(color: ground)),
+                                  layers: [over])
+            let p = pixel(try render(project), 32, 32)
+            let want = BlendMaths.blend(mode, (ground.r, ground.g, ground.b), (top.r, top.g, top.b))
+            let got = (Double(p.r) / 255, Double(p.g) / 255, Double(p.b) / 255)
+            let error = max(abs(got.0 - want.0), abs(got.1 - want.1), abs(got.2 - want.2))
+            if error > (mode == .softLight ? 0.06 : 0.03) {
+                off.append("\(mode.rawValue): got \(p.r),\(p.g),\(p.b) want \(Int(want.0 * 255)),\(Int(want.1 * 255)),\(Int(want.2 * 255))")
+            }
+        }
+        #expect(off.isEmpty, "\(off.joined(separator: "; "))")
+    }
 }
 
 @Suite(.serialized) struct ShadowRenderingTests {

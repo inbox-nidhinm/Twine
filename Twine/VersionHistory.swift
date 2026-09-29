@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Blend modes see the background", changes: [
+            "Blend modes now blend with the composition's background, as in Figma. Before, a layer over nothing but the background drew as Normal whatever its mode, on the canvas and in exports, so Overlay seemed to do nothing. Now Overlay or Screen over a white background turns white, and Multiply over it keeps the layer's own colour.",
+        ]),
         .init(date: "29 September 2026", title: "Onboarding", changes: [
             "The first time Twine opens, a card introduces it in three pages, as Flip's does: what Twine is, where it keeps your projects, and five things it does. The pages turn like the leaves of a book.",
             "The second page chooses the folder Twine keeps projects in. Projects already made stay where they are.",
