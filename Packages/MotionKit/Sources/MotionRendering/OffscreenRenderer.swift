@@ -1,4 +1,5 @@
 import Foundation
+import Accelerate
 import QuartzCore
 import Metal
 import CoreGraphics
@@ -69,11 +70,9 @@ public final class OffscreenRenderer {
     /// Draws `scene` scaled to fill the output and returns the pixels, with
     /// alpha kept where the background is transparent.
     public func image(of scene: ResolvedScene) -> CGImage? {
-        draw(scene)
         let bytesPerRow = pixelWidth * 4
         var bytes = [UInt8](repeating: 0, count: bytesPerRow * pixelHeight)
-        texture.getBytes(&bytes, bytesPerRow: bytesPerRow,
-                         from: MTLRegionMake2D(0, 0, pixelWidth, pixelHeight), mipmapLevel: 0)
+        bytes.withUnsafeMutableBytes { frame(of: scene, into: $0.baseAddress!, bytesPerRow: bytesPerRow) }
         guard let provider = CGDataProvider(data: Data(bytes) as CFData) else { return nil }
         return CGImage(width: pixelWidth, height: pixelHeight, bitsPerComponent: 8, bitsPerPixel: 32,
                        bytesPerRow: bytesPerRow, space: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -89,12 +88,42 @@ public final class OffscreenRenderer {
         precondition(CVPixelBufferGetWidth(buffer) == pixelWidth && CVPixelBufferGetHeight(buffer) == pixelHeight
                      && CVPixelBufferGetPixelFormatType(buffer) == kCVPixelFormatType_32BGRA,
                      "the pixel buffer must match the renderer")
-        draw(scene)
         CVPixelBufferLockBaseAddress(buffer, [])
         defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
         guard let base = CVPixelBufferGetBaseAddress(buffer) else { return }
-        texture.getBytes(base, bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
-                         from: MTLRegionMake2D(0, 0, pixelWidth, pixelHeight), mipmapLevel: 0)
+        frame(of: scene, into: base, bytesPerRow: CVPixelBufferGetBytesPerRow(buffer))
+    }
+
+    /// Draws `scene` and copies its pixels to `base`. With motion blur worked
+    /// out exactly, it draws the scene at every moment across the shutter
+    /// and averages them in full precision, rounding once at the end: Core
+    /// Animation's own copies are each rounded to a whole step of 255 first,
+    /// which added a light card up to white.
+    private func frame(of scene: ResolvedScene, into base: UnsafeMutableRawPointer, bytesPerRow: Int) {
+        let region = MTLRegionMake2D(0, 0, pixelWidth, pixelHeight)
+        guard let moments = scene.shutterScenes else {
+            draw(scene)
+            texture.getBytes(base, bytesPerRow: bytesPerRow, from: region, mipmapLevel: 0)
+            return
+        }
+        let rowBytes = pixelWidth * 4, length = rowBytes * pixelHeight
+        var pixels = [UInt8](repeating: 0, count: length)
+        var values = [Float](repeating: 0, count: length)
+        var sum = [Float](repeating: 0, count: length)
+        for moment in moments {
+            draw(moment)
+            texture.getBytes(&pixels, bytesPerRow: rowBytes, from: region, mipmapLevel: 0)
+            vDSP_vfltu8(pixels, 1, &values, 1, vDSP_Length(length))
+            vDSP_vadd(sum, 1, values, 1, &sum, 1, vDSP_Length(length))
+        }
+        var share = 1 / Float(moments.count)
+        vDSP_vsmul(sum, 1, &share, &sum, 1, vDSP_Length(length))
+        vDSP_vfixru8(sum, 1, &pixels, 1, vDSP_Length(length))
+        pixels.withUnsafeBytes { from in
+            for row in 0..<pixelHeight {
+                (base + row * bytesPerRow).copyMemory(from: from.baseAddress! + row * rowBytes, byteCount: rowBytes)
+            }
+        }
     }
 
     private func draw(_ scene: ResolvedScene) {

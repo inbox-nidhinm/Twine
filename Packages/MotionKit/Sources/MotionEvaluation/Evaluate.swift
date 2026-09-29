@@ -15,18 +15,28 @@ import MotionModel
 /// scene's `masks` instead, whatever is soloed, so a mask keeps working.
 ///
 /// A layer moved by an action with motion blur on carries `motion`: where
-/// to draw its `motionSamples` copies across the shutter.
+/// to draw it across the shutter, at `motionBlur`'s quality.
 public func evaluate(_ project: Project, at time: Double,
-                     motionSamples: Int = MotionBlurSamples.preview) -> ResolvedScene {
+                     motionBlur quality: MotionBlurQuality = .preview) -> ResolvedScene {
     scene(of: project, at: time, tracks: ActionTracks(project.actions),
-          blur: MotionContext(samples: motionSamples, frame: project.composition.frameRate.frameDuration))
+          blur: MotionContext(samples: quality.samples, frame: project.composition.frameRate.frameDuration,
+                              exact: quality == .export))
 }
 
-/// What motion blur needs to know: how many copies, and how long a frame is,
-/// which the shutter is a share of.
+/// What motion blur needs to know: how many copies, how long a frame is,
+/// which the shutter is a share of, and whether each moment is wanted
+/// exactly.
 struct MotionContext {
     let samples: Int
     let frame: Double
+    let exact: Bool
+
+    /// `spread` as asked for: the step and copies, or when steady and
+    /// wanted exactly, every moment worked out by `placed`.
+    func finish(_ spread: MotionSpread, first: Double, shutter: Double, _ placed: (Double) -> Projective) -> MotionSpread {
+        guard exact, case .spread = spread else { return spread }
+        return .exact((0..<samples).map { placed(first + shutter * Double($0) / Double(samples - 1)) })
+    }
 }
 
 /// The composition as designed, with no actions applied: what Design mode
@@ -179,8 +189,9 @@ private func motion(of layer: Layer, _ resolved: ResolvedLayer, tracks: ActionTr
         }
         return moved.projection
     }
-    return MotionSpread(first: placed(at: first), next: placed(at: first + shutter / Double(blur.samples - 1)),
-                        last: placed(at: first + shutter), count: blur.samples, size: resolved.size)
+    let spread = MotionSpread(first: placed(at: first), next: placed(at: first + shutter / Double(blur.samples - 1)),
+                              last: placed(at: first + shutter), count: blur.samples, size: resolved.size)
+    return blur.finish(spread, first: first, shutter: shutter, placed(at:))
 }
 
 private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures: [UUID: Size2],
@@ -320,10 +331,17 @@ private func units(of text: String, style: TextStyle, width: Double?, _ animatio
             let from = animation.states(count: spans.count, at: first)
             let next = animation.states(count: spans.count, at: first + shutter / Double(blur.samples - 1))
             let last = animation.states(count: spans.count, at: first + shutter)
+            let moments = blur.exact
+                ? (0..<blur.samples).map { animation.states(count: spans.count, at: first + shutter * Double($0) / Double(blur.samples - 1)) }
+                : []
             for i in units.indices {
-                units[i].motion = MotionSpread(first: placed(spans[i], from[i]), next: placed(spans[i], next[i]),
-                                               last: placed(spans[i], last[i]), count: blur.samples,
-                                               size: Size2(spans[i].box.width, spans[i].box.height))
+                let spread = MotionSpread(first: placed(spans[i], from[i]), next: placed(spans[i], next[i]),
+                                          last: placed(spans[i], last[i]), count: blur.samples,
+                                          size: Size2(spans[i].box.width, spans[i].box.height))
+                units[i].motion = blur.finish(spread, first: first, shutter: shutter) { t in
+                    let k = Int(((t - first) / shutter * Double(blur.samples - 1)).rounded())
+                    return placed(spans[i], moments[min(max(k, 0), moments.count - 1)][i])
+                }
             }
         }
     }

@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Exact motion blur in exports", changes: [
+            "In exports, a light layer no longer turns white while it blurs. Exports draw each moment across the shutter in full and average them exactly, so groups, masks and blend modes inside a blurring layer look right too.",
+            "Frames with motion blur take longer to export.",
+        ]),
         .init(date: "29 September 2026", title: "Steadier motion blur", changes: [
             "A layer with motion blur no longer flashes somewhere else for a frame where its motion jumps, as when a Move starts from a From of its own, or where it turns out of edge-on. Those frames are drawn sharp.",
             "Once its blur ends, a layer is drawn exactly as it was before it blurred.",

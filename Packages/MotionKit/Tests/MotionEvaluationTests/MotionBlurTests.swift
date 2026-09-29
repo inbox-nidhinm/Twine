@@ -29,14 +29,19 @@ private func project(_ layers: [Layer], _ actions: [Action]) -> Project {
 
     @Test func aBlurredMoveSpreadsAcrossItsShutter() throws {
         let layer = square()
-        let scene = evaluate(project([layer], [move(layer, blur: 0.5)]), at: 0.5, motionSamples: 6)
+        let scene = evaluate(project([layer], [move(layer, blur: 0.5)]), at: 0.5)
         let resolved = try #require(scene.layer(layer.id))
         guard case .spread(let start, let step, let count) = resolved.motion else { Issue.record("no spread"); return }
         // Half a frame open, centred on the moment: 0.475 s to 0.525 s, so
-        // the first copy is at x 47.5 and each next one a fifth of 5 px on.
-        #expect(count == 6)
+        // the first copy is at x 47.5 and each next one a seventh of 5 px on.
+        #expect(count == 8)
         #expect(near(start.tx, 47.5) && near(start.ty, 0))
-        #expect(near(step.tx, 1) && near(step.ty, 0) && near(step.a, 1) && near(step.d, 1))
+        #expect(near(step.tx, 5.0 / 7) && near(step.ty, 0) && near(step.a, 1) && near(step.d, 1))
+        // An export works out each of its sixteen moments exactly, from
+        // 0.475 s to 0.525 s.
+        guard case .exact(let moments) = evaluate(project([layer], [move(layer, blur: 0.5)]), at: 0.5, motionBlur: .export)
+            .layer(layer.id)?.motion else { Issue.record("not exact"); return }
+        #expect(moments.count == 16 && near(moments[0].tx, 47.5) && near(moments[15].tx, 52.5) && near(moments[5].tx, 49.1666666667))
         // The layer itself is still where it is at the moment.
         #expect(near(resolved.position.x, 50))
     }
@@ -88,7 +93,7 @@ private func project(_ layers: [Layer], _ actions: [Action]) -> Project {
         let layer = square()
         let turn = Action(target: layer.id, start: 0, duration: 1, easing: .linear,
                           spec: .rotate(RotateAction(mode: .to, end: 90)))
-        let scene = evaluate(project([layer], [move(layer, blur: 0.5), turn]), at: 0.5, motionSamples: 6)
+        let scene = evaluate(project([layer], [move(layer, blur: 0.5), turn]), at: 0.5)
         guard case .spread(let start, let step, _) = scene.layer(layer.id)?.motion else { Issue.record("no spread"); return }
         // The first copy is turned as the layer is at 0.5 s (45°), not at
         // 0.475 s, and the steps only move it.

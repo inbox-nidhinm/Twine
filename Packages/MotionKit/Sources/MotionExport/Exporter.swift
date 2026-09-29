@@ -114,7 +114,7 @@ public enum Exporter {
         guard let renderer = OffscreenRenderer(pixelWidth: width, pixelHeight: height) else { throw ExportError.noGPU }
         renderer.media = library
         let snapped = project.composition.frameRate.snapped(time)
-        guard let image = renderer.image(of: evaluate(project, at: snapped, motionSamples: MotionBlurSamples.export)),
+        guard let image = renderer.image(of: evaluate(project, at: snapped, motionBlur: .export)),
               let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
         else { throw ExportError.failed("The frame couldn't be drawn.") }
         CGImageDestinationAddImage(destination, image, nil)
@@ -202,7 +202,7 @@ public enum Exporter {
                 guard let pool = adaptor.pixelBufferPool,
                       CVPixelBufferPoolCreatePixelBuffer(nil, pool, &made) == kCVReturnSuccess, let buffer = made
                 else { throw ExportError.failed("There wasn't enough memory for the next frame.") }
-                renderer.render(evaluate(project, at: timing.time(ofFrame: frame), motionSamples: MotionBlurSamples.export), into: buffer)
+                renderer.render(evaluate(project, at: timing.time(ofFrame: frame), motionBlur: .export), into: buffer)
                 if settings.format.keepsTransparency { unpremultiply(buffer) }
                 describe(buffer)
                 guard adaptor.append(buffer, withPresentationTime: timing.presentationTime(ofFrame: frame)) else {

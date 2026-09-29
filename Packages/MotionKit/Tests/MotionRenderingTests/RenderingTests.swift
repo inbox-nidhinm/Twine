@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import CoreGraphics
+import CoreVideo
 import MotionModel
 import MotionEvaluation
 @testable import MotionRendering
@@ -102,7 +103,7 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
         let blurred = Project(composition: composition, layers: [square], actions: [slide])
         let renderer = try #require(OffscreenRenderer(pixelWidth: 64, pixelHeight: 64))
         let still = try #require(renderer.image(of: evaluate(sharp, at: 0.5)))
-        let smear = try #require(renderer.image(of: evaluate(blurred, at: 0.5, motionSamples: MotionBlurSamples.export)))
+        let smear = try #require(renderer.image(of: evaluate(blurred, at: 0.5, motionBlur: .export)))
         // Sharp, the square covers x 20 to 36 wholly and nothing past it.
         #expect(pixel(still, 12, 8).a == 0 && pixel(still, 28, 8).a > 250 && pixel(still, 40, 8).a == 0)
         // Blurred, its copies run from x 10 to 46, averaged: faint at the
@@ -120,8 +121,62 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
         // it: four fifths red at x 26 leaves a fifth of the white.
         var onWhite = blurred
         onWhite.composition.background = Background(color: .white)
-        let over = try #require(renderer.image(of: evaluate(onWhite, at: 0.5, motionSamples: MotionBlurSamples.export)))
+        let over = try #require(renderer.image(of: evaluate(onWhite, at: 0.5, motionBlur: .export)))
         #expect(pixel(over, 26, 8).r > 245 && pixel(over, 26, 8).g > 25 && pixel(over, 26, 8).g < 80, "\(pixel(over, 26, 8))")
+    }
+
+    @Test func motionBlurKeepsAColourWhereEveryCopyCovers() throws {
+        // A light card moving slowly: where every moment covers it, the
+        // average is the card's own colour. Drawn as 24 copies at a 24th of
+        // their strength, each was rounded before they were added, and an
+        // off-white of 247 added up to white in exports. Exports now average
+        // whole moments exactly; the canvas's eight copies, off screen, are
+        // near enough.
+        for shade in [247.0, 204, 128, 30] {
+            let v = shade / 255
+            let card = shape(fill: RGBA(v, v * 0.98, v * 0.95), at: Vec2(8, 8), size: Size2(48, 48))
+            var drift = Action(target: card.id, start: 0, duration: 10, easing: .linear,
+                               spec: .move(MoveAction(mode: .by, end: Vec2(4, 0))))
+            drift.motionBlur = 1
+            let composition = Composition(width: 64, height: 64, frameRate: FrameRate(frames: 10),
+                                          background: Background(color: RGBA(0.5, 0.5, 0.5)))
+            let project = Project(composition: composition, layers: [card], actions: [drift])
+            for (quality, slack) in [(MotionBlurQuality.export, 1), (.preview, 5)] {
+                let image = try #require(OffscreenRenderer(pixelWidth: 64, pixelHeight: 64)?
+                    .image(of: evaluate(project, at: 5, motionBlur: quality)))
+                let got = pixel(image, 32, 32)
+                let want = (r: Int(shade.rounded()), g: Int((shade * 0.98).rounded()), b: Int((shade * 0.95).rounded()))
+                #expect(abs(got.r - want.r) <= slack && abs(got.g - want.g) <= slack && abs(got.b - want.b) <= slack,
+                        "\(shade) at \(quality) came out \(got)")
+            }
+        }
+    }
+
+    @Test func aMovieFrameWithMotionBlurMatchesTheStill() throws {
+        let card = shape(fill: RGBA(0.97, 0.96, 0.95), at: Vec2(8, 8), size: Size2(30, 30))
+        var slide = Action(target: card.id, start: 0, duration: 1, easing: .linear,
+                           spec: .move(MoveAction(mode: .by, end: Vec2(20, 0))))
+        slide.motionBlur = 1
+        let composition = Composition(width: 64, height: 64, frameRate: FrameRate(frames: 10),
+                                      background: Background(color: RGBA(0.2, 0.3, 0.4)))
+        let scene = evaluate(Project(composition: composition, layers: [card], actions: [slide]), at: 0.5, motionBlur: .export)
+        let renderer = try #require(OffscreenRenderer(pixelWidth: 64, pixelHeight: 64))
+        let still = try #require(renderer.image(of: scene))
+        var made: CVPixelBuffer?
+        CVPixelBufferCreate(nil, 64, 64, kCVPixelFormatType_32BGRA, nil, &made)
+        let buffer = try #require(made)
+        renderer.render(scene, into: buffer)
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+        let base = try #require(CVPixelBufferGetBaseAddress(buffer)).assumingMemoryBound(to: UInt8.self)
+        let row = CVPixelBufferGetBytesPerRow(buffer)
+        for (x, y) in [(10, 20), (24, 20), (40, 20), (50, 20)] {
+            let p = pixel(still, x, y)
+            let i = y * row + x * 4
+            // BGRA, opaque here, so premultiplied is straight.
+            #expect(abs(Int(base[i + 2]) - p.r) <= 1 && abs(Int(base[i + 1]) - p.g) <= 1 && abs(Int(base[i]) - p.b) <= 1,
+                    "at \(x): \(base[i + 2]),\(base[i + 1]),\(base[i]) against \(p)")
+        }
     }
 
     @Test func aLayerDrawsAsBeforeOnceItsMotionBlurEnds() throws {

@@ -281,9 +281,27 @@ public struct ResolvedTextStroke: Sendable, Hashable {
 /// layer's own space first. Across a shutter, a fraction of a frame, motion
 /// is steady enough that one step repeated follows it. Boxed, as `Warp` is,
 /// so a layer without it costs nothing to copy.
+///
+/// An export works each moment out exactly instead (`exact`), and draws the
+/// scene once for each (`ResolvedScene.shutterScenes`, with the layer `at`
+/// each), averaging them in full precision.
 public enum MotionSpread: Sendable, Equatable {
     case none
     indirect case spread(start: Projective, step: Projective, count: Int)
+    /// Where the layer is at each moment across the shutter, in order.
+    indirect case exact([Projective])
+    /// One of those moments: drawn once, here.
+    indirect case at(Projective)
+
+    /// Where to draw the layer in place of its own `projection`, if not there.
+    public var placed: Projective? {
+        switch self {
+        case .none: nil
+        case .spread(let start, _, _): start
+        case .exact(let samples): samples.first
+        case .at(let p): p
+        }
+    }
 
     /// From the first copy's place, the next one's and the last one's, for
     /// something `size` big: `.none` when they are all one place, when the
@@ -318,10 +336,47 @@ public enum MotionSpread: Sendable, Equatable {
     }
 }
 
-/// How many copies motion blur draws: a few while editing, many in exports.
-public enum MotionBlurSamples {
-    public static let preview = 8
-    public static let export = 24
+/// How motion blur is worked out: quickly for the canvas, as eight copies a
+/// steady step apart, or exactly for exports, as sixteen moments each drawn
+/// whole and averaged.
+public enum MotionBlurQuality: Sendable {
+    case preview, export
+
+    public var samples: Int { self == .preview ? 8 : 16 }
+}
+
+extension ResolvedScene {
+    /// The scene at each moment across the shutter, for an export to draw
+    /// and average, every layer and letter that blurs placed where it is
+    /// then: nil when nothing does (see `MotionSpread.exact`).
+    public var shutterScenes: [ResolvedScene]? {
+        func count(_ m: MotionSpread) -> Int {
+            if case .exact(let s) = m { return s.count }
+            return 0
+        }
+        var samples = 0
+        for layer in layers {
+            samples = max(samples, count(layer.motion))
+            if case .text(let t) = layer.content { for unit in t.units { samples = max(samples, count(unit.motion)) } }
+        }
+        guard samples > 1 else { return nil }
+        func moment(_ m: MotionSpread, _ k: Int) -> MotionSpread {
+            if case .exact(let s) = m { return .at(s[min(k, s.count - 1)]) }
+            return m
+        }
+        return (0..<samples).map { k in
+            let placed = layers.map { layer -> ResolvedLayer in
+                var l = layer
+                l.motion = moment(layer.motion, k)
+                if case .text(var t) = layer.content, !t.units.isEmpty {
+                    for i in t.units.indices { t.units[i].motion = moment(t.units[i].motion, k) }
+                    l.content = .text(t)
+                }
+                return l
+            }
+            return ResolvedScene(time: time, size: size, background: background, layers: placed, masks: masks)
+        }
+    }
 }
 
 public struct ResolvedTextUnit: Sendable, Equatable {

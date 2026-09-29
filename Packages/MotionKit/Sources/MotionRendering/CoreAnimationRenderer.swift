@@ -344,11 +344,7 @@ final class Node {
         // The anchor point stays at the layer's origin and the whole local
         // transform goes in the matrix, so a layer of zero width or height
         // (a line) still turns about its real anchor.
-        if case .spread(let start, _, _) = layer.motion {
-            container.transform = start.caTransform
-        } else {
-            container.transform = layer.projection.caTransform
-        }
+        container.transform = (layer.motion.placed ?? layer.projection).caTransform
         container.opacity = Float(layer.opacity)
         updateMotion(layer.motion, size: layer.size)
 
@@ -608,7 +604,7 @@ final class Node {
     /// picture, so a blend mode inside a group blends only within it while
     /// it smears.
     private func updateMotion(_ motion: MotionSpread, size: Size2) {
-        if motion == .none {
+        guard case .spread = motion else {
             guard let copies = motionCopies else { return }
             container.sublayers = copies.body.sublayers
             motionCopies = nil
@@ -802,13 +798,17 @@ enum RevealLayers {
     }
 }
 
-/// Motion blur's copies: a replicator drawing its body `count` times, each
-/// copy moved by `step` from the one before, in the body's own space (the
-/// replicator turns about its origin, which is the layer's). Each copy is
-/// drawn at a share of its strength and added to the rest, so together they
-/// are the average of the moments across the shutter, and the replicator
-/// draws them as one picture first, so they add to one another and not to
-/// what is behind. Still, it is one copy at full strength.
+/// Motion blur's copies, for the canvas: a replicator drawing its body
+/// `count` times, each copy moved by `step` from the one before, in the
+/// body's own space (the replicator turns about its origin, which is the
+/// layer's). Each copy is drawn at a share of its strength and added to the
+/// rest, so together they are the average of the moments across the
+/// shutter, and the replicator draws them as one picture first, so they add
+/// to one another and not to what is behind. Still, it is one copy at full
+/// strength. Each share is rounded to a whole step of 255 before the copies
+/// are added, which with many copies adds up (24 copies of an off-white of
+/// 247 came to white), so exports draw each moment whole and average in
+/// full precision instead (`OffscreenRenderer`, `MotionSpread.exact`).
 final class MotionCopies {
     let copies = CAReplicatorLayer()
     let body = CALayer()
@@ -887,11 +887,7 @@ private final class TextUnitLayer {
         let size = CGSize(width: unit.box.width, height: unit.box.height)
         holder.bounds = CGRect(origin: .zero, size: size)
         holder.position = .zero
-        if case .spread(let start, _, _) = unit.motion {
-            holder.transform = start.caTransform
-        } else {
-            holder.transform = unit.transform.caTransform
-        }
+        holder.transform = (unit.motion.placed ?? unit.transform).caTransform
         motion.apply(unit.motion, size: size)
         holder.opacity = Float(unit.opacity)
         if unit.blur != blur {
