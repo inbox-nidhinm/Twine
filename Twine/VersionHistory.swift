@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Smooth playback with many sounds", changes: [
+            "Playing a project with many sound clips no longer stutters. With a dozen clicks and sounds, asking the sound player where it was held up every frame for most of a second, so playback ran at two frames a second and the sound kept restarting. It now plays at a full 60, with the sound within a hundredth of a second of the playhead.",
+        ]),
         .init(date: "29 September 2026", title: "Switched-off actions show it", changes: [
             "An action switched off in the timeline always shows its crossed-out eye, not only under the pointer, as a hidden layer does in the layers panel. Clicking it switches the action back on.",
         ]),
