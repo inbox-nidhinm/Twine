@@ -390,22 +390,18 @@ struct AnchorPicker: View {
     let pick: (Double, Double) -> Void
 
     private let fractions: [Double] = [0, 0.5, 1]
-    private let cell: CGFloat = 16
+    /// Each point's clickable box. The columns sit at the tray's edges, so
+    /// the points are inset only by half a box and the tray's padding.
+    private let cell = CGSize(width: 20, height: 14)
 
     var body: some View {
-        ZStack {
-            // The box the points sit on, from the first point to the last.
-            Rectangle()
-                .strokeBorder(Theme.edge, lineWidth: 1)
-                .padding(cell / 2)
-            VStack(spacing: 0) {
-                ForEach(fractions, id: \.self) { fy in
-                    HStack(spacing: 0) {
-                        ForEach(fractions, id: \.self) { fx in
-                            AnchorDot(isChosen: chosen.map { $0.0 == fx && $0.1 == fy } ?? false) { pick(fx, fy) }
-                                .frame(maxWidth: .infinity)
-                                .frame(height: cell)
-                        }
+        VStack(spacing: 0) {
+            ForEach(fractions, id: \.self) { fy in
+                HStack(spacing: 0) {
+                    ForEach(fractions, id: \.self) { fx in
+                        if fx > 0 { Spacer(minLength: 0) }
+                        AnchorDot(isChosen: chosen.map { $0.0 == fx && $0.1 == fy } ?? false) { pick(fx, fy) }
+                            .frame(width: cell.width, height: cell.height)
                     }
                 }
             }

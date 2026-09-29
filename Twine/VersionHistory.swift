@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "A plainer anchor picker", changes: [
+            "The anchor picker beside rotation has no outline, just its nine points, with a little less room around them.",
+        ]),
         .init(date: "29 September 2026", title: "No renaming in the timeline", changes: [
             "Double-clicking a row or a bar in the timeline no longer renames the action. It selects it, as one click does. Layers are still renamed in the layers panel.",
         ]),
