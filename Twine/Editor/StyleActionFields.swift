@@ -1,5 +1,6 @@
 import SwiftUI
 import MotionModel
+import MotionEditing
 import MotionEvaluation
 import Theme
 
@@ -48,7 +49,7 @@ struct StyleValueFields: View {
             }
         }
         .help("The colour it starts from. Empty starts from the layer's fill when the action begins.")
-        sectionLabel("To")
+        sectionLabel("To", swap: swap)
         PaintControls(paint: c.end, allowsGradients: !isText, edit: callbacks("Colour", Self.color) { $0.end = $1 })
     }
 
@@ -69,7 +70,7 @@ struct StyleValueFields: View {
             PaintControls(paint: initial.paint, title: "Stroke",
                           edit: callbacks("Starting Stroke", Self.stroke) { a, p in a.initial?.paint = p })
         }
-        StackedRow(label: "To") {
+        StackedRow(label: "To", swap: swap) {
             UnitField(unit: "W", value: s.end.width, decimals: 1, suffix: "px", accepts: { $0 >= 0 }) { v in
                 editing("Stroke", Self.stroke { a, _ in a.end.width = v })
             }
@@ -97,7 +98,7 @@ struct StyleValueFields: View {
         }
         // No S and E letters: "100 %" only just fits beside the button.
         .help("How much of the stroke is drawn when it starts: from the first number to the second, along the path. Set both to 0% to draw it on from nothing.")
-        StackedRow(label: "To") {
+        StackedRow(label: "To", swap: swap) {
             UnitField(value: t.end.start * 100, decimals: 1, suffix: "%", accepts: Self.percent) { v in
                 editing("Trim", Self.trim { a, _ in a.end.start = v / 100 })
             }
@@ -119,7 +120,7 @@ struct StyleValueFields: View {
                 }
             }
             .help("The radius it starts at. Empty starts from the layer's corners when the action begins.")
-            StackedRow(label: "To", accessory: { linkButton(r) }) {
+            StackedRow(label: "To", swap: swap, accessory: { linkButton(r) }) {
                 UnitField(unit: "R", value: r.end.topLeft, accepts: { $0 >= 0 }) { v in
                     editing("Corner Radius", Self.corners { a, _ in a.end = CornerRadii(all: v) })
                 }
@@ -140,7 +141,7 @@ struct StyleValueFields: View {
                 }
             }
             .help("The corners it starts at, clockwise from the top left. Empty starts from the layer's corners.")
-            sectionLabel("To") { linkButton(r) }
+            sectionLabel("To", swap: swap) { linkButton(r) }
             cornerGrid { corner in
                 UnitField(icon: corner.icon, value: r.end[keyPath: corner.path], accepts: { $0 >= 0 }) { v in
                     editing("Corner Radius", Self.corners { a, _ in a.end[keyPath: corner.path] = v })
@@ -196,7 +197,7 @@ struct StyleValueFields: View {
             }
         }
         .help("The shadow it starts from. Empty starts from the layer's shadow when the action begins, or from none.")
-        sectionLabel("To")
+        sectionLabel("To", swap: swap)
         ShadowControls(shadow: s.end, edit: callbacks("Shadow", Self.shadow) { $0.end = $1 })
     }
 
@@ -217,7 +218,7 @@ struct StyleValueFields: View {
             }
         }
         .help("The blur it starts at. Empty starts from the layer's blur when the action begins, or from none.")
-        StackedRow(label: "To") {
+        StackedRow(label: "To", swap: swap) {
             UnitField(unit: "Blur", value: b.end, decimals: 1, accepts: { $0 >= 0 }) { v in
                 editing("Layer Blur", Self.layerBlur { a, _ in a.end = v })
             }
@@ -242,7 +243,7 @@ struct StyleValueFields: View {
         }
         // Blur in px, then blend in %: no room for their names beside the button.
         .help("The blur (px) and blend (%) it starts at. Empty starts from the layer's background blur, or from none.")
-        StackedRow(label: "To") {
+        StackedRow(label: "To", swap: swap) {
             UnitField(value: b.end.radius, decimals: 1, suffix: "px", accepts: { $0 >= 0 }) { v in
                 editing("Background Blur", Self.backgroundBlur { a, _ in a.end.radius = v })
             }
@@ -262,7 +263,7 @@ struct StyleValueFields: View {
             }
         }
         .help("The letter spacing it starts at. Empty starts from the text's own.")
-        StackedRow(label: "To") {
+        StackedRow(label: "To", swap: swap) {
             UnitField(value: v.end, decimals: 1, suffix: "px") { x in editing("Letter Spacing", Self.letterSpacing { a, _ in a.end = x }) }
         }
     }
@@ -275,7 +276,7 @@ struct StyleValueFields: View {
             }
         }
         .help("The line height it starts at, baseline to baseline. Empty starts from the text's own.")
-        StackedRow(label: "To") {
+        StackedRow(label: "To", swap: swap) {
             UnitField(value: v.end, decimals: 1, suffix: "px", accepts: { $0 > 0 }) { x in
                 editing("Line Height", Self.lineHeight { a, _ in a.end = x })
             }
@@ -290,7 +291,7 @@ struct StyleValueFields: View {
             }
         }
         .help("The number it counts from. Empty starts from the number in the text, or 0. Set, it shows from the start of the scene.")
-        StackedRow(label: "To") {
+        StackedRow(label: "To", swap: swap) {
             UnitField(value: c.to, decimals: 4) { x in editing("Counter", Self.counter { a, _ in a.to = x }) }
         }
         StackedRow(label: "Step") {
@@ -304,7 +305,7 @@ struct StyleValueFields: View {
     }
 
     @ViewBuilder private func changeText(_ c: ChangeTextAction) -> some View {
-        sectionLabel("To")
+        sectionLabel("To", swap: swap)
         WordsField(text: c.text) { new in editing("Change Text", Self.changeText { a, _ in a.text = new }) }
             .help("The new words. Option-Return starts a new line.")
         sectionLabel("Out")
@@ -366,7 +367,7 @@ struct StyleValueFields: View {
             })
         }
         .help("The slice it starts as. Empty starts from the ellipse's own.")
-        sectionLabel("To")
+        sectionLabel("To", swap: swap)
         HStack(spacing: 8) {
             UnitField(unit: "Start", value: v.end.start, decimals: 1, suffix: "°") { x in
                 editing("Arc", Self.arc { a, _ in
@@ -390,7 +391,7 @@ struct StyleValueFields: View {
     /// back to the shape it starts from.
     @ViewBuilder private func path(_ v: PathAction) -> some View {
         let count = v.end.subpaths.reduce(0) { $0 + $1.points.count }
-        StackedRow(label: "To", accessory: {
+        StackedRow(label: "To", swap: swap, accessory: {
             IconButton(icon: .close, help: "Put the end back to the shape it starts from") {
                 editing("Reset Path", Self.path { a, st in
                     if let from = a.initial ?? st?.path { a.end = from }
@@ -439,7 +440,7 @@ struct StyleValueFields: View {
             })
         }
         .help("The star it starts as. Empty starts from the star's own shape.")
-        sectionLabel("To")
+        sectionLabel("To", swap: swap)
         HStack(spacing: 8) {
             UnitField(unit: "Points", value: Double(v.end.points), accepts: { $0 >= 3 && $0 <= 60 }) { x in
                 editing("Star", Self.star { a, _ in a.end.points = Int(x.rounded()) })
@@ -483,7 +484,7 @@ struct StyleValueFields: View {
             }
         }
         .help("The level it starts at. Set it to 0% to fade a sound in from nothing, before the action begins.")
-        StackedRow(label: "To") {
+        StackedRow(label: "To", swap: swap) {
             UnitField(value: v.end * 100, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { x in
                 editing("Volume", Self.volume { a, _ in a.end = x / 100 })
             }
@@ -565,21 +566,32 @@ struct StyleValueFields: View {
 
     /// Keeps a row's fields the width of the rows with a button at the end.
 
-    private func sectionLabel(_ title: String) -> some View {
-        sectionLabel(title) { EmptyView() }
+    private func sectionLabel(_ title: String, swap: (() -> Void)? = nil) -> some View {
+        sectionLabel(title, swap: swap) { EmptyView() }
     }
 
     /// A name over controls below it, with any button for them in the
-    /// button column.
-    private func sectionLabel<Accessory: View>(_ title: String, @ViewBuilder accessory: () -> Accessory) -> some View {
+    /// button column. The swap button takes the column when nothing else
+    /// does, and otherwise sits just inside it.
+    private func sectionLabel<Accessory: View>(_ title: String, swap: (() -> Void)? = nil,
+                                               @ViewBuilder accessory: () -> Accessory) -> some View {
         HStack(spacing: 8) {
             Text(title)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
             Spacer(minLength: 0)
+            if let swap, Accessory.self != EmptyView.self { SwapButton(action: swap) }
         }
-        .rowButton { accessory() }
+        .rowButton {
+            if let swap, Accessory.self == EmptyView.self { SwapButton(action: swap) } else { accessory() }
+        }
         .frame(height: Theme.panelRow)
+    }
+
+    /// Swaps From and To, where the action has both.
+    private var swap: (() -> Void)? {
+        guard let inherited, ActionGeometry.swappingEnds(action, from: inherited) != nil else { return nil }
+        return { controller.swapActionEnds() }
     }
 
     /// A starting value too big for one field. Empty, it shows what it

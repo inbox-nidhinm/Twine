@@ -711,6 +711,15 @@ final class EditorController {
         perform(.batch([.updateActions(edited)], name: name))
     }
 
+    /// Swaps every selected action's From and To, so it plays backwards, as
+    /// one undo step. An empty From is filled in with what it inherits.
+    func swapActionEnds() {
+        editActions("Swap From and To") { a in
+            guard let state = inheritedState(for: a), let swapped = ActionGeometry.swappingEnds(a, from: state) else { return }
+            a = swapped
+        }
+    }
+
     /// The same, as one step of a drag or a slider, between `begin` and `end`.
     func updateActions(_ change: (inout Action) -> Void) {
         let edited = selectedActions.map { action -> Action in

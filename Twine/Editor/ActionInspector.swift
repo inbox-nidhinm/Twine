@@ -491,7 +491,7 @@ private struct ValueFields: View {
             }
         }
         .help("Where it starts. Empty starts from wherever the layer is when the action begins.")
-        StackedRow(label: m.mode == .to ? "To" : "By", menu: modeEntries(m.mode)) {
+        StackedRow(label: m.mode == .to ? "To" : "By", menu: modeEntries(m.mode), swap: swap) {
             UnitField(unit: "X", value: m.end.x) { v in editMove("Move") { m, _ in m.end.x = v } }
             UnitField(unit: "Y", value: m.end.y) { v in editMove("Move") { m, _ in m.end.y = v } }
         }
@@ -554,7 +554,7 @@ private struct ValueFields: View {
             }
         }
         .help("The scale it starts at. Empty starts from the layer's scale when the action begins.")
-        StackedRow(label: s.mode == .to ? "To" : "By", menu: modeEntries(s.mode), accessory: {
+        StackedRow(label: s.mode == .to ? "To" : "By", menu: modeEntries(s.mode), swap: swap, accessory: {
             IconButton(icon: s.isLinked ? .link : .unlink, help: s.isLinked ? "Unlink width and height" : "Link width and height") {
                 editScale("Link Scale") { s, _ in
                     s.isLinked.toggle()
@@ -591,7 +591,7 @@ private struct ValueFields: View {
             }
         }
         .help("The angle it starts at. Empty starts from the layer's angle when the action begins.")
-        StackedRow(label: r.mode == .to ? "To" : "By", menu: modeEntries(r.mode)) {
+        StackedRow(label: r.mode == .to ? "To" : "By", menu: modeEntries(r.mode), swap: swap) {
             UnitField(unit: "R", value: r.end, decimals: 1, suffix: "°") { v in editRotate("Rotate") { $0.end = v } }
         }
         .help(r.mode == .to ? "The angle it ends at. 720° spins twice." : "How far it turns. Negative turns anticlockwise.")
@@ -618,7 +618,7 @@ private struct ValueFields: View {
             }
         }
         .help("The slant it starts at. Empty starts from the layer's slant when the action begins.")
-        StackedRow(label: k.mode == .to ? "To" : "By", menu: modeEntries(k.mode)) {
+        StackedRow(label: k.mode == .to ? "To" : "By", menu: modeEntries(k.mode), swap: swap) {
             UnitField(unit: "X", value: k.end.x, decimals: 1, suffix: "°") { v in editSkew("Skew") { k, _ in k.end.x = v } }
             UnitField(unit: "Y", value: k.end.y, decimals: 1, suffix: "°") { v in editSkew("Skew") { k, _ in k.end.y = v } }
         }
@@ -646,7 +646,7 @@ private struct ValueFields: View {
             }
         }
         .help("The tilt it starts at. Empty starts from the layer's tilt when the action begins.")
-        StackedRow(label: t.mode == .to ? "To" : "By", menu: modeEntries(t.mode)) {
+        StackedRow(label: t.mode == .to ? "To" : "By", menu: modeEntries(t.mode), swap: swap) {
             UnitField(unit: "X", value: t.end.x, decimals: 1, suffix: "°") { v in editTilt("Tilt") { t, _ in t.end.x = v } }
             UnitField(unit: "Y", value: t.end.y, decimals: 1, suffix: "°") { v in editTilt("Tilt") { t, _ in t.end.y = v } }
         }
@@ -680,7 +680,7 @@ private struct ValueFields: View {
             }
         }
         .help("The opacity it starts at. Set it to fade a layer in from nothing, before the action begins.")
-        StackedRow(label: "To") {
+        StackedRow(label: "To", swap: swap) {
             UnitField(value: o.end * 100, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
                 editOpacity("Opacity") { $0.end = v / 100 }
             }
@@ -708,7 +708,7 @@ private struct ValueFields: View {
             }
         }
         .help("The size it starts at. Empty starts from the layer's size when the action begins.")
-        StackedRow(label: "To", accessory: {
+        StackedRow(label: "To", swap: swap, accessory: {
             IconButton(icon: r.isLinked ? .link : .unlink, help: r.isLinked ? "Unlink width and height" : "Keep width and height in proportion") {
                 editResize("Link Size") { r, _ in r.isLinked.toggle() }
             }
@@ -753,6 +753,12 @@ private struct ValueFields: View {
     }
 
     // MARK: Shared
+
+    /// Swaps From and To, where the action has both.
+    private var swap: (() -> Void)? {
+        guard let inherited, ActionGeometry.swappingEnds(action, from: inherited) != nil else { return nil }
+        return { controller.swapActionEnds() }
+    }
 
     /// To ends at a fixed value; By changes the starting value by an
     /// amount. Chosen from the end row's name.

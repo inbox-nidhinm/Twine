@@ -476,15 +476,19 @@ struct StackedRow<Accessory: View, Content: View>: View {
     let label: String
     /// When set, the name is a menu of these, such as To or By.
     var menu: [MenuEntry]? = nil
+    /// Swaps an action's From and To: a button in the button column level
+    /// with the name, between the two rows.
+    var swap: (() -> Void)? = nil
     /// A button that acts on the fields, such as emptying them or linking
     /// them, in the button column level with them.
     @ViewBuilder var accessory: () -> Accessory
     @ViewBuilder var content: () -> Content
 
-    init(label: String, menu: [MenuEntry]? = nil, @ViewBuilder accessory: @escaping () -> Accessory,
+    init(label: String, menu: [MenuEntry]? = nil, swap: (() -> Void)? = nil, @ViewBuilder accessory: @escaping () -> Accessory,
          @ViewBuilder content: @escaping () -> Content) {
         self.label = label
         self.menu = menu
+        self.swap = swap
         self.accessory = accessory
         self.content = content
     }
@@ -502,6 +506,7 @@ struct StackedRow<Accessory: View, Content: View>: View {
                 }
                 Spacer(minLength: 0)
             }
+            .rowButton { if let swap { SwapButton(action: swap) } }
             .frame(height: 14)
             if Accessory.self == EmptyView.self {
                 fields
@@ -518,8 +523,17 @@ struct StackedRow<Accessory: View, Content: View>: View {
 }
 
 extension StackedRow where Accessory == EmptyView {
-    init(label: String, menu: [MenuEntry]? = nil, @ViewBuilder content: @escaping () -> Content) {
-        self.init(label: label, menu: menu, accessory: { EmptyView() }, content: content)
+    init(label: String, menu: [MenuEntry]? = nil, swap: (() -> Void)? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.init(label: label, menu: menu, swap: swap, accessory: { EmptyView() }, content: content)
+    }
+}
+
+/// Swaps an action's From and To, so it plays backwards.
+struct SwapButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        IconButton(icon: .swap, help: "Swap From and To", action: action)
     }
 }
 

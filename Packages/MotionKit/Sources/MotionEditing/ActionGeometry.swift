@@ -110,4 +110,111 @@ public enum ActionGeometry {
         }
         return a
     }
+
+    /// The action played backwards: it starts where it used to end and ends
+    /// where it used to start, keeping its mode. An empty starting value is
+    /// read from `from`, what the action inherits, so it is always set
+    /// afterwards. A curved Move keeps its shape, run the other way. Nil for
+    /// an action with no start and end to swap (Show, Change Text, Play,
+    /// presets), or a start the layer does not have.
+    public static func swappingEnds(_ action: Action, from state: LayerState) -> Action? {
+        var a = action
+        switch action.spec {
+        case .move(var m):
+            let p = path(of: m, from: state.position)
+            m.initial = p.end
+            m.end = m.mode == .to ? p.start : p.start - p.end
+            // Each handle is an offset from its own end, so they trade places.
+            m.curve = m.curve.map { MotionCurve(startHandle: $0.endHandle, endHandle: $0.startHandle) }
+            a.spec = .move(m)
+        case .scale(var s):
+            let base = s.initial ?? state.scale
+            s.initial = s.mode == .to ? s.end : Vec2(base.x * s.end.x, base.y * s.end.y)
+            s = settingEnd(s, to: base, from: state.scale)
+            a.spec = .scale(s)
+        case .rotate(var r):
+            let base = r.initial ?? state.rotation
+            r.initial = r.mode == .to ? r.end : base + r.end
+            r = settingEnd(r, to: base, from: state.rotation)
+            a.spec = .rotate(r)
+        case .skew(var k):
+            let base = k.initial ?? state.skew
+            let final = k.mode == .to ? k.end : base + k.end
+            k.initial = final
+            k.end = k.mode == .to ? base : base - final
+            a.spec = .skew(k)
+        case .tilt(var t):
+            // The depth is the action's own, shared by both ends.
+            let depth = t.end.depth
+            let base = t.initial ?? state.tilt
+            let final = t.mode == .to ? t.end : Tilt(x: base.x + t.end.x, y: base.y + t.end.y, depth: depth)
+            t.initial = Tilt(x: final.x, y: final.y, depth: depth)
+            t.end = t.mode == .to ? Tilt(x: base.x, y: base.y, depth: depth)
+                : Tilt(x: base.x - final.x, y: base.y - final.y, depth: depth)
+            a.spec = .tilt(t)
+        case .opacity(var o):
+            (o.initial, o.end) = (o.end, o.initial ?? state.opacity)
+            a.spec = .opacity(o)
+        case .resize(var r):
+            (r.initial, r.end) = (r.end, r.initial ?? state.size)
+            a.spec = .resize(r)
+        case .color(var c):
+            guard let start = c.initial ?? state.fill else { return nil }
+            (c.initial, c.end) = (c.end, start)
+            a.spec = .color(c)
+        case .stroke(var k):
+            guard let start = k.initial ?? state.stroke else { return nil }
+            (k.initial, k.end) = (k.end, start)
+            a.spec = .stroke(k)
+        case .trim(var t):
+            guard let start = t.initial ?? state.trim else { return nil }
+            (t.initial, t.end) = (t.end, start)
+            a.spec = .trim(t)
+        case .cornerRadius(var r):
+            guard let start = r.initial ?? state.cornerRadii else { return nil }
+            (r.initial, r.end) = (r.end, start)
+            a.spec = .cornerRadius(r)
+        case .shadow(var s):
+            (s.initial, s.end) = (s.end, s.initial ?? state.shadow)
+            a.spec = .shadow(s)
+        case .layerBlur(var b):
+            (b.initial, b.end) = (b.end, b.initial ?? state.layerBlur)
+            a.spec = .layerBlur(b)
+        case .backgroundBlur(var b):
+            (b.initial, b.end) = (b.end, b.initial ?? state.backgroundBlur)
+            a.spec = .backgroundBlur(b)
+        case .letterSpacing(var v):
+            guard let start = v.initial ?? state.letterSpacing else { return nil }
+            (v.initial, v.end) = (v.end, start)
+            a.spec = .letterSpacing(v)
+        case .lineHeight(var v):
+            guard let start = v.initial ?? state.lineHeight else { return nil }
+            (v.initial, v.end) = (v.end, start)
+            a.spec = .lineHeight(v)
+        case .counter(var c):
+            // An empty From counts from the number in the text, or 0.
+            let start = c.from ?? NumberFormat.read(state.text?.text ?? "")?.value ?? 0
+            (c.from, c.to) = (c.to, start)
+            a.spec = .counter(c)
+        case .arc(var v):
+            guard let start = v.initial ?? state.arc else { return nil }
+            (v.initial, v.end) = (v.end, start)
+            a.spec = .arc(v)
+        case .star(var v):
+            guard let start = v.initial ?? state.star else { return nil }
+            (v.initial, v.end) = (v.end, start)
+            a.spec = .star(v)
+        case .path(var v):
+            guard let start = v.initial ?? state.path else { return nil }
+            (v.initial, v.end) = (v.end, start)
+            a.spec = .path(v)
+        case .volume(var v):
+            guard let start = v.initial ?? state.volume else { return nil }
+            (v.initial, v.end) = (v.end, start)
+            a.spec = .volume(v)
+        case .visibility, .changeText, .play, .preset:
+            return nil
+        }
+        return a
+    }
 }

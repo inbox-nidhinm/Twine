@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Swap From and To", changes: [
+            "An action's To row has a button that swaps its From and To, so it plays backwards: a Resize from 300 to 360 becomes one from 360 to 300. An empty From is filled in with where the layer would have started. It works for every action with a start and an end, and a curved Move runs its same path the other way.",
+        ]),
         .init(date: "29 September 2026", title: "Hover follows the shape", changes: [
             "The layer under the pointer is outlined in the selection's thin blue line, following its own shape (a circle's circle, a star's points, a frame's rounded corners), as in Figma. Text and groups still show their box.",
         ]),
