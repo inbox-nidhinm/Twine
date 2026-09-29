@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Switched-off actions show it", changes: [
+            "An action switched off in the timeline always shows its crossed-out eye, not only under the pointer, as a hidden layer does in the layers panel. Clicking it switches the action back on.",
+        ]),
         .init(date: "29 September 2026", title: "Duplicate in the timeline", changes: [
             "The timeline's right-click menu has Duplicate. The copy goes on the row just below its original, starting where the original ends, and is selected. Command-D in the timeline does the same.",
         ]),

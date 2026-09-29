@@ -333,9 +333,10 @@ final class TimelineTracksView: NSView {
         let dimmed = !action.isEnabled
         let primary = NSColor(selected ? Theme.textPrimary : dimmed ? Theme.textTertiary : Theme.textPrimary)
         let secondary = NSColor(selected ? Theme.textPrimary : Theme.textTertiary).withAlphaComponent(selected ? 0.75 : 1)
-        // Only under the pointer: an action switched off already shows as
-        // much in its dimmed label and bar.
-        let showsEye = hoveredLabel == index
+        // Under the pointer, and always, crossed out, on an action switched
+        // off, as a hidden layer's row shows in the layers panel, so what is
+        // off is never missed.
+        let showsEye = hoveredLabel == index || !action.isEnabled
         let room = gutter - 16 - (showsEye ? Self.eyeBox + 12 : 12)
         ctx.saveGState()
         ctx.clip(to: CGRect(x: 16, y: row.y, width: max(room, 0), height: TimelineRow.height))
@@ -456,7 +457,7 @@ final class TimelineTracksView: NSView {
         // The label: the eye switches the action off; a drag reorders.
         // Nothing here is renamed: a double-click is two clicks.
         if p.x < gutter {
-            if eyeRect(row).contains(p), hoveredLabel == index { return controller.toggleEnabled(action) }
+            if eyeRect(row).contains(p), hoveredLabel == index || !action.isEnabled { return controller.toggleEnabled(action) }
             pick(action, extending: extending, ranging: ranging)
             if !extending { drag = .reorder(action: action, began: false) }
             needsDisplay = true
