@@ -202,11 +202,15 @@ private struct PresetFields: View {
                 }, height: Theme.control)
             }
             .help("Which go first. Random shuffles them, the same way every time.")
-            LabeledRow(label: "Delay") {
-                UnitField(value: (settings.delay ?? settings.unit?.delay ?? 0) * 1000, decimals: 0, suffix: "ms",
-                          step: 1, accepts: { $0 >= 0 }) { v in edit("Delay") { $0.delay = v / 1000 } }
+            // A Typewriter spreads its letters over the whole bar, so its
+            // length sets the pace.
+            if !PresetRecipe.isInstant(kind) {
+                LabeledRow(label: "Delay") {
+                    UnitField(value: (settings.delay ?? settings.unit?.delay ?? 0) * 1000, decimals: 0, suffix: "ms",
+                              step: 1, accepts: { $0 >= 0 }) { v in edit("Delay") { $0.delay = v / 1000 } }
+                }
+                .help("The time between one starting and the next. The bar's length holds them all, so a long text on a short bar starts them closer together.")
             }
-            .help("The time between one starting and the next. The bar's length holds them all, so a long text on a short bar starts them closer together.")
         }
     }
 

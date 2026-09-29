@@ -102,7 +102,7 @@ public enum PresetRecipe {
         case .bounce: PresetAction(preset: kind, distance: 40)
         case .shake: PresetAction(preset: kind, distance: 12)
         case .wiggle: PresetAction(preset: kind, angle: 8)
-        case .fadeIn, .fadeOut, .fadeSoundIn, .fadeSoundOut: PresetAction(preset: kind)
+        case .fadeIn, .fadeOut, .fadeSoundIn, .fadeSoundOut, .typewriterIn, .typewriterOut: PresetAction(preset: kind)
         }
     }
 
@@ -129,6 +129,13 @@ public enum PresetRecipe {
     /// easing of each of its jolts, so the inspector offers none.
     public static func usesEasing(_ kind: PresetKind) -> Bool {
         seconds(kind).parts.contains { $0.easing == nil }
+    }
+
+    /// Whether every part happens at once: each letter of a text then
+    /// appears in its turn rather than playing across a share of the bar,
+    /// so the turns are spread over the whole bar (`TextAnimation`).
+    public static func isInstant(_ kind: PresetKind) -> Bool {
+        seconds(kind).parts.allSatisfy { $0.duration <= 0 }
     }
 
     /// The parts, as fractions of the bar.
@@ -187,6 +194,13 @@ public enum PresetRecipe {
         switch kind {
         case .fadeIn:
             return (0.4, [part(.opacity(from: 0, to: nil), for: 0.4)])
+        // Straight on or off, no fade: the timing is all in the letters'
+        // turns. An easing of its own, as there is nothing for the bar's to
+        // shape.
+        case .typewriterIn:
+            return (1, [part(.opacity(from: 0, to: nil), for: 0, easing: .default)])
+        case .typewriterOut:
+            return (1, [part(.opacity(from: nil, to: 0), for: 0, easing: .default)])
         case .fadeOut:
             return (0.4, [part(.opacity(from: nil, to: 0), for: 0.4)])
         case .slideIn:

@@ -101,6 +101,8 @@ extension PresetKind {
         case .blurSlideOut: .blurSlideIn
         case .blurScaleIn: .blurScaleOut
         case .blurScaleOut: .blurScaleIn
+        case .typewriterIn: .typewriterOut
+        case .typewriterOut: .typewriterIn
         case .pulse, .bounce, .shake, .wiggle: nil
         }
     }
@@ -135,7 +137,7 @@ public enum Presets {
         Preset(.bounce, "Bounce", .emphasis),
         Preset(.shake, "Shake", .emphasis),
         Preset(.wiggle, "Wiggle", .emphasis),
-        Preset(.fadeIn, "Typewriter", .text, text: PresetAction(preset: .fadeIn, unit: .letters, delay: 0.05), length: 1),
+        Preset(.typewriterIn, "Typewriter", .text, text: PresetAction(preset: .typewriterIn, unit: .letters), length: 1),
         Preset(.slideIn, "Letters Rise", .text,
                text: PresetAction(preset: .slideIn, direction: .bottom, unit: .letters, delay: 0.03), length: 0.8),
         Preset(.scalePop, "Letters Pop", .text, text: PresetAction(preset: .scalePop, unit: .letters, delay: 0.03), length: 0.8),
@@ -147,15 +149,21 @@ public enum Presets {
 
     /// A preset of exactly `kind`, named for which way it goes.
     public static func preset(_ kind: PresetKind) -> Preset {
-        let group = library.first { !$0.isText && ($0.kind == kind || $0.kind == kind.reversed) }?.group ?? .emphasis
+        let group = library.first { !$0.isText && ($0.kind == kind || $0.kind == kind.reversed) }?.group
+            ?? library.first { $0.kind == kind }?.group ?? .emphasis
         return Preset(kind, name(of: kind), group, isSound: kind.isSound)
     }
 
     /// What a bar of `kind` is called: the pair's name and which way, as
     /// Fade In or Fade Out, or the preset's own name.
     public static func name(of kind: PresetKind) -> String {
-        let base = library.first { !$0.isText && ($0.kind == kind || $0.kind == kind.reversed) }?.name ?? kind.rawValue
+        func pair(_ p: Preset) -> Bool { p.kind == kind || p.kind == kind.reversed }
+        // A pair only the Text group has goes by that preset's name, and
+        // its Out by the name with Out.
+        let textOnly = !library.contains { !$0.isText && pair($0) }
+        let base = library.first { !$0.isText && pair($0) }?.name ?? library.first(where: pair)?.name ?? kind.rawValue
         switch kind.entering {
+        case true? where textOnly: return base
         case true?: return base + " In"
         case false?: return base + " Out"
         case nil: return base
@@ -182,7 +190,7 @@ public enum Presets {
         case .pulse: [.scale]
         case .bounce, .shake: [.distance]
         case .wiggle: [.angle]
-        case .fadeIn, .fadeOut, .fadeSoundIn, .fadeSoundOut: []
+        case .fadeIn, .fadeOut, .fadeSoundIn, .fadeSoundOut, .typewriterIn, .typewriterOut: []
         }
     }
 
@@ -237,6 +245,27 @@ public enum Presets {
     public static func unitDistance(_ settings: PresetAction, of layer: Layer) -> Double? {
         guard settings.distance != nil, case .text(let text) = layer.content else { return settings.distance }
         return settings.unit == nil ? PresetRecipe.defaults(settings.preset).distance : text.fontSize.rounded()
+    }
+
+    /// Typewriter bars added before it had a kind of its own (29 September
+    /// 2026), which went on as a Fade In letter by letter 50 ms apart and so
+    /// faded each letter up, made Typewriters: the same bar, each letter now
+    /// appearing at once. Ones whose settings were changed since stay fades.
+    public static func withTypewriters(_ project: Project) -> Project {
+        let old = PresetAction(preset: .fadeIn, unit: .letters, delay: 0.05)
+        func isOld(_ action: Action) -> Bool {
+            if action.name == "Typewriter", case .preset(let p) = action.spec { return p == old }
+            return false
+        }
+        guard project.actions.contains(where: isOld) else { return project }
+        var project = project
+        for i in project.actions.indices where isOld(project.actions[i]) {
+            var settings = old
+            settings.preset = .typewriterIn
+            settings.delay = nil
+            project.actions[i].spec = .preset(settings)
+        }
+        return project
     }
 
     /// Whether a bar can be split into ordinary actions: not when it moves a

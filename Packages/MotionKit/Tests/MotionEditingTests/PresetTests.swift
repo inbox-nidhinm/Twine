@@ -141,7 +141,7 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
             let whole = ActionTracks([earlier, action])
             let state = whole.inheritedState(for: action, of: layer)
             let parts = try #require(Presets.split(action, of: layer, from: state, frameRate: .fps60))
-            #expect(parts.count > 1 || preset.kind == .fadeIn || preset.kind == .fadeOut, "\(preset.name)")
+            #expect(parts.count > 1 || [.fadeIn, .fadeOut, .typewriterIn, .typewriterOut].contains(preset.kind), "\(preset.name)")
             let split = ActionTracks([earlier] + parts)
             // A shake's and a wiggle's jolts are a few frames long, and split
             // actions land on frames, so between them they differ a little;
@@ -354,6 +354,55 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
         let early = Action(target: text.id, start: 1, duration: 0, spec: .visibility(VisibilityAction(isVisible: true)))
         #expect(ActionTracks([early, fadeIn]).textAnimation(of: text.id, at: 2) == nil)
         #expect(ActionTracks([fadeIn]).textAnimation(of: text.id, at: 2) != nil)
+    }
+
+    @Test func aTypewriterPutsEachLetterOnAtOnceInTurn() throws {
+        let text = Layer(name: "T", content: .text(TextContent(text: "abcde")), size: Size2(100, 40), position: .zero)
+        let preset = try #require(Presets.library.first { $0.name == "Typewriter" })
+        let action = Presets.action(preset, for: text, at: 1, frameRate: .fps60)
+        guard case .preset(var set) = action.spec else { Issue.record("not a preset"); return }
+        #expect(action.name == "Typewriter" && set.preset == .typewriterIn && action.duration == 1)
+        #expect(!PresetRecipe.usesEasing(.typewriterIn) && Presets.name(of: .typewriterIn) == "Typewriter"
+                && Presets.name(of: .typewriterOut) == "Typewriter Out")
+        let animation = ActionTracks([action]).textAnimation(of: text.id, at: 1)
+        // Five letters a quarter of a second apart, the last at the bar's end,
+        // each wholly on or wholly off: no fading.
+        func shown(at time: Double) -> [Double] { animation?.states(count: 5, at: time).map(\.opacity) ?? [] }
+        #expect(shown(at: 0.5) == [0, 0, 0, 0, 0])
+        #expect(shown(at: 1) == [1, 0, 0, 0, 0])
+        #expect(shown(at: 1.3) == [1, 1, 0, 0, 0])
+        #expect(shown(at: 1.76) == [1, 1, 1, 1, 0])
+        #expect(shown(at: 2) == [1, 1, 1, 1, 1])
+        // A delay set by hand makes no difference: the bar sets the pace.
+        set.delay = 0.01
+        var quick = action
+        quick.spec = .preset(set)
+        #expect(ActionTracks([quick]).textAnimation(of: text.id, at: 1)?.states(count: 5, at: 1.3).map(\.opacity)
+                == [1, 1, 0, 0, 0])
+        // Out takes them away the same way, one at a time.
+        set.preset = .typewriterOut
+        set.delay = nil
+        var out = action
+        out.spec = .preset(set)
+        #expect(ActionTracks([out]).textAnimation(of: text.id, at: 1)?.states(count: 5, at: 1.3).map(\.opacity)
+                == [0, 0, 1, 1, 1])
+    }
+
+    @Test func olderTypewritersBecomeTypewriters() {
+        let text = Layer(name: "T", content: .text(TextContent(text: "abc")), size: Size2(100, 40), position: .zero)
+        let old = PresetAction(preset: .fadeIn, unit: .letters, delay: 0.05)
+        var changed = old
+        changed.delay = 0.2
+        let project = Project(layers: [text], actions: [
+            Action(target: text.id, start: 0, duration: 1, name: "Typewriter", spec: .preset(old)),
+            Action(target: text.id, start: 1, duration: 1, name: "Typewriter", spec: .preset(changed)),
+            Action(target: text.id, start: 2, duration: 1, name: "Fade In", spec: .preset(old)),
+        ])
+        let upgraded = Presets.withTypewriters(project).actions.map { action -> PresetKind? in
+            if case .preset(let p) = action.spec { return p.preset }
+            return nil
+        }
+        #expect(upgraded == [.typewriterIn, .fadeIn, .fadeIn])
     }
 
     @Test func aDelayTooLongForTheTextIsShortened() {

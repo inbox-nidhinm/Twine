@@ -42,8 +42,9 @@ final class ProjectDocument: NSDocument {
               let data = fileWrapper.fileWrappers?[ProjectFormat.documentFileName]?.regularFileContents
         else { throw ProjectFileError.missingDocument }
         // A sound or video that lost its Play bar gets one back, so it shows
-        // in the timeline; the file changes only when next saved.
-        let project = MediaPlays.withPlayBars(try ProjectFormat.decode(data))
+        // in the timeline, and an older Typewriter types rather than fades;
+        // the file changes only when next saved.
+        let project = Presets.withTypewriters(MediaPlays.withPlayBars(try ProjectFormat.decode(data)))
         package = fileWrapper
         MainActor.assumeIsolated {
             if let store {

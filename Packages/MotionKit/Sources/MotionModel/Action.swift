@@ -645,6 +645,9 @@ public enum PresetKind: String, Codable, Sendable, CaseIterable {
     case blurScaleIn = "blur-scale-in", blurScaleOut = "blur-scale-out"
     case fadeSoundIn = "fade-sound-in", fadeSoundOut = "fade-sound-out"
     case pulse, bounce, shake, wiggle
+    /// Each letter (or word, or line) appears at once, in turn, spread
+    /// evenly across the bar; Out takes them away the same way.
+    case typewriterIn = "typewriter-in", typewriterOut = "typewriter-out"
 }
 
 extension PresetKind {
@@ -653,9 +656,11 @@ extension PresetKind {
     public var entering: Bool? {
         switch self {
         case .fadeIn, .slideIn, .scalePop, .rotateIn, .blurIn, .dropIn, .fadeSoundIn, .shrinkIn, .twistIn, .moveScaleIn,
-             .maskRevealIn, .maskCenterIn, .maskResizeIn, .maskSlideIn, .maskShrinkIn, .blurSlideIn, .blurScaleIn: true
+             .maskRevealIn, .maskCenterIn, .maskResizeIn, .maskSlideIn, .maskShrinkIn, .blurSlideIn, .blurScaleIn,
+             .typewriterIn: true
         case .fadeOut, .slideOut, .scaleOut, .rotateOut, .blurOut, .dropOut, .fadeSoundOut, .shrinkOut, .twistOut, .moveScaleOut,
-             .maskRevealOut, .maskCenterOut, .maskResizeOut, .maskSlideOut, .maskShrinkOut, .blurSlideOut, .blurScaleOut: false
+             .maskRevealOut, .maskCenterOut, .maskResizeOut, .maskSlideOut, .maskShrinkOut, .blurSlideOut, .blurScaleOut,
+             .typewriterOut: false
         case .pulse, .bounce, .shake, .wiggle: nil
         }
     }

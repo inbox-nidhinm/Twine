@@ -23,6 +23,11 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "A real typewriter", changes: [
+            "Typewriter puts each letter on at once, one after another, rather than fading them up. The letters are spread evenly across the bar, so its length sets how fast it types.",
+            "Typewriter has an Out, which takes the letters away one at a time.",
+            "Typewriters added before this type too, as long as their settings were not changed.",
+        ]),
         .init(date: "29 September 2026", title: "Centred numbers in fields", changes: [
             "Numbers and hex codes sit centred in their fields, as the words in menus do. They were a pixel low, most visibly on screens that are not Retina.",
         ]),

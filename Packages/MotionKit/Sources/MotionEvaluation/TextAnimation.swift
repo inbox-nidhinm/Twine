@@ -30,7 +30,9 @@ struct TextPreset: Sendable {
 /// last ends with it, each starting `delay` after the one before (in the
 /// preset's order) and running the preset in what is left. A delay too long
 /// for the text is shortened so every letter still takes a quarter of the
-/// bar.
+/// bar. A preset that happens at once (Typewriter) has no share to play in,
+/// so its letters take their turns evenly from the bar's start to its end,
+/// whatever the delay.
 public struct TextAnimation: Sendable {
     public let unit: TextUnit
     let preset: TextPreset
@@ -66,7 +68,10 @@ public struct TextAnimation: Sendable {
         let last = ranks.max() ?? 0
         var delay = max(preset.settings.delay ?? unit.delay, 0)
         var each = action.duration - last * delay
-        if last > 0, each < action.duration * 0.25 {
+        if PresetRecipe.isInstant(preset.settings.preset) {
+            delay = last > 0 ? action.duration / last : 0
+            each = 0
+        } else if last > 0, each < action.duration * 0.25 {
             each = action.duration * 0.25
             delay = (action.duration - each) / last
         }
