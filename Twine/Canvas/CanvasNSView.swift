@@ -307,15 +307,38 @@ final class CanvasNSView: NSView {
     /// would not follow the perspective).
     private func selectedShapeOutlines(in scene: ResolvedScene, skipping editing: UUID?) -> CGPath? {
         let path = CGMutablePath()
-        let o = origin
         for id in selection where id != editing {
-            guard let layer = scene.layer(id), case .shape(let shape) = layer.content, !isTilted(id, in: scene),
-                  let w = scene.worldTransform(of: id) else { continue }
-            let toView = CGAffineTransform(a: w.a * zoom, b: w.b * zoom, c: w.c * zoom, d: w.d * zoom,
-                                           tx: w.tx * zoom + o.x, ty: w.ty * zoom + o.y)
-            path.addPath(shape.path.cgPath, transform: toView)
+            guard let layer = scene.layer(id), case .shape(let shape) = layer.content,
+                  let outline = ownOutline(shape, of: id, in: scene) else { continue }
+            path.addPath(outline)
         }
         return path.isEmpty ? nil : path
+    }
+
+    /// A layer's outline under the pointer, as Figma draws it: a shape's or
+    /// a frame's own shape, anything else (text, groups, tilted layers) its
+    /// box.
+    private func hoverOutline(of id: UUID, in scene: ResolvedScene) -> CGPath? {
+        if let layer = scene.layer(id) {
+            if case .shape(let shape) = layer.content, let outline = ownOutline(shape, of: id, in: scene) { return outline }
+            if let frame = layer.frame, let outline = ownOutline(frame, of: id, in: scene) { return outline }
+        }
+        guard let corners = scene.worldCorners(of: id), corners.count > 1 else { return nil }
+        let path = CGMutablePath()
+        path.addLines(between: corners.map(compositionToView))
+        path.closeSubpath()
+        return path
+    }
+
+    /// A shape's path in view points, or nil when it is tilted.
+    private func ownOutline(_ shape: ResolvedShape, of id: UUID, in scene: ResolvedScene) -> CGPath? {
+        guard !isTilted(id, in: scene), let w = scene.worldTransform(of: id) else { return nil }
+        let o = origin
+        let toView = CGAffineTransform(a: w.a * zoom, b: w.b * zoom, c: w.c * zoom, d: w.d * zoom,
+                                       tx: w.tx * zoom + o.x, ty: w.ty * zoom + o.y)
+        let path = CGMutablePath()
+        path.addPath(shape.path.cgPath, transform: toView)
+        return path
     }
 
     func redrawOverlay() {
@@ -359,10 +382,9 @@ final class CanvasNSView: NSView {
 
         // A selected layer shows only its box: no wash under the pointer,
         // as the user asked.
-        var hover: [CGPoint]?
-        if let hovered, drag == nil, hovered != editingPoints, !selection.contains(hovered),
-           let corners = scene.worldCorners(of: hovered) {
-            hover = corners.map(compositionToView)
+        var hover: CGPath?
+        if let hovered, drag == nil, hovered != editingPoints, !selection.contains(hovered) {
+            hover = hoverOutline(of: hovered, in: scene)
         }
 
         // While typing, the box shows without handles: the letters are
@@ -375,7 +397,7 @@ final class CanvasNSView: NSView {
         // moved about its anchor.
         if isCropping { anchor = nil }
         overlay.update(outlines: outlines, union: union, handles: handles, anchor: anchor,
-                       hover: textSession == nil ? hover : nil, hoverIsSelected: hovered.map(selection.contains) ?? false,
+                       hover: textSession == nil ? hover : nil,
                        marquee: drag?.marqueeRect, motion: motionOverlay())
         overlay.updateShapes(selectedShapeOutlines(in: scene, skipping: editingPoints))
         let marks = snapMarks()

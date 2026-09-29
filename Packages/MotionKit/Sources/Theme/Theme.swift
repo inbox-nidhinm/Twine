@@ -59,11 +59,6 @@ public enum Theme {
     /// The playhead: its line down the timeline and the pill in the ruler
     /// that carries the time. Teal, so it never reads as a selection.
     public static let playhead = Color(red: 0x2B / 255, green: 0x88 / 255, blue: 0x85 / 255)
-    /// A layer under the pointer on the canvas: a white line on a dark edge
-    /// over a faint white wash. Black and white together show on artwork of
-    /// any colour, grey included, and never read as a selection.
-    public static let canvasHover = Color.white
-    public static let canvasHoverEdge = Color.black
     /// The stand-in shape that plays each preset in the preset picker: light,
     /// as a layer on the canvas would be, on the tile's raised grey.
     public static let previewShape = Color(white: 0.86)

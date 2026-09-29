@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Hover follows the shape", changes: [
+            "The layer under the pointer is outlined in the selection's thin blue line, following its own shape (a circle's circle, a star's points, a frame's rounded corners), as in Figma. Text and groups still show their box.",
+        ]),
         .init(date: "29 September 2026", title: "Shortcuts card", changes: [
             "The Keyboard Shortcuts card lists Duplicate project, full screen and Command-click to add or take away an action in the timeline.",
         ]),
