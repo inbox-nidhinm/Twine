@@ -146,6 +146,9 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
     public var warp: Warp = .none
     /// A clip of the layer's own box from a Mask preset, or `.none`.
     public var reveal: Reveal = .none
+    /// Motion blur: the layer drawn several times across the shutter and
+    /// averaged, or `.none`.
+    public var motion: MotionSpread = .none
     /// Degrees each way (see `Transform.skew`).
     public var skew: Vec2 { warp.skew }
     /// A turn in depth (see `Tilt`), which `transform` leaves out and
@@ -272,6 +275,36 @@ public struct ResolvedTextStroke: Sendable, Hashable {
 }
 
 /// One letter, word or line of a text, moved on its own by a text preset.
+/// How motion blur draws a layer: `count` copies averaged together, the
+/// first placed by `start` (from the layer's own space into its parent's, in
+/// place of its `projection`) and each next by `step` more, taken in the
+/// layer's own space first. Across a shutter, a fraction of a frame, motion
+/// is steady enough that one step repeated follows it. Boxed, as `Warp` is,
+/// so a layer without it costs nothing to copy.
+public enum MotionSpread: Sendable, Equatable {
+    case none
+    indirect case spread(start: Projective, step: Projective, count: Int)
+
+    /// From the first copy's place and the next one's, or `.none` when they
+    /// are the same place, or the first cannot be undone.
+    public init(first: Projective, next: Projective, count: Int) {
+        let same = abs(first.a - next.a) + abs(first.b - next.b) + abs(first.c - next.c) + abs(first.d - next.d)
+            + abs(first.tx - next.tx) + abs(first.ty - next.ty) + abs(first.px - next.px) + abs(first.py - next.py)
+            + abs(first.w - next.w) < 1e-9
+        guard count > 1, !same, let back = first.inverted else {
+            self = .none
+            return
+        }
+        self = .spread(start: first, step: next.then(back), count: count)
+    }
+}
+
+/// How many copies motion blur draws: a few while editing, many in exports.
+public enum MotionBlurSamples {
+    public static let preview = 8
+    public static let export = 24
+}
+
 public struct ResolvedTextUnit: Sendable, Equatable {
     /// Its characters, in UTF-16 units of the text.
     public var range: NSRange
@@ -285,6 +318,8 @@ public struct ResolvedTextUnit: Sendable, Equatable {
     public var blur: Double
     /// A clip of its own box, or `.none`.
     public var reveal: Reveal
+    /// Motion blur, as a layer's (`ResolvedLayer.motion`).
+    public var motion: MotionSpread = .none
 
     public init(range: NSRange, box: Box, transform: Projective, opacity: Double, blur: Double, reveal: Reveal) {
         self.range = range

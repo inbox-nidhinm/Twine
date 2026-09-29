@@ -57,6 +57,14 @@ enum Compositing {
     /// does not have it, in which case an inverted mask draws as a plain one.
     static func destinationOut() -> Any? { punch }
 
+    /// For a layer's `compositingFilter`: adds what it draws to what is
+    /// underneath (Linear Dodge), so copies each drawn at a share of their
+    /// strength sum to their average, as motion blur needs. Nil if the
+    /// system does not have it, in which case motion blur is left out.
+    static func add() -> Any? { plus }
+
+    nonisolated(unsafe) private static let plus: Any? = PrivateFilter.make("plusL")
+
     /// Made once: the filter never changes, and every inverted mask made
     /// its own on every update.
     nonisolated(unsafe) private static let punch: Any? = PrivateFilter.make("destOut")

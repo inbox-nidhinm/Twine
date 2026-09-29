@@ -13,17 +13,31 @@ import MotionModel
 /// a soloed group and the groups that contain a soloed layer. Audio layers draw
 /// nothing and are left out. Layers used as another layer's mask go in the
 /// scene's `masks` instead, whatever is soloed, so a mask keeps working.
-public func evaluate(_ project: Project, at time: Double) -> ResolvedScene {
-    scene(of: project, at: time, tracks: ActionTracks(project.actions))
+///
+/// A layer moved by an action with motion blur on carries `motion`: where
+/// to draw its `motionSamples` copies across the shutter.
+public func evaluate(_ project: Project, at time: Double,
+                     motionSamples: Int = MotionBlurSamples.preview) -> ResolvedScene {
+    scene(of: project, at: time, tracks: ActionTracks(project.actions),
+          blur: MotionContext(samples: motionSamples, frame: project.composition.frameRate.frameDuration))
+}
+
+/// What motion blur needs to know: how many copies, and how long a frame is,
+/// which the shutter is a share of.
+struct MotionContext {
+    let samples: Int
+    let frame: Double
 }
 
 /// The composition as designed, with no actions applied: what Design mode
 /// shows.
 public func evaluateDesign(_ project: Project) -> ResolvedScene {
-    scene(of: project, at: 0, tracks: ActionTracks([]))
+    scene(of: project, at: 0, tracks: ActionTracks([]), blur: nil)
 }
 
-private func scene(of project: Project, at time: Double, tracks: ActionTracks) -> ResolvedScene {
+private func scene(of project: Project, at time: Double, tracks: ActionTracks, blur: MotionContext?) -> ResolvedScene {
+    // Only worked out when some action has it, so a scene without costs one check.
+    let blur = blur.flatMap { $0.samples > 1 && tracks.hasMotionBlur ? $0 : nil }
     let all = project.allLayers
     let soloing = all.contains { $0.isSoloed }
     // A layer used as another's mask stops drawing on its own, and draws
@@ -48,8 +62,10 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks) -
             let state = tracks.state(of: layer, at: time)
             // Hidden by an action: the layer and everything inside it.
             guard state.isShown else { continue }
-            guard let resolved = resolve(layer, state: state, parent: parent, pictures: pictures,
-                                         animation: tracks.textAnimation(of: layer, at: time), time: time) else { continue }
+            guard var resolved = resolve(layer, state: state, parent: parent, pictures: pictures,
+                                         animation: tracks.textAnimation(of: layer, at: time), time: time,
+                                         blur: blur) else { continue }
+            if let blur { resolved.motion = motion(of: layer, resolved, tracks: tracks, at: time, blur) }
             if let mask = layer.mask { masked.append((out.count, mask)) }
             out.append(resolved)
             if layer.isGroup { walk(layer.children, parent: layer.id, soloedAbove: soloed) }
@@ -143,8 +159,32 @@ private struct WorldTransforms {
     }
 }
 
+/// Where motion blur draws `layer`'s copies at `time`: across the shutter of
+/// the actions with it on, with only the channels they drive spread and the
+/// rest held as they are at `time`, so a layer that also fades or turns by
+/// another action does so sharply.
+private func motion(of layer: Layer, _ resolved: ResolvedLayer, tracks: ActionTracks, at time: Double,
+                    _ blur: MotionContext) -> MotionSpread {
+    guard let (channels, shutter) = tracks.motionBlur(of: layer.id, at: time, frame: blur.frame) else { return .none }
+    let first = time - shutter / 2
+    func placed(at t: Double) -> Projective {
+        let state = tracks.state(of: layer, at: t)
+        var moved = resolved
+        if channels.contains(.position) { moved.position = state.position }
+        if channels.contains(.scale) { moved.scale = state.scale }
+        if channels.contains(.rotation) { moved.rotation = state.rotation }
+        if channels.contains(.skew) || channels.contains(.tilt) {
+            moved.warp = Warp(skew: channels.contains(.skew) ? state.warp.skew : resolved.skew,
+                              tilt: channels.contains(.tilt) ? state.warp.tilt : resolved.tilt)
+        }
+        return moved.projection
+    }
+    return MotionSpread(first: placed(at: first), next: placed(at: first + shutter / Double(blur.samples - 1)),
+                        count: blur.samples)
+}
+
 private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures: [UUID: Size2],
-                     animation: TextAnimation?, time: Double) -> ResolvedLayer? {
+                     animation: TextAnimation?, time: Double, blur: MotionContext? = nil) -> ResolvedLayer? {
     var size = state.size
     let content: ResolvedContent
     var clips = false
@@ -183,7 +223,9 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
             }
             drawn.stroke = ResolvedTextStroke(color: color, width: stroke.width, alignment: stroke.alignment, join: stroke.join)
         }
-        if let animation { drawn.units = units(of: shown.text, style: resolved.style, width: width, animation, at: time) }
+        if let animation {
+            drawn.units = units(of: shown.text, style: resolved.style, width: width, animation, at: time, blur: blur)
+        }
         content = .text(drawn)
     case .video(let video):
         content = .video(mediaID: video.mediaID, sourceTime: state.sourceTime ?? 0, fit: video.fit)
@@ -255,18 +297,35 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
 /// each placed from its own centre. Empty when every one is at rest, so a
 /// finished preset draws the text whole again.
 private func units(of text: String, style: TextStyle, width: Double?, _ animation: TextAnimation,
-                   at time: Double) -> [ResolvedTextUnit] {
+                   at time: Double, blur: MotionContext?) -> [ResolvedTextUnit] {
     let spans = TextSpans.spans(animation.unit, of: text, style: style, width: width)
     let states = animation.states(count: spans.count, at: time)
     guard states.contains(where: { $0 != TextAnimation.rest }) else { return [] }
-    return zip(spans, states).map { span, state in
+    func placed(_ span: TextSpan, _ state: LayerState) -> Projective {
         let centre = Vec2(span.box.width / 2, span.box.height / 2)
-        let transform = Projective.layer(position: span.box.center + state.position, anchor: centre,
-                                         scale: state.scale, rotation: state.rotation, skew: state.skew, tilt: state.tilt)
-        return ResolvedTextUnit(range: span.range, box: span.box, transform: transform,
-                                opacity: state.isShown ? min(max(state.opacity, 0), 1) : 0,
-                                blur: max(state.layerBlur, 0), reveal: state.reveal)
+        return Projective.layer(position: span.box.center + state.position, anchor: centre,
+                                scale: state.scale, rotation: state.rotation, skew: state.skew, tilt: state.tilt)
     }
+    var units = zip(spans, states).map { span, state in
+        ResolvedTextUnit(range: span.range, box: span.box, transform: placed(span, state),
+                         opacity: state.isShown ? min(max(state.opacity, 0), 1) : 0,
+                         blur: max(state.layerBlur, 0), reveal: state.reveal)
+    }
+    // Each letter blurs by its own motion, across the bar's shutter.
+    let action = animation.preset.action
+    if let blur, let amount = action.motionBlur, amount > 0 {
+        let shutter = amount * blur.frame
+        if action.start < time + shutter / 2, action.end > time - shutter / 2 {
+            let first = time - shutter / 2
+            let from = animation.states(count: spans.count, at: first)
+            let next = animation.states(count: spans.count, at: first + shutter / Double(blur.samples - 1))
+            for i in units.indices {
+                units[i].motion = MotionSpread(first: placed(spans[i], from[i]), next: placed(spans[i], next[i]),
+                                               count: blur.samples)
+            }
+        }
+    }
+    return units
 }
 
 /// The shape with its actions applied: the first fill's paint, the first

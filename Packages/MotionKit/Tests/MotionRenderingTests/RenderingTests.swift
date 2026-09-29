@@ -89,6 +89,41 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
         #expect(pixel(late, 4, 8).a == 0 && pixel(late, 56, 8).a > 250)
     }
 
+    @Test func motionBlurSmearsAMovingLayerAlongItsPath() throws {
+        // 2 fps, so a frame is half a second; a full shutter spreads the
+        // square over half a second of its 40 px a second: 20 px.
+        let square = shape(at: .zero, size: Size2(16, 16))
+        var slide = Action(target: square.id, start: 0, duration: 1, easing: .linear,
+                           spec: .move(MoveAction(mode: .to, end: Vec2(40, 0))))
+        let composition = Composition(width: 64, height: 64, frameRate: FrameRate(frames: 2),
+                                      background: Background(isTransparent: true))
+        let sharp = Project(composition: composition, layers: [square], actions: [slide])
+        slide.motionBlur = 1
+        let blurred = Project(composition: composition, layers: [square], actions: [slide])
+        let renderer = try #require(OffscreenRenderer(pixelWidth: 64, pixelHeight: 64))
+        let still = try #require(renderer.image(of: evaluate(sharp, at: 0.5)))
+        let smear = try #require(renderer.image(of: evaluate(blurred, at: 0.5, motionSamples: MotionBlurSamples.export)))
+        // Sharp, the square covers x 20 to 36 wholly and nothing past it.
+        #expect(pixel(still, 12, 8).a == 0 && pixel(still, 28, 8).a > 250 && pixel(still, 40, 8).a == 0)
+        // Blurred, its copies run from x 10 to 46, averaged: faint at the
+        // ends, strongest in the middle, and never more than whole.
+        func share(_ x: Int) -> Double { Double(pixel(smear, x, 8).a) / 255 }
+        #expect(share(12) > 0.03 && share(12) < 0.2, "\(share(12))")
+        #expect(share(26) > 0.7 && share(26) < 0.9, "\(share(26))")
+        #expect(share(40) > 0.2 && share(40) < 0.4, "\(share(40))")
+        #expect(share(50) == 0)
+        // The same red throughout: the copies average, they do not brighten.
+        #expect(pixel(smear, 12, 8).r > 245 && pixel(smear, 40, 8).g < 10)
+        // Rows off the square's height stay empty.
+        #expect(pixel(smear, 26, 30).a == 0)
+        // Over white, the smear is laid over what is behind it, not added to
+        // it: four fifths red at x 26 leaves a fifth of the white.
+        var onWhite = blurred
+        onWhite.composition.background = Background(color: .white)
+        let over = try #require(renderer.image(of: evaluate(onWhite, at: 0.5, motionSamples: MotionBlurSamples.export)))
+        #expect(pixel(over, 26, 8).r > 245 && pixel(over, 26, 8).g > 25 && pixel(over, 26, 8).g < 80, "\(pixel(over, 26, 8))")
+    }
+
     @Test func insideStrokesStayInsideTheShape() throws {
         var layer = shape(fill: nil, at: Vec2(16, 16), size: Size2(32, 32))
         layer.content = .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),

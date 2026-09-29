@@ -292,8 +292,13 @@ final class Node {
     /// the part that shows, clipping, around the layer's own sublayers.
     private var revealClip: CALayer?
     private var revealContent: CALayer?
+    /// Made the first time motion blur draws the layer: copies of all it
+    /// draws, averaged (see `MotionCopies`).
+    private var motionCopies: MotionCopies?
+    /// What the layer draws into: inside the copies once there are any.
+    private var root: CALayer { motionCopies?.body ?? container }
     /// Where the layer's own sublayers go: inside the reveal once there is one.
-    private var host: CALayer { revealContent ?? container }
+    private var host: CALayer { revealContent ?? root }
 
     init(scale: CGFloat) {
         self.scale = scale
@@ -339,8 +344,13 @@ final class Node {
         // The anchor point stays at the layer's origin and the whole local
         // transform goes in the matrix, so a layer of zero width or height
         // (a line) still turns about its real anchor.
-        container.transform = layer.projection.caTransform
+        if case .spread(let start, _, _) = layer.motion {
+            container.transform = start.caTransform
+        } else {
+            container.transform = layer.projection.caTransform
+        }
         container.opacity = Float(layer.opacity)
+        updateMotion(layer.motion, size: layer.size)
 
         if !ignoresBlend, layer.blendMode != blend {
             blend = layer.blendMode
@@ -592,6 +602,19 @@ final class Node {
         }
     }
 
+    /// Draws the layer as motion blur has it: all it draws, wrapped in copies
+    /// the first time it blurs, and from then on one copy while it is still.
+    private func updateMotion(_ motion: MotionSpread, size: Size2) {
+        guard motion != .none || motionCopies != nil else { return }
+        if motionCopies == nil {
+            let made = MotionCopies()
+            made.body.sublayers = container.sublayers
+            container.sublayers = [made.copies]
+            motionCopies = made
+        }
+        motionCopies?.apply(motion, size: size.cg)
+    }
+
     /// Clips the layer to part of its box, with its content moved and
     /// zoomed behind the clip, as a Mask preset has it. The holders are made
     /// the first time and kept, open and still, once the reveal ends.
@@ -603,9 +626,9 @@ final class Node {
                 l.anchorPoint = .zero
                 l.actions = Self.noActions
             }
-            content.sublayers = container.sublayers
+            content.sublayers = root.sublayers
             clip.addSublayer(content)
-            container.sublayers = [clip]
+            root.sublayers = [clip]
             revealClip = clip
             revealContent = content
         }
@@ -771,6 +794,55 @@ enum RevealLayers {
     }
 }
 
+/// Motion blur's copies: a replicator drawing its body `count` times, each
+/// copy moved by `step` from the one before, in the body's own space (the
+/// replicator turns about its origin, which is the layer's). Each copy is
+/// drawn at a share of its strength and added to the rest, so together they
+/// are the average of the moments across the shutter, and the replicator
+/// draws them as one picture first, so they add to one another and not to
+/// what is behind. Still, it is one copy at full strength.
+final class MotionCopies {
+    let copies = CAReplicatorLayer()
+    let body = CALayer()
+
+    init() {
+        for l in [copies, body] {
+            l.anchorPoint = .zero
+            l.position = .zero
+            l.actions = Node.noActions
+            l.allowsGroupOpacity = true
+        }
+        copies.addSublayer(body)
+    }
+
+    func apply(_ motion: MotionSpread, size: CGSize) {
+        let bounds = CGRect(origin: .zero, size: size)
+        if copies.bounds != bounds {
+            copies.bounds = bounds
+            body.bounds = bounds
+        }
+        if case .spread(_, let step, let count) = motion, let add = Compositing.add() {
+            copies.instanceCount = count
+            copies.instanceTransform = step.caTransform
+            body.opacity = 1 / Float(count)
+            if body.compositingFilter == nil { body.compositingFilter = add }
+            // Just under full, so the copies are drawn together, apart,
+            // before they are laid over the rest: a group only forms when
+            // it fades.
+            copies.opacity = Self.grouped
+        } else if copies.instanceCount != 1 || body.compositingFilter != nil {
+            copies.instanceCount = 1
+            copies.instanceTransform = CATransform3DIdentity
+            body.opacity = 1
+            body.compositingFilter = nil
+            copies.opacity = 1
+        }
+    }
+
+    /// Fades by a thousandth, which no pixel shows.
+    static let grouped: Float = 0.999
+}
+
 /// Which picture a letter, word or line is drawn from.
 private struct UnitImageKey: Hashable {
     let text: TextImage.Key
@@ -783,6 +855,8 @@ private struct UnitImageKey: Hashable {
 /// reveal and the picture.
 private final class TextUnitLayer {
     let holder = CALayer()
+    /// Each letter blurs by its own motion.
+    private let motion = MotionCopies()
     private let clip = CALayer()
     private let content = CALayer()
     private let picture = CALayer()
@@ -795,7 +869,8 @@ private final class TextUnitLayer {
         }
         picture.contentsScale = scale
         holder.allowsGroupOpacity = true
-        holder.addSublayer(clip)
+        holder.addSublayer(motion.copies)
+        motion.body.addSublayer(clip)
         clip.addSublayer(content)
         content.addSublayer(picture)
     }
@@ -804,7 +879,12 @@ private final class TextUnitLayer {
         let size = CGSize(width: unit.box.width, height: unit.box.height)
         holder.bounds = CGRect(origin: .zero, size: size)
         holder.position = .zero
-        holder.transform = unit.transform.caTransform
+        if case .spread(let start, _, _) = unit.motion {
+            holder.transform = start.caTransform
+        } else {
+            holder.transform = unit.transform.caTransform
+        }
+        motion.apply(unit.motion, size: size)
         holder.opacity = Float(unit.opacity)
         if unit.blur != blur {
             blur = unit.blur

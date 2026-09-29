@@ -40,6 +40,9 @@ struct ActionInspector: View {
                                              && $0.preset.map { PresetRecipe.usesEasing($0.preset) } ?? true }) {
                     EasingFields(controller: controller, actions: actions)
                 }
+                if actions.allSatisfy(\.canMotionBlur) {
+                    MotionBlurFields(controller: controller, actions: actions)
+                }
             }
             .gridBody()
             .padding(.bottom, Theme.panelPad)
@@ -342,6 +345,36 @@ private struct TimingFields: View {
 }
 
 // MARK: - Easing
+
+/// Motion blur on what the actions move: a switch, and while it is on, how
+/// long the shutter stays open.
+private struct MotionBlurFields: View {
+    let controller: EditorController
+    let actions: [Action]
+
+    private var isOn: Bool { actions.allSatisfy { ($0.motionBlur ?? 0) > 0 } }
+    private var amount: Double { actions.first?.motionBlur ?? Action.standardMotionBlur }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ToggleRow(label: "Motion blur", isOn: isOn) {
+                let on = !isOn
+                controller.editActions(on ? "Motion Blur On" : "Motion Blur Off") { a in
+                    a.motionBlur = on ? (a.motionBlur ?? Action.standardMotionBlur) : nil
+                }
+            }
+            .help("Smears the layer along its movement while this plays, as a camera's shutter does.")
+            if isOn {
+                LabeledRow(label: "Amount") {
+                    UnitField(value: amount * 100, suffix: "%", accepts: { $0 > 0 && $0 <= 100 }) { v in
+                        controller.editActions("Motion Blur") { $0.motionBlur = v / 100 }
+                    }
+                }
+                .help("How long the shutter stays open, as a share of a frame: 50% is a 180° shutter, 100% a whole frame. The higher, the longer the smear.")
+            }
+        }
+    }
+}
 
 private struct EasingFields: View {
     let controller: EditorController

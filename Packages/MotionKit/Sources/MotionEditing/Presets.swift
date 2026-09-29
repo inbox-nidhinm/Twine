@@ -338,9 +338,12 @@ public enum Presets {
             }
             let start = frameRate.snapped(action.start + part.start * action.duration)
             let end = frameRate.snapped(action.start + (part.start + part.duration) * action.duration)
-            return Action(target: action.targetLayerID, start: start, duration: max(end - start, 0),
-                          easing: part.easing ?? action.easing, isEnabled: action.isEnabled,
-                          rowOrder: action.rowOrder, spec: spec)
+            var made = Action(target: action.targetLayerID, start: start, duration: max(end - start, 0),
+                              easing: part.easing ?? action.easing, isEnabled: action.isEnabled,
+                              rowOrder: action.rowOrder, spec: spec)
+            // What moves keeps the bar's motion blur.
+            if made.canMotionBlur { made.motionBlur = action.motionBlur }
+            return made
         }
     }
 }

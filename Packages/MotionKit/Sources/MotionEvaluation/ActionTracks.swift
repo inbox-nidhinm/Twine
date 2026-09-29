@@ -217,6 +217,16 @@ public enum Warp: Sendable, Equatable {
     }
 }
 
+extension Action {
+    /// Whether it moves its layer, or a text's letters, so motion blur has
+    /// something to smear: a Move, Scale, Rotate, Skew or Tilt, or a preset
+    /// that moves, scales, turns or tilts.
+    public var canMotionBlur: Bool {
+        if case .preset(let p) = spec { return !p.preset.isSound && !PresetRecipe.channels(p).isDisjoint(with: ActionTracks.moving) }
+        return ActionTracks.moving.contains(spec.kind.channel)
+    }
+}
+
 /// Every enabled action in a project, sorted into one track per layer and
 /// channel, ready to be evaluated at any moment, including between frames.
 public struct ActionTracks: Sendable {
@@ -230,6 +240,19 @@ public struct ActionTracks: Sendable {
     /// Presets that move a text's letters, words or lines one by one, by
     /// layer, in start order. They leave the layer's own channels alone.
     private var textPresets: [UUID: [TextPreset]] = [:]
+    /// Actions with motion blur on, by layer, with the moving channels each
+    /// drives. A text preset's letters blur through `TextAnimation` instead.
+    private var blurs: [UUID: [BlurRun]] = [:]
+
+    private struct BlurRun: Sendable {
+        let start: Double
+        let end: Double
+        let shutter: Double
+        let channels: Set<Channel>
+    }
+
+    /// The channels motion blur spreads: those that move a layer.
+    static let moving: Set<Channel> = [.position, .scale, .rotation, .skew, .tilt]
 
     public init(_ actions: [Action]) {
         // In presets, which show their layer as a Show does (rule 10).
@@ -251,6 +274,20 @@ public struct ActionTracks: Sendable {
             } else {
                 tracks[action.targetLayerID, default: [:]][action.spec.kind.channel, default: []].append(action)
                 if case .move(let m) = action.spec, m.turns { turningLayers.insert(action.targetLayerID) }
+            }
+            if let shutter = action.motionBlur, shutter > 0, !action.isInstant {
+                var channels: Set<Channel>
+                if case .preset(let p) = action.spec {
+                    channels = p.unit == nil ? PresetRecipe.channels(p).intersection(Self.moving) : []
+                } else {
+                    channels = Self.moving.contains(action.spec.kind.channel) ? [action.spec.kind.channel] : []
+                }
+                // A Move that turns the layer along its path turns it too.
+                if case .move(let m) = action.spec, m.turns { channels.insert(.rotation) }
+                if !channels.isEmpty {
+                    blurs[action.targetLayerID, default: []].append(
+                        BlurRun(start: action.start, end: action.end, shutter: shutter, channels: channels))
+                }
             }
         }
         // Only where there is a Show or Hide for them to answer to.
@@ -309,6 +346,28 @@ public struct ActionTracks: Sendable {
     }
 
     public var isEmpty: Bool { tracks.isEmpty }
+
+    /// Whether any action has motion blur on, text presets included.
+    public var hasMotionBlur: Bool {
+        !blurs.isEmpty || textPresets.values.contains { $0.contains { ($0.action.motionBlur ?? 0) > 0 } }
+    }
+
+    /// The moving channels motion blur spreads on `layer` at `time`, and
+    /// how long the shutter is open, in seconds, when a frame lasts `frame`:
+    /// those of each action with motion blur whose run meets the shutter,
+    /// open for half its time either side of `time`. Nil when none does.
+    public func motionBlur(of layer: UUID, at time: Double, frame: Double) -> (channels: Set<Channel>, shutter: Double)? {
+        guard let runs = blurs[layer] else { return nil }
+        var channels: Set<Channel> = []
+        var shutter = 0.0
+        for run in runs {
+            let open = run.shutter * frame
+            guard run.start < time + open / 2, run.end > time - open / 2 else { continue }
+            channels.formUnion(run.channels)
+            shutter = max(shutter, open)
+        }
+        return channels.isEmpty || shutter <= 0 ? nil : (channels, shutter)
+    }
 
     /// `layer` at `time`, with every action on it applied.
     public func state(of layer: Layer, at time: Double) -> LayerState {

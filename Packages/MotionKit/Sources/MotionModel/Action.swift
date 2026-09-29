@@ -26,6 +26,14 @@ public struct Action: Codable, Sendable, Equatable, Identifiable {
     /// user has rearranged. Lower comes first.
     public var rowOrder: Int
     public var spec: ActionSpec
+    /// Motion blur on the movement this action makes (its moves, scales,
+    /// turns, skews and tilts): how long the shutter stays open, as a share
+    /// of a frame, 0.5 being a 180° shutter. Nil is off, and is left out of
+    /// files.
+    public var motionBlur: Double?
+
+    /// A new action's Motion Blur amount: a 180° shutter.
+    public static let standardMotionBlur = 0.5
 
     public init(id: UUID = UUID(), target: UUID, start: Double, duration: Double,
                 easing: Easing = .default, name: String? = nil, isEnabled: Bool = true,

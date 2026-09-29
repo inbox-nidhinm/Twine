@@ -23,6 +23,13 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Motion blur", changes: [
+            "Actions and presets that move, scale, turn, skew or tilt a layer have a Motion blur switch under Easing. While it plays, the layer smears along its movement, as a camera's shutter does.",
+            "Amount sets how long the shutter stays open: 50% is a 180° shutter, 100% a whole frame.",
+            "Only what that action moves smears; anything else the layer does at the same time stays sharp.",
+            "Text presets that move letter by letter blur each letter by its own motion.",
+            "The canvas shows a lighter version as you play and scrub; exports draw it at full quality.",
+        ]),
         .init(date: "29 September 2026", title: "Swap Preset", changes: [
             "With a preset selected, Swap Preset puts another preset in its place. The bar keeps when it starts, and takes the new preset's name, easing and length unless you had changed them.",
             "Back to Presets and the plus beside an action's name are gone. New Action and Select Preset stay at the foot of the inspector.",
