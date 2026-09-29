@@ -232,7 +232,12 @@ private struct LayerRow: View {
             // clears it if nothing else has taken it since.
             if inside { editor.hoveredLayer = layer.id } else if editor.hoveredLayer == layer.id { editor.hoveredLayer = nil }
         }
-        .onTapGesture(perform: click)
+        // A double-click renames, as in Figma. Read from the click itself
+        // rather than a second tap gesture, which would hold every single
+        // click back until it knew no second one was coming.
+        .onTapGesture {
+            if (NSApp.currentEvent?.clickCount ?? 1) >= 2 { editor.renaming = layer.id } else { click() }
+        }
         .rightClickMenu(menu)
         .draggable(layer.id.uuidString) {
             Text(layer.name)

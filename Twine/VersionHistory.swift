@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Double-click to rename", changes: [
+            "Double-clicking a layer in the layers panel renames it, as in Figma.",
+        ]),
         .init(date: "29 September 2026", title: "Blend modes see the background", changes: [
             "Blend modes now blend with the composition's background, as in Figma. Before, a layer over nothing but the background drew as Normal whatever its mode, on the canvas and in exports, so Overlay seemed to do nothing. Now Overlay or Screen over a white background turns white, and Multiply over it keeps the layer's own colour.",
         ]),

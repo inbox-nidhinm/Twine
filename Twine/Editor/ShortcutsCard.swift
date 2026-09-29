@@ -139,6 +139,7 @@ struct ShortcutsCard: View {
                 s("Import", "⌘I"),
                 s("Export, current frame", "⌘E", "⇧⌘E"),
                 s("Duplicate, rename layer", "⌘D", "⌘R"),
+                s("Rename in the layers panel", "double-click"),
                 s("Duplicate project", "⇧⌘S"),
                 s("Home", "⇧⌘H"),
             ]),
