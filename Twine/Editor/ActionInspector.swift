@@ -14,6 +14,9 @@ struct ActionInspector: View {
     /// without leaving this one.
     var newActions: [MenuEntry] = []
     var pickPreset: (() -> Void)? = nil
+    /// A sound or video whose Play bars are selected: its level shows under
+    /// the fields.
+    var sound: Layer? = nil
 
     private var first: Action { actions[0] }
     /// Presets count as one kind only when they are the same preset.
@@ -60,6 +63,11 @@ struct ActionInspector: View {
                 ValueFields(controller: controller, action: first, inherited: controller.inheritedState(for: first))
                     .gridBody()
                     .padding(.vertical, Theme.panelPad)
+            }
+
+            if let sound {
+                PanelDivider()
+                LayerSoundSection(layer: sound, controller: controller)
             }
 
             // At the end, another action or preset for the same layers, so

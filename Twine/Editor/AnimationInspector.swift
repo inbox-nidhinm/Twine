@@ -5,7 +5,8 @@ import Theme
 
 /// Animate mode's inspector. It never shows design properties: with actions
 /// selected it shows their fields; with only layers selected it offers the
-/// actions they can take and the presets, added at the playhead; an
+/// actions they can take and the presets, added at the playhead, under a
+/// sound's level when one sound or video is selected; an
 /// action's header and the foot of its fields offer the same, to add
 /// another without leaving it.
 /// With nothing selected it is empty.
@@ -20,6 +21,9 @@ struct AnimationInspector: View {
     var body: some View {
         let layers = controller.selectedLayers
         let actions = controller.selectedActions
+        // One sound or video with sound shows its level, over its actions
+        // or under its Play bar's fields.
+        let sound = layers.count == 1 && controller.project.hasSound(layers[0]) ? layers[0] : nil
         Group {
             // The picker stands in for whatever shows, an action's fields
             // included, so a preset can be added from anywhere.
@@ -33,16 +37,23 @@ struct AnimationInspector: View {
             } else if !actions.isEmpty {
                 ActionInspector(controller: controller, actions: actions,
                                 newActions: actionEntries(controller.availableActions),
-                                pickPreset: { pickingPreset = true })
+                                pickPreset: { pickingPreset = true },
+                                sound: actions.allSatisfy { $0.spec.kind == .play } ? sound : nil)
                     .id(actions.map(\.id))
             } else if !layers.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    HeaderRow(title: "Actions") {}
-                    ActionTiles(newActions: actionEntries(controller.availableActions),
-                                hasPresets: !controller.availablePresets.isEmpty) { pickingPreset = true }
-                        .padding(.horizontal, Theme.panelPad)
+                VStack(alignment: .leading, spacing: 0) {
+                    if let sound {
+                        LayerSoundSection(layer: sound, controller: controller)
+                        PanelDivider()
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        HeaderRow(title: "Actions") {}
+                        ActionTiles(newActions: actionEntries(controller.availableActions),
+                                    hasPresets: !controller.availablePresets.isEmpty) { pickingPreset = true }
+                            .padding(.horizontal, Theme.panelPad)
+                    }
+                    .padding(.bottom, Theme.panelPad)
                 }
-                .padding(.bottom, Theme.panelPad)
             }
         }
         .onChange(of: layers.map(\.id)) { pickingPreset = false }

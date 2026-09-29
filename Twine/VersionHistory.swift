@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Volume in Animate", changes: [
+            "In Animate, a selected sound or video with sound shows its Sound section, the volume slider and mute, over its actions, and under the fields when its Play bar is selected. It is the same level as in Design, the one every Volume action starts from.",
+        ]),
         .init(date: "29 September 2026", title: "A real typewriter", changes: [
             "Typewriter puts each letter on at once, one after another, rather than fading them up. The letters are spread evenly across the bar, so its length sets how fast it types.",
             "Typewriter has an Out, which takes the letters away one at a time.",

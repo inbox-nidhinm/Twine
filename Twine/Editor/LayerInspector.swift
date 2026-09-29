@@ -459,6 +459,25 @@ struct BlendOpacityRow: View {
 
 // MARK: - Sound
 
+/// A layer's Sound section when it has a sound (a sound, or a video with a
+/// sound track), for Animate's inspector too, the user's choice on 29
+/// September 2026: the level every Volume action starts from.
+struct LayerSoundSection: View {
+    let layer: Layer
+    let controller: EditorController
+
+    var body: some View {
+        switch layer.content {
+        case .video(let v) where controller.project.hasSound(layer):
+            SoundSection(layer: layer, volume: v.volume, isMuted: v.isMuted, controller: controller)
+        case .audio(let a):
+            SoundSection(layer: layer, volume: a.volume, isMuted: a.isMuted, controller: controller)
+        default:
+            EmptyView()
+        }
+    }
+}
+
 /// A video's or a sound's level, for preview and export alike.
 private struct SoundSection: View {
     let layer: Layer
