@@ -754,8 +754,12 @@ final class EditorController {
     func duplicateSelectedActions() {
         let originals = selectedActions
         guard !originals.isEmpty else { return }
-        let copies = ActionEditing.appendingRows(ActionEditing.duplicates(of: originals, rate: frameRate), in: project)
-        if perform(.batch([.insertActions(copies)], name: copies.count == 1 ? "Duplicate Action" : "Duplicate Actions")) {
+        // Each copy on the row just under its original, later by the
+        // selection's length.
+        let (copies, moved) = ActionEditing.placingBelow(ActionEditing.duplicates(of: originals, rate: frameRate),
+                                                         originals: originals, in: project)
+        if perform(.batch([.updateActions(moved), .insertActions(copies)],
+                          name: copies.count == 1 ? "Duplicate Action" : "Duplicate Actions")) {
             selectActions(Set(copies.map(\.id)))
         }
     }

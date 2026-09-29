@@ -182,6 +182,27 @@ public enum ActionEditing {
         }
     }
 
+    /// Copies placed each on the row just below its original, as a
+    /// duplicate in the timeline is, with every row renumbered from 0: the
+    /// copies with their new row orders, and the actions already in the
+    /// project whose row order changed. `copies` pairs with `originals` by
+    /// position.
+    public static func placingBelow(_ copies: [Action], originals: [Action],
+                                    in project: Project) -> (copies: [Action], moved: [Action]) {
+        var below: [UUID: Action] = [:]
+        for (original, copy) in zip(originals, copies) { below[original.id] = copy }
+        var rows: [Action] = []
+        for row in timeline(in: project) {
+            rows.append(row)
+            if let copy = below[row.id] { rows.append(copy) }
+        }
+        let copyIDs = Set(copies.map(\.id))
+        let numbered = renumber(rows)
+        let old = Dictionary(project.actions.map { ($0.id, $0.rowOrder) }, uniquingKeysWith: { a, _ in a })
+        return (numbered.filter { copyIDs.contains($0.id) },
+                numbered.filter { !copyIDs.contains($0.id) && old[$0.id] != $0.rowOrder })
+    }
+
     // MARK: Edges
 
     /// Every start and end in the project, for jumping the playhead from one

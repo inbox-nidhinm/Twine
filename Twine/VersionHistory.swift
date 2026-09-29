@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Duplicate in the timeline", changes: [
+            "The timeline's right-click menu has Duplicate. The copy goes on the row just below its original, starting where the original ends, and is selected. Command-D in the timeline does the same.",
+        ]),
         .init(date: "29 September 2026", title: "Volume without mute", changes: [
             "The Sound section's mute button is gone, in Design and Animate: it is the volume slider alone. A sound muted before comes back as soon as its slider is moved.",
         ]),

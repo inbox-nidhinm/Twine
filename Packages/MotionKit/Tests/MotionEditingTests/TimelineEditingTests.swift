@@ -25,6 +25,18 @@ import MotionEvaluation
         #expect(ActionEditing.timeline(in: p).map(\.id) == [a.id, b.id, added[0].id])
     }
 
+    @Test func aDuplicateGoesOnTheRowJustBelowItsOriginal() {
+        let other = LayerFactory.shape(.ellipse, in: Box(minX: 0, minY: 0, maxX: 5, maxY: 5), name: "O")
+        let a = action(0, row: 0), b = action(1, row: 1, on: other), c = action(2, row: 2)
+        var project = Project(layers: [square, other], actions: [a, b, c])
+        let (copies, moved) = ActionEditing.placingBelow(ActionEditing.duplicates(of: [b], rate: rate), originals: [b], in: project)
+        #expect(copies.count == 1 && copies[0].targetLayerID == other.id)
+        #expect(moved.map(\.id) == [c.id], "only the row under it moves down")
+        for x in moved { project.actions[project.actions.firstIndex { $0.id == x.id }!] = x }
+        project.actions += copies
+        #expect(ActionEditing.timeline(in: project).map(\.id) == [a.id, b.id, copies[0].id, c.id])
+    }
+
     @Test func rowsCanBeRearrangedAcrossLayers() {
         let other = LayerFactory.shape(.ellipse, in: Box(minX: 0, minY: 0, maxX: 5, maxY: 5), name: "O")
         let a = action(0, row: 0), b = action(1, row: 1, on: other), c = action(2, row: 2)

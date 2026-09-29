@@ -679,6 +679,8 @@ final class TimelineTracksView: NSView {
         let origin = CGPoint(x: inWindow.x, y: content.bounds.height - inWindow.y)
         let editor = controller.editor
         menus.show([
+            .item("Duplicate", disabled: controller.selectedActions.isEmpty) { controller.duplicateSelectedActions() },
+            .separator,
             .item("Stagger…", disabled: controller.selectedActions.count < 2) {
                 menus.showPopup(at: origin) { StaggerCard(controller: controller) { menus.dismiss() } }
             },
