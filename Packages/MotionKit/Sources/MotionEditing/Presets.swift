@@ -240,6 +240,27 @@ public enum Presets {
                       spec: .preset(settings))
     }
 
+    /// `action`, a preset bar on `layer`, turned into `preset` where it
+    /// stands: the same start, row and switch, the new preset's settings,
+    /// and its name, easing and length for any of those still as the old
+    /// preset gave them (one changed by hand stays). Nil for anything that
+    /// is not a preset.
+    public static func swapped(_ action: Action, to preset: Preset, on layer: Layer, frameRate: FrameRate) -> Action? {
+        guard case .preset(let old) = action.spec else { return nil }
+        // The preset the bar came from: a Text one by its name, else its kind's.
+        let from = library.first { $0.isText && $0.name == action.name && $0.kind == old.preset } ?? Presets.preset(old.preset)
+        func length(_ p: Preset) -> Double {
+            max(frameRate.snapped(p.length ?? PresetRecipe.length(p.kind)), frameRate.frameDuration)
+        }
+        let made = Presets.action(preset, for: layer, at: action.start, frameRate: frameRate)
+        var swapped = action
+        swapped.spec = made.spec
+        if action.name == (from.isText ? from.name : name(of: old.preset)) { swapped.name = made.name }
+        if action.easing == PresetRecipe.easing(old.preset) { swapped.easing = made.easing }
+        if abs(action.duration - length(from)) < 1e-6 { swapped.duration = made.duration }
+        return swapped
+    }
+
     /// How far a preset set to move `layer`'s letters, words or lines one by
     /// one travels: its type size, when the preset travels at all.
     public static func unitDistance(_ settings: PresetAction, of layer: Layer) -> Double? {

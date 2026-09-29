@@ -14,6 +14,9 @@ struct ActionInspector: View {
     /// without leaving this one.
     var newActions: [MenuEntry] = []
     var pickPreset: (() -> Void)? = nil
+    /// Opens the picker to swap the selected preset bars for another; nil
+    /// when none is selected.
+    var swapPreset: (() -> Void)? = nil
     /// A sound or video whose Play bars are selected: its level shows under
     /// the fields.
     var sound: Layer? = nil
@@ -28,13 +31,7 @@ struct ActionInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let pickPreset, !controller.availablePresets.isEmpty {
-                BackToPresets(action: pickPreset)
-                PanelDivider()
-            }
-            HeaderRow(title: actions.count == 1 ? first.name : sameKind ? kindName : "Actions") {
-                if !newActions.isEmpty { AddActionButton(entries: newActions) }
-            }
+            HeaderRow(title: actions.count == 1 ? first.name : sameKind ? kindName : "Actions") {}
             VStack(alignment: .leading, spacing: 10) {
                 TimingFields(controller: controller, actions: actions)
                 // A Play runs at the clip's own speed, and a shake keeps its
@@ -70,6 +67,15 @@ struct ActionInspector: View {
                 LayerSoundSection(layer: sound, controller: controller)
             }
 
+            // A preset bar can become another where it stands.
+            if let swapPreset {
+                PanelDivider()
+                PanelButton(title: "Swap Preset", icon: .swap, disabled: controller.swappablePresets.isEmpty, action: swapPreset)
+                    .help("Picks another preset to put in this one's place, keeping when it starts.")
+                    .gridBody()
+                    .padding(.vertical, Theme.panelPad)
+            }
+
             // At the end, another action or preset for the same layers, so
             // there is no need to pick the layer again.
             if !newActions.isEmpty || pickPreset != nil {
@@ -80,30 +86,6 @@ struct ActionInspector: View {
                     .padding(.vertical, Theme.panelPad)
             }
         }
-    }
-}
-
-/// Back to the preset picker, over the action's name, to pick another.
-private struct BackToPresets: View {
-    let action: () -> Void
-
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                IconView(.chevronLeft, size: 13)
-                Text("Back to Presets")
-                    .font(ThemeFont.label)
-            }
-            .foregroundStyle(hovering ? Theme.textPrimary : Theme.textSecondary)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .help("Picks a preset to add to the layer at the playhead")
-        .padding(.horizontal, Theme.panelPad)
-        .frame(height: Theme.button, alignment: .leading)
     }
 }
 
@@ -128,21 +110,6 @@ private struct AddAnother: View {
             PanelButton(title: "Select Preset", icon: .presets, disabled: !hasPresets, action: pickPreset)
                 .help("Picks a ready-made animation to add to the layer at the playhead.")
         }
-    }
-}
-
-/// A plus that opens the New Action menu below it, right-aligned to it.
-private struct AddActionButton: View {
-    let entries: [MenuEntry]
-
-    @Environment(MenuHost.self) private var menus
-    @State private var frame: CGRect = .zero
-
-    var body: some View {
-        IconButton(icon: .plus, help: "Add another action to the layer") {
-            menus.show(entries, at: CGPoint(x: frame.maxX - Theme.menuMinWidth, y: frame.maxY + 4))
-        }
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
     }
 }
 

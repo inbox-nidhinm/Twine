@@ -388,6 +388,37 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
                 == [0, 0, 1, 1, 1])
     }
 
+    @Test func swappingAPresetKeepsItsPlace() throws {
+        let layer = square()
+        var fade = bar(Presets.preset(.fadeIn), on: layer, at: 2)
+        fade.rowOrder = 7
+        let slide = try #require(Presets.library.first { $0.kind == .slideIn && !$0.isText })
+        let swapped = try #require(Presets.swapped(fade, to: slide, on: layer, frameRate: .fps60))
+        // Where it was, as the new preset, with its name, easing and length.
+        #expect(swapped.id == fade.id && swapped.start == 2 && swapped.rowOrder == 7)
+        guard case .preset(let settings) = swapped.spec else { Issue.record("not a preset"); return }
+        #expect(settings == PresetRecipe.defaults(.slideIn))
+        #expect(swapped.name == "Slide In" && swapped.easing == PresetRecipe.easing(.slideIn) && near(swapped.duration, 0.5))
+        // What was set by hand stays.
+        var changed = fade
+        changed.name = "Arrive"
+        changed.duration = 2
+        changed.easing = .preset(.bounce, intensity: 0.5)
+        let kept = try #require(Presets.swapped(changed, to: slide, on: layer, frameRate: .fps60))
+        #expect(kept.name == "Arrive" && kept.duration == 2 && kept.easing == .preset(.bounce, intensity: 0.5))
+        // A Text preset takes its letters, and gives its own length back.
+        let text = Layer(name: "T", content: .text(TextContent(text: "abc")), size: Size2(100, 40), position: .zero)
+        let typewriter = try #require(Presets.library.first { $0.name == "Typewriter" })
+        let rise = try #require(Presets.library.first { $0.name == "Letters Rise" })
+        let typing = Presets.action(typewriter, for: text, at: 0, frameRate: .fps60)
+        let risen = try #require(Presets.swapped(typing, to: rise, on: text, frameRate: .fps60))
+        guard case .preset(let letters) = risen.spec else { Issue.record("not a preset"); return }
+        #expect(letters.preset == .slideIn && letters.unit == .letters && risen.name == "Letters Rise" && near(risen.duration, 0.8))
+        // Only presets swap.
+        let move = Action(target: layer.id, start: 0, duration: 1, spec: .move(MoveAction(mode: .by, end: Vec2(10, 0))))
+        #expect(Presets.swapped(move, to: slide, on: layer, frameRate: .fps60) == nil)
+    }
+
     @Test func olderTypewritersBecomeTypewriters() {
         let text = Layer(name: "T", content: .text(TextContent(text: "abc")), size: Size2(100, 40), position: .zero)
         let old = PresetAction(preset: .fadeIn, unit: .letters, delay: 0.05)

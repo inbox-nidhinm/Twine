@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "29 September 2026", title: "Swap Preset", changes: [
+            "With a preset selected, Swap Preset puts another preset in its place. The bar keeps when it starts, and takes the new preset's name, easing and length unless you had changed them.",
+            "Back to Presets and the plus beside an action's name are gone. New Action and Select Preset stay at the foot of the inspector.",
+        ]),
         .init(date: "29 September 2026", title: "Smooth playback with many sounds", changes: [
             "Playing a project with many sound clips no longer stutters. With a dozen clicks and sounds, asking the sound player where it was held up every frame for most of a second, so playback ran at two frames a second and the sound kept restarting. It now plays at a full 60, with the sound within a hundredth of a second of the playhead.",
         ]),

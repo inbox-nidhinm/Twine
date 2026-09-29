@@ -65,6 +65,8 @@ private struct BigTile: View {
 /// its settings.
 struct PresetPicker: View {
     let presets: [Preset]
+    /// Picking puts the preset in the selected bars' place rather than adding it.
+    var swapping = false
     let pick: (Preset) -> Void
     let close: () -> Void
 
@@ -91,7 +93,7 @@ struct PresetPicker: View {
                                 .foregroundStyle(Theme.textPrimary)
                             LazyVGrid(columns: columns, spacing: 10) {
                                 ForEach(shown) { preset in
-                                    PresetTile(preset: preset) { pick(preset) }
+                                    PresetTile(preset: preset, swapping: swapping) { pick(preset) }
                                 }
                             }
                         }
@@ -106,6 +108,7 @@ struct PresetPicker: View {
 
 private struct PresetTile: View {
     let preset: Preset
+    var swapping = false
     let pick: () -> Void
 
     @State private var hovering = false
@@ -127,7 +130,8 @@ private struct PresetTile: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(preset.isText ? "Adds \(preset.name) at the playhead, moving the text \(preset.text?.unit?.rawValue ?? "letters") one by one"
+        .help(swapping ? "Puts \(preset.name) in the selected preset's place"
+              : preset.isText ? "Adds \(preset.name) at the playhead, moving the text \(preset.text?.unit?.rawValue ?? "letters") one by one"
               : preset.kind.reversed == nil ? "Adds \(preset.name) at the playhead"
               : "Adds \(Presets.name(of: preset.kind)) at the playhead; its settings turn it to \(preset.name) Out")
     }

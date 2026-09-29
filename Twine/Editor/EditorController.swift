@@ -629,6 +629,29 @@ final class EditorController {
         insertAndShow(made, name: preset.name)
     }
 
+    /// The selected preset bars.
+    var selectedPresetBars: [Action] {
+        selectedActions.filter { if case .preset = $0.spec { return true } else { return false } }
+    }
+
+    /// The presets every selected preset bar's layer can take, to swap in.
+    var swappablePresets: [Preset] {
+        let ids = Set(selectedPresetBars.map(\.targetLayerID))
+        return Presets.available(for: ids.compactMap(project.layer(withID:)), in: project)
+    }
+
+    /// Turns every selected preset bar into `preset` where it stands, as one
+    /// undo step (`Presets.swapped`): its place stays, and its name, easing
+    /// and length follow unless they were changed by hand.
+    func swapPresets(to preset: Preset) {
+        editActions("Swap Preset") { a in
+            guard let layer = project.layer(withID: a.targetLayerID),
+                  Presets.available(for: [layer], in: project).contains(preset),
+                  let swapped = Presets.swapped(a, to: preset, on: layer, frameRate: frameRate) else { return }
+            a = swapped
+        }
+    }
+
     /// Whether any selected action is a preset bar Split into Actions can
     /// take apart: not one moving letters one by one, or clipping.
     var canSplitPresets: Bool {

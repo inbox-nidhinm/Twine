@@ -6,9 +6,9 @@ import Theme
 /// Animate mode's inspector. It never shows design properties: with actions
 /// selected it shows their fields; with only layers selected it offers the
 /// actions they can take and the presets, added at the playhead, under a
-/// sound's level when one sound or video is selected; an
-/// action's header and the foot of its fields offer the same, to add
-/// another without leaving it.
+/// sound's level when one sound or video is selected; the foot of an
+/// action's fields offers the same, to add another without leaving it,
+/// and for a preset bar, Swap Preset, to put another in its place.
 /// With nothing selected it is empty.
 struct AnimationInspector: View {
     let controller: EditorController
@@ -17,6 +17,8 @@ struct AnimationInspector: View {
     /// The preset picker stands in for the tiles until a preset is picked,
     /// it is closed, or the selection changes.
     @State private var pickingPreset = false
+    /// The picker is up to swap the selected preset bars rather than add.
+    @State private var swappingPreset = false
 
     var body: some View {
         let layers = controller.selectedLayers
@@ -27,7 +29,14 @@ struct AnimationInspector: View {
         Group {
             // The picker stands in for whatever shows, an action's fields
             // included, so a preset can be added from anywhere.
-            if pickingPreset && !layers.isEmpty {
+            if swappingPreset && !controller.selectedPresetBars.isEmpty {
+                PresetPicker(presets: controller.swappablePresets, swapping: true,
+                             pick: { preset in
+                                 swappingPreset = false
+                                 controller.swapPresets(to: preset)
+                             },
+                             close: { swappingPreset = false })
+            } else if pickingPreset && !layers.isEmpty {
                 PresetPicker(presets: controller.availablePresets,
                              pick: { preset in
                                  pickingPreset = false
@@ -38,6 +47,7 @@ struct AnimationInspector: View {
                 ActionInspector(controller: controller, actions: actions,
                                 newActions: actionEntries(controller.availableActions),
                                 pickPreset: { pickingPreset = true },
+                                swapPreset: controller.selectedPresetBars.isEmpty ? nil : { swappingPreset = true },
                                 sound: actions.allSatisfy { $0.spec.kind == .play } ? sound : nil)
                     .id(actions.map(\.id))
             } else if !layers.isEmpty {
@@ -56,7 +66,8 @@ struct AnimationInspector: View {
                 }
             }
         }
-        .onChange(of: layers.map(\.id)) { pickingPreset = false }
+        .onChange(of: layers.map(\.id)) { pickingPreset = false; swappingPreset = false }
+        .onChange(of: actions.map(\.id)) { swappingPreset = false }
     }
 }
 
