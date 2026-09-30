@@ -17,9 +17,16 @@ struct TimelineRow {
     /// The first row of a layer with more than one action, which carries
     /// the chevron that folds the layer's rows into one.
     var foldable = false
+    /// Set on a scene's own row, which heads its actions' rows and shows
+    /// their span; `members` are its actions in row order.
+    var header: TimelineScene? = nil
+    var members: [Action] = []
+    /// The scene a row's action is in, drawn with its colour.
+    var inScene: UUID? = nil
 
-    /// The actions whose bars the row draws.
-    var actions: [Action] { folded ?? [action] }
+    /// The actions the row stands for: a scene row's members, a folded
+    /// layer's actions, or the row's own.
+    var actions: [Action] { header != nil ? members : folded ?? [action] }
 
     /// A row, a little taller than a panel row so a bar is easy to grab.
     static let height: CGFloat = 34
@@ -33,29 +40,60 @@ struct TimelineRow {
     var layerID: UUID { action.targetLayerID }
 
     /// Every row for `project`, or only those on the layers in `only`. A
-    /// layer in `folded` has one row, where its first would be, carrying all
-    /// its actions.
-    static func rows(of project: Project, only: Set<UUID>? = nil, folded: Set<UUID> = []) -> [TimelineRow] {
+    /// scene's actions sit together under a row of its own where its first
+    /// would be, or only that row while it is in `foldedScenes`. A layer in
+    /// `folded` has one row, where its first would be, carrying all its
+    /// actions (inside a scene, all its actions in that scene).
+    static func rows(of project: Project, only: Set<UUID>? = nil, folded: Set<UUID> = [],
+                     foldedScenes: Set<UUID> = []) -> [TimelineRow] {
         let names = Dictionary(project.allLayers.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
         let order = ActionEditing.timeline(in: project).filter { action in
             names[action.targetLayerID] != nil && (only?.contains(action.targetLayerID) ?? true)
         }
-        var byLayer: [UUID: [Action]] = [:]
-        for action in order { byLayer[action.targetLayerID, default: []].append(action) }
+        var sceneOf: [UUID: TimelineScene] = [:]
+        for scene in project.scenes { for id in scene.actionIDs { sceneOf[id] = scene } }
+        var members: [UUID: [Action]] = [:]
+        for action in order { if let scene = sceneOf[action.id] { members[scene.id, default: []].append(action) } }
+
         var y: CGFloat = 0
-        var started: Set<UUID> = []
         var rows: [TimelineRow] = []
-        for action in order {
+        /// Rows for `actions` (a scene's, or those in no scene), in their
+        /// order, each folded layer as one row at its first, holding its
+        /// actions among these.
+        func folding(_ actions: [Action]) -> (layers: [UUID: [Action]], started: Set<UUID>) {
+            var byLayer: [UUID: [Action]] = [:]
+            for action in actions { byLayer[action.targetLayerID, default: []].append(action) }
+            return (byLayer, [])
+        }
+        func addRow(_ action: Action, among group: inout (layers: [UUID: [Action]], started: Set<UUID>), scene: UUID?) {
             let layer = action.targetLayerID
-            let first = started.insert(layer).inserted
-            let mine = byLayer[layer] ?? []
+            let first = group.started.insert(layer).inserted
+            let mine = group.layers[layer] ?? []
+            let name = names[layer] ?? ""
             if folded.contains(layer), mine.count > 1 {
-                guard first else { continue }
-                rows.append(TimelineRow(action: action, layerName: names[layer] ?? "", y: y, folded: mine, foldable: true))
+                guard first else { return }
+                rows.append(TimelineRow(action: action, layerName: name, y: y, folded: mine, foldable: true, inScene: scene))
             } else {
-                rows.append(TimelineRow(action: action, layerName: names[layer] ?? "", y: y, foldable: first && mine.count > 1))
+                rows.append(TimelineRow(action: action, layerName: name, y: y, foldable: first && mine.count > 1, inScene: scene))
             }
             y += height
+        }
+
+        var loose = folding(order.filter { sceneOf[$0.id] == nil })
+        var shown: Set<UUID> = []
+        for action in order {
+            guard let scene = sceneOf[action.id] else {
+                addRow(action, among: &loose, scene: nil)
+                continue
+            }
+            guard shown.insert(scene.id).inserted else { continue }
+            let mine = members[scene.id] ?? []
+            rows.append(TimelineRow(action: mine[0], layerName: names[mine[0].targetLayerID] ?? "", y: y,
+                                    header: scene, members: mine))
+            y += height
+            guard !foldedScenes.contains(scene.id) else { continue }
+            var inside = folding(mine)
+            for member in mine { addRow(member, among: &inside, scene: scene.id) }
         }
         return rows
     }

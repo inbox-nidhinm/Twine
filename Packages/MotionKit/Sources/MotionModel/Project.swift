@@ -12,13 +12,58 @@ public struct Project: Codable, Sendable, Equatable {
     public var actions: [Action]
     /// Every file copied into the package's `media` folder.
     public var media: [MediaAsset]
+    /// Actions gathered under a name on the timeline, from any layers.
+    /// Left out of the file while there are none.
+    public var scenes: [TimelineScene]
 
     public init(composition: Composition = Composition(), layers: [Layer] = [], actions: [Action] = [],
-                media: [MediaAsset] = []) {
+                media: [MediaAsset] = [], scenes: [TimelineScene] = []) {
         self.composition = composition
         self.layers = layers
         self.actions = actions
         self.media = media
+        self.scenes = scenes
+    }
+
+    private enum CodingKeys: String, CodingKey { case composition, layers, actions, media, scenes }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        composition = try c.decode(Composition.self, forKey: .composition)
+        layers = try c.decode([Layer].self, forKey: .layers)
+        actions = try c.decode([Action].self, forKey: .actions)
+        media = try c.decode([MediaAsset].self, forKey: .media)
+        scenes = try c.decodeIfPresent([TimelineScene].self, forKey: .scenes) ?? []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(composition, forKey: .composition)
+        try c.encode(layers, forKey: .layers)
+        try c.encode(actions, forKey: .actions)
+        try c.encode(media, forKey: .media)
+        if !scenes.isEmpty { try c.encode(scenes, forKey: .scenes) }
+    }
+
+    /// The scene an action is in, if any.
+    public func scene(containing action: UUID) -> TimelineScene? {
+        scenes.first { $0.actionIDs.contains(action) }
+    }
+}
+
+/// Actions from any layers gathered under one name on the timeline, as a
+/// moment of the animation ("Logo reveal"): its rows sit together under a
+/// row of its own that shows how long it runs, folds, and moves or
+/// stretches them all at once. An action is in at most one scene.
+public struct TimelineScene: Codable, Sendable, Equatable, Identifiable {
+    public let id: UUID
+    public var name: String
+    public var actionIDs: [UUID]
+
+    public init(id: UUID = UUID(), name: String, actionIDs: [UUID]) {
+        self.id = id
+        self.name = name
+        self.actionIDs = actionIDs
     }
 }
 

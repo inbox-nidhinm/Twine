@@ -290,7 +290,7 @@ struct StyleValueFields: View {
                 editing("Counter", Self.counter { a, _ in a.from = x })
             }
         }
-        .help("The number it counts from. Empty starts from the number in the text, or 0. Set, it shows from the start of the scene.")
+        .help("The number it counts from. Empty starts from the number in the text, or 0. Set, it shows from the start of the animation.")
         StackedRow(label: "To", swap: swap) {
             UnitField(value: c.to, decimals: 4) { x in editing("Counter", Self.counter { a, _ in a.to = x }) }
         }

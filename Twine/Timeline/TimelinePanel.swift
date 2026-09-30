@@ -49,6 +49,37 @@ struct StaggerCard: View {
     }
 }
 
+/// A scene's name, typed; Return keeps it.
+struct SceneNameCard: View {
+    let controller: EditorController
+    let scene: TimelineScene
+    let close: () -> Void
+
+    @State private var name = ""
+    @FocusState private var typing: Bool
+
+    var body: some View {
+        PopupCard(title: "Rename Scene", width: Theme.cardWidth) {
+            TextField("Name", text: $name)
+                .textFieldStyle(.plain)
+                .font(ThemeFont.label)
+                .focused($typing)
+                .padding(.horizontal, 8)
+                .frame(height: Theme.control)
+                .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+                .focusRing(typing)
+                .onSubmit {
+                    controller.renameScene(scene.id, to: name)
+                    close()
+                }
+                .onAppear {
+                    name = scene.name
+                    typing = true
+                }
+        }
+    }
+}
+
 // MARK: - Transport
 
 /// The play controls, centred over the labels. The time itself rides in the

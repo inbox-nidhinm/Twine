@@ -33,7 +33,7 @@ struct ActionTimeline: NSViewRepresentable {
         // Read here so SwiftUI calls this whenever any of them change.
         _ = (editor.time, editor.selection, editor.selectedActions, editor.timelineOnlySelected,
              editor.viewport.pointsPerSecond, editor.viewport.start, controller.project, editor.revealActions.request,
-             editor.foldedLayers)
+             editor.foldedLayers, editor.foldedScenes)
         tracks.menus = menus
         tracks.reload()
     }
@@ -90,12 +90,18 @@ final class TimelineTracksView: NSView {
     static let eyeBox = 22.0
     /// Where a label's words start, leaving room for the fold chevron.
     static let labelInset = 18.0
+    /// How much further in a scene's rows start, under their scene's line.
+    static let sceneIndent = 10.0
     static let chevronSize = 12.0
 
     private enum Drag {
         case move(originals: [Action], anchor: Action, startX: Double)
         /// Every selected bar with a length trims with the one grabbed.
         case trim(originals: [Action], anchor: Action, startEdge: Bool, startX: Double)
+        /// A scene's span bar: every action in it moves together, or with an
+        /// end grabbed, stretches. `row` is the scene row's, for the guide.
+        case shift(originals: [Action], span: ClosedRange<Double>, row: CGFloat, startX: Double)
+        case stretch(originals: [Action], span: ClosedRange<Double>, row: CGFloat, startEdge: Bool, startX: Double)
         case reorder(action: Action, began: Bool)
         case marquee(start: CGPoint, current: CGPoint, base: Set<UUID>)
         case pan(startX: Double, startTime: Double)
@@ -117,7 +123,7 @@ final class TimelineTracksView: NSView {
         guard let controller else { return }
         let editor = controller.editor
         rows = TimelineRow.rows(of: controller.project, only: editor.timelineOnlySelected ? editor.selection : nil,
-                                folded: editor.foldedLayers)
+                                folded: editor.foldedLayers, foldedScenes: editor.foldedScenes)
         sizeToRows()
         // A selection made elsewhere (the layers panel, the canvas) brings
         // its rows into view.
@@ -199,9 +205,33 @@ final class TimelineTracksView: NSView {
         return nil
     }
 
+    /// A scene row's span bar: from the earliest start of its actions to
+    /// the latest end.
+    private func spanRect(_ row: TimelineRow) -> CGRect? {
+        guard row.header != nil, let span = Scenes.span(of: row.members) else { return nil }
+        let x0 = x(for: span.lowerBound), h = TimelineRow.barHeight
+        return CGRect(x: x0, y: row.y + (TimelineRow.height - h) / 2, width: max(x(for: span.upperBound) - x0, 4), height: h)
+    }
+
+    /// Which end of a scene's span a point would stretch, if any.
+    private func spanEdge(at p: CGPoint, rect: CGRect) -> Bool? {
+        guard p.x >= rect.minX - Self.edgeHit, p.x <= rect.maxX + Self.edgeHit else { return nil }
+        let reach = trimReach(rect)
+        if p.x <= rect.minX + reach { return true }
+        if p.x >= rect.maxX - reach { return false }
+        return nil
+    }
+
+    /// Where a row's words start: in from the chevron, and further in a scene.
+    private func labelInset(_ row: TimelineRow) -> Double {
+        Self.labelInset + (row.inScene != nil ? Self.sceneIndent : 0)
+    }
+
     /// The bar under a point on a row: on a folded row, the one drawn on
-    /// top there (the later in the row's order).
+    /// top there (the later in the row's order). A scene's row has only its
+    /// span, which is handled on its own.
     private func bar(at p: CGPoint, in row: TimelineRow) -> (action: Action, rect: CGRect)? {
+        guard row.header == nil else { return nil }
         for action in row.actions.reversed() {
             let rect = barRect(action, in: row)
             if rect.insetBy(dx: -Self.edgeHit, dy: 0).contains(p) { return (action, rect) }
@@ -211,7 +241,7 @@ final class TimelineTracksView: NSView {
 
     /// The chevron that folds a layer's rows, left of the label's words.
     private func chevronRect(_ row: TimelineRow) -> CGRect {
-        CGRect(x: 0, y: row.y, width: Self.labelInset, height: TimelineRow.height)
+        CGRect(x: 0, y: row.y, width: labelInset(row), height: TimelineRow.height)
     }
 
     private func toggleFold(_ row: TimelineRow) {
@@ -259,6 +289,10 @@ final class TimelineTracksView: NSView {
         if let index, p.x >= gutter, let hit = self.bar(at: p, in: rows[index]) {
             bar = hit.action.id
             trims = trimEdge(at: p, of: hit.action, rect: hit.rect) != nil
+        } else if let index, p.x >= gutter, let scene = rows[index].header, let rect = spanRect(rows[index]),
+                  rect.insetBy(dx: -Self.edgeHit, dy: 0).contains(p) {
+            bar = scene.id
+            trims = spanEdge(at: p, rect: rect) != nil
         }
         if drag == nil { (trims ? Cursors.resizeHorizontal : Cursors.arrow).set() }
         if label != hoveredLabel || bar != hoveredBar {
@@ -332,6 +366,18 @@ final class TimelineTracksView: NSView {
         let full = CGRect(x: 0, y: row.y, width: bounds.width, height: TimelineRow.height)
         let label = CGRect(x: 0, y: row.y, width: gutter, height: TimelineRow.height)
 
+        // A scene's row, the rows in it, and a folded layer's row each take
+        // their own quiet colour, under anything else.
+        if row.header != nil {
+            ctx.setFillColor(NSColor(Theme.timelineScene).withAlphaComponent(0.12).cgColor)
+            ctx.fill(full)
+        } else if row.folded != nil {
+            ctx.setFillColor(NSColor(Theme.timelineFold).withAlphaComponent(0.08).cgColor)
+            ctx.fill(full)
+        } else if row.inScene != nil {
+            ctx.setFillColor(NSColor(Theme.timelineScene).withAlphaComponent(0.04).cgColor)
+            ctx.fill(full)
+        }
         // The row: the accent across it when its action is selected, a tint
         // when only its layer is.
         if selected {
@@ -351,6 +397,12 @@ final class TimelineTracksView: NSView {
         // The faint line under every row.
         ctx.setFillColor(NSColor(Theme.border).withAlphaComponent(0.45).cgColor)
         ctx.fill(CGRect(x: 0, y: row.y + TimelineRow.height - 1, width: bounds.width, height: 1))
+        // Down the left of a scene's rows, its line.
+        if row.inScene != nil {
+            ctx.setFillColor(NSColor(Theme.timelineScene).withAlphaComponent(0.7).cgColor)
+            ctx.fill(CGRect(x: 8, y: row.y, width: 2, height: TimelineRow.height))
+        }
+        if let scene = row.header { return drawScene(scene, row: row, selected: selected, in: ctx) }
 
         // The label: layer, then action.
         let dimmed = row.folded == nil ? !action.isEnabled : row.actions.allSatisfy { !$0.isEnabled }
@@ -362,11 +414,12 @@ final class TimelineTracksView: NSView {
         let showsEye = row.folded == nil && (hoveredLabel == index || !action.isEnabled)
         if row.foldable {
             let size = Self.chevronSize
-            let chevron = CGRect(x: (Self.labelInset - size) / 2 + 2, y: row.y + (TimelineRow.height - size) / 2, width: size, height: size)
+            let chevron = CGRect(x: labelInset(row) - Self.labelInset + (Self.labelInset - size) / 2 + 2,
+                                 y: row.y + (TimelineRow.height - size) / 2, width: size, height: size)
             drawIcon(row.folded == nil ? .chevronDown : .chevronRight, in: chevron,
                      color: NSColor(selected ? Theme.textPrimary : Theme.textTertiary), in: ctx)
         }
-        let inset = Self.labelInset
+        let inset = labelInset(row)
         let room = gutter - inset - (showsEye ? Self.eyeBox + 12 : 12)
         ctx.saveGState()
         ctx.clip(to: CGRect(x: inset, y: row.y, width: max(room, 0), height: TimelineRow.height))
@@ -408,6 +461,59 @@ final class TimelineTracksView: NSView {
         ctx.restoreGState()
     }
 
+    /// A scene's row: its chevron, name and how long it runs, and its span
+    /// bar across the tracks.
+    private func drawScene(_ scene: TimelineScene, row: TimelineRow, selected: Bool, in ctx: CGContext) {
+        let folded = controller?.editor.foldedScenes.contains(scene.id) ?? false
+        let size = Self.chevronSize
+        drawIcon(folded ? .chevronRight : .chevronDown,
+                 in: CGRect(x: (Self.labelInset - size) / 2 + 2, y: row.y + (TimelineRow.height - size) / 2, width: size, height: size),
+                 color: NSColor(selected ? Theme.textPrimary : Theme.timelineScene), in: ctx)
+        let span = Scenes.span(of: row.members) ?? 0...0
+        let rate = controller?.frameRate ?? .fps30
+        let length = controller?.editor.showsFrames == true
+            ? "\(rate.frame(at: span.upperBound) - rate.frame(at: span.lowerBound)) f"
+            : String(format: "%.2f s", span.upperBound - span.lowerBound)
+        let truncating = NSMutableParagraphStyle()
+        truncating.lineBreakMode = .byTruncatingTail
+        let nameAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12, weight: .semibold),
+                                                             .foregroundColor: NSColor(Theme.textPrimary), .paragraphStyle: truncating]
+        let lengthAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular),
+                                                               .foregroundColor: NSColor(selected ? Theme.textPrimary : Theme.textTertiary)]
+        let textY = row.y + (TimelineRow.height - 15) / 2
+        let lengthText = length as NSString
+        let lengthWidth = ceil(lengthText.size(withAttributes: lengthAttributes).width)
+        let room = gutter - Self.labelInset - 12
+        let nameWidth = min(ceil((scene.name as NSString).size(withAttributes: nameAttributes).width), room - lengthWidth - 10)
+        (scene.name as NSString).draw(in: CGRect(x: Self.labelInset, y: textY, width: max(nameWidth, 0), height: 17),
+                                      withAttributes: nameAttributes)
+        lengthText.draw(at: CGPoint(x: Self.labelInset + max(nameWidth, 0) + 10, y: textY), withAttributes: lengthAttributes)
+
+        guard let rect = spanRect(row) else { return }
+        ctx.saveGState()
+        ctx.clip(to: CGRect(x: gutter, y: row.y, width: bounds.width - gutter, height: TimelineRow.height))
+        let path = CGPath(roundedRect: rect, cornerWidth: 6, cornerHeight: 6, transform: nil)
+        ctx.addPath(path)
+        ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.timelineScene).withAlphaComponent(selected ? 1 : 0.45).cgColor)
+        ctx.fillPath()
+        // Where each of its actions runs, faintly, inside the span.
+        ctx.setFillColor(NSColor.white.withAlphaComponent(0.18).cgColor)
+        for member in row.members where !member.isInstant {
+            let x0 = x(for: member.start), x1 = x(for: member.end)
+            ctx.fill(CGRect(x: x0, y: rect.maxY - 5, width: max(x1 - x0, 1), height: 2))
+        }
+        if hoveredBar == scene.id, rect.width >= Self.edgeReach * 2.4 {
+            let handle = Self.handleSize
+            ctx.setFillColor(NSColor(Theme.handle).cgColor)
+            for hx in [rect.minX + Self.handleInset, rect.maxX - Self.handleInset - handle.width] {
+                let r = CGRect(x: hx, y: rect.midY - handle.height / 2, width: handle.width, height: handle.height)
+                ctx.addPath(CGPath(roundedRect: r, cornerWidth: handle.width / 2, cornerHeight: handle.width / 2, transform: nil))
+            }
+            ctx.fillPath()
+        }
+        ctx.restoreGState()
+    }
+
     private func drawBar(_ action: Action, in row: TimelineRow, selected: Bool, dimmed: Bool, ctx: CGContext) {
         let rect = barRect(action, in: row)
         ctx.saveGState()
@@ -417,7 +523,9 @@ final class TimelineTracksView: NSView {
         let radius = shows ? rect.width / 2 : action.isInstant ? 3 : 6.0
         let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
         ctx.addPath(path)
-        ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.panelHover).cgColor)
+        ctx.setFillColor(selected ? NSColor(Theme.accent).cgColor
+                         : row.folded != nil ? NSColor(Theme.timelineFold).withAlphaComponent(0.32).cgColor
+                         : NSColor(Theme.panelHover).cgColor)
         ctx.fillPath()
         // Bars folded together overlap: an edge keeps each one's ends in sight.
         if row.folded != nil {
@@ -509,6 +617,38 @@ final class TimelineTracksView: NSView {
 
         // The label: the eye switches the action off; a drag reorders.
         // Nothing here is renamed: a double-click is two clicks.
+        // A scene's row: its chevron folds it, its name picks all its
+        // actions, and its span bar moves them together, or with an end
+        // grabbed, stretches them.
+        if let scene = row.header {
+            var ids = Set(row.members.map(\.id))
+            if extending { ids.formUnion(controller.selectedActions.map(\.id)) }
+            if p.x < gutter {
+                if CGRect(x: 0, y: row.y, width: Self.labelInset, height: TimelineRow.height).contains(p) {
+                    let editor = controller.editor
+                    if editor.foldedScenes.contains(scene.id) { editor.foldedScenes.remove(scene.id) } else { editor.foldedScenes.insert(scene.id) }
+                    return
+                }
+                controller.selectActions(ids)
+                rangeAnchor = row.action.id
+                needsDisplay = true
+                return
+            }
+            guard let rect = spanRect(row), rect.insetBy(dx: -Self.edgeHit, dy: 0).contains(p),
+                  let span = Scenes.span(of: row.members) else { return startEmptyDrag(at: p, event: event) }
+            controller.selectActions(ids)
+            guard !extending else { return }
+            if let startEdge = spanEdge(at: p, rect: rect) {
+                drag = .stretch(originals: row.members, span: span, row: row.y, startEdge: startEdge, startX: p.x)
+                controller.begin("Stretch Scene")
+            } else {
+                drag = .shift(originals: row.members, span: span, row: row.y, startX: p.x)
+                controller.begin("Move Scene")
+            }
+            needsDisplay = true
+            return
+        }
+
         if p.x < gutter {
             if row.foldable, chevronRect(row).contains(p) { return toggleFold(row) }
             // A folded row's label picks all its actions; it has no one row to drag.
@@ -599,7 +739,7 @@ final class TimelineTracksView: NSView {
         // can outrun the drawing.
         let editor = controller.editor
         let current = TimelineRow.rows(of: controller.project, only: editor.timelineOnlySelected ? editor.selection : nil,
-                                       folded: editor.foldedLayers)
+                                       folded: editor.foldedLayers, foldedScenes: editor.foldedScenes)
         // A bar on a folded row moves only in time: its layer's rows are gathered up.
         guard !editor.foldedLayers.contains(action.targetLayerID) || !current.contains(where: { $0.folded?.contains { $0.id == action.id } ?? false })
         else { return [] }
@@ -658,11 +798,32 @@ final class TimelineTracksView: NSView {
                                                 mediaLength: { controller.asset(ofLayer: $0.targetLayerID)?.duration })
             controller.update(.updateActions(trimmed))
 
+        case .shift(let originals, let span, let row, let startX):
+            var delta = snapped((p.x - startX) / viewport.pointsPerSecond, edges: [span.lowerBound, span.upperBound],
+                                ignoring: Set(originals.map(\.id)), row: row, event: event)
+            delta = max(delta, -span.lowerBound)
+            controller.update(.updateActions(Scenes.stretched(originals, from: span,
+                                                              to: (span.lowerBound + delta)...(span.upperBound + delta), rate: rate)))
+
+        case .stretch(let originals, let span, let row, let startEdge, let startX):
+            let edge = startEdge ? span.lowerBound : span.upperBound
+            let delta = snapped((p.x - startX) / viewport.pointsPerSecond, edges: [edge], ignoring: Set(originals.map(\.id)),
+                                row: row, event: event)
+            let shortest = rate.frameDuration
+            let new = startEdge
+                ? min(max(span.lowerBound + delta, 0), span.upperBound - shortest)...span.upperBound
+                : span.lowerBound...max(span.upperBound + delta, span.lowerBound + shortest)
+            controller.update(.updateActions(Scenes.stretched(originals, from: span, to: new, rate: rate)))
+
         case .marquee(let start, _, let base):
             self.drag = .marquee(start: start, current: p, base: base)
             let box = CGRect(x: min(start.x, p.x), y: min(start.y, p.y), width: abs(p.x - start.x), height: abs(p.y - start.y))
             var picked = base
             for row in rows {
+                if row.header != nil {
+                    if spanRect(row)?.intersects(box) == true { picked.formUnion(row.members.map(\.id)) }
+                    continue
+                }
                 for action in row.actions where barRect(action, in: row).intersects(box) { picked.insert(action.id) }
             }
             if picked.isEmpty { controller.deselectActions() } else { controller.selectActions(picked) }
@@ -676,7 +837,7 @@ final class TimelineTracksView: NSView {
     override func mouseUp(with event: NSEvent) {
         guard let drag else { return }
         switch drag {
-        case .move, .trim: controller?.end()
+        case .move, .trim, .shift, .stretch: controller?.end()
         case .reorder(_, let began): if began { controller?.end() }
         case .marquee(let start, let current, _):
             // A click rather than a box: the playhead goes there.
@@ -713,6 +874,13 @@ final class TimelineTracksView: NSView {
         var targets: [(time: Double, row: CGFloat?)] = [(controller.editor.time, nil), (controller.duration, nil), (0, nil)]
         let visible = visibleRect
         for r in rows where r.y + TimelineRow.height > visible.minY && r.y < visible.maxY {
+            if r.header != nil {
+                if let span = Scenes.span(of: r.members), !r.members.contains(where: { ignoring.contains($0.id) }) {
+                    targets.append((span.lowerBound, r.y))
+                    targets.append((span.upperBound, r.y))
+                }
+                continue
+            }
             for action in r.actions where !ignoring.contains(action.id) {
                 targets.append((action.start, r.y))
                 if !action.isInstant { targets.append((action.end, r.y)) }
@@ -761,6 +929,14 @@ final class TimelineTracksView: NSView {
             .item("Paste", disabled: !controller.canPasteActions) { controller.pasteActions(onto: onto.isEmpty ? nil : onto) },
             .separator,
             .item("Duplicate", disabled: controller.selectedActions.isEmpty) { controller.duplicateSelectedActions() },
+            .separator,
+            .item("Group into Scene", disabled: controller.selectedActions.isEmpty) { controller.groupSelectedActionsIntoScene() },
+            .item("Rename Scene…", disabled: controller.selectedScene == nil) {
+                if let scene = controller.selectedScene {
+                    menus.showPopup(at: origin) { SceneNameCard(controller: controller, scene: scene) { menus.dismiss() } }
+                }
+            },
+            .item("Ungroup Scene", disabled: !controller.selectionHasScenes) { controller.ungroupSelectedScenes() },
             .separator,
             .item("Stagger…", disabled: controller.selectedActions.count < 2) {
                 menus.showPopup(at: origin) { StaggerCard(controller: controller) { menus.dismiss() } }

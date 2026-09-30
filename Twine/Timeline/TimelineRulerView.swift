@@ -130,7 +130,7 @@ final class TimelineRulerView: NSView {
         let p = convert(event.locationInWindow, from: nil)
         if abs(p.x - endX) <= 5 {
             draggingEnd = true
-            controller.begin("Scene Length")
+            controller.begin("Change Duration")
             window?.invalidateCursorRects(for: self)
             return
         }

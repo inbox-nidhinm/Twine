@@ -79,6 +79,16 @@ struct ActionInspector: View {
                     .padding(.vertical, Theme.panelPad)
             }
 
+            // Several actions picked: gather them into a timeline scene.
+            if actions.count > 1, controller.selectedScene?.actionIDs.count != actions.count {
+                PanelDivider()
+                PanelButton(title: "Group into Scene", icon: .plus) { controller.groupSelectedActionsIntoScene() }
+                    .help("Gathers these actions under one row on the timeline that shows how long they run, "
+                          + "folds, and moves or stretches them together.")
+                    .gridBody()
+                    .padding(.vertical, Theme.panelPad)
+            }
+
             // At the end, another action or preset for the same layers, so
             // there is no need to pick the layer again.
             if !newActions.isEmpty || pickPreset != nil {
@@ -334,7 +344,7 @@ private struct TimingFields: View {
                     let t = rate.snapped(frames ? rate.time(ofFrame: Int(v.rounded())) : v)
                     controller.editActions("Change Timing") { $0.start = max(t, 0) }
                 }
-                .help("When it starts, from the beginning of the scene.")
+                .help("When it starts, from the beginning of the animation.")
             }
             if first.spec.kind != .visibility {
                 named("Duration") {

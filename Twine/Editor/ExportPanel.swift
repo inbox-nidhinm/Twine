@@ -136,7 +136,7 @@ struct ExportPanel: View {
                           + "A PNG is the frame under the playhead, or in Design, the layout as designed.")
                 if isMovie {
                     MenuField(value: "\(exportRate.label) fps", entries: rateEntries)
-                        .help("The movie's frame rate. The scene is the same; a lower rate shows it less often.")
+                        .help("The movie's frame rate. The animation is the same; a lower rate shows it less often.")
                 }
             }
         }
@@ -145,7 +145,7 @@ struct ExportPanel: View {
 
     private var rangeSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            MenuRow(label: "Range", value: session.range == nil ? "Whole scene" : "Part of the scene", entries: rangeEntries)
+            MenuRow(label: "Range", value: session.range == nil ? "Whole animation" : "Part of the animation", entries: rangeEntries)
             if let range = session.range {
                 HStack(spacing: 8) {
                     UnitField(unit: "From", value: range.lowerBound, decimals: 2, suffix: "s",
@@ -157,7 +157,7 @@ struct ExportPanel: View {
                         session.range = range.lowerBound...min(snapped(v), composition.duration)
                     }
                 }
-                .help("The part of the scene to export, in seconds. The movie starts at From.")
+                .help("The part of the animation to export, in seconds. The movie starts at From.")
             }
         }
         .padding(Theme.panelPad)
@@ -300,8 +300,8 @@ struct ExportPanel: View {
 
     private func rangeEntries() -> [MenuEntry] {
         [
-            .item("Whole scene", checked: session.range == nil) { session.range = nil },
-            .item("Part of the scene", checked: session.range != nil) {
+            .item("Whole animation", checked: session.range == nil) { session.range = nil },
+            .item("Part of the animation", checked: session.range != nil) {
                 if session.range == nil { session.range = 0...composition.duration }
             },
         ]

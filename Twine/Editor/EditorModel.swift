@@ -148,6 +148,8 @@ final class EditorModel {
     var timelineOnlySelected = false
     /// Layers whose timeline rows are folded into one.
     var foldedLayers: Set<UUID> = []
+    /// Timeline scenes folded to their one row.
+    var foldedScenes: Set<UUID> = []
     /// The timeline card's height, which its top edge drags. Remembered for
     /// every window and every launch.
     var timelineHeight: CGFloat = EditorModel.savedTimelineHeight

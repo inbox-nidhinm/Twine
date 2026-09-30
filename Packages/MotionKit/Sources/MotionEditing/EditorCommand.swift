@@ -31,6 +31,8 @@ public enum EditorCommand: Sendable {
     /// Replaces actions wholesale with edited copies, matched by id.
     case updateActions([Action])
     case deleteActions(Set<UUID>)
+    /// The timeline's scenes, all of them, as they should be.
+    case setScenes([TimelineScene])
     /// Several commands applied in order as one undo step, such as grouping,
     /// which takes layers out and puts a group in. If any fails, none apply.
     case batch([EditorCommand], name: String)
@@ -51,6 +53,7 @@ public enum EditorCommand: Sendable {
         case .insertActions(let actions): return actions.count == 1 ? "Add Action" : "Add Actions"
         case .updateActions: return "Edit Action"
         case .deleteActions(let ids): return ids.count == 1 ? "Delete Action" : "Delete Actions"
+        case .setScenes: return "Edit Scenes"
         case .batch(_, let name): return name
         }
     }
@@ -65,6 +68,15 @@ public enum EditorCommand: Sendable {
         // goes with its layer, whichever command took the layer away.
         let remaining = Set(draft.allLayers.map(\.id))
         draft.actions.removeAll { !remaining.contains($0.targetLayerID) }
+        // A scene holds only actions still there, and goes when it holds none.
+        if !draft.scenes.isEmpty {
+            let actions = Set(draft.actions.map(\.id))
+            draft.scenes = draft.scenes.compactMap { scene in
+                var kept = scene
+                kept.actionIDs = scene.actionIDs.filter(actions.contains)
+                return kept.actionIDs.isEmpty ? nil : kept
+            }
+        }
         // Likewise a mask naming a layer that is not there. Checked once
         // the whole command is done, so a batch that takes a layer out and
         // puts it back, as ungrouping does, keeps the masks that name it,
@@ -166,6 +178,8 @@ public enum EditorCommand: Sendable {
 
         case .deleteActions(let ids):
             p.actions.removeAll { ids.contains($0.id) }
+        case .setScenes(let scenes):
+            p.scenes = scenes
 
         case .batch(let commands, _):
             for command in commands { try command.apply(into: &p) }

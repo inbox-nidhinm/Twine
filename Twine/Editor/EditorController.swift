@@ -809,6 +809,42 @@ final class EditorController {
         }
     }
 
+    // MARK: Scenes
+
+    /// Gathers the selected actions into a new timeline scene, taking them
+    /// out of any they were in, and opens it.
+    func groupSelectedActionsIntoScene() {
+        guard let made = Scenes.grouping(Set(selectedActions.map(\.id)), in: project) else { return NSSound.beep() }
+        if perform(.batch([.setScenes(made.scenes)], name: "Group into Scene")) {
+            editor.foldedScenes.remove(made.made.id)
+        }
+    }
+
+    /// The one scene every selected action is in, if they are all in one.
+    var selectedScene: TimelineScene? {
+        let scenes = Set(selectedActions.compactMap { project.scene(containing: $0.id)?.id })
+        guard scenes.count == 1, let id = scenes.first, selectedActions.allSatisfy({ project.scene(containing: $0.id) != nil })
+        else { return nil }
+        return project.scenes.first { $0.id == id }
+    }
+
+    var selectionHasScenes: Bool { selectedActions.contains { project.scene(containing: $0.id) != nil } }
+
+    /// Undoes the scenes the selected actions are in; the actions stay.
+    func ungroupSelectedScenes() {
+        let scenes = Scenes.ungrouping(Set(selectedActions.map(\.id)), in: project)
+        guard scenes != project.scenes else { return }
+        perform(.batch([.setScenes(scenes)], name: "Ungroup Scene"))
+    }
+
+    func renameScene(_ id: UUID, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let i = project.scenes.firstIndex(where: { $0.id == id }), project.scenes[i].name != trimmed else { return }
+        var scenes = project.scenes
+        scenes[i].name = trimmed
+        perform(.batch([.setScenes(scenes)], name: "Rename Scene"))
+    }
+
     /// Moves the selected actions by whole frames.
     func nudgeActions(frames: Int) {
         let moved = ActionEditing.moved(selectedActions, by: Double(frames) * frameRate.frameDuration, rate: frameRate)
