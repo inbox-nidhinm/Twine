@@ -551,61 +551,68 @@ final class ExportPreviewView: NSView {
 // MARK: - The counter
 
 /// The export's progress as a big number and a percent sign, counting as an
-/// odometer does: each digit rolls on its own when it changes, the old one
-/// rising one type size and fading out while the new one rises into place
-/// from one type size below, and the percent sign stays still. A digit
-/// place that appears (10, 100) rolls in the same way.
+/// odometer does: each digit that changes rolls, the old one rising one type
+/// size and fading out while the new one rises into place from one type size
+/// below, and the percent sign stays still. A digit place that appears (10,
+/// 100) rolls in the same way. The places roll together, from one number to
+/// the next: rolled one by one, a place still finishing its last roll could
+/// show a number that never was, as 109 on the way to 100. A roll always
+/// finishes; a number that changed meanwhile rolls in straight after.
 private struct SlideCounter: View {
     let value: Int
     let size: CGFloat
 
+    /// The number showing, which trails `value` while a roll is under way.
+    @State private var shown: Int?
+    @State private var rolling = false
+
+    /// Never past 100, whatever the export reports.
+    private var target: Int { min(max(value, 0), 100) }
+
     var body: some View {
-        let digits = Array(String(max(value, 0)))
+        let digits = Array(String(shown ?? target))
         HStack(spacing: 0) {
             HStack(spacing: 0) {
                 // Places counted from the right, so the ones stay the ones.
                 ForEach((0..<digits.count).reversed(), id: \.self) { place in
                     RollingDigit(digit: digits[digits.count - 1 - place], size: size)
-                        .transition(.asymmetric(insertion: .offset(y: size).combined(with: .opacity),
-                                                removal: .offset(y: -size).combined(with: .opacity)))
+                        .transition(Self.roll(size))
                 }
             }
-            .animation(Theme.counterEase, value: digits.count)
             Figures(text: "%", size: size)
         }
         .fixedSize()
+        .onAppear { shown = target }
+        .onChange(of: target) { _, _ in roll() }
+    }
+
+    static func roll(_ size: CGFloat) -> AnyTransition {
+        .asymmetric(insertion: .offset(y: size).combined(with: .opacity),
+                    removal: .offset(y: -size).combined(with: .opacity))
+    }
+
+    private func roll() {
+        guard !rolling, shown != target else { return }
+        rolling = true
+        withAnimation(Theme.counterEase, completionCriteria: .removed) {
+            shown = target
+        } completion: {
+            rolling = false
+            roll()
+        }
     }
 }
 
-/// One place of the counter. A roll always finishes; a digit that changed
-/// meanwhile rolls in straight after, so at most two show at once.
+/// One place of the counter, rolling whenever its digit changes.
 private struct RollingDigit: View {
     let digit: Character
     let size: CGFloat
 
-    /// The digit showing, which trails `digit` while a roll is under way.
-    @State private var shown: Character?
-    @State private var rolling = false
-
     var body: some View {
         ZStack {
-            Figures(text: String(shown ?? digit), size: size)
-                .id(shown)
-                .transition(.asymmetric(insertion: .offset(y: size).combined(with: .opacity),
-                                        removal: .offset(y: -size).combined(with: .opacity)))
-        }
-        .onAppear { shown = digit }
-        .onChange(of: digit) { _, _ in roll() }
-    }
-
-    private func roll() {
-        guard !rolling, shown != digit else { return }
-        rolling = true
-        withAnimation(Theme.counterEase, completionCriteria: .removed) {
-            shown = digit
-        } completion: {
-            rolling = false
-            roll()
+            Figures(text: String(digit), size: size)
+                .id(digit)
+                .transition(SlideCounter.roll(size))
         }
     }
 }
