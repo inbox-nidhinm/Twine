@@ -24,7 +24,8 @@ struct ShortcutsCard: View {
                     Spacer(minLength: 0)
                     IconButton(icon: .close, help: "Close (Esc or ⌘/)", action: dismiss)
                 }
-                .padding(.horizontal, pad)
+                .padding(.leading, pad)
+                .padding(.trailing, Theme.sheetCloseInset)
                 .frame(height: Theme.sheetHeader)
                 .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: Theme.hairline) }
 

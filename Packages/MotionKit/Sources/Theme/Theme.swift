@@ -106,6 +106,10 @@ public enum Theme {
     public static let hairline: CGFloat = 1
     public static let cardHeader: CGFloat = 34
     public static let sheetHeader: CGFloat = 38
+    /// How far a sheet's close button sits in from the right: as far as it
+    /// sits down from the top, so the cross reads as tucked into the corner.
+    /// The sheet's own side inset left it twice as far in as down.
+    public static let sheetCloseInset: CGFloat = (sheetHeader - control) / 2
     /// The bar on a slider's or a switch's pill that says it drags.
     public static let gripWidth: CGFloat = 2
     public static let gripHeight: CGFloat = 10

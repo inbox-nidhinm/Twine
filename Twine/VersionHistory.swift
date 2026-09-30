@@ -52,6 +52,7 @@ enum VersionHistory {
             "Playing a project with many sound clips no longer stutters. With a dozen clicks and sounds, asking the sound player where it was held up every frame for most of a second, so playback ran at two frames a second and the sound kept restarting. It now plays at a full 60, with the sound within a hundredth of a second of the playhead.",
             "The tool bar's hover highlight slides as smoothly right to left as left to right. Going leftwards it could stick to the tool just left.",
         ], misc: [
+            "The close buttons on the Keyboard Shortcuts and Version History cards sit as far in from the right as they sit down from the top, tucked into the corner.",
             "The canvas shows a lighter motion blur as you play and scrub; exports draw it at full quality, so frames with motion blur take longer to export.",
             "An action switched off in the timeline always shows its crossed-out eye, not only under the pointer, as a hidden layer does in the layers panel. Clicking it switches the action back on.",
             "Back to Presets and the plus beside an action's name are gone. New Action and Select Preset stay at the foot of the inspector.",
@@ -315,7 +316,8 @@ struct VersionHistoryCard: View {
                     Spacer(minLength: 0)
                     IconButton(icon: .close, help: "Close (Esc)", action: dismiss)
                 }
-                .padding(.horizontal, pad)
+                .padding(.leading, pad)
+                .padding(.trailing, Theme.sheetCloseInset)
                 .frame(height: Theme.sheetHeader)
                 .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: Theme.hairline) }
 
