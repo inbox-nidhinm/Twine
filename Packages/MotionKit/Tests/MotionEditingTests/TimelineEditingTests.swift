@@ -118,6 +118,69 @@ import MotionEvaluation
         #expect(ActionEditing.pasted([resize], onto: [group], at: 0, in: project, rate: rate).isEmpty)
     }
 
+    @Test func aMovePastedOntoAnotherLayerMakesTheSameMotionFromItsOwnPlace() throws {
+        // The square's centre is at (5, 5); the other layer's at (100, 200).
+        let other = LayerFactory.shape(.rectangle, in: Box(minX: 90, minY: 190, maxX: 110, maxY: 210), name: "O")
+        let project = Project(layers: [square, other])
+        var move = Action(target: square.id, start: 0, duration: 1, spec: .move(MoveAction(mode: .to, initial: Vec2(0, 5), end: Vec2(45, 5))))
+        move.motionBlur = 0.5
+        let origin = ActionOrigin(ActionTracks([move]).inheritedState(for: move, of: square))
+        let pasted = ActionEditing.pasted([move], onto: [other], at: 2, in: project, rate: rate, origins: [move.id: origin])
+        guard case .move(let m) = try #require(pasted.first).spec else { Issue.record("not a move"); return }
+        // From 5 to the left of it, to 40 to the right, as on the square.
+        #expect(m.initial == Vec2(95, 200) && m.end == Vec2(140, 200) && m.mode == .to)
+        #expect(pasted.first?.start == 2 && pasted.first?.duration == 1 && pasted.first?.motionBlur == 0.5)
+        // Back on its own layer, it is copied exactly.
+        let back = ActionEditing.pasted([move], onto: [square], at: 2, in: project, rate: rate, origins: [move.id: origin])
+        #expect(back.first?.spec == move.spec)
+        // By values are the same motion wherever they go.
+        let by = Action(target: square.id, start: 0, duration: 1, spec: .move(MoveAction(mode: .by, end: Vec2(10, 0))))
+        let byOrigin = ActionOrigin(ActionTracks([by]).inheritedState(for: by, of: square))
+        #expect(ActionEditing.pasted([by], onto: [other], at: 0, in: project, rate: rate, origins: [by.id: byOrigin]).first?.spec == by.spec)
+    }
+
+    @Test func scalesTurnsAndSizesCarryByRatioAndDifference() {
+        let from = ActionOrigin(position: .zero, scale: Vec2(1, 1), rotation: 10, size: Size2(100, 50))
+        let to = ActionOrigin(position: .zero, scale: Vec2(2, 2), rotation: 40, size: Size2(200, 200))
+        func carried(_ spec: ActionSpec) -> ActionSpec {
+            ActionEditing.carried(Action(target: square.id, start: 0, duration: 1, spec: spec), from: from, to: to).spec
+        }
+        #expect(carried(.scale(ScaleAction(mode: .to, end: Vec2(1.5, 1.5)))) == .scale(ScaleAction(mode: .to, end: Vec2(3, 3))))
+        #expect(carried(.rotate(RotateAction(mode: .to, initial: 0, end: 90))) == .rotate(RotateAction(mode: .to, initial: 30, end: 120)))
+        #expect(carried(.resize(ResizeAction(end: Size2(150, 25)))) == .resize(ResizeAction(end: Size2(300, 100))))
+        // Nothing else changes.
+        #expect(carried(.opacity(OpacityAction(end: 0.2))) == .opacity(OpacityAction(end: 0.2)))
+    }
+
+    @Test func pastedActionsJoinTheirLayersRows() {
+        let other = LayerFactory.shape(.ellipse, in: Box(minX: 0, minY: 0, maxX: 5, maxY: 5), name: "O")
+        let lone = LayerFactory.shape(.ellipse, in: Box(minX: 0, minY: 0, maxX: 5, maxY: 5), name: "L")
+        let a = action(0, row: 0), b = action(0, row: 1, on: other), c = action(0, row: 2)
+        let project = Project(layers: [square, other, lone], actions: [a, b, c])
+        let onOther = action(1, on: other), onLone = action(1, on: lone)
+        let placed = ActionEditing.placingWithTheirLayers([onOther, onLone], in: project)
+        var p = project
+        p.actions = project.actions.map { old in placed.moved.first { $0.id == old.id } ?? old } + placed.actions
+        // Just under the other layer's row; one for a layer with none goes last.
+        #expect(ActionEditing.timeline(in: p).map(\.id) == [a.id, b.id, onOther.id, c.id, onLone.id])
+        #expect(placed.moved.map(\.id) == [c.id])
+    }
+
+    @Test func textAndSoundPresetsOnlyPasteWhereTheyFit() {
+        let text = Layer(name: "T", content: .text(TextContent(text: "abc")), size: Size2(40, 20), position: .zero)
+        let project = Project(layers: [square, text])
+        var letters = PresetRecipe.defaults(.slideIn)
+        letters.unit = .letters
+        let bar = Action(target: text.id, start: 0, duration: 1, spec: .preset(letters))
+        #expect(ActionEditing.pasted([bar], onto: [square], at: 0, in: project, rate: rate).isEmpty)
+        #expect(ActionEditing.pasted([bar], onto: [text], at: 0, in: project, rate: rate).count == 1)
+        let fade = Action(target: square.id, start: 0, duration: 1, spec: .preset(PresetRecipe.defaults(.fadeSoundIn)))
+        #expect(ActionEditing.pasted([fade], onto: [square], at: 0, in: project, rate: rate).isEmpty)
+        // An ordinary preset goes onto any layer that draws, Out as well as In.
+        let out = Action(target: text.id, start: 0, duration: 1, spec: .preset(PresetRecipe.defaults(.slideOut)))
+        #expect(ActionEditing.pasted([out], onto: [square], at: 0, in: project, rate: rate).count == 1)
+    }
+
     @Test func pastedRowsGoToTheBottom() {
         let project = Project(layers: [square], actions: [action(0, row: 4)])
         let rows = ActionEditing.appendingRows([action(1), action(2)], in: project)

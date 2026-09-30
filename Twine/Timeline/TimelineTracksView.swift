@@ -679,7 +679,13 @@ final class TimelineTracksView: NSView {
         let inWindow = convert(p, to: nil)
         let origin = CGPoint(x: inWindow.x, y: content.bounds.height - inWindow.y)
         let editor = controller.editor
+        // Pasted onto the layers of the rows picked, or of the row clicked.
+        let onto = Array(Set(controller.selectedActions.map(\.targetLayerID))).compactMap(controller.project.layer(withID:))
         menus.show([
+            .item("Cut", disabled: controller.selectedActions.isEmpty) { controller.cutSelectedActions() },
+            .item("Copy", disabled: controller.selectedActions.isEmpty) { controller.copySelectedActions() },
+            .item("Paste", disabled: !controller.canPasteActions) { controller.pasteActions(onto: onto.isEmpty ? nil : onto) },
+            .separator,
             .item("Duplicate", disabled: controller.selectedActions.isEmpty) { controller.duplicateSelectedActions() },
             .separator,
             .item("Stagger…", disabled: controller.selectedActions.count < 2) {

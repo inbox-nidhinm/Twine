@@ -39,9 +39,11 @@ enum VersionHistory {
             "Amount sets how long the shutter stays open: 50% is a 180° shutter, 100% a whole frame.",
             "Only what that action moves smears; anything else the layer does at the same time stays sharp. Text presets that move letter by letter blur each letter by its own motion.",
             "Swap Preset. With a preset selected, Swap Preset puts another in its place. The bar keeps when it starts and takes the new preset's name, easing and length unless you had changed them.",
+            "Copy actions from one layer onto another. Copy bars in the timeline (Command-C, or Cut and Copy on a bar's right-click menu), then paste onto another layer with Command-V, Paste on a timeline row's right-click menu, or Paste Action on a layer's right-click menu. Each lands at the playhead on a row just under that layer's others, with the same length, easing and settings, and makes the same motion from where the new layer stands: a Move to a spot travels as far the same way.",
             "Duplicate in the timeline, from the right-click menu or Command-D. The copy goes on the row just below its original, starting where the original ends, and is selected.",
             "A plainer tool bar. The tools sit straight on the bar without the darker tray behind them, the hover highlight slides from tool to tool as the pointer moves along the bar, and the blue of the tool in hand slides to the next tool picked, by a click or its key.",
         ], fixes: [
+            "Presets copied in the timeline paste onto other layers too. Before, only ordinary actions did.",
             "In exports, a light layer no longer turns white while it blurs. Exports draw each moment across the shutter in full and average them exactly, so groups, masks and blend modes inside a blurring layer look right too.",
             "A layer with motion blur no longer flashes somewhere else for a frame where its motion jumps, as when a Move starts from a From of its own, or where it turns out of edge-on. Those frames are drawn sharp.",
             "Once its blur ends, a layer is drawn exactly as it was before it blurred.",

@@ -332,6 +332,11 @@ extension EditorController {
             .item("Frame Selection") { self.frameSelection() },
         ]
         if layer.isGroup { entries.append(.item("Ungroup") { self.ungroupSelection() }) }
+        // Copied actions go onto this layer, or every selected one it is among.
+        if editor.mode == .animate, canPasteActions {
+            let onto = editor.selection.contains(layer.id) ? selectedLayers : [layer]
+            entries += [.separator, .item(copiedActionCount == 1 ? "Paste Action" : "Paste Actions") { self.pasteActions(onto: onto) }]
+        }
         entries += [
             .separator,
             .item(layer.isSoloed ? "Unsolo" : "Solo") { self.perform(.setSoloed([layer.id], !layer.isSoloed)) },

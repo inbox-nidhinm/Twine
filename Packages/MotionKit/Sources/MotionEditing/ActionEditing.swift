@@ -1,5 +1,6 @@
 import Foundation
 import MotionModel
+import MotionEvaluation
 
 /// The timeline's edits to actions, worked out as plain values so they can
 /// be tested without a window. Every time they produce lands on a frame.
@@ -151,8 +152,14 @@ public enum ActionEditing {
     /// keeping their spacing. With `targets`, every action goes to each
     /// target layer that can take it; without, each goes back to its own
     /// layer if that still exists.
-    public static func pasted(_ actions: [Action], onto targets: [Layer], at time: Double,
-                              in project: Project, rate: FrameRate) -> [Action] {
+    ///
+    /// On a layer other than its own, an action with its `origin` (where
+    /// its own layer stood as it began) makes the same motion from where the
+    /// new layer stands: a Move To travels as far the same way, a Scale To
+    /// grows by as much, a starting value moves along with it (`carried`).
+    /// Back on its own layer it is copied exactly.
+    public static func pasted(_ actions: [Action], onto targets: [Layer], at time: Double, in project: Project,
+                              rate: FrameRate, origins: [UUID: ActionOrigin] = [:]) -> [Action] {
         guard let earliest = actions.map(\.start).min() else { return [] }
         func place(_ a: Action, on target: UUID) -> Action {
             copy(of: a, target: target, start: rate.snapped(max(0, time + a.start - earliest)))
@@ -160,15 +167,105 @@ public enum ActionEditing {
         if targets.isEmpty {
             return actions.filter { project.layer(withID: $0.targetLayerID) != nil }.map { place($0, on: $0.targetLayerID) }
         }
-        return targets.flatMap { layer in
+        var placed: [Action] = []
+        for layer in targets {
             let allowed = Set(ActionFactory.kinds(for: layer, in: project))
-            return actions.filter { allowed.contains($0.spec.kind) }.map { place($0, on: layer.id) }
+            let presets = Presets.available(for: [layer], in: project)
+            for action in actions.sorted(by: { $0.start < $1.start }) where fits(action, on: layer, allowed: allowed, presets: presets) {
+                var made = place(action, on: layer.id)
+                if layer.id != action.targetLayerID, let origin = origins[action.id] {
+                    // Where the new layer stands as the copy begins, after
+                    // what is already on it and what went on before it.
+                    let tracks = ActionTracks(project.actions + placed + [made])
+                    made = carried(made, from: origin, to: ActionOrigin(tracks.inheritedState(for: made, of: layer)))
+                }
+                placed.append(made)
+            }
         }
+        return placed
+    }
+
+    /// Whether an action suits the layer it would be pasted onto: one of
+    /// the kinds it can take, or a preset it is offered (either way round),
+    /// one moving letters only on text.
+    private static func fits(_ action: Action, on layer: Layer, allowed: Set<ActionKind>, presets: [Preset]) -> Bool {
+        guard case .preset(let p) = action.spec else { return allowed.contains(action.spec.kind) }
+        return (p.unit == nil || layer.isText) && presets.contains { $0.kind == p.preset || $0.kind.reversed == p.preset }
+    }
+
+    /// `action` moved from a layer that stood at `from` to one standing at
+    /// `to`: its To value and its starting value shifted by the difference
+    /// in place, turn, skew and tilt, and scaled by the ratio of scale and
+    /// size, so it makes the same motion. By values already are relative
+    /// and stay; a curved Move's handles are relative to its ends.
+    public static func carried(_ action: Action, from: ActionOrigin, to: ActionOrigin) -> Action {
+        func ratio(_ a: Double, _ b: Double) -> Double { abs(a) > 1e-9 ? b / a : 1 }
+        let shift = Vec2(to.position.x - from.position.x, to.position.y - from.position.y)
+        let grow = Vec2(ratio(from.scale.x, to.scale.x), ratio(from.scale.y, to.scale.y))
+        let widen = Size2(ratio(from.size.width, to.size.width), ratio(from.size.height, to.size.height))
+        let turn = to.rotation - from.rotation
+        let slant = Vec2(to.skew.x - from.skew.x, to.skew.y - from.skew.y)
+        var a = action
+        switch action.spec {
+        case .move(var m):
+            if m.mode == .to { m.end = m.end + shift }
+            m.initial = m.initial.map { $0 + shift }
+            a.spec = .move(m)
+        case .scale(var s):
+            if s.mode == .to { s.end = Vec2(s.end.x * grow.x, s.end.y * grow.y) }
+            s.initial = s.initial.map { Vec2($0.x * grow.x, $0.y * grow.y) }
+            a.spec = .scale(s)
+        case .rotate(var r):
+            if r.mode == .to { r.end += turn }
+            r.initial = r.initial.map { $0 + turn }
+            a.spec = .rotate(r)
+        case .resize(var r):
+            r.end = Size2(r.end.width * widen.width, r.end.height * widen.height)
+            r.initial = r.initial.map { Size2($0.width * widen.width, $0.height * widen.height) }
+            a.spec = .resize(r)
+        case .skew(var s):
+            if s.mode == .to { s.end = s.end + slant }
+            s.initial = s.initial.map { $0 + slant }
+            a.spec = .skew(s)
+        case .tilt(var t):
+            func tilted(_ v: Tilt) -> Tilt {
+                Tilt(x: v.x + to.tilt.x - from.tilt.x, y: v.y + to.tilt.y - from.tilt.y, depth: v.depth)
+            }
+            if t.mode == .to { t.end = tilted(t.end) }
+            t.initial = t.initial.map(tilted)
+            a.spec = .tilt(t)
+        default:
+            break
+        }
+        return a
     }
 
     private static func copy(of a: Action, target: UUID, start: Double) -> Action {
-        Action(target: target, start: start, duration: a.duration, easing: a.easing, name: a.name,
-               isEnabled: a.isEnabled, rowOrder: a.rowOrder, spec: a.spec)
+        var made = Action(target: target, start: start, duration: a.duration, easing: a.easing, name: a.name,
+                          isEnabled: a.isEnabled, rowOrder: a.rowOrder, spec: a.spec)
+        made.motionBlur = a.motionBlur
+        return made
+    }
+
+    /// New actions placed each just below the last row of the layer it is
+    /// on (at the bottom when that layer has none), so a layer's actions
+    /// stay together, with every row renumbered from 0: the new actions
+    /// with their row orders, and the actions already in the project whose
+    /// row order changed.
+    public static func placingWithTheirLayers(_ actions: [Action], in project: Project) -> (actions: [Action], moved: [Action]) {
+        var rows = timeline(in: project)
+        for action in actions {
+            if let last = rows.lastIndex(where: { $0.targetLayerID == action.targetLayerID }) {
+                rows.insert(action, at: last + 1)
+            } else {
+                rows.append(action)
+            }
+        }
+        let newIDs = Set(actions.map(\.id))
+        let numbered = renumber(rows)
+        let old = Dictionary(project.actions.map { ($0.id, $0.rowOrder) }, uniquingKeysWith: { a, _ in a })
+        return (numbered.filter { newIDs.contains($0.id) },
+                numbered.filter { !newIDs.contains($0.id) && old[$0.id] != $0.rowOrder })
     }
 
     /// New actions given the rows at the bottom of the timeline, in the
@@ -220,11 +317,40 @@ public enum ActionEditing {
     }
 }
 
-/// Actions on the pasteboard.
+/// Actions on the pasteboard, with where each one's layer stood as it
+/// began, so a paste onto another layer can make the same motion.
 public struct ActionClipboard: Codable, Sendable {
     public var actions: [Action]
+    /// By action id; nil in a copy made before origins were kept.
+    public var origins: [UUID: ActionOrigin]?
 
-    public init(actions: [Action]) {
+    public init(actions: [Action], origins: [UUID: ActionOrigin]? = nil) {
         self.actions = actions
+        self.origins = origins
+    }
+}
+
+/// Where a layer stands, as far as moving actions go: its place, scale,
+/// turn, size, skew and tilt.
+public struct ActionOrigin: Codable, Sendable, Equatable {
+    public var position: Vec2
+    public var scale: Vec2
+    public var rotation: Double
+    public var size: Size2
+    public var skew: Vec2
+    public var tilt: Tilt
+
+    public init(position: Vec2, scale: Vec2, rotation: Double, size: Size2, skew: Vec2 = .zero, tilt: Tilt = .none) {
+        self.position = position
+        self.scale = scale
+        self.rotation = rotation
+        self.size = size
+        self.skew = skew
+        self.tilt = tilt
+    }
+
+    public init(_ state: LayerState) {
+        self.init(position: state.position, scale: state.scale, rotation: state.rotation, size: state.size,
+                  skew: state.warp.skew, tilt: state.warp.tilt)
     }
 }

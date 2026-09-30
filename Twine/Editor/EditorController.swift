@@ -847,25 +847,54 @@ final class EditorController {
         }
     }
 
+    /// Copies the selected actions, with where each one's layer stood as it
+    /// began, so a paste onto another layer makes the same motion.
     func copySelectedActions() {
         let actions = selectedActions
-        guard !actions.isEmpty, let data = try? JSONEncoder().encode(ActionClipboard(actions: actions)) else { return }
+        let tracks = ActionTracks(project.actions)
+        var origins: [UUID: ActionOrigin] = [:]
+        for action in actions {
+            guard let layer = project.layer(withID: action.targetLayerID) else { continue }
+            origins[action.id] = ActionOrigin(tracks.inheritedState(for: action, of: layer))
+        }
+        guard !actions.isEmpty,
+              let data = try? JSONEncoder().encode(ActionClipboard(actions: actions, origins: origins)) else { return }
         let board = NSPasteboard.general
         board.clearContents()
         board.setData(data, forType: Self.actionPasteboardType)
     }
 
-    /// Pastes with the earliest at the playhead, onto the selected layers,
-    /// or back onto the layers they came from when nothing is selected.
-    func pasteActions() {
+    func cutSelectedActions() {
+        copySelectedActions()
+        deleteSelectedActions()
+    }
+
+    /// Whether the pasteboard holds actions.
+    var canPasteActions: Bool { NSPasteboard.general.data(forType: Self.actionPasteboardType) != nil }
+
+    /// How many actions the pasteboard holds.
+    var copiedActionCount: Int {
+        guard let data = NSPasteboard.general.data(forType: Self.actionPasteboardType),
+              let clipboard = try? JSONDecoder().decode(ActionClipboard.self, from: data) else { return 0 }
+        return clipboard.actions.count
+    }
+
+    /// Pastes with the earliest at the playhead, onto `layers` (the selected
+    /// ones unless given), or back onto the layers they came from when none
+    /// are; on another layer each makes the same motion from where that
+    /// layer stands. Each lands just below its layer's last row, and the
+    /// new bars are selected.
+    func pasteActions(onto layers: [Layer]? = nil) {
         guard let data = NSPasteboard.general.data(forType: Self.actionPasteboardType),
               let clipboard = try? JSONDecoder().decode(ActionClipboard.self, from: data) else { return }
-        let pasted = ActionEditing.appendingRows(
-            ActionEditing.pasted(clipboard.actions, onto: selectedLayers, at: editor.time, in: project, rate: frameRate),
-            in: project)
-        guard !pasted.isEmpty else { return NSSound.beep() }
-        if perform(.batch([.insertActions(pasted)], name: pasted.count == 1 ? "Paste Action" : "Paste Actions")) {
-            selectActions(Set(pasted.map(\.id)))
+        let made = ActionEditing.pasted(clipboard.actions, onto: layers ?? selectedLayers, at: editor.time, in: project,
+                                        rate: frameRate, origins: clipboard.origins ?? [:])
+        guard !made.isEmpty else { return NSSound.beep() }
+        let placed = ActionEditing.placingWithTheirLayers(made, in: project)
+        if perform(.batch([.insertActions(placed.actions), .updateActions(placed.moved)],
+                          name: made.count == 1 ? "Paste Action" : "Paste Actions")) {
+            selectActions(Set(placed.actions.map(\.id)))
+            editor.revealActions = (Set(placed.actions.map(\.id)), editor.revealActions.request + 1)
         }
     }
 
