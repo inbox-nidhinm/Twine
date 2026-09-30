@@ -32,6 +32,7 @@ struct ColorWell: View {
     var onEnd: () -> Void = {}
 
     @Environment(MenuHost.self) private var menus
+    @Environment(\.documentColors) private var documentColors
     @State private var hovering = false
     @State private var frame: CGRect = .zero
 
@@ -39,9 +40,10 @@ struct ColorWell: View {
         Button {
             // Beside the well, towards the canvas, level with it.
             let x = frame.minX - Theme.cardWidth - Theme.floatGap * 2
+            let swatches = documentColors()
             menus.showPopup(at: CGPoint(x: x, y: frame.minY - 40)) {
                 PopupCard(title: title, width: Theme.cardWidth) {
-                    ColorPicker(color: color, onChange: onChange, onBegin: onBegin, onEnd: onEnd)
+                    ColorPicker(color: color, documentColors: swatches, onChange: onChange, onBegin: onBegin, onEnd: onEnd)
                 }
             }
         } label: {

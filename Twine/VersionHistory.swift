@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 150
+    static let pushes = 151
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -51,6 +51,8 @@ enum VersionHistory {
             "Importing shows how it is going. When a picture, video or sound takes more than a moment to come in, a note at the top says so with a loader, and a WebM's conversion shows how far it has got. Once done, the note says so for three seconds before it goes.",
             "Arrow keys in number fields, as in Figma. With a field clicked into, Up and Down change its number by one (a tenth of a second for times), and by eight with Shift.",
             "An action's Start and Duration (which was Length) have their names above their fields, so the numbers are never cut off.",
+            "Document colours. The colour picker shows the colours the project already uses, most used first, as swatches under the hex. A click takes one.",
+            "New Project on the home screen, or ⌘N there, makes the project in the folder you are looking at.",
             "A plainer tool bar. The tools sit straight on the bar without the darker tray behind them, the hover highlight slides from tool to tool as the pointer moves along the bar, and the blue of the tool in hand slides to the next tool picked, by a click or its key.",
         ], fixes: [
             "Presets copied in the timeline paste onto other layers too. Before, only ordinary actions did.",
@@ -60,6 +62,7 @@ enum VersionHistory {
             "A layer with motion blur no longer flashes somewhere else for a frame where its motion jumps, as when a Move starts from a From of its own, or where it turns out of edge-on. Those frames are drawn sharp.",
             "Once its blur ends, a layer is drawn exactly as it was before it blurred.",
             "Playing a project with many sound clips no longer stutters. With a dozen clicks and sounds, asking the sound player where it was held up every frame for most of a second, so playback ran at two frames a second and the sound kept restarting. It now plays at a full 60, with the sound within a hundredth of a second of the playhead.",
+            "The colour picker follows a colour taken from the eyedropper or typed as a hex: its square and bars stayed on the colour it opened with.",
             "The tool bar's hover highlight slides as smoothly right to left as left to right. Going leftwards it could stick to the tool just left.",
             "Duplicating a sound's bar in the timeline no longer crashes or freezes Twine. A copy that landed out of view sent its waveform drawing into a loop that never ended, or, before that, a place in the sound too large to count; a bar out of view now draws no waveform.",
         ], misc: [

@@ -91,6 +91,7 @@ struct EditorView: View {
         // Every number field in the window, its cards and menus included,
         // undoes a drag as one step.
         .environment(\.scrubbing, controller.scrubbing)
+        .environment(\.documentColors, { [weak controller] in controller?.project.documentColors() ?? [] })
     }
 
     /// Design mode floats the tools in a bar centred under the canvas,

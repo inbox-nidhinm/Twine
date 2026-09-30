@@ -1,4 +1,5 @@
 import SwiftUI
+import MotionModel
 import AppKit
 import Theme
 
@@ -862,6 +863,8 @@ struct Scrubbing {
 
 extension EnvironmentValues {
     @Entry var scrubbing: Scrubbing? = nil
+    /// The colours the open project uses, for the colour picker's swatches.
+    @Entry var documentColors: @MainActor () -> [RGBA] = { [] }
 }
 
 /// Laid over a number field while it is not being typed in: a drag across

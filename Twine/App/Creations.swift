@@ -61,9 +61,9 @@ enum Creations {
     }
 
     /// Writes a fresh project package and returns where it went.
-    static func makeProject(named base: String = "Untitled") throws -> URL {
+    static func makeProject(named base: String = "Untitled", in directory: URL? = nil) throws -> URL {
         try ensureFolder()
-        let url = uniqueURL(for: base)
+        let url = uniqueURL(for: base, in: directory ?? folder)
         try write(Project(), to: url)
         return url
     }

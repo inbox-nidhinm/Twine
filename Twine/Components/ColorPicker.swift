@@ -14,12 +14,22 @@ import Theme
 /// step, then `end`, and so undoes as one step.
 struct ColorPicker: View {
     let color: RGBA
+    /// The colours the project uses, most used first, shown as swatches
+    /// under the hex, as Figma's document colours are.
+    var documentColors: [RGBA] = []
     let onChange: (RGBA) -> Void
     let onBegin: () -> Void
     let onEnd: () -> Void
 
     @State private var hsb = HSB(h: 0, s: 0, b: 1)
     @State private var alpha = 1.0
+    /// The colour last picked here. The card is drawn once, when it opens,
+    /// so `color` stays what it was then; without this, a colour taken from
+    /// a swatch, the eyedropper or the hex left the square and the hex
+    /// showing the old one.
+    @State private var picked: RGBA?
+
+    private var current: RGBA { picked ?? color }
 
     static let squareHeight: CGFloat = 144
     static let bar: CGFloat = 8
@@ -33,16 +43,11 @@ struct ColorPicker: View {
             HueBar(hue: hsb.h, change: { hsb.h = $0; push() }, began: onBegin, ended: onEnd)
             AlphaBar(alpha: alpha, color: hsb.rgba(alpha: 1), change: { alpha = $0; push() }, began: onBegin, ended: onEnd)
             HStack(spacing: 8) {
-                EyedropperButton { picked in
-                    onBegin()
-                    onChange(picked)
-                    onEnd()
-                }
-                HexField(color: color) { picked in
-                    onBegin()
-                    onChange(picked)
-                    onEnd()
-                }
+                EyedropperButton(pick: take)
+                HexField(color: current, commit: take)
+            }
+            if !documentColors.isEmpty {
+                DocumentSwatches(colors: documentColors, current: current, pick: take)
             }
         }
         .onAppear { pull(color) }
@@ -50,7 +55,18 @@ struct ColorPicker: View {
     }
 
     private func push() {
-        onChange(hsb.rgba(alpha: alpha))
+        let c = hsb.rgba(alpha: alpha)
+        picked = c
+        onChange(c)
+    }
+
+    /// A whole colour at once, as one undo step.
+    private func take(_ c: RGBA) {
+        onBegin()
+        onChange(c)
+        onEnd()
+        pull(c)
+        picked = c
     }
 
     /// Takes a colour from outside, keeping the hue where it was for greys and
@@ -221,6 +237,57 @@ private struct AlphaBar: View {
                       }
                   },
                   change: change, began: began, ended: ended)
+    }
+}
+
+/// The project's own colours in a grid of swatches, eight to a row; a click
+/// takes one. The one matching the colour being edited is ringed.
+private struct DocumentSwatches: View {
+    let colors: [RGBA]
+    let current: RGBA
+    let pick: (RGBA) -> Void
+
+    static let perRow = 8
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Document colours")
+                .font(ThemeFont.caption)
+                .foregroundStyle(Theme.textTertiary)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: Self.perRow), spacing: 6) {
+                ForEach(Array(colors.enumerated()), id: \.offset) { _, c in
+                    Swatch(color: c, isCurrent: c.near(current)) { pick(c) }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct Swatch: View {
+    let color: RGBA
+    let isCurrent: Bool
+    let pick: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: pick) {
+            ZStack {
+                // A see-through colour shows over the checks, as the opacity bar does.
+                if color.a < 0.999 { Checkerboard(cell: 4) }
+                color.color
+            }
+            .aspectRatio(1, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.radiusControl))
+            .overlay(RoundedRectangle(cornerRadius: Theme.radiusControl)
+                .strokeBorder(isCurrent ? Theme.textPrimary : hovering ? Theme.edgeHover : Theme.edge,
+                              lineWidth: isCurrent ? 1.5 : 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("#\(color.hex6)")
     }
 }
 

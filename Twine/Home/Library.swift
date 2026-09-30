@@ -165,8 +165,9 @@ final class Library {
         }
     }
 
+    /// Into the folder showing, if one is.
     func newProject() {
-        (NSDocumentController.shared as? DocumentController)?.createAndOpenProject()
+        (NSDocumentController.shared as? DocumentController)?.createAndOpenProject(in: selectedFolder)
     }
 
     /// An open project renames through its document, so its window follows.

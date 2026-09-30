@@ -4,13 +4,15 @@ import AppKit
 /// away, instead of opening an untitled document that asks where to save it
 /// on close.
 final class DocumentController: NSDocumentController {
+    /// From the home screen (no project open), into the folder it shows.
     override func newDocument(_ sender: Any?) {
-        createAndOpenProject()
+        createAndOpenProject(in: documents.isEmpty ? HomeWindowController.shared.library.selectedFolder : nil)
     }
 
-    func createAndOpenProject() {
+    /// A new project in `folder`, or loose in the creations folder.
+    func createAndOpenProject(in folder: URL? = nil) {
         do {
-            let url = try Creations.makeProject()
+            let url = try Creations.makeProject(in: folder)
             openDocument(withContentsOf: url, display: true) { _, _, error in
                 if let error { NSApp.presentError(error) }
             }
