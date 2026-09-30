@@ -64,9 +64,10 @@ public enum Theme {
     public static let previewShape = Color(white: 0.86)
     /// Smart guides and equal-spacing marks while something snaps.
     public static let guide = Color(red: 0xF2 / 255, green: 0x4E / 255, blue: 0x6B / 255)
-    /// A timeline scene's own colour: its row, its span bar and the line
-    /// down its rows. A soft violet, apart from the blue of a selection.
-    public static let timelineScene = Color(red: 0xA7 / 255, green: 0x8B / 255, blue: 0xFA / 255)
+    /// A timeline scene's own colour: its span bar and the line down its
+    /// rows (#2E5575, the user's choice), a deep blue apart from the light
+    /// blue of a selection. Scenes have no row colour: the bar is enough.
+    public static let timelineScene = Color(red: 0x2E / 255, green: 0x55 / 255, blue: 0x75 / 255)
     /// A layer folded on the timeline: its row and its bars, a quiet slate.
     public static let timelineFold = Color(red: 0x8F / 255, green: 0xA3 / 255, blue: 0xB8 / 255)
 

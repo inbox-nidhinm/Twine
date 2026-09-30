@@ -366,16 +366,10 @@ final class TimelineTracksView: NSView {
         let full = CGRect(x: 0, y: row.y, width: bounds.width, height: TimelineRow.height)
         let label = CGRect(x: 0, y: row.y, width: gutter, height: TimelineRow.height)
 
-        // A scene's row, the rows in it, and a folded layer's row each take
-        // their own quiet colour, under anything else.
-        if row.header != nil {
-            ctx.setFillColor(NSColor(Theme.timelineScene).withAlphaComponent(0.12).cgColor)
-            ctx.fill(full)
-        } else if row.folded != nil {
+        // A folded layer's row takes a quiet colour of its own, under
+        // anything else. Scenes take none: their bar's colour is enough.
+        if row.folded != nil {
             ctx.setFillColor(NSColor(Theme.timelineFold).withAlphaComponent(0.08).cgColor)
-            ctx.fill(full)
-        } else if row.inScene != nil {
-            ctx.setFillColor(NSColor(Theme.timelineScene).withAlphaComponent(0.04).cgColor)
             ctx.fill(full)
         }
         // The row: the accent across it when its action is selected, a tint
@@ -399,7 +393,7 @@ final class TimelineTracksView: NSView {
         ctx.fill(CGRect(x: 0, y: row.y + TimelineRow.height - 1, width: bounds.width, height: 1))
         // Down the left of a scene's rows, its line.
         if row.inScene != nil {
-            ctx.setFillColor(NSColor(Theme.timelineScene).withAlphaComponent(0.7).cgColor)
+            ctx.setFillColor(NSColor(Theme.timelineScene).cgColor)
             ctx.fill(CGRect(x: 8, y: row.y, width: 2, height: TimelineRow.height))
         }
         if let scene = row.header { return drawScene(scene, row: row, selected: selected, in: ctx) }
@@ -468,7 +462,7 @@ final class TimelineTracksView: NSView {
         let size = Self.chevronSize
         drawIcon(folded ? .chevronRight : .chevronDown,
                  in: CGRect(x: (Self.labelInset - size) / 2 + 2, y: row.y + (TimelineRow.height - size) / 2, width: size, height: size),
-                 color: NSColor(selected ? Theme.textPrimary : Theme.timelineScene), in: ctx)
+                 color: NSColor(selected ? Theme.textPrimary : Theme.textTertiary), in: ctx)
         let span = Scenes.span(of: row.members) ?? 0...0
         let rate = controller?.frameRate ?? .fps30
         let length = controller?.editor.showsFrames == true
@@ -494,7 +488,7 @@ final class TimelineTracksView: NSView {
         ctx.clip(to: CGRect(x: gutter, y: row.y, width: bounds.width - gutter, height: TimelineRow.height))
         let path = CGPath(roundedRect: rect, cornerWidth: 6, cornerHeight: 6, transform: nil)
         ctx.addPath(path)
-        ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.timelineScene).withAlphaComponent(selected ? 1 : 0.45).cgColor)
+        ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.timelineScene).cgColor)
         ctx.fillPath()
         // Where each of its actions runs, faintly, inside the span.
         ctx.setFillColor(NSColor.white.withAlphaComponent(0.18).cgColor)
