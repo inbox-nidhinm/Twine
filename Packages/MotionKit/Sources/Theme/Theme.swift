@@ -257,6 +257,11 @@ public enum Theme {
     public static let counterEase = Animation.timingCurve(0.5, 0, 0, 1, duration: 0.4)
     /// The panel appearing and going.
     public static let exportFade = Animation.timingCurve(0.5, 0, 0, 1, duration: 0.35)
+    /// The tool bar's hover highlight sliding from one tool to the next.
+    public static let hoverGlide = Animation.timingCurve(0.5, 0, 0, 1, duration: 0.28)
+    /// How long a highlight waits after the pointer leaves one tool before
+    /// fading, so passing to the next slides it rather than fading it out and in.
+    public static let hoverLinger: Double = 0.06
 }
 
 // MARK: - Type

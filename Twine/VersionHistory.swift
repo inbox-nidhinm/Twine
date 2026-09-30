@@ -23,6 +23,10 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "30 September 2026", title: "A plainer tool bar", changes: [
+            "The tools sit straight on the tool bar, without the darker tray behind them.",
+            "The hover highlight slides from tool to tool as the pointer moves along the bar, rather than appearing under each one.",
+        ]),
         .init(date: "29 September 2026", title: "Exact motion blur in exports", changes: [
             "In exports, a light layer no longer turns white while it blurs. Exports draw each moment across the shutter in full and average them exactly, so groups, masks and blend modes inside a blurring layer look right too.",
             "Frames with motion blur take longer to export.",
