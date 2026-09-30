@@ -325,22 +325,41 @@ private struct TimingFields: View {
         let frames = controller.editor.showsFrames
         let rate = controller.frameRate
         let first = actions[0]
-        HStack(spacing: 8) {
-            UnitField(unit: "Start", value: frames ? Double(rate.frame(at: first.start)) : first.start,
-                      decimals: frames ? 0 : 2, suffix: frames ? "f" : "s", accepts: { $0 >= 0 }) { v in
-                let t = rate.snapped(frames ? rate.time(ofFrame: Int(v.rounded())) : v)
-                controller.editActions("Change Timing") { $0.start = max(t, 0) }
-            }
-            .help("When it starts, from the beginning of the scene.")
-            if first.spec.kind != .visibility {
-                UnitField(unit: "Length", value: frames ? Double(rate.frame(at: first.duration)) : first.duration,
+        // The names sit above the fields, so the fields keep their whole
+        // width for the number.
+        HStack(alignment: .top, spacing: 8) {
+            named("Start") {
+                UnitField(value: frames ? Double(rate.frame(at: first.start)) : first.start,
                           decimals: frames ? 0 : 2, suffix: frames ? "f" : "s", accepts: { $0 >= 0 }) { v in
-                    let d = rate.snapped(frames ? rate.time(ofFrame: Int(v.rounded())) : v)
-                    controller.editActions("Change Timing") { $0.duration = max(d, 0) }
+                    let t = rate.snapped(frames ? rate.time(ofFrame: Int(v.rounded())) : v)
+                    controller.editActions("Change Timing") { $0.start = max(t, 0) }
                 }
-                .help("How long it runs. 0 makes the change instant.")
+                .help("When it starts, from the beginning of the scene.")
+            }
+            if first.spec.kind != .visibility {
+                named("Duration") {
+                    UnitField(value: frames ? Double(rate.frame(at: first.duration)) : first.duration,
+                              decimals: frames ? 0 : 2, suffix: frames ? "f" : "s", accepts: { $0 >= 0 }) { v in
+                        let d = rate.snapped(frames ? rate.time(ofFrame: Int(v.rounded())) : v)
+                        controller.editActions("Change Timing") { $0.duration = max(d, 0) }
+                    }
+                    .help("How long it runs. 0 makes the change instant.")
+                }
             }
         }
+    }
+
+    /// A field with its name above it, as a `StackedRow` has.
+    private func named(_ label: String, @ViewBuilder field: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(ThemeFont.label)
+                .foregroundStyle(Theme.textSecondary)
+                .lineLimit(1)
+                .frame(height: 14)
+            field()
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 

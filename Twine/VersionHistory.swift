@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 149
+    static let pushes = 150
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -50,6 +50,7 @@ enum VersionHistory {
             "The export's percentage counts like an odometer: each digit that changes rolls, and the percent sign stays still. It never shows more than 100%, nor a number it never reached on the way (it could flash 109% just before 100%).",
             "Importing shows how it is going. When a picture, video or sound takes more than a moment to come in, a note at the top says so with a loader, and a WebM's conversion shows how far it has got. Once done, the note says so for three seconds before it goes.",
             "Arrow keys in number fields, as in Figma. With a field clicked into, Up and Down change its number by one (a tenth of a second for times), and by eight with Shift.",
+            "An action's Start and Duration (which was Length) have their names above their fields, so the numbers are never cut off.",
             "A plainer tool bar. The tools sit straight on the bar without the darker tray behind them, the hover highlight slides from tool to tool as the pointer moves along the bar, and the blue of the tool in hand slides to the next tool picked, by a click or its key.",
         ], fixes: [
             "Presets copied in the timeline paste onto other layers too. Before, only ordinary actions did.",
