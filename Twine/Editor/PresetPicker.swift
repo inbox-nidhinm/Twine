@@ -72,6 +72,20 @@ struct PresetPicker: View {
 
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
+    @State private var search = ""
+    @FocusState private var searching: Bool
+
+    /// The presets whose name, other way's name (Fade Out for Fade) or group
+    /// holds what is typed, every one while nothing is.
+    private var matching: [Preset] {
+        let query = search.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return presets }
+        return presets.filter { preset in
+            [preset.name, Presets.name(of: preset.kind), preset.kind.reversed.map(Presets.name(of:)) ?? "", preset.group.title]
+                .contains { $0.localizedCaseInsensitiveContains(query) }
+        }
+    }
+
     /// With text selected, the Text group comes first.
     private var groups: [PresetGroup] {
         guard presets.contains(where: \.isText) else { return PresetGroup.allCases }
@@ -84,8 +98,24 @@ struct PresetPicker: View {
                 IconButton(icon: .close, help: "Back to actions") { close() }
             }
             VStack(alignment: .leading, spacing: Theme.panelPad) {
+                TextField("Search", text: $search)
+                    .textFieldStyle(.plain)
+                    .font(ThemeFont.label)
+                    .focused($searching)
+                    .padding(.horizontal, 8)
+                    .frame(height: Theme.control)
+                    .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+                    .focusRing(searching)
+                    // Return takes the first match, as the first tile shown.
+                    .onSubmit { if let first = groups.lazy.compactMap({ g in matching.first { $0.group == g } }).first { pick(first) } }
+                    .onAppear { searching = true }
+                if matching.isEmpty {
+                    Text("No presets")
+                        .font(ThemeFont.label)
+                        .foregroundStyle(Theme.textTertiary)
+                }
                 ForEach(groups, id: \.self) { group in
-                    let shown = presets.filter { $0.group == group }
+                    let shown = matching.filter { $0.group == group }
                     if !shown.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(group.title)

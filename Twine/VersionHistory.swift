@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 151
+    static let pushes = 152
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -53,6 +53,7 @@ enum VersionHistory {
             "An action's Start and Duration (which was Length) have their names above their fields, so the numbers are never cut off.",
             "Document colours. The colour picker shows the colours the project already uses, most used first, as swatches under the hex. A click takes one.",
             "New Project on the home screen, or ⌘N there, makes the project in the folder you are looking at.",
+            "Search in the preset picker. It opens ready to type: \"slide\" or \"blur\" narrows the tiles to the presets named so (their Out names and groups count too), and Return adds the first.",
             "A plainer tool bar. The tools sit straight on the bar without the darker tray behind them, the hover highlight slides from tool to tool as the pointer moves along the bar, and the blue of the tool in hand slides to the next tool picked, by a click or its key.",
         ], fixes: [
             "Presets copied in the timeline paste onto other layers too. Before, only ordinary actions did.",
