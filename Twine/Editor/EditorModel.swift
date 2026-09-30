@@ -1,4 +1,5 @@
 import Foundation
+import MotionModel
 import Observation
 import Theme
 import MotionEditing
@@ -136,8 +137,17 @@ final class EditorModel {
     /// count changes with every request, so the same actions can be asked
     /// for twice and the timeline never has to clear it.
     var revealActions: (ids: Set<UUID>, request: Int) = ([], 0)
+
+    /// Asks the timeline to bring `actions` into view, opening any folded
+    /// layer they are on, so what was just added shows.
+    func reveal(_ actions: [Action]) {
+        foldedLayers.subtract(actions.map(\.targetLayerID))
+        revealActions = (Set(actions.map(\.id)), revealActions.request + 1)
+    }
     /// The timeline lists only the selected layers' actions.
     var timelineOnlySelected = false
+    /// Layers whose timeline rows are folded into one.
+    var foldedLayers: Set<UUID> = []
     /// The timeline card's height, which its top edge drags. Remembered for
     /// every window and every launch.
     var timelineHeight: CGFloat = EditorModel.savedTimelineHeight

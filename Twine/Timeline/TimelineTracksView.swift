@@ -32,7 +32,8 @@ struct ActionTimeline: NSViewRepresentable {
         guard let tracks = scroll.documentView as? TimelineTracksView else { return }
         // Read here so SwiftUI calls this whenever any of them change.
         _ = (editor.time, editor.selection, editor.selectedActions, editor.timelineOnlySelected,
-             editor.viewport.pointsPerSecond, editor.viewport.start, controller.project, editor.revealActions.request)
+             editor.viewport.pointsPerSecond, editor.viewport.start, controller.project, editor.revealActions.request,
+             editor.foldedLayers)
         tracks.menus = menus
         tracks.reload()
     }
@@ -87,6 +88,9 @@ final class TimelineTracksView: NSView {
     static let instantWidth = 12.0
     /// The eye's square at the right of a label.
     static let eyeBox = 22.0
+    /// Where a label's words start, leaving room for the fold chevron.
+    static let labelInset = 18.0
+    static let chevronSize = 12.0
 
     private enum Drag {
         case move(originals: [Action], anchor: Action, startX: Double)
@@ -112,7 +116,8 @@ final class TimelineTracksView: NSView {
     func reload() {
         guard let controller else { return }
         let editor = controller.editor
-        rows = TimelineRow.rows(of: controller.project, only: editor.timelineOnlySelected ? editor.selection : nil)
+        rows = TimelineRow.rows(of: controller.project, only: editor.timelineOnlySelected ? editor.selection : nil,
+                                folded: editor.foldedLayers)
         sizeToRows()
         // A selection made elsewhere (the layers panel, the canvas) brings
         // its rows into view.
@@ -130,7 +135,7 @@ final class TimelineTracksView: NSView {
     /// Scrolls, gently, just far enough to bring these actions' rows into
     /// view: a row added below the fold slides up into sight.
     private func reveal(_ ids: Set<UUID>) {
-        let mine = rows.filter { ids.contains($0.action.id) }
+        let mine = rows.filter { $0.actions.contains { ids.contains($0.id) } }
         guard let first = mine.first, let last = mine.last, let scroll = enclosingScrollView else { return }
         let clip = scroll.contentView
         let visible = clip.bounds
@@ -194,6 +199,26 @@ final class TimelineTracksView: NSView {
         return nil
     }
 
+    /// The bar under a point on a row: on a folded row, the one drawn on
+    /// top there (the later in the row's order).
+    private func bar(at p: CGPoint, in row: TimelineRow) -> (action: Action, rect: CGRect)? {
+        for action in row.actions.reversed() {
+            let rect = barRect(action, in: row)
+            if rect.insetBy(dx: -Self.edgeHit, dy: 0).contains(p) { return (action, rect) }
+        }
+        return nil
+    }
+
+    /// The chevron that folds a layer's rows, left of the label's words.
+    private func chevronRect(_ row: TimelineRow) -> CGRect {
+        CGRect(x: 0, y: row.y, width: Self.labelInset, height: TimelineRow.height)
+    }
+
+    private func toggleFold(_ row: TimelineRow) {
+        guard let editor = controller?.editor else { return }
+        if editor.foldedLayers.contains(row.layerID) { editor.foldedLayers.remove(row.layerID) } else { editor.foldedLayers.insert(row.layerID) }
+    }
+
     private func eyeRect(_ row: TimelineRow) -> CGRect {
         CGRect(x: gutter - Self.eyeBox - 8, y: row.y + (TimelineRow.height - Self.eyeBox) / 2,
                width: Self.eyeBox, height: Self.eyeBox)
@@ -231,13 +256,9 @@ final class TimelineTracksView: NSView {
         let label = p.x < gutter ? index : nil
         var bar: UUID?
         var trims = false
-        if let index, p.x >= gutter {
-            let row = rows[index]
-            let rect = barRect(row.action, in: row)
-            if rect.insetBy(dx: -Self.edgeHit, dy: 0).contains(p) {
-                bar = row.action.id
-                trims = trimEdge(at: p, of: row.action, rect: rect) != nil
-            }
+        if let index, p.x >= gutter, let hit = self.bar(at: p, in: rows[index]) {
+            bar = hit.action.id
+            trims = trimEdge(at: p, of: hit.action, rect: hit.rect) != nil
         }
         if drag == nil { (trims ? Cursors.resizeHorizontal : Cursors.arrow).set() }
         if label != hoveredLabel || bar != hoveredBar {
@@ -263,7 +284,7 @@ final class TimelineTracksView: NSView {
 
         for (index, row) in rows.enumerated() where row.y + TimelineRow.height >= dirtyRect.minY && row.y <= dirtyRect.maxY {
             drawRow(row, index: index, layerSelected: selectedLayers.contains(row.layerID),
-                    selected: selectedActions.contains(row.action.id), in: ctx)
+                    selectedActions: selectedActions, in: ctx)
         }
 
         // After the composition ends, dimmed.
@@ -304,8 +325,10 @@ final class TimelineTracksView: NSView {
         }
     }
 
-    private func drawRow(_ row: TimelineRow, index: Int, layerSelected: Bool, selected: Bool, in ctx: CGContext) {
+    private func drawRow(_ row: TimelineRow, index: Int, layerSelected: Bool, selectedActions: Set<UUID>, in ctx: CGContext) {
         let action = row.action
+        // A folded row counts as selected when any of its actions is.
+        let selected = row.actions.contains { selectedActions.contains($0.id) }
         let full = CGRect(x: 0, y: row.y, width: bounds.width, height: TimelineRow.height)
         let label = CGRect(x: 0, y: row.y, width: gutter, height: TimelineRow.height)
 
@@ -330,23 +353,31 @@ final class TimelineTracksView: NSView {
         ctx.fill(CGRect(x: 0, y: row.y + TimelineRow.height - 1, width: bounds.width, height: 1))
 
         // The label: layer, then action.
-        let dimmed = !action.isEnabled
+        let dimmed = row.folded == nil ? !action.isEnabled : row.actions.allSatisfy { !$0.isEnabled }
         let primary = NSColor(selected ? Theme.textPrimary : dimmed ? Theme.textTertiary : Theme.textPrimary)
         let secondary = NSColor(selected ? Theme.textPrimary : Theme.textTertiary).withAlphaComponent(selected ? 0.75 : 1)
         // Under the pointer, and always, crossed out, on an action switched
         // off, as a hidden layer's row shows in the layers panel, so what is
         // off is never missed.
-        let showsEye = hoveredLabel == index || !action.isEnabled
-        let room = gutter - 16 - (showsEye ? Self.eyeBox + 12 : 12)
+        let showsEye = row.folded == nil && (hoveredLabel == index || !action.isEnabled)
+        if row.foldable {
+            let size = Self.chevronSize
+            let chevron = CGRect(x: (Self.labelInset - size) / 2 + 2, y: row.y + (TimelineRow.height - size) / 2, width: size, height: size)
+            drawIcon(row.folded == nil ? .chevronDown : .chevronRight, in: chevron,
+                     color: NSColor(selected ? Theme.textPrimary : Theme.textTertiary), in: ctx)
+        }
+        let inset = Self.labelInset
+        let room = gutter - inset - (showsEye ? Self.eyeBox + 12 : 12)
         ctx.saveGState()
-        ctx.clip(to: CGRect(x: 16, y: row.y, width: max(room, 0), height: TimelineRow.height))
+        ctx.clip(to: CGRect(x: inset, y: row.y, width: max(room, 0), height: TimelineRow.height))
         let truncating = NSMutableParagraphStyle()
         truncating.lineBreakMode = .byTruncatingTail
         let layerAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12, weight: .medium),
                                                               .foregroundColor: primary, .paragraphStyle: truncating]
         let actionAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: secondary,
                                                                .paragraphStyle: truncating]
-        let layerName = row.layerName as NSString, actionName = action.name as NSString
+        let layerName = row.layerName as NSString
+        let actionName = (row.folded.map { "\($0.count) actions" } ?? action.name) as NSString
         let textY = row.y + (TimelineRow.height - 15) / 2
         // The action's name always shows: a long layer name gives way to
         // it, cut short, though never to less than a third of the room.
@@ -354,12 +385,12 @@ final class TimelineTracksView: NSView {
         let actionWidth = ceil(actionName.size(withAttributes: actionAttributes).width)
         let layerWidth = min(ceil(layerName.size(withAttributes: layerAttributes).width),
                              max(room - dotGap - actionWidth, room * 0.35))
-        layerName.draw(in: CGRect(x: 16, y: textY, width: layerWidth, height: 17), withAttributes: layerAttributes)
-        var cursor = 16 + layerWidth + 7
+        layerName.draw(in: CGRect(x: inset, y: textY, width: layerWidth, height: 17), withAttributes: layerAttributes)
+        var cursor = inset + layerWidth + 7
         ctx.setFillColor(secondary.cgColor)
         ctx.fillEllipse(in: CGRect(x: cursor, y: row.y + TimelineRow.height / 2 - 1.5, width: 3, height: 3))
         cursor += 10
-        actionName.draw(in: CGRect(x: cursor, y: textY, width: max(16 + room - cursor, 0), height: 17),
+        actionName.draw(in: CGRect(x: cursor, y: textY, width: max(inset + room - cursor, 0), height: 17),
                         withAttributes: actionAttributes)
         ctx.restoreGState()
         if showsEye {
@@ -368,10 +399,18 @@ final class TimelineTracksView: NSView {
                      color: NSColor(selected ? Theme.textPrimary : Theme.textSecondary), in: ctx)
         }
 
-        // The bar.
-        let rect = barRect(action, in: row)
+        // The bar, or on a folded row, every bar of the layer.
         ctx.saveGState()
         ctx.clip(to: CGRect(x: gutter, y: row.y, width: bounds.width - gutter, height: TimelineRow.height))
+        for bar in row.actions {
+            drawBar(bar, in: row, selected: selectedActions.contains(bar.id), dimmed: !bar.isEnabled, ctx: ctx)
+        }
+        ctx.restoreGState()
+    }
+
+    private func drawBar(_ action: Action, in row: TimelineRow, selected: Bool, dimmed: Bool, ctx: CGContext) {
+        let rect = barRect(action, in: row)
+        ctx.saveGState()
         ctx.setAlpha(dimmed ? 0.4 : 1)
         // A Show is a dot and a Hide a square, so the two read apart at a glance.
         let shows: Bool = { if case .visibility(let v) = action.spec { return v.isVisible } else { return false } }()
@@ -380,7 +419,15 @@ final class TimelineTracksView: NSView {
         ctx.addPath(path)
         ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.panelHover).cgColor)
         ctx.fillPath()
-        if case .play(let play) = action.spec { drawWaveform(action, play: play, in: rect, selected: selected, ctx: ctx) }
+        // Bars folded together overlap: an edge keeps each one's ends in sight.
+        if row.folded != nil {
+            ctx.addPath(path)
+            ctx.setStrokeColor(NSColor(Theme.border).cgColor)
+            ctx.setLineWidth(1)
+            ctx.strokePath()
+        } else if case .play(let play) = action.spec {
+            drawWaveform(action, play: play, in: rect, selected: selected, ctx: ctx)
+        }
         // Under the pointer, a handle at each end says the ends drag.
         if hoveredBar == action.id, !action.isInstant, rect.width >= Self.edgeReach * 2.4 {
             let size = Self.handleSize
@@ -463,6 +510,16 @@ final class TimelineTracksView: NSView {
         // The label: the eye switches the action off; a drag reorders.
         // Nothing here is renamed: a double-click is two clicks.
         if p.x < gutter {
+            if row.foldable, chevronRect(row).contains(p) { return toggleFold(row) }
+            // A folded row's label picks all its actions; it has no one row to drag.
+            if let folded = row.folded {
+                var ids = Set(folded.map(\.id))
+                if extending { ids.formUnion(controller.selectedActions.map(\.id)) }
+                controller.selectActions(ids)
+                rangeAnchor = action.id
+                needsDisplay = true
+                return
+            }
             if eyeRect(row).contains(p), hoveredLabel == index || !action.isEnabled { return controller.toggleEnabled(action) }
             pick(action, extending: extending, ranging: ranging)
             if !extending { drag = .reorder(action: action, began: false) }
@@ -470,8 +527,7 @@ final class TimelineTracksView: NSView {
             return
         }
 
-        let rect = barRect(action, in: row)
-        guard rect.insetBy(dx: -Self.edgeHit, dy: 0).contains(p) else { return startEmptyDrag(at: p, event: event) }
+        guard let (action, rect) = bar(at: p, in: row) else { return startEmptyDrag(at: p, event: event) }
         guard pick(action, extending: extending, ranging: ranging) else { return }
 
         if !extending, let startEdge = trimEdge(at: p, of: action, rect: rect) {
@@ -493,10 +549,10 @@ final class TimelineTracksView: NSView {
     private func pick(_ action: Action, extending: Bool, ranging: Bool = false) -> Bool {
         guard let controller else { return false }
         var selected = Set(controller.selectedActions.map(\.id))
-        if ranging, let from = rangeAnchor.flatMap({ id in rows.firstIndex { $0.action.id == id } }),
-           selected.contains(rows[from].action.id),
-           let to = rows.firstIndex(where: { $0.action.id == action.id }) {
-            for row in rows[min(from, to)...max(from, to)] { selected.insert(row.action.id) }
+        if ranging, let anchor = rangeAnchor, let from = rows.firstIndex(where: { $0.actions.contains { $0.id == anchor } }),
+           selected.contains(anchor),
+           let to = rows.firstIndex(where: { $0.actions.contains { $0.id == action.id } }) {
+            for row in rows[min(from, to)...max(from, to)] { selected.formUnion(row.actions.map(\.id)) }
             controller.selectActions(selected)
             return true
         }
@@ -542,7 +598,11 @@ final class TimelineTracksView: NSView {
         // The rows as they are this moment, not as last drawn: a quick drag
         // can outrun the drawing.
         let editor = controller.editor
-        let current = TimelineRow.rows(of: controller.project, only: editor.timelineOnlySelected ? editor.selection : nil)
+        let current = TimelineRow.rows(of: controller.project, only: editor.timelineOnlySelected ? editor.selection : nil,
+                                       folded: editor.foldedLayers)
+        // A bar on a folded row moves only in time: its layer's rows are gathered up.
+        guard !editor.foldedLayers.contains(action.targetLayerID) || !current.contains(where: { $0.folded?.contains { $0.id == action.id } ?? false })
+        else { return [] }
         let index = min(max(Int((y / TimelineRow.height).rounded(.down)), 0), current.count - 1)
         guard index >= 0, current[index].action.id != action.id,
               let target = ActionEditing.timeline(in: controller.project).firstIndex(where: { $0.id == current[index].action.id })
@@ -559,7 +619,7 @@ final class TimelineTracksView: NSView {
             let ids = Set(originals.map(\.id))
             let edges = anchor.isInstant ? [anchor.start] : [anchor.start, anchor.end]
             let delta = snapped((p.x - startX) / viewport.pointsPerSecond, edges: edges, ignoring: ids,
-                                row: rows.first { $0.action.id == anchor.id }?.y, event: event)
+                                row: rows.first { $0.actions.contains { $0.id == anchor.id } }?.y, event: event)
             // Times from where the drag began; rows as they are now.
             let rowsNow = Dictionary(controller.project.actions.map { ($0.id, $0.rowOrder) }, uniquingKeysWith: { a, _ in a })
             var edited = Dictionary(uniqueKeysWithValues: ActionEditing.moved(originals, by: delta, rate: rate).map { moved -> (UUID, Action) in
@@ -592,7 +652,7 @@ final class TimelineTracksView: NSView {
         case .trim(let originals, let anchor, let startEdge, let startX):
             let edge = startEdge ? anchor.start : anchor.end
             let delta = snapped((p.x - startX) / viewport.pointsPerSecond, edges: [edge], ignoring: Set(originals.map(\.id)),
-                                row: rows.first { $0.action.id == anchor.id }?.y, event: event)
+                                row: rows.first { $0.actions.contains { $0.id == anchor.id } }?.y, event: event)
             let trimmed = ActionEditing.trimmed(originals, startEdge: startEdge, by: delta,
                                                 symmetric: event.modifierFlags.contains(.option), rate: rate,
                                                 mediaLength: { controller.asset(ofLayer: $0.targetLayerID)?.duration })
@@ -602,7 +662,9 @@ final class TimelineTracksView: NSView {
             self.drag = .marquee(start: start, current: p, base: base)
             let box = CGRect(x: min(start.x, p.x), y: min(start.y, p.y), width: abs(p.x - start.x), height: abs(p.y - start.y))
             var picked = base
-            for row in rows where barRect(row.action, in: row).intersects(box) { picked.insert(row.action.id) }
+            for row in rows {
+                for action in row.actions where barRect(action, in: row).intersects(box) { picked.insert(action.id) }
+            }
             if picked.isEmpty { controller.deselectActions() } else { controller.selectActions(picked) }
 
         case .pan(let startX, let startTime):
@@ -650,9 +712,11 @@ final class TimelineTracksView: NSView {
         }
         var targets: [(time: Double, row: CGFloat?)] = [(controller.editor.time, nil), (controller.duration, nil), (0, nil)]
         let visible = visibleRect
-        for r in rows where r.y + TimelineRow.height > visible.minY && r.y < visible.maxY && !ignoring.contains(r.action.id) {
-            targets.append((r.action.start, r.y))
-            if !r.action.isInstant { targets.append((r.action.end, r.y)) }
+        for r in rows where r.y + TimelineRow.height > visible.minY && r.y < visible.maxY {
+            for action in r.actions where !ignoring.contains(action.id) {
+                targets.append((action.start, r.y))
+                if !action.isInstant { targets.append((action.end, r.y)) }
+            }
         }
         var best: (delta: Double, time: Double, row: CGFloat?)?
         var nearest = Self.snapDistance / pps
@@ -679,8 +743,12 @@ final class TimelineTracksView: NSView {
         guard let controller, let menus, let window, let content = window.contentView else { return }
         let p = convert(event.locationInWindow, from: nil)
         // A right-click on an unselected row picks it first, as Finder does.
-        if let index = rowIndex(at: p.y), !controller.selectedActions.contains(where: { $0.id == rows[index].action.id }) {
-            controller.selectActions([rows[index].action.id])
+        if let index = rowIndex(at: p.y) {
+            let row = rows[index]
+            let clicked = p.x >= gutter ? bar(at: p, in: row).map { [$0.action] } ?? row.actions : row.actions
+            if !clicked.contains(where: { a in controller.selectedActions.contains { $0.id == a.id } }) {
+                controller.selectActions(Set(clicked.map(\.id)))
+            }
         }
         let inWindow = convert(p, to: nil)
         let origin = CGPoint(x: inWindow.x, y: content.bounds.height - inWindow.y)
@@ -698,6 +766,11 @@ final class TimelineTracksView: NSView {
                 menus.showPopup(at: origin) { StaggerCard(controller: controller) { menus.dismiss() } }
             },
             .item("Split into Actions", disabled: !controller.canSplitPresets) { controller.splitSelectedPresets() },
+            .separator,
+            .item("Fold All Layers", disabled: !rows.contains { $0.foldable && $0.folded == nil }) {
+                editor.foldedLayers = Set(controller.project.actions.map(\.targetLayerID))
+            },
+            .item("Unfold All Layers", disabled: editor.foldedLayers.isEmpty) { editor.foldedLayers = [] },
             .separator,
             .item("Show Only Selected Layers", checked: editor.timelineOnlySelected) { editor.timelineOnlySelected.toggle() },
             .item("Show Times as Frames", checked: editor.showsFrames) { editor.showsFrames.toggle() },

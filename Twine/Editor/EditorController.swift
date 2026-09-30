@@ -708,7 +708,7 @@ final class EditorController {
         guard !added.isEmpty else { return NSSound.beep() }
         guard perform(.batch([.insertActions(added)], name: name)) else { return }
         selectActions(Set(added.map(\.id)))
-        editor.revealActions = (Set(added.map(\.id)), editor.revealActions.request + 1)
+        editor.reveal(added)
         guard let last = added.max(by: { $0.end < $1.end }), last.end > editor.time else { return }
         stop()
         glide(to: last.end, over: min(last.end - editor.time, 1), eased: false)
@@ -916,7 +916,7 @@ final class EditorController {
         if perform(.batch([.insertActions(placed.actions), .updateActions(placed.moved)],
                           name: made.count == 1 ? "Paste Action" : "Paste Actions")) {
             selectActions(Set(placed.actions.map(\.id)))
-            editor.revealActions = (Set(placed.actions.map(\.id)), editor.revealActions.request + 1)
+            editor.reveal(placed.actions)
         }
     }
 
