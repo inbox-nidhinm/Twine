@@ -70,14 +70,21 @@ private struct ProgressTrack: View {
     }
 }
 
-/// A note over the top of the canvas, with a way to dismiss it.
+/// A note over the top of the canvas, with a way to dismiss it: for work
+/// under way, a loader before it, and once done, a check.
 struct NoticeCard: View {
-    let text: String
+    let notice: Notice
     let dismiss: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(text)
+            switch notice.state {
+            case .note: EmptyView()
+            case .working(let fraction): Loader(fraction: fraction)
+            case .done: IconView(.check, size: Theme.loader, lineWidth: Theme.checkStroke)
+                    .foregroundStyle(Theme.accent)
+            }
+            Text(notice.text)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(4)
@@ -89,5 +96,35 @@ struct NoticeCard: View {
         .padding(.trailing, Theme.barPad)
         .padding(.vertical, Theme.barPad)
         .floatingPanel()
+        .animation(.easeOut(duration: 0.18), value: notice)
+    }
+}
+
+/// A ring filling as work goes on, or, while how far it has got is not
+/// known, a part of one turning.
+private struct Loader: View {
+    let fraction: Double?
+
+    var body: some View {
+        ZStack {
+            Circle().stroke(Theme.panelRaised, lineWidth: Theme.loaderLine)
+            if let fraction {
+                arc(to: fraction)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeOut(duration: 0.3), value: fraction)
+            } else {
+                TimelineView(.animation) { context in
+                    let turn = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 0.9) / 0.9
+                    arc(to: 0.28).rotationEffect(.degrees(turn * 360 - 90))
+                }
+            }
+        }
+        .frame(width: Theme.loader, height: Theme.loader)
+    }
+
+    private func arc(to end: Double) -> some View {
+        Circle()
+            .trim(from: 0, to: end)
+            .stroke(Theme.accent, style: StrokeStyle(lineWidth: Theme.loaderLine, lineCap: .round))
     }
 }

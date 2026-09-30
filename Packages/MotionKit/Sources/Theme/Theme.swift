@@ -222,6 +222,9 @@ public enum Theme {
     public static let rowGap: CGFloat = 4
     /// The thickness of a progress bar.
     public static let progressBar: CGFloat = 4
+    /// The ring a notice shows while work is under way, and its line.
+    public static let loader: CGFloat = 14
+    public static let loaderLine: CGFloat = 2
 
     // MARK: Widths (width/*)
 

@@ -339,6 +339,10 @@ final class EditorController {
         for (i, url) in drawings.enumerated() { importSVG(url, at: point.map { Vec2($0.x + Double(i) * 20, $0.y + Double(i) * 20) }) }
         guard !urls.isEmpty else { return }
         Task { @MainActor in
+            // A notice follows the import once it takes a moment, a WebM's
+            // conversion at once, and says when it is done.
+            let label = urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files"
+            let work = editor.beginWork("Importing \(label)", after: urls.contains(where: WebMConversion.isWebM) ? 0 : 0.4)
             var commands: [EditorCommand] = []
             var added: [UUID] = []
             var skipped = false
@@ -351,7 +355,8 @@ final class EditorController {
             for url in urls {
                 let asset: MediaAsset
                 if WebMConversion.isWebM(url) {
-                    guard let brought = await bringInWebM(url, known: known) else { continue }
+                    guard let brought = await bringInWebM(url, known: known, work: work) else { continue }
+                    if urls.count > 1 { editor.updateWork(work, text: "Importing \(label)", fraction: nil) }
                     asset = brought.asset
                     if brought.isNew {
                         commands.append(.addMedia(asset))
@@ -384,8 +389,12 @@ final class EditorController {
                 added.append(layer.id)
             }
             if skipped { NSSound.beep() }
-            guard !commands.isEmpty, perform(.batch(commands, name: added.count == 1 ? "Import" : "Import Files")) else { return }
+            guard !commands.isEmpty, perform(.batch(commands, name: added.count == 1 ? "Import" : "Import Files")) else {
+                editor.finishWork(work, done: nil)
+                return
+            }
             select(added)
+            editor.finishWork(work, done: "Imported \(added.count == urls.count ? label : "\(added.count) of \(urls.count) files")")
         }
     }
 
@@ -409,30 +418,44 @@ final class EditorController {
     private func bringIn(_ url: URL, as kind: MediaKind) async -> (asset: MediaAsset, isNew: Bool)? {
         if WebMConversion.isWebM(url) {
             guard kind == .video else { NSSound.beep(); return nil }
-            return await bringInWebM(url, known: project.media)
+            let work = editor.beginWork("Importing \(url.lastPathComponent)", after: 0)
+            let brought = await bringInWebM(url, known: project.media, work: work)
+            editor.finishWork(work, done: brought == nil ? nil : "Imported \(url.lastPathComponent)")
+            return brought
         }
+        let work = editor.beginWork("Importing \(url.lastPathComponent)", after: 0.4)
         guard let document, let described = await MediaImport.describe(url), described.kind == kind else {
+            editor.finishWork(work, done: nil)
             NSSound.beep()
             return nil
         }
-        if let existing = project.media.first(where: { $0.contentHash == described.contentHash }) { return (existing, false) }
+        if let existing = project.media.first(where: { $0.contentHash == described.contentHash }) {
+            editor.finishWork(work, done: "Imported \(url.lastPathComponent)")
+            return (existing, false)
+        }
         do { try await document.stage(url, as: described.fileName) } catch {
+            editor.finishWork(work, done: nil)
             NSSound.beep()
             return nil
         }
+        editor.finishWork(work, done: "Imported \(url.lastPathComponent)")
         return (described, true)
     }
 
     /// A WebM made into a movie macOS can open (`WebMConversion`) and staged,
     /// or the one already in the project from the same file: it is known by
     /// the WebM's own fingerprint, so importing it again converts nothing.
-    /// What goes wrong is said in a notice.
-    private func bringInWebM(_ url: URL, known: [MediaAsset]) async -> (asset: MediaAsset, isNew: Bool)? {
+    /// What goes wrong is said in a notice; how far the conversion has got
+    /// is shown on `work`'s.
+    private func bringInWebM(_ url: URL, known: [MediaAsset], work: UUID) async -> (asset: MediaAsset, isNew: Bool)? {
         guard let document, let hash = await MediaImport.fingerprint(url) else { NSSound.beep(); return nil }
         if let existing = known.first(where: { $0.contentHash == hash }) { return (existing, false) }
-        editor.showNotice("Converting \(url.lastPathComponent)…")
+        let text = "Converting \(url.lastPathComponent)"
+        editor.updateWork(work, text: text, fraction: 0)
         do {
-            let movie = try await WebMConversion.convert(url)
+            let movie = try await WebMConversion.convert(url) { fraction in
+                Task { @MainActor [weak self] in self?.editor.updateWork(work, text: text, fraction: fraction) }
+            }
             defer { try? FileManager.default.removeItem(at: movie) }
             guard var asset = await MediaImport.describe(movie) else {
                 editor.showNotice("\(url.lastPathComponent) was converted but couldn't be opened.")
@@ -441,7 +464,6 @@ final class EditorController {
             asset.originalName = url.lastPathComponent
             asset.contentHash = hash
             try await document.stage(movie, as: asset.fileName)
-            editor.notice = nil
             return (asset, true)
         } catch {
             editor.showNotice(error.localizedDescription)

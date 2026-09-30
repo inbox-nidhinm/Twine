@@ -34,15 +34,74 @@ final class EditorModel {
     var hoveredLayer: UUID?
     /// The keyboard shortcuts card is up (⌘/).
     var showShortcuts = false
-    /// A short note over the canvas, such as fonts a paste could not find.
-    /// Goes by itself after a few seconds.
-    var notice: String?
+    /// A short note over the canvas, such as fonts a paste could not find,
+    /// or an import under way. A note goes by itself after a few seconds;
+    /// work stays up until it is done, then shows it is for three.
+    var notice: Notice?
     @ObservationIgnored private var noticeTimer: Timer?
+    /// The work the notice follows, if any: its id, whether it has shown
+    /// (it waits a moment, so quick work shows nothing), whether it was
+    /// dismissed, and what it would show.
+    @ObservationIgnored private var work: (id: UUID, shown: Bool, dismissed: Bool, notice: Notice)?
 
     func showNotice(_ text: String) {
-        notice = text
+        // A note says something went wrong or needs saying; work under way
+        // gives way to it rather than writing over it.
+        work = nil
+        show(Notice(text: text, state: .note), for: 6)
+    }
+
+    /// Starts following some work with `text` and a loader, shown once it
+    /// has gone on for `delay` seconds.
+    func beginWork(_ text: String, after delay: Double) -> UUID {
+        let id = UUID()
+        work = (id, false, false, Notice(text: text, state: .working(nil)))
+        if delay <= 0 { revealWork(id) } else {
+            Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated { self?.revealWork(id) }
+            }
+        }
+        return id
+    }
+
+    /// What the work is doing now, and how far through it is (nil when
+    /// that is not known).
+    func updateWork(_ id: UUID, text: String? = nil, fraction: Double?) {
+        guard var current = work, current.id == id else { return }
+        current.notice = Notice(text: text ?? current.notice.text,
+                                state: .working(fraction.map { min(max($0, 0), 1) }))
+        work = current
+        if current.shown, !current.dismissed { notice = current.notice }
+    }
+
+    /// Ends the work. With `done`, a notice that showed says so for three
+    /// seconds; without, it goes (the work failed and said so itself).
+    func finishWork(_ id: UUID, done: String?) {
+        guard let current = work, current.id == id else { return }
+        work = nil
+        guard current.shown, !current.dismissed else { return }
+        if let done { show(Notice(text: done, state: .done), for: 3) } else { notice = nil }
+    }
+
+    /// The notice's close button: work carries on without it.
+    func dismissNotice() {
+        work?.dismissed = true
         noticeTimer?.invalidate()
-        noticeTimer = Timer.scheduledTimer(withTimeInterval: 6, repeats: false) { [weak self] _ in
+        notice = nil
+    }
+
+    private func revealWork(_ id: UUID) {
+        guard var current = work, current.id == id, !current.shown else { return }
+        current.shown = true
+        work = current
+        noticeTimer?.invalidate()
+        notice = current.notice
+    }
+
+    private func show(_ new: Notice, for seconds: Double) {
+        notice = new
+        noticeTimer?.invalidate()
+        noticeTimer = Timer.scheduledTimer(withTimeInterval: seconds, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated { self?.notice = nil }
         }
     }
@@ -182,4 +241,17 @@ enum Tool: String, CaseIterable {
     static func forKey(_ key: String) -> Tool? {
         allCases.first { $0.key.lowercased() == key.lowercased() }
     }
+}
+
+/// What the notice over the canvas says, and whether it is a plain note,
+/// work under way (with how far through, when known) or work just done.
+struct Notice: Equatable {
+    enum State: Equatable {
+        case note
+        case working(Double?)
+        case done
+    }
+
+    var text: String
+    var state: State
 }
