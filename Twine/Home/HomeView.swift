@@ -143,8 +143,9 @@ struct HomeView: View {
                 }
             }
             .foregroundStyle(on ? Theme.textPrimary : dim ? Theme.textTertiary : Theme.textSecondary)
-            .padding(.leading, Theme.panelPad)
-            .padding(.trailing, 6)
+            // As far in on the right as on the left, so a trailing word
+            // (Version History's build) clears the highlight's edge.
+            .padding(.horizontal, Theme.panelPad)
             .frame(height: Theme.listRow)
             .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
                 .fill(on ? Theme.rowSelected : hoveredRow == title ? Theme.rowHover : .clear)
@@ -164,8 +165,9 @@ struct HomeView: View {
             .font(ThemeFont.label)
             .foregroundStyle(Theme.textPrimary)
             .focused($folderFocused)
-            .padding(.leading, Theme.panelPad)
-            .padding(.trailing, 6)
+            // As far in on the right as on the left, so a trailing word
+            // (Version History's build) clears the highlight's edge.
+            .padding(.horizontal, Theme.panelPad)
             .frame(height: Theme.listRow)
             .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
                 .fill(Theme.panelRaised)

@@ -53,6 +53,7 @@ enum VersionHistory {
             "The tool bar's hover highlight slides as smoothly right to left as left to right. Going leftwards it could stick to the tool just left.",
         ], misc: [
             "The close buttons on the Keyboard Shortcuts and Version History cards sit as far in from the right as they sit down from the top, tucked into the corner.",
+            "On the home screen, the build number beside Version History sits as far in from the right as the words do from the left.",
             "The canvas shows a lighter motion blur as you play and scrub; exports draw it at full quality, so frames with motion blur take longer to export.",
             "An action switched off in the timeline always shows its crossed-out eye, not only under the pointer, as a hidden layer does in the layers panel. Clicking it switches the action back on.",
             "Back to Presets and the plus beside an action's name are gone. New Action and Select Preset stay at the foot of the inspector.",
