@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 144
+    static let pushes = 145
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -57,7 +57,7 @@ enum VersionHistory {
             "Once its blur ends, a layer is drawn exactly as it was before it blurred.",
             "Playing a project with many sound clips no longer stutters. With a dozen clicks and sounds, asking the sound player where it was held up every frame for most of a second, so playback ran at two frames a second and the sound kept restarting. It now plays at a full 60, with the sound within a hundredth of a second of the playhead.",
             "The tool bar's hover highlight slides as smoothly right to left as left to right. Going leftwards it could stick to the tool just left.",
-            "Duplicating a sound's bar in the timeline no longer crashes Twine. Drawing its waveform could work out a place in the sound too large to count when the bar was drawn extremely narrow or wide; such a bar now simply shows no waveform.",
+            "Duplicating a sound's bar in the timeline no longer crashes or freezes Twine. A copy that landed out of view sent its waveform drawing into a loop that never ended, or, before that, a place in the sound too large to count; a bar out of view now draws no waveform.",
         ], misc: [
             "The close buttons on the Keyboard Shortcuts and Version History cards sit as far in from the right as they sit down from the top, tucked into the corner.",
             "On the home screen, the build number beside Version History sits as far in from the right as the words do from the left.",

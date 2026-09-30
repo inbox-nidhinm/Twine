@@ -414,6 +414,10 @@ final class TimelineTracksView: NSView {
         ctx.addPath(CGPath(roundedRect: rect.insetBy(dx: 1, dy: 2), cornerWidth: 5, cornerHeight: 5, transform: nil))
         ctx.clip()
         let visible = rect.intersection(CGRect(x: gutter, y: rect.minY, width: bounds.width - gutter, height: rect.height))
+        // A bar wholly out of view leaves a null rectangle, whose infinite
+        // edge would make the loop below step for ever (and, before this,
+        // count a place no Int could hold). There is nothing to draw then.
+        guard !visible.isNull, !visible.isEmpty else { ctx.restoreGState(); return }
         let path = CGMutablePath()
         let mid = rect.midY, half = rect.height / 2 - 3
         var x = visible.minX.rounded(.down)
