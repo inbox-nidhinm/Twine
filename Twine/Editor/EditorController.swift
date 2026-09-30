@@ -986,6 +986,12 @@ final class EditorController {
         // After a click in the timeline, Delete is for actions only; with
         // none selected it does nothing rather than reaching for the layer.
         if timelineHasFocus { return deleteSelectedActions() }
+        deleteSelectedLayers()
+    }
+
+    /// Deletes the selected layers, wherever the last click was: what a
+    /// layer's own right-click menu asks for.
+    func deleteSelectedLayers() {
         let ids = selection
         guard !ids.isEmpty else { return }
         perform(.deleteLayers(Set(ids)))
@@ -994,6 +1000,11 @@ final class EditorController {
 
     func duplicateSelection() {
         if timelineHasFocus, !selectedActions.isEmpty { return duplicateSelectedActions() }
+        duplicateSelectedLayers()
+    }
+
+    /// Duplicates the selected layers, wherever the last click was.
+    func duplicateSelectedLayers() {
         let layers = topmost(selectedLayers)
         guard !layers.isEmpty else { return }
         // Duplicates land just in front of their originals, nudged so they

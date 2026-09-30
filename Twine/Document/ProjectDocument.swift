@@ -293,17 +293,20 @@ final class ProjectDocument: NSDocument {
 
     /// Renames the package on disk. The document follows its file, so the
     /// window, the recent list and autosave all carry on under the new name.
-    func rename(to newName: String) {
+    /// The move finishes a moment later (a few seconds when it saves
+    /// first), so `done` says when, and whether it took.
+    func rename(to newName: String, done: @escaping (Bool) -> Void = { _ in }) {
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = fileURL, !trimmed.isEmpty, trimmed != name, !trimmed.contains("/") else { return }
+        guard let url = fileURL, !trimmed.isEmpty, trimmed != name, !trimmed.contains("/") else { return done(false) }
         let target = url.deletingLastPathComponent()
             .appendingPathComponent(trimmed).appendingPathExtension(url.pathExtension)
         guard !FileManager.default.fileExists(atPath: target.path) else {
             NSSound.beep()
-            return
+            return done(false)
         }
         move(to: target) { error in
             if let error { NSApp.presentError(error) }
+            done(error == nil)
         }
     }
 }

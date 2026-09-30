@@ -14,6 +14,9 @@ struct LayersPanel: View {
 
     @State private var renamingFile = false
     @State private var fileDraft = ""
+    /// A new name shown at once while the file is moved to it, which takes a
+    /// moment; the panel went back to the old name until it was done.
+    @State private var pendingName: String?
     @State private var nameHover = false
     @FocusState private var fileFocused: Bool
 
@@ -88,6 +91,9 @@ struct LayersPanel: View {
             controller.select([id])
             lastClicked = id
         }
+        // Delete, Duplicate and Copy are for layers after a click here, as
+        // after one on the canvas, not for the actions last clicked.
+        editor.focus = .canvas
     }
 
     // MARK: The file
@@ -105,7 +111,7 @@ struct LayersPanel: View {
                     .onExitCommand { renamingFile = false }
                     .onChange(of: fileFocused) { _, now in if !now, renamingFile { commitFileName() } }
             } else {
-                Text(document.name)
+                Text(pendingName ?? document.name)
                     .font(ThemeFont.title)
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
@@ -142,7 +148,9 @@ struct LayersPanel: View {
 
     private func commitFileName() {
         renamingFile = false
-        document.rename(to: fileDraft)
+        let wanted = fileDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !wanted.isEmpty, wanted != document.name, !wanted.contains("/") { pendingName = wanted }
+        document.rename(to: fileDraft) { _ in pendingName = nil }
     }
 }
 
@@ -317,6 +325,7 @@ private struct LayerRow: View {
 
     private func menu() -> [MenuEntry] {
         if !selected { controller.select([layer.id]) }
+        editor.focus = .canvas
         return controller.layerMenu(for: layer)
     }
 }
@@ -327,7 +336,7 @@ extension EditorController {
     func layerMenu(for layer: Layer) -> [MenuEntry] {
         var entries: [MenuEntry] = [
             .item("Rename") { self.editor.renaming = layer.id },
-            .item("Duplicate") { self.duplicateSelection() },
+            .item("Duplicate") { self.duplicateSelectedLayers() },
             .item("Group Selection") { self.groupSelection() },
             .item("Frame Selection") { self.frameSelection() },
         ]
@@ -343,7 +352,7 @@ extension EditorController {
             .item(layer.isLocked ? "Unlock" : "Lock") { self.perform(.setLocked([layer.id], !layer.isLocked)) },
             .item(layer.isVisible ? "Hide" : "Show") { self.perform(.setVisible([layer.id], !layer.isVisible)) },
             .separator,
-            .item("Delete") { self.deleteSelection() },
+            .item("Delete") { self.deleteSelectedLayers() },
         ]
         return entries
     }

@@ -44,6 +44,8 @@ enum VersionHistory {
             "A plainer tool bar. The tools sit straight on the bar without the darker tray behind them, the hover highlight slides from tool to tool as the pointer moves along the bar, and the blue of the tool in hand slides to the next tool picked, by a click or its key.",
         ], fixes: [
             "Presets copied in the timeline paste onto other layers too. Before, only ordinary actions did.",
+            "Delete in a layer's right-click menu deletes it at once. After a click in the timeline it deleted the selected actions instead, often none, so it took several tries. Clicking a layer in the layers panel also makes Delete, Duplicate and Copy act on layers again.",
+            "Renaming the project above the layers panel shows the new name at once. It used to go back to the old name for a few seconds while the file was moved.",
             "In exports, a light layer no longer turns white while it blurs. Exports draw each moment across the shutter in full and average them exactly, so groups, masks and blend modes inside a blurring layer look right too.",
             "A layer with motion blur no longer flashes somewhere else for a frame where its motion jumps, as when a Move starts from a From of its own, or where it turns out of edge-on. Those frames are drawn sharp.",
             "Once its blur ends, a layer is drawn exactly as it was before it blurred.",
