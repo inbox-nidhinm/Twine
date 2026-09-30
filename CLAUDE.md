@@ -8,7 +8,8 @@ The original brief is `docs/brief.md`. The project is now working through a Jitt
 
 - **No em dashes anywhere**: UI strings, comments, docs, commit messages.
 - No third-party dependencies without asking.
-- Every milestone ends with: `./make-app.sh` with no warnings, `./test.sh` passing, a new entry at the top of `Twine/VersionHistory.swift`, a commit, and a push to `inbox-nidhinm/Twine`.
+- Every milestone ends with: `./make-app.sh` with no warnings, `./test.sh` passing, the change written into the top build of `Twine/VersionHistory.swift` (see below), a commit, and a push to `inbox-nidhinm/Twine`.
+- **Builds are releases, not changes** (30 September 2026, the user's request): `VersionHistory.builds` has about a dozen entries, each with `features`, `fixes` and `misc` lists (shown as Feature updates, Bug fixes and Misc, an empty list left out). Write each change as a line in the top build's list that fits it; start a new build (which raises the version number) only when the user says to cut one. Fold a change that undoes an earlier one in the same build into the final state. The build numbers in these notes ("build 43") are the old numbering, one per change, from before this.
 - The user is a designer, not an engineer. Explain in plain terms.
 - No help text in the UI. States are shown, not explained. Put explanations in `.help()` tooltips.
 - Views never write literals: every colour, size and radius comes from `Theme` (in `Packages/MotionKit/Sources/Theme`). Values come from the "Flip Design System" page of Figma file `2XErpBfGuIGNU0DkL58Ute` (node 171:2055), with a light blue accent (#4C9FEF) in place of Flip's green.
