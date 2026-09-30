@@ -13,11 +13,17 @@ struct ToolBar: View {
     @State private var chevronFrame: CGRect = .zero
     /// What the pointer is over: a tool, or the shapes chevron.
     @State private var hovered: Spot?
-    @Namespace private var glide
+    /// Where the highlight sits: the spot hovered, or after the pointer
+    /// leaves, the last one, while it fades there.
+    @State private var place: Spot?
+    /// Each spot's box in the bar.
+    @State private var frames: [Spot: CGRect] = [:]
 
     private enum Spot: Hashable {
         case tool(Tool), chevron
     }
+
+    nonisolated private static let space = "toolbar"
 
     var body: some View {
         HStack(spacing: Theme.trayPad) {
@@ -30,6 +36,20 @@ struct ToolBar: View {
             tool(.pen)
             tool(.text)
         }
+        .coordinateSpace(.named(Self.space))
+        // One highlight for the whole row, moved to the spot under the
+        // pointer. A highlight per tool, handed on by a matched geometry
+        // effect, stuck going right to left: the one fading out came later
+        // in the row and pulled the new one back to itself.
+        .background(alignment: .topLeading) {
+            if let place, let box = frames[place] {
+                RoundedRectangle(cornerRadius: radius(place))
+                    .fill(Theme.panelRaised)
+                    .frame(width: box.width, height: box.height)
+                    .offset(x: box.minX, y: box.minY)
+                    .opacity(hovered == nil ? 0 : 1)
+            }
+        }
         .padding(Theme.trayPad + Theme.barPad)
         .floatingPanel()
     }
@@ -39,27 +59,30 @@ struct ToolBar: View {
                   size: Theme.modeButton, iconBox: Theme.icon, hoverFill: .clear) {
             pick(tool)
         }
-        .background { highlight(.tool(tool), radius: Theme.radius(forButton: Theme.modeButton)) }
         .onHover { hover(.tool(tool), $0) }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { frames[.tool(tool)] = $0 }
     }
 
-    /// The one highlight, under whichever spot the pointer is on (under a
-    /// tool in hand too, where its accent covers it, so the slide carries on
-    /// across it).
-    @ViewBuilder private func highlight(_ spot: Spot, radius: CGFloat) -> some View {
-        if hovered == spot {
-            RoundedRectangle(cornerRadius: radius)
-                .fill(Theme.panelRaised)
-                .matchedGeometryEffect(id: "hover", in: glide)
-        }
+    private func radius(_ spot: Spot) -> CGFloat {
+        spot == .chevron ? Theme.radiusRow : Theme.radius(forButton: Theme.modeButton)
     }
 
-    /// Moving onto a spot slides the highlight there. Leaving waits a moment,
-    /// since the next spot's arrival may come just after, and only then fades
-    /// it, if nothing has taken it since.
+    /// Moving from one spot to the next slides the highlight there; coming
+    /// onto the bar, it appears where the pointer is rather than sliding in
+    /// from where it last faded. Leaving waits a moment, since the next
+    /// spot's arrival may come just after, and only then fades it, if
+    /// nothing has taken it since.
     private func hover(_ spot: Spot, _ inside: Bool) {
         if inside {
-            withAnimation(Theme.hoverGlide) { hovered = spot }
+            if hovered == nil {
+                var still = Transaction()
+                still.disablesAnimations = true
+                withTransaction(still) { place = spot }
+            }
+            withAnimation(Theme.hoverGlide) {
+                place = spot
+                hovered = spot
+            }
         } else if hovered == spot {
             DispatchQueue.main.asyncAfter(deadline: .now() + Theme.hoverLinger) {
                 guard hovered == spot else { return }
@@ -88,11 +111,11 @@ struct ToolBar: View {
             IconView(.chevronDown, size: chevronGlyph)
                 .foregroundStyle(hovered == .chevron ? Theme.textPrimary : Theme.textTertiary)
                 .frame(width: chevronGlyph + (Theme.modeButton - Theme.icon) / 2, height: Theme.modeButton)
-                .background { highlight(.chevron, radius: Theme.radiusRow) }
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hover(.chevron, $0) }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { frames[.chevron] = $0 }
         .help("More shapes")
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { chevronFrame = $0 }
     }

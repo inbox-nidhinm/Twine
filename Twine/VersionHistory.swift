@@ -23,6 +23,9 @@ enum VersionHistory {
     }
 
     static let builds: [Build] = [
+        .init(date: "30 September 2026", title: "Tool bar hover both ways", changes: [
+            "The tool bar's hover highlight slides as smoothly right to left as left to right. Going leftwards it could stick to the tool just left.",
+        ]),
         .init(date: "30 September 2026", title: "A plainer tool bar", changes: [
             "The tools sit straight on the tool bar, without the darker tray behind them.",
             "The hover highlight slides from tool to tool as the pointer moves along the bar, rather than appearing under each one.",
