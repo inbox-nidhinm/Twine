@@ -550,39 +550,62 @@ final class ExportPreviewView: NSView {
 
 // MARK: - The counter
 
-/// The export's progress as a big number and a percent sign, moving as the
-/// app's Counter does with its Slide transition: the old number rises one
-/// type size and fades out while the new one rises into place from one type
-/// size below, fading in. A slide always finishes; a number that changed
-/// meanwhile slides in straight after, so at most two show at once.
+/// The export's progress as a big number and a percent sign, counting as an
+/// odometer does: each digit rolls on its own when it changes, the old one
+/// rising one type size and fading out while the new one rises into place
+/// from one type size below, and the percent sign stays still. A digit
+/// place that appears (10, 100) rolls in the same way.
 private struct SlideCounter: View {
     let value: Int
     let size: CGFloat
 
-    /// The number showing, which trails `value` while a slide is under way.
-    @State private var shown: Int?
-    @State private var sliding = false
+    var body: some View {
+        let digits = Array(String(max(value, 0)))
+        HStack(spacing: 0) {
+            HStack(spacing: 0) {
+                // Places counted from the right, so the ones stay the ones.
+                ForEach((0..<digits.count).reversed(), id: \.self) { place in
+                    RollingDigit(digit: digits[digits.count - 1 - place], size: size)
+                        .transition(.asymmetric(insertion: .offset(y: size).combined(with: .opacity),
+                                                removal: .offset(y: -size).combined(with: .opacity)))
+                }
+            }
+            .animation(Theme.counterEase, value: digits.count)
+            Figures(text: "%", size: size)
+        }
+        .fixedSize()
+    }
+}
+
+/// One place of the counter. A roll always finishes; a digit that changed
+/// meanwhile rolls in straight after, so at most two show at once.
+private struct RollingDigit: View {
+    let digit: Character
+    let size: CGFloat
+
+    /// The digit showing, which trails `digit` while a roll is under way.
+    @State private var shown: Character?
+    @State private var rolling = false
 
     var body: some View {
-        ZStack(alignment: .trailing) {
-            Figures(text: "\(shown ?? value)%", size: size)
+        ZStack {
+            Figures(text: String(shown ?? digit), size: size)
                 .id(shown)
                 .transition(.asymmetric(insertion: .offset(y: size).combined(with: .opacity),
                                         removal: .offset(y: -size).combined(with: .opacity)))
         }
-        .fixedSize()
-        .onAppear { shown = value }
-        .onChange(of: value) { _, _ in slide() }
+        .onAppear { shown = digit }
+        .onChange(of: digit) { _, _ in roll() }
     }
 
-    private func slide() {
-        guard !sliding, shown != value else { return }
-        sliding = true
+    private func roll() {
+        guard !rolling, shown != digit else { return }
+        rolling = true
         withAnimation(Theme.counterEase, completionCriteria: .removed) {
-            shown = value
+            shown = digit
         } completion: {
-            sliding = false
-            slide()
+            rolling = false
+            roll()
         }
     }
 }

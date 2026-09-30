@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 145
+    static let pushes = 146
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -47,6 +47,7 @@ enum VersionHistory {
             "Swap Preset. With a preset selected, Swap Preset puts another in its place. The bar keeps when it starts and takes the new preset's name, easing and length unless you had changed them.",
             "Copy actions from one layer onto another. Copy bars in the timeline (Command-C, or Cut and Copy on a bar's right-click menu), then paste onto another layer with Command-V, Paste on a timeline row's right-click menu, or Paste Action on a layer's right-click menu. Each lands at the playhead on a row just under that layer's others, with the same length, easing and settings, and makes the same motion from where the new layer stands: a Move to a spot travels as far the same way.",
             "Duplicate in the timeline, from the right-click menu or Command-D. The copy goes on the row just below its original, starting where the original ends, and is selected.",
+            "The export's percentage counts like an odometer: each digit rolls on its own as it changes, and the percent sign stays still.",
             "A plainer tool bar. The tools sit straight on the bar without the darker tray behind them, the hover highlight slides from tool to tool as the pointer moves along the bar, and the blue of the tool in hand slides to the next tool picked, by a click or its key.",
         ], fixes: [
             "Presets copied in the timeline paste onto other layers too. Before, only ordinary actions did.",
