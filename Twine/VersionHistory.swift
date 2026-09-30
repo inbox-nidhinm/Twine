@@ -40,7 +40,7 @@ enum VersionHistory {
             "Only what that action moves smears; anything else the layer does at the same time stays sharp. Text presets that move letter by letter blur each letter by its own motion.",
             "Swap Preset. With a preset selected, Swap Preset puts another in its place. The bar keeps when it starts and takes the new preset's name, easing and length unless you had changed them.",
             "Duplicate in the timeline, from the right-click menu or Command-D. The copy goes on the row just below its original, starting where the original ends, and is selected.",
-            "A plainer tool bar. The tools sit straight on the bar without the darker tray behind them, and the hover highlight slides from tool to tool as the pointer moves along the bar.",
+            "A plainer tool bar. The tools sit straight on the bar without the darker tray behind them, the hover highlight slides from tool to tool as the pointer moves along the bar, and the blue of the tool in hand slides to the next tool picked, by a click or its key.",
         ], fixes: [
             "In exports, a light layer no longer turns white while it blurs. Exports draw each moment across the shutter in full and average them exactly, so groups, masks and blend modes inside a blurring layer look right too.",
             "A layer with motion blur no longer flashes somewhere else for a frame where its motion jumps, as when a Move starts from a From of its own, or where it turns out of edge-on. Those frames are drawn sharp.",
