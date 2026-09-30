@@ -13,6 +13,12 @@ import Theme
 enum VersionHistory {
     static var version: String { "\(builds.count)" }
 
+    /// How many pushes to GitHub the app has had, this one included. Raise it by
+    /// one with every push: the first was v0.0.01, the 100th is v0.1.00.
+    static let pushes = 135
+
+    static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
+
     struct Build: Identifiable {
         let date: String
         let title: String
@@ -312,9 +318,14 @@ struct VersionHistoryCard: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    Text("Version History")
-                        .font(ThemeFont.labelStrong)
-                        .foregroundStyle(Theme.textPrimary)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text("Version History")
+                            .font(ThemeFont.labelStrong)
+                            .foregroundStyle(Theme.textPrimary)
+                        Text(VersionHistory.release)
+                            .font(ThemeFont.caption)
+                            .foregroundStyle(Theme.textTertiary.opacity(0.6))
+                    }
                     Spacer(minLength: 0)
                     IconButton(icon: .close, help: "Close (Esc)", action: dismiss)
                 }
