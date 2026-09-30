@@ -54,7 +54,7 @@ enum VersionHistory {
         ], misc: [
             "The close buttons on the Keyboard Shortcuts and Version History cards sit as far in from the right as they sit down from the top, tucked into the corner.",
             "On the home screen, the build number beside Version History sits as far in from the right as the words do from the left.",
-            "Version History's points have more room between their lines (about 155%), so long ones read more easily.",
+            "Version History breathes: more room between the lines of each point (about 155%), between points, between sections and their headings, and between builds.",
             "The canvas shows a lighter motion blur as you play and scrub; exports draw it at full quality, so frames with motion blur take longer to export.",
             "An action switched off in the timeline always shows its crossed-out eye, not only under the pointer, as a hidden layer does in the layers panel. Clicking it switches the action back on.",
             "Back to Presets and the plus beside an action's name are gone. New Action and Select Preset stay at the foot of the inspector.",
@@ -324,9 +324,9 @@ struct VersionHistoryCard: View {
                 .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: Theme.hairline) }
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: Theme.readingBlockGap) {
                         ForEach(VersionHistory.builds) { build in
-                            VStack(alignment: .leading, spacing: 8) {
+                            VStack(alignment: .leading, spacing: Theme.readingTitleGap) {
                                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                                     Text(build.title)
                                         .displayTitle(20)
@@ -336,21 +336,22 @@ struct VersionHistoryCard: View {
                                         .font(ThemeFont.caption)
                                         .foregroundStyle(Theme.textTertiary)
                                 }
-                                ForEach(build.sections, id: \.heading) { section in
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text(section.heading)
-                                            .font(ThemeFont.labelStrong)
-                                            .foregroundStyle(Theme.textPrimary)
-                                            .padding(.top, 4)
-                                        ForEach(section.items, id: \.self) { change in
-                                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                                Circle().fill(Theme.textTertiary).frame(width: 3, height: 3)
-                                                    .alignmentGuide(.firstTextBaseline) { $0[.bottom] + 3 }
-                                                Text(change)
-                                                    .font(ThemeFont.label)
-                                                    .lineSpacing(Theme.readingLineSpacing)
-                                                    .foregroundStyle(Theme.textSecondary)
-                                                    .fixedSize(horizontal: false, vertical: true)
+                                VStack(alignment: .leading, spacing: Theme.readingSectionGap) {
+                                    ForEach(build.sections, id: \.heading) { section in
+                                        VStack(alignment: .leading, spacing: Theme.readingItemGap) {
+                                            Text(section.heading)
+                                                .font(ThemeFont.labelStrong)
+                                                .foregroundStyle(Theme.textPrimary)
+                                            ForEach(section.items, id: \.self) { change in
+                                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                                    Circle().fill(Theme.textTertiary).frame(width: 3, height: 3)
+                                                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] + 3 }
+                                                    Text(change)
+                                                        .font(ThemeFont.label)
+                                                        .lineSpacing(Theme.readingLineSpacing)
+                                                        .foregroundStyle(Theme.textSecondary)
+                                                        .fixedSize(horizontal: false, vertical: true)
+                                                }
                                             }
                                         }
                                     }

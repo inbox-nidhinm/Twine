@@ -110,6 +110,13 @@ public enum Theme {
     /// History's points): 11 pt text at about 155% of its size, 17 pt lines
     /// where the system font's own are 14 (measured on screen).
     public static let readingLineSpacing: CGFloat = 3
+    /// The steps of running text in a sheet, from the smallest: between two
+    /// points, and a heading and its first; between sections; a build's
+    /// title and what it says; one build and the next.
+    public static let readingItemGap: CGFloat = 10
+    public static let readingSectionGap: CGFloat = 22
+    public static let readingTitleGap: CGFloat = 14
+    public static let readingBlockGap: CGFloat = 44
     /// How far a sheet's close button sits in from the right: as far as it
     /// sits down from the top, so the cross reads as tucked into the corner.
     /// The sheet's own side inset left it twice as far in as down.
