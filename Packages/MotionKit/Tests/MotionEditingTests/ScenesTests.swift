@@ -34,6 +34,17 @@ import MotionModel
         #expect(p.scenes.isEmpty)
     }
 
+    @Test func copiesJoinTheirOriginalsScene() throws {
+        var (p, actions) = project()
+        p.scenes = try #require(Scenes.grouping([actions[0].id, actions[1].id], in: p)).scenes
+        let copy = UUID(), other = UUID()
+        let joined = Scenes.joining([(actions[0].id, copy), (actions[2].id, other)], in: p.scenes)
+        #expect(joined[0].actionIDs == [actions[0].id, actions[1].id, copy])
+        // Pasted copies are made with their originals' ids beside them.
+        let pairs = ActionEditing.pastedPairs([actions[0]], onto: [], at: 3, in: p, rate: .fps30)
+        #expect(pairs.count == 1 && pairs[0].original == actions[0].id && pairs[0].copy.id != actions[0].id)
+    }
+
     @Test func stretchingKeepsEveryonesShareOfTheSpan() throws {
         let (_, actions) = project()
         let span = try #require(Scenes.span(of: actions))

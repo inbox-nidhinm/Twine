@@ -34,6 +34,20 @@ public enum Scenes {
         }
     }
 
+    /// `scenes` with each copy in `pairs` added to its original's scene, so
+    /// duplicating or pasting keeps a scene's actions together. Scenes
+    /// without an original among them are unchanged.
+    public static func joining(_ pairs: [(original: UUID, copy: UUID)], in scenes: [TimelineScene]) -> [TimelineScene] {
+        guard !scenes.isEmpty, !pairs.isEmpty else { return scenes }
+        var copies: [UUID: [UUID]] = [:]
+        for pair in pairs { copies[pair.original, default: []].append(pair.copy) }
+        return scenes.map { scene in
+            var joined = scene
+            for id in scene.actionIDs { joined.actionIDs += copies[id] ?? [] }
+            return joined
+        }
+    }
+
     /// From the earliest start to the latest end of `actions`.
     public static func span(of actions: [Action]) -> ClosedRange<Double>? {
         guard let start = actions.map(\.start).min(), let end = actions.map(\.end).max() else { return nil }

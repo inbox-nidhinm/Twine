@@ -96,13 +96,20 @@ extension Project {
     /// at the new layers, each with an id of its own. Duplicating or pasting
     /// a layer brings its animation with it this way.
     public func actionCopies(for map: [UUID: UUID]) -> [Action] {
+        actionCopyPairs(for: map).map(\.copy)
+    }
+
+    /// The same copies, each with the id of the action it copies, so a copy
+    /// can join its original's scene.
+    public func actionCopyPairs(for map: [UUID: UUID]) -> [(original: UUID, copy: Action)] {
         actions.compactMap { action in
             guard let target = map[action.targetLayerID] else { return nil }
             var copy = Action(target: target, start: action.start, duration: action.duration, easing: action.easing,
                               name: action.name, isEnabled: action.isEnabled, rowOrder: action.rowOrder,
                               spec: action.spec)
             copy.targetLayerID = target
-            return copy
+            copy.motionBlur = action.motionBlur
+            return (action.id, copy)
         }
     }
 

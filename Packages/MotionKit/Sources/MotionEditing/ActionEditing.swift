@@ -160,13 +160,21 @@ public enum ActionEditing {
     /// Back on its own layer it is copied exactly.
     public static func pasted(_ actions: [Action], onto targets: [Layer], at time: Double, in project: Project,
                               rate: FrameRate, origins: [UUID: ActionOrigin] = [:]) -> [Action] {
+        pastedPairs(actions, onto: targets, at: time, in: project, rate: rate, origins: origins).map(\.copy)
+    }
+
+    /// The same copies, each with the id of the action it copies, so a copy
+    /// can join its original's scene.
+    public static func pastedPairs(_ actions: [Action], onto targets: [Layer], at time: Double, in project: Project,
+                                   rate: FrameRate, origins: [UUID: ActionOrigin] = [:]) -> [(original: UUID, copy: Action)] {
         guard let earliest = actions.map(\.start).min() else { return [] }
         func place(_ a: Action, on target: UUID) -> Action {
             copy(of: a, target: target, start: rate.snapped(max(0, time + a.start - earliest)))
         }
         if targets.isEmpty {
-            return actions.filter { project.layer(withID: $0.targetLayerID) != nil }.map { place($0, on: $0.targetLayerID) }
+            return actions.filter { project.layer(withID: $0.targetLayerID) != nil }.map { ($0.id, place($0, on: $0.targetLayerID)) }
         }
+        var pairs: [(original: UUID, copy: Action)] = []
         var placed: [Action] = []
         for layer in targets {
             let allowed = Set(ActionFactory.kinds(for: layer, in: project))
@@ -180,9 +188,10 @@ public enum ActionEditing {
                     made = carried(made, from: origin, to: ActionOrigin(tracks.inheritedState(for: made, of: layer)))
                 }
                 placed.append(made)
+                pairs.append((action.id, made))
             }
         }
-        return placed
+        return pairs
     }
 
     /// Whether an action suits the layer it would be pasted onto: one of
