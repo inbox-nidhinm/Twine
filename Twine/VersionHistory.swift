@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 153
+    static let pushes = 154
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -55,6 +55,7 @@ enum VersionHistory {
             "New Project on the home screen, or ⌘N there, makes the project in the folder you are looking at.",
             "Search in the preset picker. It opens ready to type: \"slide\" or \"blur\" narrows the tiles to the presets named so (their Out names and groups count too), and Return adds the first.",
             "Fold the timeline by layer. A layer with more than one action has a chevron on its first row: click it to gather all its rows into one, its bars side by side, which still click, move and trim. Clicking the folded row's name selects all its actions. Fold All Layers and Unfold All Layers are on the timeline's right-click menu, and adding an action to a folded layer opens it.",
+            "GIF and WebM exports. GIF (animated) is for Slack, Notion and prototypes: silent, at most 50 frames a second, each frame with its own colours, flat colour kept exact and gradients finely dithered; on an opaque background only what changes is stored, so a 5-second 4K GIF of shapes moving came out at 630 KB. WebM (VP9) keeps transparency and sound, and is made by the ffmpeg installed on this Mac.",
             "A plainer tool bar. The tools sit straight on the bar without the darker tray behind them, the hover highlight slides from tool to tool as the pointer moves along the bar, and the blue of the tool in hand slides to the next tool picked, by a click or its key.",
         ], fixes: [
             "Presets copied in the timeline paste onto other layers too. Before, only ordinary actions did.",

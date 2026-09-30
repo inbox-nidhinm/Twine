@@ -73,10 +73,10 @@ public enum Exporter {
     /// and `frames` count at that rate. `progress` is called
     /// from the exporting thread after each frame, from 0 to 1.
     /// `media` locates each imported file by its id, for pictures, video
-    /// frames and sound.
+    /// frames and sound. `ffmpeg` is the ffmpeg that makes WebM.
     public static func export(_ project: Project, settings: ExportSettings, at time: Double = 0,
                               frames: Range<Int>? = nil, to url: URL,
-                              media: [UUID: URL] = [:], job: ExportJob = ExportJob(),
+                              media: [UUID: URL] = [:], ffmpeg: URL? = nil, job: ExportJob = ExportJob(),
                               progress: (Double) -> Void = { _ in }) throws {
         var project = project
         project.composition = settings.exported(project.composition)
@@ -90,7 +90,14 @@ public enum Exporter {
         let temporary = folder.appendingPathComponent(url.lastPathComponent)
 
         let library = MediaLibrary(locate: { media[$0] })
-        if settings.format.isMovie {
+        if settings.format == .gif {
+            try writeGIF(project, settings: settings, frames: frames, library: library, to: temporary, job: job,
+                         progress: progress)
+        } else if settings.format == .webm {
+            guard let ffmpeg else { throw ExportError.failed("WebM needs ffmpeg, which isn't installed on this Mac.") }
+            try writeWebM(project, settings: settings, frames: frames, library: library, media: media, ffmpeg: ffmpeg,
+                          folder: folder, to: temporary, job: job, progress: progress)
+        } else if settings.format.isMovie {
             try writeMovie(project, settings: settings, frames: frames, library: library, media: media, to: temporary,
                            job: job, progress: progress)
         } else {
@@ -237,6 +244,167 @@ public enum Exporter {
 
     static func isMOV(_ format: ExportFormat) -> Bool { format.fileExtension == "mov" }
 
+    // MARK: GIF
+
+    private static func writeGIF(_ project: Project, settings: ExportSettings, frames: Range<Int>?,
+                                 library: MediaLibrary, to url: URL, job: ExportJob,
+                                 progress: (Double) -> Void) throws {
+        let composition = project.composition
+        let timing = ExportTiming(composition, frames: frames)
+        let (width, height) = settings.pixelSize(of: composition)
+        guard let renderer = OffscreenRenderer(pixelWidth: width, pixelHeight: height) else { throw ExportError.noGPU }
+        renderer.media = library
+        let buffer = try pixelBuffer(width: width, height: height)
+        let gif = try GIFWriter(url: url, width: width, height: height, transparent: composition.background.isTransparent)
+        // Frame times in hundredths, each frame's delay the step between its
+        // start and the next's, rounded from the exact times so they never drift.
+        func hundredths(_ frame: Int) -> Int { Int((timing.presentationTime(ofFrame: frame).seconds * 100).rounded()) }
+        do {
+            for frame in 0..<timing.frameCount {
+                if job.isCancelled { throw ExportError.cancelled }
+                renderer.render(evaluate(project, at: timing.time(ofFrame: frame), motionBlur: .export), into: buffer)
+                CVPixelBufferLockBaseAddress(buffer, .readOnly)
+                defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+                guard let base = CVPixelBufferGetBaseAddress(buffer) else { throw ExportError.failed("The frame couldn't be drawn.") }
+                try gif.add(base, bytesPerRow: CVPixelBufferGetBytesPerRow(buffer), delay: hundredths(frame + 1) - hundredths(frame))
+                progress(Double(frame + 1) / Double(timing.frameCount))
+            }
+            try gif.finish()
+        } catch {
+            gif.abandon()
+            throw error
+        }
+    }
+
+    private static func pixelBuffer(width: Int, height: Int) throws -> CVPixelBuffer {
+        var made: CVPixelBuffer?
+        let attributes: [String: Any] = [kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any]()]
+        guard CVPixelBufferCreate(nil, width, height, kCVPixelFormatType_32BGRA, attributes as CFDictionary, &made) == kCVReturnSuccess,
+              let made else { throw ExportError.failed("There wasn't enough memory for a frame.") }
+        return made
+    }
+
+    // MARK: WebM
+
+    /// VP9 from ffmpeg, fed the drawn frames as they are made; the sound is
+    /// mixed first into a WAV beside it, which ffmpeg makes Opus.
+    private static func writeWebM(_ project: Project, settings: ExportSettings, frames: Range<Int>?,
+                                  library: MediaLibrary, media: [UUID: URL], ffmpeg: URL, folder: URL,
+                                  to url: URL, job: ExportJob, progress: (Double) -> Void) throws {
+        let composition = project.composition
+        let timing = ExportTiming(composition, frames: frames)
+        let (width, height) = settings.pixelSize(of: composition)
+        let alpha = composition.background.isTransparent
+        guard let renderer = OffscreenRenderer(pixelWidth: width, pixelHeight: height) else { throw ExportError.noGPU }
+        renderer.media = library
+        let buffer = try pixelBuffer(width: width, height: height)
+
+        let wav = folder.appendingPathComponent("sound.wav")
+        let hasSound = settings.includesAudio
+            ? try writeSound(project, from: timing, to: wav, media: media, job: job)
+            : false
+        if job.isCancelled { throw ExportError.cancelled }
+
+        let rate = composition.frameRate
+        var arguments = ["-hide_banner", "-loglevel", "error", "-y",
+                         "-f", "rawvideo", "-pix_fmt", "bgra", "-s", "\(width)x\(height)",
+                         "-framerate", "\(rate.frames)/\(rate.seconds)", "-i", "pipe:0"]
+        if hasSound { arguments += ["-i", wav.path] }
+        arguments += ["-map", "0:v"] + (hasSound ? ["-map", "1:a", "-c:a", "libopus", "-b:a", "192k"] : [])
+        arguments += ["-vf", "scale=out_color_matrix=bt709:out_range=tv",
+                      "-c:v", "libvpx-vp9", "-pix_fmt", alpha ? "yuva420p" : "yuv420p",
+                      "-crf", "30", "-b:v", "0", "-row-mt", "1", "-deadline", "good", "-cpu-used", "4",
+                      "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
+        if alpha { arguments += ["-auto-alt-ref", "0"] }
+        arguments += ["-f", "webm", url.path]
+
+        // A write into a pipe ffmpeg has closed would otherwise end the app.
+        signal(SIGPIPE, SIG_IGN)
+        let process = Process()
+        process.executableURL = ffmpeg
+        process.arguments = arguments
+        let input = Pipe(), errors = Pipe()
+        process.standardInput = input
+        process.standardError = errors
+        process.standardOutput = FileHandle.nullDevice
+        do { try process.run() } catch { throw ExportError.failed("ffmpeg couldn't be started: \(error.localizedDescription)") }
+        let said = Mutex(Data())
+        let reading = DispatchGroup()
+        reading.enter()
+        DispatchQueue.global(qos: .utility).async {
+            let data = errors.fileHandleForReading.readDataToEndOfFile()
+            said.withLock { $0 = data }
+            reading.leave()
+        }
+        func reason() -> String {
+            reading.wait()
+            let text = said.withLock { String(decoding: $0, as: UTF8.self) }
+            return text.split(separator: "\n").last.map { "ffmpeg: \($0)" } ?? "ffmpeg stopped."
+        }
+
+        let rowBytes = width * 4
+        var row = Data(count: rowBytes * height)
+        do {
+            for frame in 0..<timing.frameCount {
+                if job.isCancelled { throw ExportError.cancelled }
+                guard process.isRunning else { throw ExportError.failed(reason()) }
+                renderer.render(evaluate(project, at: timing.time(ofFrame: frame), motionBlur: .export), into: buffer)
+                if alpha { unpremultiply(buffer) }
+                CVPixelBufferLockBaseAddress(buffer, .readOnly)
+                if let base = CVPixelBufferGetBaseAddress(buffer) {
+                    let stride = CVPixelBufferGetBytesPerRow(buffer)
+                    row.withUnsafeMutableBytes { out in
+                        for y in 0..<height {
+                            out.baseAddress!.advanced(by: y * rowBytes).copyMemory(from: base + y * stride, byteCount: rowBytes)
+                        }
+                    }
+                }
+                CVPixelBufferUnlockBaseAddress(buffer, .readOnly)
+                do { try input.fileHandleForWriting.write(contentsOf: row) } catch { throw ExportError.failed(reason()) }
+                // The last tenth is ffmpeg finishing the file.
+                progress(Double(frame + 1) / Double(timing.frameCount) * 0.95)
+            }
+            try? input.fileHandleForWriting.close()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { throw ExportError.failed(reason()) }
+            progress(1)
+        } catch {
+            if process.isRunning { process.terminate() }
+            try? input.fileHandleForWriting.close()
+            process.waitUntilExit()
+            throw error
+        }
+    }
+
+    /// The mixed sound for the export's frames as 16-bit WAV at `url`.
+    /// False when there is no sound.
+    private static func writeSound(_ project: Project, from timing: ExportTiming, to url: URL,
+                                   media: [UUID: URL], job: ExportJob) throws -> Bool {
+        let names = Dictionary(project.media.map { ($0.id, $0.originalName) }, uniquingKeysWith: { a, _ in a })
+        guard let sound = try AudioMixdown(clips: audioClips(project), media: media, names: names, start: timing.startTime,
+                                           duration: timing.duration.seconds, compressed: false) else { return false }
+        let writer: AVAssetWriter
+        do { writer = try AVAssetWriter(outputURL: url, fileType: .wav) } catch {
+            throw ExportError.failed("The sound couldn't be prepared: \(error.localizedDescription)")
+        }
+        guard writer.canAdd(sound.input) else { throw ExportError.failed("The sound couldn't be prepared.") }
+        writer.add(sound.input)
+        guard writer.startWriting() else { throw ExportError.failed(writer.error?.localizedDescription ?? "The sound couldn't be prepared.") }
+        writer.startSession(atSourceTime: .zero)
+        sound.start(job: job)
+        sound.wait(until: { job.isCancelled || writer.status != .writing })
+        if job.isCancelled { writer.cancelWriting(); throw ExportError.cancelled }
+        if let problem = sound.failure { writer.cancelWriting(); throw ExportError.failed(problem) }
+        writer.endSession(atSourceTime: timing.duration)
+        let done = DispatchSemaphore(value: 0)
+        writer.finishWriting { done.signal() }
+        done.wait()
+        guard writer.status == .completed else {
+            throw ExportError.failed(writer.error?.localizedDescription ?? "The sound couldn't be prepared.")
+        }
+        return true
+    }
+
     /// Rec. 709 throughout, as video players expect. The composition's sRGB
     /// colours go in unchanged: the two share their primaries.
     private static let colorProperties: [String: String] = [
@@ -281,7 +449,7 @@ public enum Exporter {
             output[AVVideoCodecKey] = AVVideoCodecType.proRes422
         case .proRes4444:
             output[AVVideoCodecKey] = AVVideoCodecType.proRes4444
-        case .png:
+        case .png, .gif, .webm:
             break
         }
         return output

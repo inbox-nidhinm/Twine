@@ -100,7 +100,7 @@ struct ExportPanel: View {
                     PanelDivider()
                     rangeSection
                 }
-                if hasSound && isMovie {
+                if hasSound && settings.format.carriesSound {
                     PanelDivider()
                     ToggleRow(label: "Audio", isOn: settings.includesAudio) { session.settings.includesAudio.toggle() }
                         .help("Includes the sound of the project's video and audio layers.")
@@ -131,7 +131,8 @@ struct ExportPanel: View {
             HStack(spacing: 8) {
                 MenuField(value: settings.format.shortTitle, entries: formatEntries)
                     .help("H.264, HEVC and ProRes 422 have no transparency, so a transparent background "
-                          + "exports as its colour. HEVC with alpha, ProRes 4444 and PNG keep it. "
+                          + "exports as its colour. HEVC with alpha, ProRes 4444, WebM and PNG keep it; a GIF keeps it "
+                          + "only fully or not at all, and has no sound. WebM is made by ffmpeg. "
                           + "A PNG is the frame under the playhead, or in Design, the layout as designed.")
                 if isMovie {
                     MenuField(value: "\(exportRate.label) fps", entries: rateEntries)
@@ -240,7 +241,7 @@ struct ExportPanel: View {
         player.seek(player.time)
     }
 
-    private var exportRate: FrameRate { settings.frameRate ?? composition.frameRate }
+    private var exportRate: FrameRate { settings.exported(composition).frameRate }
 
     // MARK: Menus
 
@@ -271,10 +272,15 @@ struct ExportPanel: View {
     private var largestPercent: Double { ExportSettings.largestScale(for: composition) * 100 }
 
     private func formatEntries() -> [MenuEntry] {
-        let groups: [[ExportFormat]] = [[.h264, .hevc], [.hevcAlpha, .proRes422, .proRes4444], [.png]]
+        let groups: [[ExportFormat]] = [[.h264, .hevc], [.hevcAlpha, .proRes422, .proRes4444], [.gif, .webm], [.png]]
+        // WebM is made by ffmpeg; without it, it is shown but not offered.
+        let hasFFmpeg = WebMConversion.tool("ffmpeg") != nil
         return groups.enumerated().flatMap { index, formats in
             (index > 0 ? [MenuEntry.separator] : []) + formats.map { format in
-                MenuEntry.item(format.title, checked: format == settings.format) { session.settings.format = format }
+                MenuEntry.item(format.needsFFmpeg && !hasFFmpeg ? "\(format.title)   Needs ffmpeg" : format.title,
+                               checked: format == settings.format, disabled: format.needsFFmpeg && !hasFFmpeg) {
+                    session.settings.format = format
+                }
             }
         }
     }
@@ -282,7 +288,9 @@ struct ExportPanel: View {
     /// The composition's own rate first, then the usual ones.
     private func rateEntries() -> [MenuEntry] {
         let own = composition.frameRate
-        let others = ExportSettings.frameRates.filter { $0 != own }
+        // A GIF plays at most 50 frames a second.
+        let fits: (FrameRate) -> Bool = { settings.format != .gif || $0.perSecond <= ExportFormat.gifMaxRate.perSecond + 1e-9 }
+        let others = ExportSettings.frameRates.filter { $0 != own && fits($0) }
         return [.item("\(own.label) fps   Composition", checked: settings.frameRate == nil || settings.frameRate == own) {
             session.settings.frameRate = nil
         }, .separator] + others.map { rate in

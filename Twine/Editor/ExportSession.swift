@@ -91,12 +91,13 @@ final class ExportSession {
         finished = nil
         completed = nil
         progress = 0
+        let ffmpeg = WebMConversion.tool("ffmpeg")
         DispatchQueue.global(qos: .userInitiated).async {
             // Progress crosses to the main thread at most a hundred times.
             var shown = 0
             let result = Result {
                 try Exporter.export(project, settings: settings, at: time, frames: frames, to: url, media: media,
-                                    job: job) { value in
+                                    ffmpeg: ffmpeg, job: job) { value in
                     let step = Int(value * 100)
                     guard step > shown else { return }
                     shown = step
@@ -161,6 +162,8 @@ extension ExportFormat {
         case .hevcAlpha: "HEVC with alpha"
         case .proRes422: "ProRes 422"
         case .proRes4444: "ProRes 4444"
+        case .gif: "GIF"
+        case .webm: "WebM"
         case .png: "PNG frame"
         }
     }

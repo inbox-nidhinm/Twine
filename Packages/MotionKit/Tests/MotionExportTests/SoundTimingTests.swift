@@ -72,6 +72,29 @@ private func samples(of url: URL) async throws -> [Float] {
         #expect(abs(loudest - 12_000) <= 1, "the click at sample \(loudest), not 12000")
     }
 
+    @Test func aWebMCarriesTheSoundAsOpus() throws {
+        guard let ffmpeg = ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"].first(where: FileManager.default.isExecutableFile(atPath:)),
+              let ffprobe = ["/opt/homebrew/bin/ffprobe", "/usr/local/bin/ffprobe"].first(where: FileManager.default.isExecutableFile(atPath:))
+        else { return }
+        let file = try sound(seconds: 2, tone: true)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let (project, asset) = project(sound: 2, bar: (0.5, 2))
+        let url = temporaryURL("webm")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Exporter.export(project, settings: ExportSettings(format: .webm), to: url, media: [asset.id: file],
+                            ffmpeg: URL(fileURLWithPath: ffmpeg))
+        let probe = Process()
+        probe.executableURL = URL(fileURLWithPath: ffprobe)
+        probe.arguments = ["-v", "error", "-show_entries", "stream=codec_type,codec_name", "-of", "csv=p=0", url.path]
+        let out = Pipe()
+        probe.standardOutput = out
+        try probe.run()
+        probe.waitUntilExit()
+        let streams = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        #expect(streams.contains("vp9,video"))
+        #expect(streams.contains("opus,audio"))
+    }
+
     @Test func aSoundShorterThanItsBarStillExports() async throws {
         // A phone clip's sound often stops a little before its picture, so
         // the bar, as long as the clip, outruns the sound.

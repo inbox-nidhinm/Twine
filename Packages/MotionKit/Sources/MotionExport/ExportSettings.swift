@@ -10,6 +10,12 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
     case hevcAlpha
     case proRes422
     case proRes4444
+    /// An animated GIF, for Slack, Notion and prototypes. Silent, at most
+    /// 50 fps, and see-through only fully or not at all.
+    case gif
+    /// VP9 in WebM, for the web, with Opus sound; made by the ffmpeg
+    /// installed on the Mac.
+    case webm
     case png
 
     public var title: String {
@@ -19,6 +25,8 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
         case .hevcAlpha: "MOV (HEVC with transparency)"
         case .proRes422: "MOV (ProRes 422)"
         case .proRes4444: "MOV (ProRes 4444)"
+        case .gif: "GIF (animated)"
+        case .webm: "WebM (VP9)"
         case .png: "PNG (current frame)"
         }
     }
@@ -27,17 +35,29 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
         switch self {
         case .h264, .hevc: "mp4"
         case .hevcAlpha, .proRes422, .proRes4444: "mov"
+        case .gif: "gif"
+        case .webm: "webm"
         case .png: "png"
         }
     }
 
     public var isMovie: Bool { self != .png }
 
+    /// Whether the file can carry the project's sound.
+    public var carriesSound: Bool { isMovie && self != .gif }
+
+    /// Made by the ffmpeg installed on the Mac rather than by macOS.
+    public var needsFFmpeg: Bool { self == .webm }
+
+    /// The fastest a GIF plays: its frame times are in hundredths of a
+    /// second, and browsers slow anything under two to a tenth.
+    public static let gifMaxRate = FrameRate.fps50
+
     /// Whether a transparent background stays transparent. The others are
     /// drawn over the background colour, which is kept for exactly this.
     public var keepsTransparency: Bool {
         switch self {
-        case .hevcAlpha, .proRes4444, .png: true
+        case .hevcAlpha, .proRes4444, .png, .gif, .webm: true
         case .h264, .hevc, .proRes422: false
         }
     }
@@ -47,7 +67,7 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
     public var hasQuality: Bool {
         switch self {
         case .h264, .hevc, .hevcAlpha: true
-        case .proRes422, .proRes4444, .png: false
+        case .proRes422, .proRes4444, .png, .gif, .webm: false
         }
     }
 }
@@ -125,9 +145,10 @@ public struct ExportSettings: Codable, Sendable, Equatable {
 
     /// The composition as it is exported: at the chosen rate, if one is.
     public func exported(_ composition: Composition) -> Composition {
-        guard format.isMovie, let frameRate else { return composition }
+        guard format.isMovie else { return composition }
         var c = composition
-        c.frameRate = frameRate
+        if let frameRate { c.frameRate = frameRate }
+        if format == .gif, c.frameRate.perSecond > ExportFormat.gifMaxRate.perSecond + 1e-9 { c.frameRate = ExportFormat.gifMaxRate }
         return c
     }
 
