@@ -68,8 +68,6 @@ public enum Theme {
     /// rows (#2E5575, the user's choice), a deep blue apart from the light
     /// blue of a selection. Scenes have no row colour: the bar is enough.
     public static let timelineScene = Color(red: 0x2E / 255, green: 0x55 / 255, blue: 0x75 / 255)
-    /// A layer folded on the timeline: its row and its bars, a quiet slate.
-    public static let timelineFold = Color(red: 0x8F / 255, green: 0xA3 / 255, blue: 0xB8 / 255)
 
     // MARK: Text (text/*)
 

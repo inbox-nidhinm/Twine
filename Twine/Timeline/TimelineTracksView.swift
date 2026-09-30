@@ -366,12 +366,6 @@ final class TimelineTracksView: NSView {
         let full = CGRect(x: 0, y: row.y, width: bounds.width, height: TimelineRow.height)
         let label = CGRect(x: 0, y: row.y, width: gutter, height: TimelineRow.height)
 
-        // A folded layer's row takes a quiet colour of its own, under
-        // anything else. Scenes take none: their bar's colour is enough.
-        if row.folded != nil {
-            ctx.setFillColor(NSColor(Theme.timelineFold).withAlphaComponent(0.08).cgColor)
-            ctx.fill(full)
-        }
         // The row: the accent across it when its action is selected, a tint
         // when only its layer is.
         if selected {
@@ -479,9 +473,12 @@ final class TimelineTracksView: NSView {
         let lengthWidth = ceil(lengthText.size(withAttributes: lengthAttributes).width)
         let room = gutter - Self.labelInset - 12
         let nameWidth = min(ceil((scene.name as NSString).size(withAttributes: nameAttributes).width), room - lengthWidth - 10)
-        (scene.name as NSString).draw(in: CGRect(x: Self.labelInset, y: textY, width: max(nameWidth, 0), height: 17),
-                                      withAttributes: nameAttributes)
-        lengthText.draw(at: CGPoint(x: Self.labelInset + max(nameWidth, 0) + 10, y: textY), withAttributes: lengthAttributes)
+        // While it is being renamed, the field stands in its place.
+        if renaming?.scene != scene.id {
+            (scene.name as NSString).draw(in: CGRect(x: Self.labelInset, y: textY, width: max(nameWidth, 0), height: 17),
+                                          withAttributes: nameAttributes)
+        }
+        if renaming?.scene != scene.id { lengthText.draw(at: CGPoint(x: Self.labelInset + max(nameWidth, 0) + 10, y: textY), withAttributes: lengthAttributes) }
 
         guard let rect = spanRect(row) else { return }
         ctx.saveGState()
@@ -517,9 +514,7 @@ final class TimelineTracksView: NSView {
         let radius = shows ? rect.width / 2 : action.isInstant ? 3 : 6.0
         let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
         ctx.addPath(path)
-        ctx.setFillColor(selected ? NSColor(Theme.accent).cgColor
-                         : row.folded != nil ? NSColor(Theme.timelineFold).withAlphaComponent(0.32).cgColor
-                         : NSColor(Theme.panelHover).cgColor)
+        ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.panelHover).cgColor)
         ctx.fillPath()
         // Bars folded together overlap: an edge keeps each one's ends in sight.
         if row.folded != nil {
@@ -625,6 +620,8 @@ final class TimelineTracksView: NSView {
                 }
                 controller.selectActions(ids)
                 rangeAnchor = row.action.id
+                // A double-click on its name renames the scene, there.
+                if event.clickCount == 2, !extending { beginRenaming(scene, in: row) }
                 needsDisplay = true
                 return
             }
@@ -899,6 +896,48 @@ final class TimelineTracksView: NSView {
         return best.delta
     }
 
+    // MARK: Renaming a scene
+
+    /// The field a scene's name is typed into, over its row's label.
+    private var renaming: (scene: UUID, field: NSTextField)?
+
+    private func beginRenaming(_ scene: TimelineScene, in row: TimelineRow) {
+        endRenaming(keep: true)
+        let field = NSTextField(string: scene.name)
+        field.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        field.textColor = NSColor(Theme.textPrimary)
+        field.backgroundColor = NSColor(Theme.panelRaised)
+        field.drawsBackground = true
+        field.isBordered = false
+        field.focusRingType = .none
+        field.wantsLayer = true
+        field.layer?.cornerRadius = Theme.radiusControl
+        field.cell?.isScrollable = true
+        field.cell?.wraps = false
+        field.delegate = self
+        let height: CGFloat = 20
+        field.frame = CGRect(x: CGFloat(Self.labelInset) - 3, y: row.y + (TimelineRow.height - height) / 2,
+                             width: gutter - CGFloat(Self.labelInset) - 10, height: height)
+        addSubview(field)
+        renaming = (scene.id, field)
+        window?.makeFirstResponder(field)
+        field.currentEditor()?.selectAll(nil)
+        needsDisplay = true
+    }
+
+    /// Keeps what was typed (unless `keep` is false, as Escape asks) and
+    /// puts the field away.
+    private func endRenaming(keep: Bool) {
+        guard let (scene, field) = renaming else { return }
+        renaming = nil
+        let name = field.stringValue
+        field.delegate = nil
+        field.removeFromSuperview()
+        if keep { controller?.renameScene(scene, to: name) }
+        window?.makeFirstResponder(self)
+        needsDisplay = true
+    }
+
     // MARK: Right-click
 
     override func rightMouseDown(with event: NSEvent) {
@@ -1066,3 +1105,24 @@ enum EditorKeys {
         }
     }
 }
+
+extension TimelineTracksView: NSTextFieldDelegate {
+    /// Return keeps the name, Escape puts the old one back; clicking away
+    /// keeps it too.
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        if selector == #selector(NSResponder.cancelOperation(_:)) {
+            endRenaming(keep: false)
+            return true
+        }
+        if selector == #selector(NSResponder.insertNewline(_:)) {
+            endRenaming(keep: true)
+            return true
+        }
+        return false
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) {
+        endRenaming(keep: true)
+    }
+}
+
