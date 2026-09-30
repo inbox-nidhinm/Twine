@@ -400,7 +400,7 @@ final class TimelineTracksView: NSView {
     private func drawWaveform(_ action: Action, play: PlayAction, in rect: CGRect, selected: Bool, ctx: CGContext) {
         guard let controller, let asset = controller.asset(ofLayer: action.targetLayerID), asset.hasAudio,
               let peaks = controller.waveforms.peaks(for: asset.id, at: controller.document?.mediaURL(for: asset.id)),
-              !peaks.isEmpty, action.duration > 0 else { return }
+              !peaks.isEmpty, action.duration > 0, rect.width > 0, rect.width.isFinite, rect.minX.isFinite else { return }
         var level: ((Double) -> Double)?
         let fades = controller.project.actions(on: action.targetLayerID).filter { $0.isEnabled && $0.drives(.volume) }
         if !fades.isEmpty, let layer = controller.project.layer(withID: action.targetLayerID) {
@@ -419,8 +419,10 @@ final class TimelineTracksView: NSView {
         var x = visible.minX.rounded(.down)
         while x <= visible.maxX {
             let t = play.trimStart + Double(x - rect.minX) / rect.width * action.duration
-            let i = Int(t * Waveforms.peaksPerSecond)
-            if i >= 0, i < peaks.count {
+            let place = t * Waveforms.peaksPerSecond
+            // A bar drawn far past the file, or zoomed to nothing, can put this
+            // outside what an Int holds; there is no sound there to draw.
+            if place.isFinite, place >= 0, place < Double(peaks.count), case let i = Int(place) {
                 let scale = level.map { CGFloat($0(action.start + (t - play.trimStart))) } ?? 1
                 let h = max(CGFloat(peaks[i]) * half * scale, 0.5)
                 path.addRect(CGRect(x: x, y: mid - h, width: 1, height: h * 2))
