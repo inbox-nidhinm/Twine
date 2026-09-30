@@ -106,6 +106,10 @@ public enum Theme {
     public static let hairline: CGFloat = 1
     public static let cardHeader: CGFloat = 34
     public static let sheetHeader: CGFloat = 38
+    /// Extra space between the lines of running text in a sheet (Version
+    /// History's points): 11 pt text at about 155% of its size, 17 pt lines
+    /// where the system font's own are 14 (measured on screen).
+    public static let readingLineSpacing: CGFloat = 3
     /// How far a sheet's close button sits in from the right: as far as it
     /// sits down from the top, so the cross reads as tucked into the corner.
     /// The sheet's own side inset left it twice as far in as down.
