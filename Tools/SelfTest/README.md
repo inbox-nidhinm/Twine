@@ -32,7 +32,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `scroll X Y DY` | Scrolls the scroll view under the point DY points further down its content (negative goes back up), as a wheel would |
 | `down X Y`, `to X Y`, `up X Y` | A held drag, a step at a time, for screenshots mid-drag |
 | `open X Y`, `pick X Y` | Clicks until the app's menu opens, or closes |
-| `key K` | `space`, `enter`, `del`, `left`, `right`, `comma`, `stop`, `esc`, or a letter |
+| `key K` | `space`, `enter`, `del`, `left`, `right`, `up`, `down`, `comma`, `stop`, `esc`, or a letter |
 | `keycode N`, `type TEXT`, `clear` | A key by code (Option changes characters), typing, deleting a field |
 | `spacedown`, `spaceup` | Holds and releases Space |
 | `menukey C` | ⌘C through the main menu |

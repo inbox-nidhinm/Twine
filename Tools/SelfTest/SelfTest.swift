@@ -115,6 +115,8 @@ enum SelfTest {
                 case "del": key("\u{7f}", 51)
                 case "left": key("\u{f702}", 123)
                 case "right": key("\u{f703}", 124)
+                case "up": key("\u{f700}", 126)
+                case "down": key("\u{f701}", 125)
                 case "comma": key(",", 43)
                 case "stop": key(".", 47)
                 case "esc": key("\u{1b}", 53)
@@ -563,7 +565,7 @@ enum SelfTest {
                 controller.pasteFromFigma(text)
             case "composition":
                 let c = controller.project.composition
-                log("COMPOSITION \(c.width)x\(c.height) notice=\(controller.editor.notice ?? "-")")
+                log("COMPOSITION \(c.width)x\(c.height) notice=\(controller.editor.notice?.text ?? "-")")
             case "replace":
                 // As Replace in the inspector, with the file handed in rather
                 // than chosen in the panel, which runs in another process.

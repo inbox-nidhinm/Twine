@@ -319,6 +319,10 @@ struct UnitField: View {
                 .onAppear { text = format(value) }
                 // Follows the value unless the field holds typing of its own.
                 .onChange(of: value) { old, now in if !focused || text == format(old) { text = format(now) } }
+                .onKeyPress(keys: [.upArrow, .downArrow], phases: [.down, .repeat]) { press in
+                    nudge(by: ArrowNudge.amount(press, step: step, suffix: suffix))
+                    return .handled
+                }
             // The unit stays put at the end, typed or not.
             if !suffix.isEmpty { UnitSuffix(suffix) }
         }
@@ -340,6 +344,22 @@ struct UnitField: View {
     /// The number alone: its unit is drawn beside it.
     private func format(_ v: Double) -> String {
         decimals == 0 ? String(Int(v.rounded())) : Self.trimmed(v, decimals)
+    }
+
+    /// Up or down arrow: from the number typed (or showing) by `delta`.
+    private func nudge(by delta: Double) {
+        let from = number(in: text) ?? value
+        let v = ArrowNudge.rounded(from + delta, decimals: decimals)
+        guard v.isFinite, accepts(v) else { NSSound.beep(); return }
+        if abs(v - value) > .ulpOfOne { commit(v) }
+        text = format(v)
+    }
+
+    /// The typed text as a number, its unit left off.
+    private func number(in text: String) -> Double? {
+        var typed = text.trimmingCharacters(in: .whitespaces)
+        if !suffix.isEmpty, typed.hasSuffix(suffix) { typed.removeLast(suffix.count) }
+        return Double(typed.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "."))
     }
 
     /// Up to `decimals` places, with trailing zeros dropped, so 5 reads `5`
@@ -414,6 +434,10 @@ struct OptionalField: View {
                 .onChange(of: value) { old, now in
                     if !focused || text == (old.map(format) ?? "") { text = now.map(format) ?? "" }
                 }
+                .onKeyPress(keys: [.upArrow, .downArrow], phases: [.down, .repeat]) { press in
+                    nudge(by: ArrowNudge.amount(press, step: step, suffix: suffix))
+                    return .handled
+                }
             if !suffix.isEmpty { UnitSuffix(suffix) }
         }
         .padding(.horizontal, 8)
@@ -436,6 +460,19 @@ struct OptionalField: View {
         decimals == 0 ? String(Int(v.rounded())) : UnitField.trimmed(v, decimals)
     }
 
+    /// Up or down arrow: from the number typed, or the one it falls back to
+    /// while empty, by `delta`.
+    private func nudge(by delta: Double) {
+        var typed = text.trimmingCharacters(in: .whitespaces)
+        if !suffix.isEmpty, typed.hasSuffix(suffix) { typed.removeLast(suffix.count) }
+        let from = Double(typed.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "."))
+            ?? value ?? placeholder
+        let v = ArrowNudge.rounded(from + delta, decimals: decimals)
+        guard v.isFinite, accepts(v) else { NSSound.beep(); return }
+        if value.map({ abs($0 - v) > .ulpOfOne }) ?? true { commit(v) }
+        text = format(v)
+    }
+
     private func apply() {
         var typed = text.trimmingCharacters(in: .whitespaces)
         if !suffix.isEmpty, typed.hasSuffix(suffix) { typed.removeLast(suffix.count) }
@@ -449,6 +486,27 @@ struct OptionalField: View {
         } else {
             text = value.map(format) ?? ""
         }
+    }
+}
+
+/// The up and down arrows in a number field, as in Figma: a step each
+/// press, eight with Shift. A step is a whole unit (a pixel, a degree, a
+/// percent), a tenth of a second for times, or the field's own finer step
+/// where it has one (an easing curve's numbers, which run from 0 to 1).
+enum ArrowNudge {
+    static let shiftTimes: Double = 8
+
+    static func amount(_ press: KeyPress, step: Double?, suffix: String) -> Double {
+        let one = step ?? (suffix == "s" ? 0.1 : 1)
+        let size = press.modifiers.contains(.shift) ? one * shiftTimes : one
+        return press.key == .upArrow ? size : -size
+    }
+
+    /// Held to the places the field shows, so tenths added over and over
+    /// never drift to 0.30000000000000004.
+    static func rounded(_ v: Double, decimals: Int) -> Double {
+        let scale = pow(10, Double(max(decimals, 0)))
+        return (v * scale).rounded() / scale
     }
 }
 
