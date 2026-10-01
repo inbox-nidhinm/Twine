@@ -224,8 +224,12 @@ struct SettingsPage: View {
                 .font(ThemeFont.labelStrong)
                 .foregroundStyle(Theme.textSecondary)
                 .padding(.leading, Theme.rowGap)
+            // As far in at the top and bottom as at the sides: a row
+            // already leaves `rowInset` round its tile, so the card adds
+            // the rest.
             VStack(alignment: .leading, spacing: 0) { rows() }
                 .padding(.horizontal, Theme.panelPad)
+                .padding(.vertical, Theme.panelPad - Self.rowInset)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .floatingPanel()
         }
@@ -271,7 +275,6 @@ struct SettingsPage: View {
                            change: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: Theme.columnGap) {
             row(icon, label, help: help) { EmptyView() }
-                .frame(height: Theme.settingsTile + Theme.panelPad)
             Text(Self.short(folder))
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textPrimary)
@@ -286,8 +289,11 @@ struct SettingsPage: View {
                 PanelButton(title: "Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([folder]) }
             }
         }
-        .padding(.bottom, Theme.panelPad)
+        .padding(.bottom, Self.rowInset)
     }
+
+    /// The room a row leaves above and below its tile.
+    private static let rowInset = (Theme.settingsRow - Theme.settingsTile) / 2
 
     /// The rounded square an icon sits on at a row's left.
     private static func tile(_ content: AnyView) -> some View {

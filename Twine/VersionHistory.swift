@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 172
+    static let pushes = 173
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
