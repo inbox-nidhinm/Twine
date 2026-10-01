@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 162
+    static let pushes = 163
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -59,6 +59,7 @@ enum VersionHistory {
             "The colour picker follows a colour taken from the eyedropper or typed as a hex: its square and bars stayed on the colour it opened with.",
             "Duplicating or pasting a layer keeps motion blur on its actions. It was switched off on the copies.",
         ], misc: [
+            "Cancel in the export window is a plain grey button while an export runs, rather than blue: it is not the thing the window is for.",
             "Where \"scene\" meant the whole animation, it now says so: the export range is Whole animation or Part of the animation.",
             "The project's name at the top of the export window is smaller, 24 points rather than 32.",
         ]),

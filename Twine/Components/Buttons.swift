@@ -98,10 +98,12 @@ struct PanelButton: View {
 }
 
 /// The one button that does a panel's main thing, filled with the accent:
-/// Export.
+/// Export. `quiet` gives it a plain button's colours in the same place, for
+/// what is not the main thing (Cancel while exporting).
 struct PrimaryButton: View {
     let title: String
     var disabled: Bool = false
+    var quiet: Bool = false
     let action: () -> Void
 
     @State private var hovering = false
@@ -110,16 +112,21 @@ struct PrimaryButton: View {
         Button(action: action) {
             Text(title)
                 .font(ThemeFont.labelStrong)
-                .foregroundStyle(Theme.textOnColor.opacity(disabled ? 0.5 : 1))
+                .foregroundStyle(quiet ? Theme.textPrimary : Theme.textOnColor.opacity(disabled ? 0.5 : 1))
                 .frame(maxWidth: .infinity)
                 .frame(height: Theme.primaryButton)
-                .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
-                    .fill(disabled ? Theme.accent.opacity(0.4) : hovering ? Theme.accentHover : Theme.accent))
+                .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(fill))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(disabled)
         .onHover { hovering = $0 }
+    }
+
+    /// The panel button's grounds when quiet, the accent's otherwise.
+    private var fill: Color {
+        if quiet { return hovering ? Theme.panelRaised : Theme.panelRaised.opacity(0.5) }
+        return disabled ? Theme.accent.opacity(0.4) : hovering ? Theme.accentHover : Theme.accent
     }
 }
 

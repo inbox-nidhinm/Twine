@@ -165,7 +165,8 @@ struct ExportPanel: View {
 
     private var actions: some View {
         VStack(spacing: 8) {
-            PrimaryButton(title: session.isExporting ? "Cancel" : session.completed != nil ? "Export again" : "Export") {
+            PrimaryButton(title: session.isExporting ? "Cancel" : session.completed != nil ? "Export again" : "Export",
+                          quiet: session.isExporting) {
                 if session.isExporting {
                     session.cancel()
                 } else {
