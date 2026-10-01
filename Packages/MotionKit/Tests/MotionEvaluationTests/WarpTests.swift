@@ -41,6 +41,39 @@ private func near(_ a: Vec2?, _ b: Vec2, _ e: Double = 1e-6) -> Bool { a.map { n
         #expect(near(back.apply(Vec2(100, 50)), Vec2(450, 300), 1e-4))
     }
 
+    @Test func aHingedTiltTurnsOnItsEdgeLikeAPage() {
+        var layer = square()
+        layer.transform.tilt = Tilt(x: 0, y: -60, hinge: Vec2(0, 0.5))
+        let world = evaluateDesign(Project(layers: [layer])).worldProjection(of: layer.id)!
+        // The spine, the left edge, stays put.
+        #expect(near(world.apply(Vec2(0, 0)), Vec2(450, 250), 1e-6))
+        #expect(near(world.apply(Vec2(0, 100)), Vec2(450, 350), 1e-6))
+        // The free edge comes towards the viewer, so it is drawn taller than
+        // the spine, and nearer it.
+        let top = world.apply(Vec2(100, 0))!, bottom = world.apply(Vec2(100, 100))!
+        #expect(bottom.y - top.y > 100)
+        #expect(top.x > 450 && top.x < 550)
+        // Seen from 1 / 0.35 of its longer side, as the onboarding's pages,
+        // so even a wide layer never reaches the eye.
+        layer.size = Size2(3000, 100)
+        layer.transform.anchor = Vec2(1500, 50)
+        layer.transform.tilt = Tilt(x: 0, y: -89, hinge: Vec2(0, 0.5))
+        let wide = evaluateDesign(Project(layers: [layer])).worldProjection(of: layer.id)!
+        #expect(wide.apply(Vec2(3000, 50)) != nil)
+        // A turned layer turns on its own edge.
+        layer = square()
+        layer.transform.rotation = 90
+        layer.transform.tilt = Tilt(x: 0, y: -60, hinge: Vec2(0, 0.5))
+        let turned = evaluateDesign(Project(layers: [layer])).worldProjection(of: layer.id)!
+        #expect(near(turned.apply(Vec2(0, 0)), Vec2(550, 250), 1e-6))
+        #expect(near(turned.apply(Vec2(0, 100)), Vec2(450, 250), 1e-6))
+        // Files without one read as before, and one is written only when set.
+        let plain = try! JSONEncoder().encode(Tilt(x: 0, y: 10))
+        #expect(!String(decoding: plain, as: UTF8.self).contains("hinge"))
+        let hinged = Tilt(x: 0, y: 10, hinge: Vec2(1, 0.5))
+        #expect(try! JSONDecoder().decode(Tilt.self, from: JSONEncoder().encode(hinged)) == hinged)
+    }
+
     @Test func projectionsComposeAndInvert() {
         let a = Projective.layer(position: Vec2(10, 20), anchor: Vec2(5, 5), scale: Vec2(2, 1), rotation: 30,
                                  skew: Vec2(10, -5), tilt: Tilt(x: 20, y: -35, depth: 400))

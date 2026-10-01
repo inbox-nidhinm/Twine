@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 164
+    static let pushes = 165
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -42,6 +42,8 @@ enum VersionHistory {
     static let builds: [Build] = [
         .init(date: "1 October 2026", title: "Large projects", features: [
             "Info on a project's right-click menu on the home screen: a card with when it was made and last saved, its size on disk and folder, the composition's size, length and frame rate, how many layers it has of each kind, and how many actions, presets and scenes are on its timeline, with where the last action ends. An open project's card counts its unsaved changes too.",
+            "Page Curl, a new preset in a new Flip group: the layer curls away from a corner like a page of Apple Books, as the pictures turn in Flip's onboarding, showing what is under it, with the back of the page in a lighter shade of the layer's colour and a shadow travelling with the fold. Out curls it off, In lays it down; pick the corner it lifts from in its settings. Half a second, eased in and out as Flip's is, and the same on the canvas and in exports.",
+            "Page Turn, beside it in the Flip group: the layer swings on one edge like a page on its spine, the free edge lifting towards you until it is edge-on (Out), or coming down from the far side (In), as the onboarding's pages do. Pick the edge it hinges on in its settings.",
             "A card saying \"Opening\" with the project's name, and a turning ring, shows in the middle of the window while a large project opens, however it is opened (the home screen, the Finder, Open Recent). It keeps turning while Twine builds the editor, and appears only when opening takes longer than a moment, so small projects show nothing.",
         ], fixes: [
             "Opening a project with text is far quicker on a Mac with many fonts. Each new text style asked macOS for the list of every installed font, about a tenth of a second each time; the list is now kept until fonts are added or removed. A large project of 316 texts in 16 styles opens in 0.8 s, from 2.6 s, and selecting text no longer waits on it either.",

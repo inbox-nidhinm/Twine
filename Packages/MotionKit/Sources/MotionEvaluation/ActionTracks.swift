@@ -12,6 +12,8 @@ public enum Channel: String, Hashable, Sendable, CaseIterable {
     case skew, tilt
     /// A clip of the layer's own box, which only the Mask presets drive.
     case reveal
+    /// A page curl, which only the Page Curl presets drive.
+    case curl
 }
 
 extension ActionKind {
@@ -144,6 +146,8 @@ public struct LayerState: Sendable, Equatable {
     public var volume: Double?
     /// A clip of the layer's own box, from a Mask preset; `.none` otherwise.
     public var reveal: Reveal = .none
+    /// A page curl, from a Page Curl preset; `.none` otherwise.
+    public var curl: Curl = .none
 
     /// The layer as it is designed, with no actions.
     public init(design layer: Layer) {
@@ -424,6 +428,8 @@ public struct ActionTracks: Sendable {
             case .tilt: state.tilt = walk(state.tilt, steps(list, Self.tiltStep, Self.tiltPart), at: time)
             case .reveal:
                 state.reveal = Reveal(walk(state.reveal.box, steps(list, { _ in nil }, Self.revealPart), at: time))
+            case .curl:
+                state.curl = Curl(walk(state.curl.curl, steps(list, { _ in nil }, Self.curlPart), at: time))
             case .size: state.size = walk(state.size, list.compactMap(Self.sizeStep), at: time)
             case .visibility: state.isShown = MotionEvaluation.walk(1, Self.visibilitySteps(list), at: time) > 0.5
             // Only what the layer has: a Colour on a layer with no fill does nothing.
@@ -562,16 +568,49 @@ public struct ActionTracks: Sendable {
     }
 
     private static func tiltPart(_ e: PresetEffect) -> PartRun<Tilt>? {
-        guard case .tilt(let by, let entering) = e else { return nil }
-        func turned(_ t: Tilt, _ d: Double) -> Tilt { Tilt(x: t.x, y: t.y + d, depth: t.depth) }
-        return PartRun(holds: entering) { inherited, own, _ in
-            entering ? (turned(own, -by), own) : (inherited, turned(inherited, by))
+        switch e {
+        case .tilt(let by, let entering):
+            // About the anchor, whatever turned on a hinge before it.
+            func turned(_ t: Tilt, _ d: Double) -> Tilt { Tilt(x: t.x, y: t.y + d, depth: t.depth) }
+            return PartRun(holds: entering) { inherited, own, _ in
+                entering ? (turned(own, -by), turned(own, 0)) : (turned(inherited, 0), turned(inherited, by))
+            }
+        case .turnPage(let hinge, let by, let entering):
+            let (point, lift) = pageHinge(hinge, by)
+            func turned(_ t: Tilt, _ k: Double) -> Tilt {
+                Tilt(x: t.x + lift.x * k, y: t.y + lift.y * k, depth: t.depth, hinge: point)
+            }
+            // Landed, it is its own tilt again, on its anchor.
+            return PartRun(holds: entering) { inherited, own, _ in
+                entering ? (turned(own, -1), own) : (turned(inherited, 0), turned(inherited, 1))
+            }
+        default:
+            return nil
+        }
+    }
+
+    /// A page's spine on the `side` edge, as a share of the box, and the
+    /// turn of `by` degrees that lifts its free edge towards the viewer
+    /// (a positive y takes the right side away, a positive x the top).
+    public static func pageHinge(_ side: PresetDirection, _ by: Double) -> (point: Vec2, lift: Vec2) {
+        switch side {
+        case .left: (Vec2(0, 0.5), Vec2(0, -by))
+        case .right: (Vec2(1, 0.5), Vec2(0, by))
+        case .top: (Vec2(0.5, 0), Vec2(by, 0))
+        case .bottom: (Vec2(0.5, 1), Vec2(-by, 0))
         }
     }
 
     private static func revealPart(_ e: PresetEffect) -> PartRun<RevealBox>? {
         guard case .reveal(let from, let to) = e else { return nil }
         return PartRun(holds: from != nil) { inherited, _, _ in (from ?? inherited, to ?? .full) }
+    }
+
+    private static func curlPart(_ e: PresetEffect) -> PartRun<PageCurl>? {
+        guard case .curl(let corner, let from, let to) = e else { return nil }
+        return PartRun(holds: from > 0) { _, _, _ in
+            (PageCurl(progress: from, corner: corner), PageCurl(progress: to, corner: corner))
+        }
     }
 
     private static func volumePart(_ e: PresetEffect) -> PartRun<Double>? {

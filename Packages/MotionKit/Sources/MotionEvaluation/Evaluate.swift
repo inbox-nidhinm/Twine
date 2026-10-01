@@ -482,6 +482,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
                          // mask can sit anywhere in the tree.
                          mask: nil, warp: state.warp)
     resolved.reveal = state.reveal
+    if state.curl.isGone { resolved.opacity = 0 } else { resolved.curl = state.curl }
     return resolved
 }
 
@@ -496,7 +497,8 @@ private func units(of text: String, style: TextStyle, width: Double?, _ animatio
     func placed(_ span: TextSpan, _ state: LayerState) -> Projective {
         let centre = Vec2(span.box.width / 2, span.box.height / 2)
         return Projective.layer(position: span.box.center + state.position, anchor: centre,
-                                scale: state.scale, rotation: state.rotation, skew: state.skew, tilt: state.tilt)
+                                scale: state.scale, rotation: state.rotation, skew: state.skew, tilt: state.tilt,
+                                size: Size2(span.box.width, span.box.height))
     }
     var units = zip(spans, states).map { span, state in
         ResolvedTextUnit(range: span.range, box: span.box, transform: placed(span, state),

@@ -20,7 +20,8 @@ extension Double: Interpolatable {
 
 extension Tilt: Interpolatable {
     public static func interpolate(_ a: Tilt, _ b: Tilt, _ t: Double) -> Tilt {
-        Tilt(x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), depth: lerp(a.depth, b.depth, t))
+        // A hinge is kept, not blended: only a page turn has one, on both ends.
+        Tilt(x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), depth: lerp(a.depth, b.depth, t), hinge: a.hinge ?? b.hinge)
     }
 }
 

@@ -223,14 +223,26 @@ public struct Tilt: AnimatableValue {
     public var x: Double
     public var y: Double
     public var depth: Double
+    /// Where it turns, as a share of the layer's box ((0, 0.5) is the middle
+    /// of its left edge), for a page turning on its spine; nil turns about
+    /// the anchor. Only the Page Turn preset sets one. A hinged tilt's lines
+    /// follow the layer's own rotation, so the spine is its own edge, and it
+    /// is seen from `hingeDistance` times the box's longer side, as the
+    /// onboarding's pages are, whatever `depth` says. Left out of files
+    /// when nil.
+    public var hinge: Vec2?
 
-    public init(x: Double, y: Double, depth: Double = Tilt.defaultDepth) {
+    public init(x: Double, y: Double, depth: Double = Tilt.defaultDepth, hinge: Vec2? = nil) {
         self.x = x
         self.y = y
         self.depth = depth
+        self.hinge = hinge
     }
 
     public static let defaultDepth = 1200.0
+    /// How far a hinged tilt is seen from, in the box's longer sides: the
+    /// onboarding's perspective of 0.35.
+    public static let hingeDistance = 1 / 0.35
     public static let none = Tilt(x: 0, y: 0)
 
     /// Whether it turns at all; the depth alone changes nothing.

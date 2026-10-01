@@ -51,7 +51,7 @@ struct ActionInspector: View {
                 // A preset with nothing to set but its timing, and no way to
                 // turn it In or Out or move a text letter by letter, shows
                 // nothing more.
-                let onText = !settings.preset.isSound && actions.allSatisfy { controller.project.layer(withID: $0.targetLayerID)?.isText == true }
+                let onText = !settings.preset.movesWholeLayer && actions.allSatisfy { controller.project.layer(withID: $0.targetLayerID)?.isText == true }
                 if !Presets.controls(for: settings.preset).isEmpty || settings.preset.reversed != nil || onText {
                     PanelDivider()
                     PresetFields(controller: controller, settings: settings, onText: onText)
@@ -258,13 +258,14 @@ private struct PresetFields: View {
         case .direction:
             // Its name above, as Easing's is: four choices need the width.
             VStack(alignment: .leading, spacing: 6) {
-                Text(kind.entering == false ? "To" : "From")
+                Text(isPageTurn ? "Hinge" : kind.entering == false ? "To" : "From")
                     .font(ThemeFont.label)
                     .foregroundStyle(Theme.textSecondary)
                 SegmentRow(selection: settings.direction ?? own.direction ?? .left, options: PresetDirection.allCases,
                            title: { $0.rawValue.capitalized }, icon: Self.arrow) { d in edit("Direction") { $0.direction = d } }
             }
-            .help(kind.entering == false ? "Which way it leaves." : "Which side it comes in from.")
+            .help(isPageTurn ? "The edge it turns on, as a page on its spine."
+                  : kind.entering == false ? "Which way it leaves." : "Which side it comes in from.")
         case .distance:
             LabeledRow(label: kind == .bounce ? "Height" : "Distance") {
                 UnitField(value: settings.distance ?? own.distance ?? 0, decimals: 0, suffix: "px", accepts: { $0 >= 0 }) { v in
@@ -302,10 +303,40 @@ private struct PresetFields: View {
                 PillToggle(isOn: fades) { edit(fades ? "Stop Fading" : "Fade") { $0.fades = !fades } }
             }
             .help(kind.entering == false ? "Fades out as it goes." : "Fades in as it comes on.")
+        case .corner:
+            // Its name above, as Direction's is.
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Corner")
+                    .font(ThemeFont.label)
+                    .foregroundStyle(Theme.textSecondary)
+                SegmentRow(selection: settings.corner ?? own.corner ?? .topRight, options: PresetCorner.allCases,
+                           title: Self.title, icon: Self.icon) { c in edit("Corner") { $0.corner = c } }
+            }
+            .help(kind.entering == false ? "The corner the page lifts from." : "The corner the page comes down from.")
+        }
+    }
+
+    private static func title(_ corner: PresetCorner) -> String {
+        switch corner {
+        case .topLeft: "Top Left"
+        case .topRight: "Top Right"
+        case .bottomLeft: "Bottom Left"
+        case .bottomRight: "Bottom Right"
+        }
+    }
+
+    private static func icon(_ corner: PresetCorner) -> Icon {
+        switch corner {
+        case .topLeft: .cornerTopLeft
+        case .topRight: .cornerTopRight
+        case .bottomLeft: .cornerBottomLeft
+        case .bottomRight: .cornerBottomRight
         }
     }
 
     /// Each side as an arrow pointing to it.
+    private var isPageTurn: Bool { kind == .pageTurnIn || kind == .pageTurnOut }
+
     private static func arrow(_ side: PresetDirection) -> Icon {
         switch side {
         case .left: .arrowLeft

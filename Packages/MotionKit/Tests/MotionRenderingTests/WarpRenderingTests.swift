@@ -39,6 +39,32 @@ import MotionEvaluation
         #expect(alpha(image, 54, 18) == 0)
     }
 
+    @Test func aPageCurlLiftsItsCornerAndStaysInItsBox() throws {
+        // A 100 point square in a 200 point scene, curled halfway from its
+        // top right corner.
+        let layer = Layer(name: "S", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
+                                                                 fills: [Fill(paint: .color(RGBA(1, 0, 0)))])),
+                          size: Size2(100, 100), position: Vec2(100, 100))
+        var curl = Action(target: layer.id, start: 0, duration: 1, easing: .linear,
+                          spec: .preset(PresetAction(preset: .pageCurlOut, corner: .topRight)))
+        func image(at time: Double) throws -> CGImage {
+            let project = Project(composition: Composition(width: 200, height: 200, background: Background(isTransparent: true)),
+                                  layers: [layer], actions: [curl])
+            let renderer = try #require(OffscreenRenderer(pixelWidth: 200, pixelHeight: 200))
+            return try #require(renderer.image(of: evaluate(project, at: time)))
+        }
+        let half = try image(at: 0.5)
+        #expect(alpha(half, 145, 55) == 0, "the top right corner has lifted away")
+        #expect(alpha(half, 55, 145) > 200, "the bottom left is still down")
+        #expect(alpha(half, 45, 100) == 0 && alpha(half, 100, 155) == 0, "the leaf never leaves the box")
+        // The other way up from the bottom left.
+        curl.spec = .preset(PresetAction(preset: .pageCurlOut, corner: .bottomLeft))
+        let other = try image(at: 0.5)
+        #expect(alpha(other, 55, 145) == 0 && alpha(other, 145, 55) > 200)
+        // Curled off, nothing at all.
+        #expect(alpha(try image(at: 1), 100, 100) == 0)
+    }
+
     @Test func aTiltDrawsInPerspective() throws {
         // Turned 60° side to side, seen from 100 px: the right side, gone
         // away, is shorter (y 18 to 46 at x 39); the near left side longer

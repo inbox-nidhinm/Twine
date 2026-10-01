@@ -47,12 +47,13 @@ public struct Preset: Sendable, Equatable, Identifiable {
 
 /// The headed groups the picker shows presets in, in order.
 public enum PresetGroup: String, Sendable, CaseIterable {
-    case fade, scale, mask, blur, emphasis, text, sound
+    case fade, scale, flip, mask, blur, emphasis, text, sound
 
     public var title: String {
         switch self {
         case .fade: "Fade"
         case .scale: "Scale"
+        case .flip: "Flip"
         case .mask: "Mask"
         case .blur: "Blur"
         case .emphasis: "Emphasis"
@@ -103,6 +104,10 @@ extension PresetKind {
         case .blurScaleOut: .blurScaleIn
         case .typewriterIn: .typewriterOut
         case .typewriterOut: .typewriterIn
+        case .pageTurnIn: .pageTurnOut
+        case .pageTurnOut: .pageTurnIn
+        case .pageCurlIn: .pageCurlOut
+        case .pageCurlOut: .pageCurlIn
         case .pulse, .bounce, .shake, .wiggle: nil
         }
     }
@@ -110,7 +115,7 @@ extension PresetKind {
 
 /// A setting a preset shows in the inspector.
 public enum PresetControl: Sendable, Hashable {
-    case direction, distance, scale, angle, blur, fades
+    case direction, distance, scale, angle, blur, fades, corner
 }
 
 public enum Presets {
@@ -125,6 +130,8 @@ public enum Presets {
         Preset(.rotateIn, "Spin", .scale),
         Preset(.twistIn, "Twist", .scale),
         Preset(.moveScaleIn, "Move & Scale", .scale),
+        Preset(.pageTurnIn, "Page Turn", .flip),
+        Preset(.pageCurlIn, "Page Curl", .flip),
         Preset(.maskRevealIn, "Mask Reveal", .mask),
         Preset(.maskCenterIn, "Mask Center", .mask),
         Preset(.maskResizeIn, "Mask Resize", .mask),
@@ -183,6 +190,8 @@ public enum Presets {
         case .maskSlideIn, .maskSlideOut: [.direction, .distance]
         case .maskShrinkIn, .maskShrinkOut: [.scale]
         case .maskCenterIn, .maskCenterOut: []
+        case .pageTurnIn, .pageTurnOut: [.direction]
+        case .pageCurlIn, .pageCurlOut: [.corner]
         case .blurSlideIn, .blurSlideOut: [.direction, .distance, .blur, .fades]
         case .blurScaleIn, .blurScaleOut: [.scale, .blur, .fades]
         case .blurIn, .blurOut: [.blur, .fades]
@@ -290,9 +299,10 @@ public enum Presets {
     }
 
     /// Whether a bar can be split into ordinary actions: not when it moves a
-    /// text's letters one by one, or clips the layer, which no action does.
+    /// text's letters one by one, or clips or curls the layer, which no
+    /// action does.
     public static func splits(_ settings: PresetAction) -> Bool {
-        settings.unit == nil && !PresetRecipe.channels(settings).contains(.reveal)
+        settings.unit == nil && PresetRecipe.channels(settings).isDisjoint(with: [.reveal, .curl])
     }
 
     /// A preset bar as the ordinary actions it is made of, for editing one
@@ -330,10 +340,21 @@ public enum Presets {
             case .tilt(let by, let entering):
                 let own = state.tilt
                 spec = entering
-                    ? .tilt(TiltAction(mode: .to, initial: Tilt(x: own.x, y: own.y - by, depth: own.depth), end: own))
+                    ? .tilt(TiltAction(mode: .to, initial: Tilt(x: own.x, y: own.y - by, depth: own.depth),
+                                       end: Tilt(x: own.x, y: own.y, depth: own.depth)))
                     : .tilt(TiltAction(mode: .by, end: Tilt(x: 0, y: by, depth: own.depth)))
-            case .reveal:
-                // Never reached: `splits` turns away any preset that clips.
+            case .turnPage(let side, let by, let entering):
+                // To, since a tilt's hinge is carried by its values.
+                let own = state.tilt
+                let (hinge, lift) = ActionTracks.pageHinge(side, by)
+                func turned(_ k: Double) -> Tilt {
+                    Tilt(x: own.x + lift.x * k, y: own.y + lift.y * k, depth: own.depth, hinge: hinge)
+                }
+                spec = entering
+                    ? .tilt(TiltAction(mode: .to, initial: turned(-1), end: own))
+                    : .tilt(TiltAction(mode: .to, end: turned(1)))
+            case .reveal, .curl:
+                // Never reached: `splits` turns away any preset that clips or curls.
                 spec = .opacity(OpacityAction(end: ownOpacity))
             }
             let start = frameRate.snapped(action.start + part.start * action.duration)

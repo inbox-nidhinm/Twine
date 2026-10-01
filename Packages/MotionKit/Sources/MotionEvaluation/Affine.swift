@@ -115,11 +115,23 @@ public struct Projective: Sendable, Equatable {
     }
 
     /// A layer's whole transform, tilt and all: `Affine.layer`, turned in
-    /// depth about the anchor after its rotation.
-    public static func layer(position: Vec2, anchor: Vec2, scale: Vec2, rotation: Double, skew: Vec2, tilt: Tilt) -> Projective {
+    /// depth about the anchor after its rotation. A hinged tilt turns about
+    /// its hinge in the layer's box of `size` instead, along the layer's own
+    /// lines, and is seen from over the hinge (`Tilt.hinge`).
+    public static func layer(position: Vec2, anchor: Vec2, scale: Vec2, rotation: Double, skew: Vec2, tilt: Tilt,
+                             size: Size2 = Size2(0, 0)) -> Projective {
         let flat = Affine.layer(position: .zero, anchor: anchor, scale: scale, rotation: rotation, skew: skew)
         guard tilt.isTilted else { return Projective(flat.then(.translation(position))) }
-        return Projective(flat).then(.tilt(tilt)).then(Projective(.translation(position)))
+        guard let hinge = tilt.hinge else {
+            return Projective(flat).then(.tilt(tilt)).then(Projective(.translation(position)))
+        }
+        let pivot = flat.apply(Vec2(hinge.x * size.width, hinge.y * size.height))
+        let longest = max(abs(size.width * scale.x), abs(size.height * scale.y))
+        let seen = Tilt(x: tilt.x, y: tilt.y, depth: longest * Tilt.hingeDistance)
+        // To the hinge, square to the layer's own lines, turned, and back.
+        let toHinge = Affine.translation(Vec2(-pivot.x, -pivot.y)).then(.rotation(degrees: -rotation))
+        let back = Affine.rotation(degrees: rotation).then(.translation(pivot + position))
+        return Projective(flat.then(toHinge)).then(.tilt(seen)).then(Projective(back))
     }
 
     /// This transform followed by `next`.

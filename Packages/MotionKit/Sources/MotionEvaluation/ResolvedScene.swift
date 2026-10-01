@@ -157,6 +157,9 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
     public var warp: Warp = .none
     /// A clip of the layer's own box from a Mask preset, or `.none`.
     public var reveal: Reveal = .none
+    /// A page curl, or `.none`; never curled right off, which `resolve`
+    /// makes a fade to nothing.
+    public var curl: Curl = .none
     /// Motion blur: the layer drawn several times across the shutter and
     /// averaged, or `.none`.
     public var motion: MotionSpread = .none
@@ -183,7 +186,7 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
 
     /// From the layer's own space into its parent's as drawn, tilt and all.
     public var projection: Projective {
-        .layer(position: position, anchor: anchor, scale: scale, rotation: rotation, skew: skew, tilt: tilt)
+        .layer(position: position, anchor: anchor, scale: scale, rotation: rotation, skew: skew, tilt: tilt, size: size)
     }
 }
 

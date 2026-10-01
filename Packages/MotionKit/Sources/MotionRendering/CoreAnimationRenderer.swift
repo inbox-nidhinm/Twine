@@ -268,6 +268,10 @@ final class Node {
     private var signature: [String] = []
     private var paintLayers: [PaintLayers] = []
     private var blurRadius = 0.0
+    /// The page curl last drawn, and the back of the page it was drawn
+    /// with, kept while the look and size stay the same.
+    private var curl: Curl = .none
+    private var curlBack: (color: RGBA, size: CGSize, outline: CGPath?, image: CIImage)?
     /// Frosted glass: the blurred background, under the fills and clipped
     /// to the shape. Made when a layer first needs one.
     private var backdrop: CALayer?
@@ -417,9 +421,16 @@ final class Node {
             container.shadowPath = nil
         }
 
-        if layer.blur != blurRadius {
+        if layer.blur != blurRadius || layer.curl != curl {
             blurRadius = layer.blur
-            container.filters = layer.blur > 0 ? [Blur.filter(amount: layer.blur)] : nil
+            curl = layer.curl
+            var filters: [Any] = layer.blur > 0 ? [Blur.filter(amount: layer.blur)] : []
+            if case .curled(let c) = layer.curl {
+                filters += PageCurlFilter.filters(c, size: layer.size.cg, back: back(of: layer))
+            } else {
+                curlBack = nil
+            }
+            container.filters = filters.isEmpty ? nil : filters
         }
         updateReveal(layer.reveal, size: layer.size)
 
@@ -658,6 +669,17 @@ final class Node {
             motionCopies = made
         }
         motionCopies?.apply(motion, size: size.cg)
+    }
+
+    /// The back of a curling page, made again only when its colour, size
+    /// or outline change.
+    private func back(of layer: ResolvedLayer) -> CIImage {
+        let color = PageCurlFilter.backColor(of: layer), size = layer.size.cg
+        let outline = layer.look.map(area(of:))
+        if let curlBack, curlBack.color == color, curlBack.size == size, curlBack.outline == outline { return curlBack.image }
+        let image = PageCurlFilter.back(outline: outline, size: size, color: color, scale: max(scale, 2))
+        curlBack = (color, size, outline, image)
+        return image
     }
 
     /// Clips the layer to part of its box, with its content moved and

@@ -2,6 +2,8 @@ import SwiftUI
 import MotionModel
 import MotionEditing
 import MotionEvaluation
+import MotionRendering
+import CoreImage
 import Theme
 
 /// The two ways to start animating the selection, as big tiles: a new action
@@ -209,6 +211,25 @@ struct PresetThumbnail: View {
         context.opacity = state.opacity
         // Blur is stored as Figma has it, twice the spread.
         if state.layerBlur > 0 { context.addFilter(.blur(radius: state.layerBlur / 2 * k)) }
+        // A page curl is Core Image's, as on the canvas, on a picture of the square.
+        if case .curled(let curl) = state.curl {
+            let w = side * k
+            guard let picture = PresetPreview.curled(curl, side: w) else { return }
+            context.draw(Image(decorative: picture, scale: PresetPreview.curlScale),
+                         in: CGRect(x: -w / 2, y: -w / 2, width: w, height: w))
+            return
+        }
+        // A turn in depth is drawn in its true perspective, about its hinge
+        // when it has one, so a page turn swings on its edge.
+        if state.tilt.isTilted {
+            let turn = Projective.layer(position: .zero, anchor: Vec2(side / 2, side / 2), scale: state.scale,
+                                        rotation: state.rotation, skew: state.skew, tilt: state.tilt,
+                                        size: Size2(side, side))
+            let flat = RoundedRectangle(cornerRadius: side * PresetPreview.roundness)
+                .path(in: CGRect(x: 0, y: 0, width: side, height: side))
+            context.fill(projected(flat, turn, scale: k), with: .color(Theme.previewShape))
+            return
+        }
         context.rotate(by: .degrees(state.rotation))
         context.scaleBy(x: state.scale.x * max(abs(cos(state.tilt.y * .pi / 180)), 0.001),
                         y: state.scale.y * max(abs(cos(state.tilt.x * .pi / 180)), 0.001))
@@ -221,6 +242,25 @@ struct PresetThumbnail: View {
         }
         context.fill(RoundedRectangle(cornerRadius: w * PresetPreview.roundness).path(in: box),
                      with: .color(Theme.previewShape))
+    }
+
+    /// `path` carried point by point through `turn`, then scaled to the tile.
+    private static func projected(_ path: Path, _ turn: Projective, scale k: Double) -> Path {
+        func place(_ q: CGPoint) -> CGPoint {
+            let v = turn.apply(Vec2(q.x, q.y)) ?? .zero
+            return CGPoint(x: v.x * k, y: v.y * k)
+        }
+        var out = Path()
+        path.forEach { element in
+            switch element {
+            case .move(let to): out.move(to: place(to))
+            case .line(let to): out.addLine(to: place(to))
+            case .quadCurve(let to, let control): out.addQuadCurve(to: place(to), control: place(control))
+            case .curve(let to, let c1, let c2): out.addCurve(to: place(to), control1: place(c1), control2: place(c2))
+            case .closeSubpath: out.closeSubpath()
+            }
+        }
+        return out
     }
 
     /// A sound has nothing to draw, so its level is shown as bars.
@@ -309,6 +349,38 @@ struct PresetPreview {
     }
 
     func state(at time: Double) -> LayerState { tracks.state(of: layer, at: time) }
+
+    /// Pixels to a point for a curling square's picture.
+    static let curlScale: CGFloat = 2
+    private static let curlContext = CIContext()
+    private static var squares: [Int: CIImage] = [:]
+
+    /// The stand-in, `side` points across, curled as `curl` has it.
+    static func curled(_ curl: PageCurl, side: Double) -> CGImage? {
+        let pixels = max(Int((side * curlScale).rounded()), 1)
+        let size = CGSize(width: pixels, height: pixels)
+        let square = squares[pixels] ?? {
+            let made = Self.square(pixels: pixels)
+            squares[pixels] = made
+            return made
+        }()
+        guard let square, let ground = NSColor(Theme.previewShape).usingColorSpace(.sRGB) else { return nil }
+        let back = PageCurlFilter.lifted(RGBA(ground.redComponent, ground.greenComponent, ground.blueComponent))
+        guard let output = PageCurlFilter.curled(square, size: size, curl: curl, back: back) else { return nil }
+        return curlContext.createCGImage(output, from: CGRect(origin: .zero, size: size))
+    }
+
+    private static func square(pixels: Int) -> CIImage? {
+        guard let context = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        let w = CGFloat(pixels)
+        context.addPath(CGPath(roundedRect: CGRect(x: 0, y: 0, width: w, height: w), cornerWidth: w * roundness,
+                               cornerHeight: w * roundness, transform: nil))
+        context.setFillColor(NSColor(Theme.previewShape).cgColor)
+        context.fillPath()
+        return context.makeImage().map { CIImage(cgImage: $0) }
+    }
 
     /// A text preset's letters at `time`, each as moved from its place; nil
     /// for any other preset.

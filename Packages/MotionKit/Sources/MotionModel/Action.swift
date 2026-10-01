@@ -619,11 +619,14 @@ public struct PresetAction: Codable, Sendable, Equatable {
     /// Seconds between one letter, word or line starting and the next; nil
     /// is the unit's own (`TextUnit.delay`).
     public var delay: Double?
+    /// The corner a page curl lifts from.
+    public var corner: PresetCorner?
 
     public init(preset: PresetKind, direction: PresetDirection? = nil, distance: Double? = nil, scale: Double? = nil,
                 angle: Double? = nil, blur: Double? = nil, fades: Bool? = nil, unit: TextUnit? = nil,
-                order: TextOrder? = nil, delay: Double? = nil) {
+                order: TextOrder? = nil, delay: Double? = nil, corner: PresetCorner? = nil) {
         self.preset = preset
+        self.corner = corner
         self.direction = direction
         self.distance = distance
         self.scale = scale
@@ -656,6 +659,13 @@ public enum PresetKind: String, Codable, Sendable, CaseIterable {
     /// Each letter (or word, or line) appears at once, in turn, spread
     /// evenly across the bar; Out takes them away the same way.
     case typewriterIn = "typewriter-in", typewriterOut = "typewriter-out"
+    /// Turns on one edge like a page on its spine, as the onboarding's
+    /// pages do: In comes down from edge-on, Out lifts away to it.
+    case pageTurnIn = "page-turn-in", pageTurnOut = "page-turn-out"
+    /// Curls away from a corner like a page of Apple Books, as Flip's
+    /// onboarding pictures turn, showing what is under it: Out curls it
+    /// off, In lays it down the same way played backwards.
+    case pageCurlIn = "page-curl-in", pageCurlOut = "page-curl-out"
 }
 
 extension PresetKind {
@@ -665,15 +675,19 @@ extension PresetKind {
         switch self {
         case .fadeIn, .slideIn, .scalePop, .rotateIn, .blurIn, .dropIn, .fadeSoundIn, .shrinkIn, .twistIn, .moveScaleIn,
              .maskRevealIn, .maskCenterIn, .maskResizeIn, .maskSlideIn, .maskShrinkIn, .blurSlideIn, .blurScaleIn,
-             .typewriterIn: true
+             .typewriterIn, .pageTurnIn, .pageCurlIn: true
         case .fadeOut, .slideOut, .scaleOut, .rotateOut, .blurOut, .dropOut, .fadeSoundOut, .shrinkOut, .twistOut, .moveScaleOut,
              .maskRevealOut, .maskCenterOut, .maskResizeOut, .maskSlideOut, .maskShrinkOut, .blurSlideOut, .blurScaleOut,
-             .typewriterOut: false
+             .typewriterOut, .pageTurnOut, .pageCurlOut: false
         case .pulse, .bounce, .shake, .wiggle: nil
         }
     }
 
     public var isSound: Bool { self == .fadeSoundIn || self == .fadeSoundOut }
+
+    /// Whether it can only move the whole layer, never a text's letters one
+    /// by one: a sound fade, and a page curl, which curls one picture.
+    public var movesWholeLayer: Bool { isSound || self == .pageCurlIn || self == .pageCurlOut }
 }
 
 /// What of a text moves on its own in a preset.
@@ -706,6 +720,10 @@ public enum TextOrder: String, Codable, Sendable, CaseIterable {
 
 public enum PresetDirection: String, Codable, Sendable, CaseIterable {
     case left, right, top, bottom
+}
+
+public enum PresetCorner: String, Codable, Sendable, CaseIterable {
+    case topLeft = "top-left", topRight = "top-right", bottomLeft = "bottom-left", bottomRight = "bottom-right"
 }
 
 extension ActionSpec: Codable {

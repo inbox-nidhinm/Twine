@@ -21,6 +21,11 @@ private func bar(_ preset: Preset, on layer: Layer, at time: Double = 1) -> Acti
 private func near(_ a: Double, _ b: Double) -> Bool { abs(a - b) < 1e-6 }
 private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.y) }
 
+/// Turned in depth to show only its edge.
+private func edgeOn(_ state: LayerState) -> Bool {
+    abs(cos(state.tilt.x * .pi / 180) * cos(state.tilt.y * .pi / 180)) < 1e-6
+}
+
 @Suite struct PresetTests {
     @Test func theLibraryIsWellFormed() {
         #expect(Set(Presets.library.map(\.id)).count == Presets.library.count)
@@ -66,10 +71,12 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
             #expect(near(end.scale, Vec2(1, 1)), "\(preset.name)")
             #expect(near(end.rotation, 10), "\(preset.name)")
             #expect(near(end.layerBlur, 0), "\(preset.name)")
-            #expect(end.reveal == .none && end.tilt == layer.transform.tilt, "\(preset.name)")
-            // Before it, the layer waits unseen: faded right out, or clipped away.
+            #expect(end.reveal == .none && end.tilt == layer.transform.tilt && end.curl == .none, "\(preset.name)")
+            // Before it, the layer waits unseen: faded right out, clipped
+            // away, edge-on or curled off.
             let before = tracks.state(of: layer, at: 0.5)
-            #expect(before.opacity == 0 || before.reveal.showsNothing, "\(preset.name)")
+            #expect(before.opacity == 0 || before.reveal.showsNothing || edgeOn(before) || before.curl.isGone,
+                    "\(preset.name)")
         }
     }
 
@@ -79,7 +86,8 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
             let action = bar(preset, on: layer)
             let tracks = ActionTracks([action])
             let end = tracks.state(of: layer, at: action.end + 0.01)
-            #expect(end.opacity < 1e-6 || end.scale.x < 1e-6 || end.reveal.showsNothing, "\(preset.name)")
+            #expect(end.opacity < 1e-6 || end.scale.x < 1e-6 || end.reveal.showsNothing || edgeOn(end) || end.curl.isGone,
+                    "\(preset.name)")
             // Untouched until it starts.
             #expect(near(tracks.state(of: layer, at: 0.5).opacity, 0.5), "\(preset.name)")
         }
@@ -141,7 +149,7 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
             let whole = ActionTracks([earlier, action])
             let state = whole.inheritedState(for: action, of: layer)
             let parts = try #require(Presets.split(action, of: layer, from: state, frameRate: .fps60))
-            #expect(parts.count > 1 || [.fadeIn, .fadeOut, .typewriterIn, .typewriterOut].contains(preset.kind), "\(preset.name)")
+            #expect(parts.count > 1 || [.fadeIn, .fadeOut, .typewriterIn, .typewriterOut, .pageTurnIn, .pageTurnOut].contains(preset.kind), "\(preset.name)")
             let split = ActionTracks([earlier] + parts)
             // A shake's and a wiggle's jolts are a few frames long, and split
             // actions land on frames, so between them they differ a little;
@@ -152,7 +160,8 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
                 let a = whole.state(of: layer, at: t), b = split.state(of: layer, at: t)
                 #expect(abs(a.position.x - b.position.x) < 0.5 && abs(a.position.y - b.position.y) < 0.5
                         && abs(a.opacity - b.opacity) < 0.02 && abs(a.scale.x - b.scale.x) < 0.02
-                        && abs(a.rotation - b.rotation) < 0.5 && abs(a.layerBlur - b.layerBlur) < 0.5,
+                        && abs(a.rotation - b.rotation) < 0.5 && abs(a.layerBlur - b.layerBlur) < 0.5
+                        && abs(a.tilt.x - b.tilt.x) < 0.5 && abs(a.tilt.y - b.tilt.y) < 0.5,
                         "\(preset.name) at \(t)")
             }
             layer.opacity = 0.5
@@ -227,6 +236,8 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
         #expect(Presets.name(of: .dropOut) == "Drop Out")
         #expect(Presets.name(of: .fadeSoundOut) == "Sound Fade Out")
         #expect(Presets.name(of: .shake) == "Shake")
+        #expect(Presets.name(of: .pageTurnIn) == "Page Turn In")
+        #expect(Presets.name(of: .pageTurnOut) == "Page Turn Out")
         #expect(bar(Presets.library[0], on: square()).name == "Fade In")
     }
 
@@ -243,6 +254,70 @@ private func near(_ a: Vec2, _ b: Vec2) -> Bool { near(a.x, b.x) && near(a.y, b.
         let groups = Presets.library.map(\.group)
         let runs = groups.enumerated().filter { $0.offset == 0 || groups[$0.offset - 1] != $0.element }.map(\.element)
         #expect(runs == PresetGroup.allCases)
+    }
+
+    @Test func aPageTurnSwingsOnItsEdge() throws {
+        let preset = try #require(Presets.library.first { $0.kind == .pageTurnIn })
+        #expect(preset.name == "Page Turn" && preset.group == .flip)
+        #expect(Presets.controls(for: .pageTurnIn) == [.direction])
+        #expect(near(PresetRecipe.length(.pageTurnIn), 0.5) && near(PresetRecipe.length(.pageTurnOut), 0.5))
+        var layer = square()
+        layer.transform.rotation = 0
+        let into = bar(preset, on: layer, at: 1)
+        var away = bar(Presets.preset(.pageTurnOut), on: layer, at: 2)
+        let tracks = ActionTracks([into, away])
+        // In comes down from edge-on, its right side away; it is flat and
+        // on its anchor again once landed.
+        let start = tracks.state(of: layer, at: 1)
+        #expect(near(start.tilt.y, 90) && start.tilt.hinge == Vec2(0, 0.5))
+        #expect(tracks.state(of: layer, at: 1.6).tilt == .none)
+        // Out lifts its right side towards the viewer, the same way round,
+        // to edge-on, and stays there.
+        let gone = tracks.state(of: layer, at: 2.6)
+        #expect(near(gone.tilt.y, -90) && gone.tilt.hinge == Vec2(0, 0.5))
+        // The left edge stays put all the way over.
+        let world = evaluate(Project(layers: [layer], actions: [into, away]), at: 2.25).worldProjection(of: layer.id)!
+        #expect(near(world.apply(Vec2(0, 0))!, Vec2(450, 250)) && near(world.apply(Vec2(0, 100))!, Vec2(450, 350)))
+        // The hinge follows the setting.
+        guard case .preset(var settings) = away.spec else { Issue.record("not a preset"); return }
+        settings.direction = .top
+        away.spec = .preset(settings)
+        let top = ActionTracks([away]).state(of: layer, at: 2.6).tilt
+        #expect(near(top.x, 90) && near(top.y, 0) && top.hinge == Vec2(0.5, 0))
+        // Split, it keeps its hinge.
+        let parts = try #require(Presets.split(away, of: layer, from: LayerState(design: layer), frameRate: .fps60))
+        let split = ActionTracks(parts).state(of: layer, at: 2.6).tilt
+        #expect(near(split.x, 90) && split.hinge == Vec2(0.5, 0))
+    }
+
+    @Test func aPageCurlLiftsFromItsCorner() throws {
+        let preset = try #require(Presets.library.first { $0.kind == .pageCurlIn })
+        #expect(preset.name == "Page Curl" && preset.group == .flip)
+        #expect(Presets.name(of: .pageCurlOut) == "Page Curl Out")
+        #expect(Presets.controls(for: .pageCurlOut) == [.corner])
+        #expect(near(PresetRecipe.length(.pageCurlOut), 0.5))
+        let layer = square()
+        var away = bar(Presets.preset(.pageCurlOut), on: layer, at: 1)
+        away.easing = .linear
+        // Flat until it starts, from the top right unless set otherwise.
+        let tracks = ActionTracks([away])
+        #expect(tracks.state(of: layer, at: 0.5).curl == .none)
+        let half = tracks.state(of: layer, at: 1.25).curl.curl
+        #expect(near(half.progress, 0.5) && half.corner == .topRight)
+        guard case .preset(var settings) = away.spec else { Issue.record("not a preset"); return }
+        settings.corner = .bottomLeft
+        away.spec = .preset(settings)
+        #expect(ActionTracks([away]).state(of: layer, at: 1.25).curl.curl.corner == .bottomLeft)
+        // Curled right off, it draws nothing and is not left curled.
+        let gone = try #require(evaluate(Project(layers: [layer], actions: [away]), at: 2).layer(layer.id))
+        #expect(gone.opacity == 0 && gone.curl == .none)
+        // A curl has no ordinary actions to split into, and moves the whole
+        // layer, never a text's letters.
+        #expect(!Presets.splits(settings))
+        #expect(PresetKind.pageCurlIn.movesWholeLayer && !PresetKind.slideIn.movesWholeLayer)
+        // Older settings without a corner read as before.
+        let old = #"{"preset":"slide-in","direction":"left"}"#
+        #expect(try JSONDecoder().decode(PresetAction.self, from: Data(old.utf8)).corner == nil)
     }
 
     @Test func aMaskPresetClipsTheLayerToItsOwnBox() {

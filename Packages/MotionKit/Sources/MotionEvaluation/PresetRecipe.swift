@@ -26,9 +26,17 @@ public enum PresetEffect: Sendable, Equatable {
     /// Entering, it turns into its own tilt from `by` short of it;
     /// otherwise it turns on by that much.
     case tilt(by: Double, entering: Bool)
+    /// Turns in depth on the `hinge` edge, like a page on its spine, by
+    /// `by` degrees. Going, the free edge lifts towards the viewer until it
+    /// has turned by that much; entering, it comes down into its own tilt
+    /// from as far round the other side, so an Out on one layer and an In
+    /// on the next turn the same way, as the onboarding's pages do.
+    case turnPage(hinge: PresetDirection, by: Double, entering: Bool)
     /// A clip of the layer's own box, from `from` (nil carries on) to `to`
     /// (nil is the whole box, nothing clipped).
     case reveal(from: RevealBox?, to: RevealBox?)
+    /// A page curl from `corner`, from `from` to `to` (0 flat, 1 curled off).
+    case curl(corner: PresetCorner, from: Double, to: Double)
 
     public var channel: Channel {
         switch self {
@@ -38,8 +46,9 @@ public enum PresetEffect: Sendable, Equatable {
         case .rotate: .rotation
         case .blur: .layerBlur
         case .volume: .volume
-        case .tilt: .tilt
+        case .tilt, .turnPage: .tilt
         case .reveal: .reveal
+        case .curl: .curl
         }
     }
 
@@ -51,7 +60,8 @@ public enum PresetEffect: Sendable, Equatable {
         case .opacity(let from, _), .scale(let from, _), .volume(let from, _): from != nil
         case .blur(let from, _): from != nil
         case .reveal(let from, _): from != nil
-        case .move(_, let entering), .rotate(_, let entering), .tilt(_, let entering): entering
+        case .curl(_, let from, _): from > 0
+        case .move(_, let entering), .rotate(_, let entering), .tilt(_, let entering), .turnPage(_, _, let entering): entering
         }
     }
 }
@@ -93,6 +103,8 @@ public enum PresetRecipe {
         case .maskSlideOut: PresetAction(preset: kind, direction: .right, distance: travel / 2)
         case .maskShrinkIn, .maskShrinkOut: PresetAction(preset: kind, scale: 1.4)
         case .maskCenterIn, .maskCenterOut: PresetAction(preset: kind)
+        case .pageTurnIn, .pageTurnOut: PresetAction(preset: kind, direction: .left)
+        case .pageCurlIn, .pageCurlOut: PresetAction(preset: kind, corner: .topRight)
         case .blurSlideIn: PresetAction(preset: kind, direction: .bottom, distance: travel / 3, blur: 16, fades: true)
         case .blurSlideOut: PresetAction(preset: kind, direction: .top, distance: travel / 3, blur: 16, fades: true)
         case .blurScaleIn, .blurScaleOut: PresetAction(preset: kind, scale: 0.6, blur: 16, fades: true)
@@ -115,12 +127,15 @@ public enum PresetRecipe {
     public static func easing(_ kind: PresetKind) -> Easing {
         switch kind {
         case .slideIn, .rotateIn, .blurIn, .shrinkIn, .twistIn, .moveScaleIn, .blurSlideIn, .blurScaleIn,
-             .maskRevealIn, .maskCenterIn, .maskResizeIn, .maskSlideIn, .maskShrinkIn: slowDown
+             .maskRevealIn, .maskCenterIn, .maskResizeIn, .maskSlideIn, .maskShrinkIn, .pageTurnIn: slowDown
         case .slideOut, .blurOut, .rotateOut, .dropOut, .shrinkOut, .twistOut, .moveScaleOut, .blurSlideOut, .blurScaleOut,
-             .maskRevealOut, .maskCenterOut, .maskResizeOut, .maskSlideOut, .maskShrinkOut: accelerate
+             .maskRevealOut, .maskCenterOut, .maskResizeOut, .maskSlideOut, .maskShrinkOut, .pageTurnOut: accelerate
         case .scalePop: .preset(.overshoot, intensity: 0.6)
         case .scaleOut: .preset(.accelerate, intensity: 0.5)
         case .dropIn: .preset(.spring, intensity: 0.5)
+        // Flip's own ease in and out (SwiftUI's), gentler than Natural, so
+        // the corner is seen lifting.
+        case .pageCurlIn, .pageCurlOut: .custom(CubicBezier(0.42, 0, 0.58, 1))
         default: .default
         }
     }
@@ -233,6 +248,16 @@ public enum PresetRecipe {
             return (0.6, [part(.tilt(by: angle, entering: true), for: 0.6)] + fadeIn(0.3))
         case .twistOut:
             return (0.5, [part(.tilt(by: angle, entering: false), for: 0.5)] + fadeOut(at: 0.2, 0.3))
+        // Edge-on at the far end, so nothing shows there and nothing fades.
+        case .pageTurnIn:
+            return (0.5, [part(.turnPage(hinge: direction, by: 90, entering: true), for: 0.5)])
+        case .pageTurnOut:
+            return (0.5, [part(.turnPage(hinge: direction, by: 90, entering: false), for: 0.5)])
+        // Flip's own: the leaf lifts from a corner, curls over and is gone.
+        case .pageCurlIn:
+            return (0.5, [part(.curl(corner: s.corner ?? own.corner ?? .topRight, from: 1, to: 0), for: 0.5)])
+        case .pageCurlOut:
+            return (0.5, [part(.curl(corner: s.corner ?? own.corner ?? .topRight, from: 0, to: 1), for: 0.5)])
         case .moveScaleIn:
             return (0.6, [part(.move(by: toward(s.direction), entering: true), for: 0.6),
                           part(.scale(from: scale, to: nil), for: 0.6)] + fadeIn(0.3))
