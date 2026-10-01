@@ -34,7 +34,7 @@ struct SettingsPage: View {
             Rectangle().fill(Theme.border).frame(height: Theme.hairline)
 
             ScrollView {
-                Masonry(minColumn: Theme.settingsCardMin, spacing: margin) {
+                Masonry(minColumn: Theme.settingsCardMin, spacing: Theme.settingsCardGap) {
                     projects
                     newProjects
                     canvas

@@ -279,6 +279,8 @@ public enum Theme {
     /// height, the icon tile at a row's left, the width of a menu or number
     /// at its right, the dashes between rows, and Version History's button.
     public static let settingsCardMin: CGFloat = 320
+    /// Between cards, across and down.
+    public static let settingsCardGap: CGFloat = 32
     public static let settingsRow: CGFloat = 48
     public static let settingsTile: CGFloat = 32
     public static let settingsTileIcon: CGFloat = 16
