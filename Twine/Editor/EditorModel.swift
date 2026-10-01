@@ -146,6 +146,12 @@ final class EditorModel {
     }
     /// The timeline lists only the selected layers' actions.
     var timelineOnlySelected = false
+    /// The timeline gathers the sound layers' rows at its foot, under
+    /// everything that draws. Remembered for every window and every launch.
+    var soundAtBottom: Bool = UserDefaults.standard.bool(forKey: EditorModel.soundAtBottomKey) {
+        didSet { UserDefaults.standard.set(soundAtBottom, forKey: Self.soundAtBottomKey) }
+    }
+    private static let soundAtBottomKey = "timelineSoundAtBottom"
     /// Layers whose timeline rows are folded into one.
     var foldedLayers: Set<UUID> = []
     /// Timeline scenes folded to their one row.

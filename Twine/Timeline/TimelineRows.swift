@@ -43,15 +43,26 @@ struct TimelineRow {
     /// scene's actions sit together under a row of its own where its first
     /// would be, or only that row while it is in `foldedScenes`. A layer in
     /// `folded` has one row, where its first would be, carrying all its
-    /// actions (inside a scene, all its actions in that scene).
+    /// actions (inside a scene, all its actions in that scene). With
+    /// `soundLast`, the rows of sound layers that are in no scene come
+    /// after all the others, in their own order (`isSoundRow`).
     static func rows(of project: Project, only: Set<UUID>? = nil, folded: Set<UUID> = [],
-                     foldedScenes: Set<UUID> = []) -> [TimelineRow] {
+                     foldedScenes: Set<UUID> = [], soundLast: Bool = false) -> [TimelineRow] {
         let names = Dictionary(project.allLayers.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
-        let order = ActionEditing.timeline(in: project).filter { action in
+        var order = ActionEditing.timeline(in: project).filter { action in
             names[action.targetLayerID] != nil && (only?.contains(action.targetLayerID) ?? true)
         }
         var sceneOf: [UUID: TimelineScene] = [:]
         for scene in project.scenes { for id in scene.actionIDs { sceneOf[id] = scene } }
+        if soundLast {
+            let sounds = soundLayers(in: project)
+            // A scene keeps its rows together, sound or not.
+            let low = order.filter { sceneOf[$0.id] == nil && sounds.contains($0.targetLayerID) }
+            if !low.isEmpty {
+                let ids = Set(low.map(\.id))
+                order = order.filter { !ids.contains($0.id) } + low
+            }
+        }
         var members: [UUID: [Action]] = [:]
         for action in order { if let scene = sceneOf[action.id] { members[scene.id, default: []].append(action) } }
 
@@ -96,6 +107,22 @@ struct TimelineRow {
             for member in mine { addRow(member, among: &inside, scene: scene.id) }
         }
         return rows
+    }
+
+    /// The layers that are only sound, whose rows can be gathered at the
+    /// foot of the timeline.
+    static func soundLayers(in project: Project) -> Set<UUID> {
+        var ids: Set<UUID> = []
+        project.forEachLayer { layer in
+            if case .audio = layer.content { ids.insert(layer.id) }
+        }
+        return ids
+    }
+
+    /// Whether `action` is one the timeline gathers at its foot with
+    /// `soundLast`: on a sound layer, in no scene.
+    static func isSoundRow(_ action: Action, sounds: Set<UUID>, in project: Project) -> Bool {
+        sounds.contains(action.targetLayerID) && !project.scenes.contains { $0.actionIDs.contains(action.id) }
     }
 
     /// Actions in the order their rows run down the timeline.

@@ -33,7 +33,7 @@ struct ActionTimeline: NSViewRepresentable {
         // Read here so SwiftUI calls this whenever any of them change.
         _ = (editor.time, editor.selection, editor.selectedActions, editor.timelineOnlySelected,
              editor.viewport.pointsPerSecond, editor.viewport.start, controller.project, editor.revealActions.request,
-             editor.foldedLayers, editor.foldedScenes)
+             editor.foldedLayers, editor.foldedScenes, editor.soundAtBottom)
         tracks.menus = menus
         tracks.reload()
     }
@@ -123,7 +123,7 @@ final class TimelineTracksView: NSView {
         guard let controller else { return }
         let editor = controller.editor
         rows = TimelineRow.rows(of: controller.project, only: editor.timelineOnlySelected ? editor.selection : nil,
-                                folded: editor.foldedLayers, foldedScenes: editor.foldedScenes)
+                                folded: editor.foldedLayers, foldedScenes: editor.foldedScenes, soundLast: editor.soundAtBottom)
         sizeToRows()
         // A selection made elsewhere (the layers panel, the canvas) brings
         // its rows into view.
@@ -730,11 +730,18 @@ final class TimelineTracksView: NSView {
         // can outrun the drawing.
         let editor = controller.editor
         let current = TimelineRow.rows(of: controller.project, only: editor.timelineOnlySelected ? editor.selection : nil,
-                                       folded: editor.foldedLayers, foldedScenes: editor.foldedScenes)
+                                       folded: editor.foldedLayers, foldedScenes: editor.foldedScenes,
+                                       soundLast: editor.soundAtBottom)
         // A bar on a folded row moves only in time: its layer's rows are gathered up.
         guard !editor.foldedLayers.contains(action.targetLayerID) || !current.contains(where: { $0.folded?.contains { $0.id == action.id } ?? false })
         else { return [] }
         let index = min(max(Int((y / TimelineRow.height).rounded(.down)), 0), current.count - 1)
+        // With sound at the foot, a row stays on its own side of the line.
+        if editor.soundAtBottom, index >= 0 {
+            let sounds = TimelineRow.soundLayers(in: controller.project)
+            guard TimelineRow.isSoundRow(action, sounds: sounds, in: controller.project)
+                    == TimelineRow.isSoundRow(current[index].action, sounds: sounds, in: controller.project) else { return [] }
+        }
         guard index >= 0, current[index].action.id != action.id,
               let target = ActionEditing.timeline(in: controller.project).firstIndex(where: { $0.id == current[index].action.id })
         else { return [] }
@@ -983,6 +990,7 @@ final class TimelineTracksView: NSView {
             .separator,
             .item("Show Only Selected Layers", checked: editor.timelineOnlySelected) { editor.timelineOnlySelected.toggle() },
             .item("Show Times as Frames", checked: editor.showsFrames) { editor.showsFrames.toggle() },
+            .item("Show Sound at the Bottom", checked: editor.soundAtBottom) { editor.soundAtBottom.toggle() },
         ], at: origin)
     }
 
