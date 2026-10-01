@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 170
+    static let pushes = 171
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -42,7 +42,7 @@ enum VersionHistory {
     static let builds: [Build] = [
         .init(date: "1 October 2026", title: "Large projects", features: [
             "Info on a project's right-click menu on the home screen: a card with when it was made and last saved, its size on disk and folder, the composition's size, length and frame rate, how many layers it has of each kind, and how many actions, presets and scenes are on its timeline, with where the last action ends. An open project's card counts its unsaved changes too.",
-            "Settings, at the foot of the home screen's sidebar where Version History was (which is now a button at the foot of Settings, beside the build number). Change where projects are kept; what a new project starts with (its size, from Landscape, Portrait, Square or 4K or typed, frame rate, length and background); how far the arrow keys nudge, with and without Shift; the easing and length a new action takes; whether times show as frames; whether sound plays while editing; and whether exports ask where to go or go straight into a folder, and are shown in the Finder when done. Each change is kept at once.",
+            "Settings, at the foot of the home screen's sidebar where Version History was (which is now a button at the foot of Settings, beside the build number). Each kind of setting is a card of rows, each with its icon, laid out in three columns when the window has room and two when it is narrower. Change where projects are kept; what a new project starts with (its size, from Landscape, Portrait, Square or 4K or typed, frame rate, length and background); how far the arrow keys nudge, with and without Shift; the easing and length a new action takes; whether times show as frames; whether sound plays while editing; and whether exports ask where to go or go straight into a folder, and are shown in the Finder when done. Each change is kept at once.",
             "Show Sound at the Bottom, on the timeline's right-click menu beside Show Times as Frames: every sound layer's rows move to the foot of the timeline, under everything that draws, keeping their own order, so new actions on other layers go above them. Rows in a scene stay with their scene. While it is on, dragging a row reorders it only among its own kind. Twine remembers the choice.",
             "Page Curl, a new preset in a new Flip group: the layer curls away from a corner like a page of Apple Books, as the pictures turn in Flip's onboarding, showing what is under it, with the back of the page in a lighter shade of the layer's colour and a shadow travelling with the fold. Out curls it off, In lays it down; pick the corner it lifts from in its settings. Half a second, eased in and out as Flip's is, and the same on the canvas and in exports.",
             "Page Turn, beside it in the Flip group: the layer swings on one edge like a page on its spine, the free edge lifting towards you until it is edge-on (Out), or coming down from the far side (In), as the onboarding's pages do. Pick the edge it hinges on in its settings.",

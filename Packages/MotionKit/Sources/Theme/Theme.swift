@@ -274,12 +274,16 @@ public enum Theme {
     /// The home screen's Info card on a project: its width, which its
     /// thumbnail spans.
     public static let infoCardWidth: CGFloat = 340
-    /// The Settings page: the column its rows run down, a name's width at
-    /// their left, and the width of a short control (a menu, a number).
-    public static let settingsColumn: CGFloat = 520
-    public static let settingsLabel: CGFloat = 200
-    public static let settingsControl: CGFloat = 200
-    /// Show in Finder and Version History, side by side under what they act on.
+    /// The Settings page's cards: the narrowest a column of them may be
+    /// (three side by side when the window has room, else two), a row's
+    /// height, the icon tile at a row's left, the width of a menu or number
+    /// at its right, the dashes between rows, and Version History's button.
+    public static let settingsCardMin: CGFloat = 320
+    public static let settingsRow: CGFloat = 48
+    public static let settingsTile: CGFloat = 32
+    public static let settingsTileIcon: CGFloat = 16
+    public static let settingsControl: CGFloat = 150
+    public static let settingsDash: [CGFloat] = [3, 3]
     public static let settingsButton: CGFloat = 140
     /// Under the onboarding card, darker while a page turns.
     public static let onboardingShadow = Color.black
