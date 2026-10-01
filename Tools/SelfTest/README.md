@@ -42,6 +42,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `import PATH`, `save` | Imports media (an `.svg` comes in as layers), saves (logging `SAVE` with how long the save held the main thread) |
 | `actions`, `spec`, `text` | Logs every action, the selected actions' specs, the selected text layer |
 | `path`, `path xy` | Logs the selected shape's points, style and box, and whether its points are showing or being drawn; `xy` adds each point's and handle's place in the window, to click on |
+| `info NAME` | Raises a home screen project's Info card, as its right-click menu does |
 | `moveproject NAME FOLDER`, `showfolder FOLDER` | Moves a home screen project into a folder (`-` for out of one), as a drop does; shows a folder (`-` for All Projects) |
 | `library` | Logs the home screen's folders (with counts), which is showing, and every project with its folder |
 | `onboarding` | Raises the onboarding card, as Help > Show Onboarding does (the test copy never shows it by itself); the state line's `onb=` is its page and feature |

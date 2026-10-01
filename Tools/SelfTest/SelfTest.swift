@@ -547,6 +547,10 @@ enum SelfTest {
             case "showfolder":
                 let lib = HomeWindowController.shared.library
                 lib.selectedFolder = parts[1] == "-" ? nil : lib.folders.first { $0.name == parts[1] }?.url
+            case "info":
+                // A home screen project's Info card, as its right-click menu's Info does.
+                let lib = HomeWindowController.shared.library
+                if let item = lib.items.first(where: { $0.name == parts[1] }) { lib.info = item } else { log("no project \(parts[1])") }
             case "onboarding":
                 // Raises the onboarding card, as Help > Show Onboarding does.
                 OnboardingState.shared.show()

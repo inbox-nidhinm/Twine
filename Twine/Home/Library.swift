@@ -33,6 +33,8 @@ final class Library {
     /// The folder the shelf shows, nil for All Projects.
     var selectedFolder: URL?
     var showVersionHistory = false
+    /// The project whose Info card is up.
+    var info: Item?
 
     /// What the shelf shows: everything, or one folder's projects.
     var shownItems: [Item] {
@@ -205,6 +207,16 @@ final class Library {
         openDocument(at: item.url)?.close()
         do { try FileManager.default.trashItem(at: item.url, resultingItemURL: nil) } catch { NSApp.presentError(error) }
         refresh()
+    }
+
+    /// What the Info card shows, read off the main thread: an open project's
+    /// as it stands, with its unsaved changes, otherwise its saved file.
+    func details(of item: Item) async -> ProjectDetails {
+        let open = openDocument(at: item.url)?.store?.project
+        let url = item.url
+        return await Task.detached(priority: .userInitiated) {
+            ProjectDetails(url: url, open: open)
+        }.value
     }
 
     private func openDocument(at url: URL) -> ProjectDocument? {
