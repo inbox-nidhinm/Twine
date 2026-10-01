@@ -332,10 +332,13 @@ public struct ActionClipboard: Codable, Sendable {
     public var actions: [Action]
     /// By action id; nil in a copy made before origins were kept.
     public var origins: [UUID: ActionOrigin]?
+    /// The scenes copied whole, so a paste makes them again (`Scenes.copying`).
+    public var scenes: [TimelineScene]?
 
-    public init(actions: [Action], origins: [UUID: ActionOrigin]? = nil) {
+    public init(actions: [Action], origins: [UUID: ActionOrigin]? = nil, scenes: [TimelineScene]? = nil) {
         self.actions = actions
         self.origins = origins
+        self.scenes = scenes
     }
 }
 

@@ -817,8 +817,10 @@ final class EditorController {
         // selection's length.
         let made = ActionEditing.duplicates(of: originals, rate: frameRate)
         let (copies, moved) = ActionEditing.placingBelow(made, originals: originals, in: project)
-        // Copies join their originals' scenes (`duplicates` keeps their order).
-        let scenes = Scenes.joining(zip(originals, made).map { ($0.id, $1.id) }, in: project.scenes)
+        // A scene duplicated whole becomes a scene of its own; copies of part
+        // of one join it (`duplicates` keeps their order).
+        let scenes = Scenes.copying(zip(originals, made).map { ($0.id, $1.id, nil) },
+                                    whole: Scenes.whole(Set(originals.map(\.id)), in: project.scenes), in: project.scenes)
         if perform(.batch([.updateActions(moved), .insertActions(copies)] + sceneChange(scenes),
                           name: copies.count == 1 ? "Duplicate Action" : "Duplicate Actions")) {
             selectActions(Set(copies.map(\.id)))
@@ -937,7 +939,9 @@ final class EditorController {
             origins[action.id] = ActionOrigin(tracks.inheritedState(for: action, of: layer))
         }
         guard !actions.isEmpty,
-              let data = try? JSONEncoder().encode(ActionClipboard(actions: actions, origins: origins)) else { return }
+              let data = try? JSONEncoder().encode(ActionClipboard(
+                  actions: actions, origins: origins, scenes: Scenes.whole(Set(actions.map(\.id)), in: project.scenes)))
+        else { return }
         let board = NSPasteboard.general
         board.clearContents()
         board.setData(data, forType: Self.actionPasteboardType)
@@ -961,17 +965,25 @@ final class EditorController {
     /// Pastes with the earliest at the playhead, onto `layers` (the selected
     /// ones unless given), or back onto the layers they came from when none
     /// are; on another layer each makes the same motion from where that
-    /// layer stands. Each lands just below its layer's last row, and the
-    /// new bars are selected.
+    /// layer stands. A whole scene pasted onto other layers keeps its times
+    /// and becomes a scene of its own on each (the user's choice, 1 October
+    /// 2026). Each lands just below its layer's last row, and the new bars
+    /// are selected.
     func pasteActions(onto layers: [Layer]? = nil) {
         guard let data = NSPasteboard.general.data(forType: Self.actionPasteboardType),
               let clipboard = try? JSONDecoder().decode(ActionClipboard.self, from: data) else { return }
-        let pairs = ActionEditing.pastedPairs(clipboard.actions, onto: layers ?? selectedLayers, at: editor.time, in: project,
+        let targets = layers ?? selectedLayers
+        let whole = clipboard.scenes ?? []
+        let sources = Set(clipboard.actions.map(\.targetLayerID))
+        let keepsTimes = !whole.isEmpty && !targets.isEmpty && !targets.contains { sources.contains($0.id) }
+        let at = keepsTimes ? clipboard.actions.map(\.start).min() ?? editor.time : editor.time
+        let pairs = ActionEditing.pastedPairs(clipboard.actions, onto: targets, at: at, in: project,
                                               rate: frameRate, origins: clipboard.origins ?? [:])
         let made = pairs.map(\.copy)
         guard !made.isEmpty else { return NSSound.beep() }
         let placed = ActionEditing.placingWithTheirLayers(made, in: project)
-        let scenes = Scenes.joining(pairs.map { ($0.original, $0.copy.id) }, in: project.scenes)
+        let scenes = Scenes.copying(pairs.map { ($0.original, $0.copy.id, $0.copy.targetLayerID) }, whole: whole,
+                                    in: project.scenes)
         if perform(.batch([.insertActions(placed.actions), .updateActions(placed.moved)] + sceneChange(scenes),
                           name: made.count == 1 ? "Paste Action" : "Paste Actions")) {
             selectActions(Set(placed.actions.map(\.id)))
@@ -1126,7 +1138,9 @@ final class EditorController {
         let pairs = project.actionCopyPairs(for: map)
         let actions = pairs.map { $0.copy.remapped(point: { $0 + offset }, vector: { $0 }) }
         if !actions.isEmpty { commands.append(.insertActions(actions)) }
-        commands += sceneChange(Scenes.joining(pairs.map { ($0.original, $0.copy.id) }, in: project.scenes))
+        commands += sceneChange(Scenes.copying(pairs.map { ($0.original, $0.copy.id, nil) },
+                                               whole: Scenes.whole(Set(pairs.map(\.original)), in: project.scenes),
+                                               in: project.scenes))
         return (.batch(commands, name: "Duplicate"), copies)
     }
 
@@ -1273,13 +1287,17 @@ final class EditorController {
     private struct LayerClipboard: Codable {
         var layers: [Layer]
         var actions: [Action]
+        /// The scenes the layers' actions make whole; nil in older copies.
+        var scenes: [TimelineScene]?
     }
 
     func copySelection() {
         if timelineHasFocus, !selectedActions.isEmpty { return copySelectedActions() }
         let layers = topmost(selectedLayers)
         let ids = Set(layers.flatMap { [$0] + Project(layers: [$0]).allLayers }.map(\.id))
-        let clipboard = LayerClipboard(layers: layers, actions: project.actions.filter { ids.contains($0.targetLayerID) })
+        let actions = project.actions.filter { ids.contains($0.targetLayerID) }
+        let clipboard = LayerClipboard(layers: layers, actions: actions,
+                                       scenes: Scenes.whole(Set(actions.map(\.id)), in: project.scenes))
         guard !layers.isEmpty, let data = try? JSONEncoder().encode(clipboard) else { return }
         let board = NSPasteboard.general
         board.clearContents()
@@ -1310,7 +1328,8 @@ final class EditorController {
         let copies = clipboard.layers.map { $0.duplicated(recordingIDs: &map) }.map { $0.remappingMasks(map) }
         let pairs = Project(actions: clipboard.actions).actionCopyPairs(for: map)
         let actions = pairs.map(\.copy)
-        let scenes = Scenes.joining(pairs.map { ($0.original, $0.copy.id) }, in: project.scenes)
+        let scenes = Scenes.copying(pairs.map { ($0.original, $0.copy.id, nil) }, whole: clipboard.scenes ?? [],
+                                    in: project.scenes)
         if perform(.batch([.insertLayers(copies, parentID: nil, index: nil), .insertActions(actions)] + sceneChange(scenes),
                           name: copies.count == 1 ? "Paste Layer" : "Paste Layers")) {
             editor.selection = Set(copies.map(\.id))

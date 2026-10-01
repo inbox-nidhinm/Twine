@@ -48,6 +48,53 @@ public enum Scenes {
         }
     }
 
+    /// The scenes every one of whose actions is among `ids`: copied whole.
+    public static func whole(_ ids: Set<UUID>, in scenes: [TimelineScene]) -> [TimelineScene] {
+        scenes.filter { !$0.actionIDs.isEmpty && $0.actionIDs.allSatisfy(ids.contains) }
+    }
+
+    /// `scenes` after copying actions (the user's choice, 1 October 2026):
+    /// the copies of each scene in `whole`, one copied entire, make a scene
+    /// of their own named after it ("Scene 1 copy"), one for each `group`
+    /// (the layer a paste went onto, or nil for all of them), so a scene
+    /// pasted onto two layers makes two; copies of only part of a scene
+    /// join it, as `joining` does. `whole` may come from another project.
+    public static func copying(_ pairs: [(original: UUID, copy: UUID, group: UUID?)], whole: [TimelineScene],
+                               in scenes: [TimelineScene]) -> [TimelineScene] {
+        var result = scenes
+        var taken = Set(scenes.map(\.name))
+        var inWhole = Set<UUID>()
+        for scene in whole {
+            let members = Set(scene.actionIDs)
+            inWhole.formUnion(members)
+            let rank = Dictionary(scene.actionIDs.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+            let copies = pairs.filter { members.contains($0.original) }
+            // One scene per group, in the order the groups first come.
+            var groups: [UUID?] = []
+            for pair in copies where !groups.contains(pair.group) { groups.append(pair.group) }
+            for group in groups {
+                let ids = copies.filter { $0.group == group }
+                    .sorted { rank[$0.original, default: 0] < rank[$1.original, default: 0] }
+                    .map(\.copy)
+                let base = copyBase(of: scene.name)
+                var name = "\(base) copy"
+                var n = 2
+                while taken.contains(name) { name = "\(base) copy \(n)"; n += 1 }
+                taken.insert(name)
+                result.append(TimelineScene(name: name, actionIDs: ids))
+            }
+        }
+        let rest = pairs.filter { !inWhole.contains($0.original) }.map { ($0.original, $0.copy) }
+        return joining(rest, in: result)
+    }
+
+    /// A name without the " copy" or " copy N" a copy was given, so a copy
+    /// of "Scene 1 copy" is "Scene 1 copy 2" rather than "Scene 1 copy copy".
+    static func copyBase(of name: String) -> String {
+        guard let range = name.range(of: #" copy( \d+)?$"#, options: .regularExpression) else { return name }
+        return String(name[..<range.lowerBound])
+    }
+
     /// From the earliest start to the latest end of `actions`.
     public static func span(of actions: [Action]) -> ClosedRange<Double>? {
         guard let start = actions.map(\.start).min(), let end = actions.map(\.end).max() else { return nil }

@@ -481,6 +481,27 @@ enum SelfTest {
                     .map { "\($0.name)[\(controller.project.layer(withID: $0.targetLayerID)?.name ?? "?") r\($0.rowOrder) \(String(format: "%.3f", $0.start))+\(String(format: "%.3f", $0.duration))\($0.isEnabled ? "" : " off")]" }
                     .joined(separator: " ") + " sel=\(controller.selectedActions.map(\.name))")
             case "wait": wait = n[0]
+            case "selectlayer":
+                // Selects the layer with this name, as a click on its row does.
+                let name = parts.dropFirst().joined(separator: " ")
+                var found: UUID?
+                controller.project.forEachLayer { if $0.name == name, found == nil { found = $0.id } }
+                if let found { controller.editor.selection = [found] } else { log("no layer \(name)") }
+            case "layeractions":
+                // Picks every action of the selected layers, as a marquee over their rows does.
+                controller.selectActions(Set(controller.project.actions.filter { controller.editor.selection.contains($0.targetLayerID) }.map(\.id)))
+            case "groupscene": controller.groupSelectedActionsIntoScene()
+            case "copyactions": controller.copySelectedActions()
+            case "pasteactions": controller.pasteActions()
+            case "duplicateactions": controller.duplicateSelectedActions()
+            case "scenes":
+                // Every scene, with each member's name, layer and time.
+                let p = controller.project
+                log("SCENES " + p.scenes.map { scene in
+                    scene.name + "{" + scene.actionIDs.compactMap { id in p.actions.first { $0.id == id } }
+                        .map { "\($0.name)@\(p.layer(withID: $0.targetLayerID)?.name ?? "?") \(String(format: "%.2f", $0.start))" }
+                        .joined(separator: ", ") + "}"
+                }.joined(separator: " "))
             case "savepanel":
                 if let panel = window.attachedSheet as? NSSavePanel {
                     let url = URL(fileURLWithPath: parts[1])
