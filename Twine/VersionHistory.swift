@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 158
+    static let pushes = 159
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -52,6 +52,7 @@ enum VersionHistory {
             "Duplicating or pasting a layer keeps motion blur on its actions. It was switched off on the copies.",
         ], misc: [
             "Where \"scene\" meant the whole animation, it now says so: the export range is Whole animation or Part of the animation.",
+            "The project's name at the top of the export window is smaller, 24 points rather than 32.",
         ]),
         .init(date: "30 September 2026", title: "Motion blur", features: [
             "Motion blur on actions. Any action or preset that moves, scales, turns, skews or tilts a layer has a Motion blur switch under Easing. While it plays, the layer smears along its movement, as a camera's shutter does.",

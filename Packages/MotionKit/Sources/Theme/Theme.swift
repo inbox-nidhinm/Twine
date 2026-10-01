@@ -257,7 +257,7 @@ public enum Theme {
     /// The gap between the preview and its controls.
     public static let previewGap: CGFloat = 24
     /// The project's name at the head of the panel.
-    public static let exportTitle: CGFloat = 32
+    public static let exportTitle: CGFloat = 24
     /// The counter's type size, as a share of the preview area's height.
     public static let exportCounterShare: CGFloat = 0.36
     /// The onboarding card, as Flip's: its size, the panel down its left
