@@ -67,13 +67,20 @@ struct ProjectInfoCard: View {
         .task(id: item.url) { details = await library.details(of: item) }
     }
 
+    /// The card's width, at the picture's own shape, never taller than
+    /// square (a tall one is cut to a square), as the home screen's cards.
     @ViewBuilder private var thumbnail: some View {
         if let image = item.thumbnail {
-            Image(nsImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
+            let shape = image.size.height > 0 ? max(image.size.width / image.size.height, 1) : 1
+            Color.clear
+                .aspectRatio(shape, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .overlay {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                }
                 .clipShape(RoundedRectangle(cornerRadius: Theme.radiusControl))
-                .frame(maxWidth: .infinity, maxHeight: Theme.infoThumbnail)
         }
     }
 

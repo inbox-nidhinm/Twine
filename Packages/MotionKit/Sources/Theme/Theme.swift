@@ -271,10 +271,9 @@ public enum Theme {
     public static let onboardingRow: CGFloat = 30
     public static let onboardingFolderRow: CGFloat = 34
     public static let radiusCard: CGFloat = 12
-    /// The home screen's Info card on a project: its width, and the
-    /// thumbnail's height at the top of it.
+    /// The home screen's Info card on a project: its width, which its
+    /// thumbnail spans.
     public static let infoCardWidth: CGFloat = 340
-    public static let infoThumbnail: CGFloat = 150
     /// Under the onboarding card, darker while a page turns.
     public static let onboardingShadow = Color.black
     /// How the player and the counter trade places: cubic-bezier(0.5, 0, 0, 1).

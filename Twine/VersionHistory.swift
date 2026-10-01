@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 166
+    static let pushes = 167
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -54,6 +54,7 @@ enum VersionHistory {
             "Saving a very large project no longer pauses Twine for half a second after each edit. Its picture on the home screen is drawn as the project closes, rather than with every save.",
             "Projects with more than 512 texts no longer lay all their text out again on every edit and frame.",
         ], misc: [
+            "The picture at the top of a project's Info card fills the card's width at its own shape, rather than shrinking to a fixed height with space at its sides; a tall one is cut to a square, as on the home screen's cards.",
             "Cancel in the export window is a plain grey button while an export runs, rather than blue: it is not the thing the window is for.",
         ]),
         .init(date: "30 September 2026", title: "Scenes and GIFs", features: [
