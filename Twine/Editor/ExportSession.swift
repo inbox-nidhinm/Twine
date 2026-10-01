@@ -63,15 +63,34 @@ final class ExportSession {
             ? range.map { ExportTiming.frames(from: $0.lowerBound, to: $0.upperBound, in: exported) }
             : nil
 
+        let file = "\(name).\(settings.format.fileExtension)"
+        // Straight into the folder Settings names, under a free name, when
+        // it is still there.
+        if let folder = AppSettings.shared.exportFolder,
+           (try? folder.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+            return run(project, settings: settings, time: time, frames: frames,
+                       to: Self.free(file, in: folder), media: media)
+        }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: settings.format.fileExtension) ?? .data]
-        panel.nameFieldStringValue = "\(name).\(settings.format.fileExtension)"
+        panel.nameFieldStringValue = file
         panel.canCreateDirectories = true
         let start: (NSApplication.ModalResponse) -> Void = { [weak self, weak panel] response in
             guard response == .OK, let url = panel?.url else { return }
             self?.run(project, settings: settings, time: time, frames: frames, to: url, media: media)
         }
         if let window { panel.beginSheetModal(for: window, completionHandler: start) } else { start(panel.runModal()) }
+    }
+
+    /// `file` in `folder`, numbered (Name 2, Name 3) past any already there.
+    private static func free(_ file: String, in folder: URL) -> URL {
+        let base = (file as NSString).deletingPathExtension, ext = (file as NSString).pathExtension
+        var n = 1
+        while true {
+            let url = folder.appendingPathComponent(n == 1 ? base : "\(base) \(n)").appendingPathExtension(ext)
+            if !FileManager.default.fileExists(atPath: url.path) { return url }
+            n += 1
+        }
     }
 
     func cancel() { job?.cancel() }
@@ -119,6 +138,7 @@ final class ExportSession {
         case .success:
             lastProgress = 1
             completed = url
+            if AppSettings.shared.revealsExports { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             finished = url
             finishedToken += 1
             let token = finishedToken

@@ -1338,7 +1338,7 @@ final class CanvasNSView: NSView {
         }
         if EditorKeys.handle(event, controller) { return }
         if !animating, AlignKeys.handle(event, controller) { return }
-        let step = event.modifierFlags.contains(.shift) ? 10.0 : 1.0
+        let step = event.modifierFlags.contains(.shift) ? AppSettings.shared.shiftNudge : AppSettings.shared.nudge
         switch event.keyCode {
         case 51 where event.modifierFlags.contains(.command):         // ⌘⌫ ungroups groups and frames
             controller.ungroupSelection()

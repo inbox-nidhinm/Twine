@@ -65,87 +65,95 @@ struct ShortcutsCard: View {
 
     private static func s(_ what: String, _ keys: String...) -> Shortcut { Shortcut(keys: keys, what: what) }
 
-    static let columns: [[Group]] = [
+    /// A nudge as Settings has it, in whole pixels where it is whole.
+    private static func pixels(_ v: Double) -> String {
+        (v == v.rounded() ? String(Int(v)) : String(format: "%.1f", v)) + " px"
+    }
+
+    /// Worked out each time it shows, since the nudge comes from Settings.
+    static var columns: [[Group]] {
         [
-            Group(title: "Modes and tools", items: [
-                s("Design or Animate", "M"),
-                s("Select", "V"),
-                s("Frame", "F"),
-                s("Rectangle, ellipse, line", "R", "O", "L"),
-                s("Polygon, star", "Y", "S"),
-                s("Pen", "P"),
-                s("Text", "T"),
-                s("Type into a text layer", "Return"),
-            ]),
-            Group(title: "Points", items: [
-                s("Edit a shape's points", "Return"),
-                s("Finish a path, stop editing", "Esc"),
-                s("Sharp or smooth point", "⌘", "click"),
-                s("Pull out handles", "⌘", "drag"),
-                s("Move one handle alone", "⌥", "drag"),
-                s("Delete points", "⌫"),
-            ]),
-            Group(title: "Pictures", items: [
-                s("Crop a picture", "double-click"),
-                s("Finish cropping", "Esc"),
-            ]),
-            Group(title: "View", items: [
-                s("Pan", "Space", "drag"),
-                s("Zoom to fit, actual size", "⌘0", "⌥⌘0"),
-                s("Zoom in, out", "⌘=", "⌘-"),
-                s("Hide layers, inspector", "⌘1", "⌘2"),
-                s("Full screen", "⌃⌘F"),
-                s("Keyboard shortcuts", "⌘/"),
-            ]),
-        ],
-        [
-            Group(title: "On the canvas", items: [
-                s("Keep to one axis, square", "⇧", "drag"),
-                s("Duplicate as you drag", "⌥", "drag"),
-                s("Place without snapping", "⌘", "drag"),
-                s("Resize from the centre", "⌥", "handle"),
-                s("Move the anchor", "⌘", "anchor"),
-                s("Select inside a group", "⌘", "click"),
-                s("Nudge 1 px, 10 px", "←→", "⇧←→"),
-            ]),
-            Group(title: "Arrange", items: [
-                s("Align left, centres, right", "⌥A", "⌥H", "⌥D"),
-                s("Align top, middles, bottom", "⌥W", "⌥V", "⌥S"),
-                s("Distribute across, down", "⌃⌥H", "⌃⌥V"),
-                s("Group", "⌘G"),
-                s("Ungroup groups and frames", "⇧⌘G", "⌘⌫"),
-                s("Frame selection", "⌥⌘G"),
-                s("Forward, backward", "⌘]", "⌘["),
-                s("To front, to back", "⌥⌘]", "⌥⌘["),
-            ]),
-        ],
-        [
-            Group(title: "Playback", items: [
-                s("Play or pause", "Space"),
-                s("Frame back, forward", ",", "."),
-                s("Ten frames", "⇧,", "⇧."),
-                s("Previous, next action edge", "⌥,", "⌥."),
-                s("Start, end", "Home", "End"),
-            ]),
-            Group(title: "Timeline", items: [
-                s("Add or take away an action", "⌘", "click"),
-                s("Select the actions between", "⇧", "click"),
-                s("Move actions a frame", "←→", "⇧←→"),
-                s("Trim both ends", "⌥", "drag end"),
-                s("Pan", "⌥", "drag"),
-                s("Zoom", "⌘", "scroll"),
-                s("Copy, paste easing", "⌥⌘C", "⌥⌘V"),
-            ]),
-            Group(title: "Project", items: [
-                s("Import", "⌘I"),
-                s("Export, current frame", "⌘E", "⇧⌘E"),
-                s("Duplicate, rename layer", "⌘D", "⌘R"),
-                s("Rename in the layers panel", "double-click"),
-                s("Duplicate project", "⇧⌘S"),
-                s("Home", "⇧⌘H"),
-            ]),
-        ],
-    ]
+            [
+                Group(title: "Modes and tools", items: [
+                    s("Design or Animate", "M"),
+                    s("Select", "V"),
+                    s("Frame", "F"),
+                    s("Rectangle, ellipse, line", "R", "O", "L"),
+                    s("Polygon, star", "Y", "S"),
+                    s("Pen", "P"),
+                    s("Text", "T"),
+                    s("Type into a text layer", "Return"),
+                ]),
+                Group(title: "Points", items: [
+                    s("Edit a shape's points", "Return"),
+                    s("Finish a path, stop editing", "Esc"),
+                    s("Sharp or smooth point", "⌘", "click"),
+                    s("Pull out handles", "⌘", "drag"),
+                    s("Move one handle alone", "⌥", "drag"),
+                    s("Delete points", "⌫"),
+                ]),
+                Group(title: "Pictures", items: [
+                    s("Crop a picture", "double-click"),
+                    s("Finish cropping", "Esc"),
+                ]),
+                Group(title: "View", items: [
+                    s("Pan", "Space", "drag"),
+                    s("Zoom to fit, actual size", "⌘0", "⌥⌘0"),
+                    s("Zoom in, out", "⌘=", "⌘-"),
+                    s("Hide layers, inspector", "⌘1", "⌘2"),
+                    s("Full screen", "⌃⌘F"),
+                    s("Keyboard shortcuts", "⌘/"),
+                ]),
+            ],
+            [
+                Group(title: "On the canvas", items: [
+                    s("Keep to one axis, square", "⇧", "drag"),
+                    s("Duplicate as you drag", "⌥", "drag"),
+                    s("Place without snapping", "⌘", "drag"),
+                    s("Resize from the centre", "⌥", "handle"),
+                    s("Move the anchor", "⌘", "anchor"),
+                    s("Select inside a group", "⌘", "click"),
+                    s("Nudge \(Self.pixels(AppSettings.shared.nudge)), \(Self.pixels(AppSettings.shared.shiftNudge))", "←→", "⇧←→"),
+                ]),
+                Group(title: "Arrange", items: [
+                    s("Align left, centres, right", "⌥A", "⌥H", "⌥D"),
+                    s("Align top, middles, bottom", "⌥W", "⌥V", "⌥S"),
+                    s("Distribute across, down", "⌃⌥H", "⌃⌥V"),
+                    s("Group", "⌘G"),
+                    s("Ungroup groups and frames", "⇧⌘G", "⌘⌫"),
+                    s("Frame selection", "⌥⌘G"),
+                    s("Forward, backward", "⌘]", "⌘["),
+                    s("To front, to back", "⌥⌘]", "⌥⌘["),
+                ]),
+            ],
+            [
+                Group(title: "Playback", items: [
+                    s("Play or pause", "Space"),
+                    s("Frame back, forward", ",", "."),
+                    s("Ten frames", "⇧,", "⇧."),
+                    s("Previous, next action edge", "⌥,", "⌥."),
+                    s("Start, end", "Home", "End"),
+                ]),
+                Group(title: "Timeline", items: [
+                    s("Add or take away an action", "⌘", "click"),
+                    s("Select the actions between", "⇧", "click"),
+                    s("Move actions a frame", "←→", "⇧←→"),
+                    s("Trim both ends", "⌥", "drag end"),
+                    s("Pan", "⌥", "drag"),
+                    s("Zoom", "⌘", "scroll"),
+                    s("Copy, paste easing", "⌥⌘C", "⌥⌘V"),
+                ]),
+                Group(title: "Project", items: [
+                    s("Import", "⌘I"),
+                    s("Export, current frame", "⌘E", "⇧⌘E"),
+                    s("Duplicate, rename layer", "⌘D", "⌘R"),
+                    s("Rename in the layers panel", "double-click"),
+                    s("Duplicate project", "⇧⌘S"),
+                    s("Home", "⇧⌘H"),
+                ]),
+            ],
+        ]
+    }
 }
 
 private struct ShortcutGroupView: View {

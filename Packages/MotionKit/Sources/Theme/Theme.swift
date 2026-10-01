@@ -274,6 +274,13 @@ public enum Theme {
     /// The home screen's Info card on a project: its width, which its
     /// thumbnail spans.
     public static let infoCardWidth: CGFloat = 340
+    /// The Settings page: the column its rows run down, a name's width at
+    /// their left, and the width of a short control (a menu, a number).
+    public static let settingsColumn: CGFloat = 520
+    public static let settingsLabel: CGFloat = 200
+    public static let settingsControl: CGFloat = 200
+    /// Show in Finder and Version History, side by side under what they act on.
+    public static let settingsButton: CGFloat = 140
     /// Under the onboarding card, darker while a page turns.
     public static let onboardingShadow = Color.black
     /// How the player and the counter trade places: cubic-bezier(0.5, 0, 0, 1).

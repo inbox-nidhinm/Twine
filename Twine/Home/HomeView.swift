@@ -46,7 +46,11 @@ struct HomeView: View {
     var body: some View {
         HStack(spacing: 0) {
             sidebarColumn
-            shelf
+            if library.showsSettings {
+                SettingsPage(library: library, margin: margin, titleBlock: titleBlock)
+            } else {
+                shelf
+            }
         }
         .background(Theme.canvas.grained())
         // The app's arrow everywhere, never the system's.
@@ -99,7 +103,7 @@ struct HomeView: View {
                 .padding(.horizontal, Theme.panelPad)
                 .padding(.bottom, Theme.rowGap)
 
-            sidebarRow("All Projects", on: library.selectedFolder == nil) { library.selectedFolder = nil }
+            sidebarRow("All Projects", on: !library.showsSettings && library.selectedFolder == nil) { library.selectedFolder = nil }
                 .background(dropHighlight(Creations.folder.standardizedFileURL))
                 .dropDestination(for: URL.self) { urls, _ in drop(urls, into: nil) } isTargeted: {
                     target(Creations.folder.standardizedFileURL, $0)
@@ -122,8 +126,10 @@ struct HomeView: View {
 
             Spacer(minLength: 0)
 
-            sidebarRow("Version History", trailing: "Build \(VersionHistory.version)") {
-                library.showVersionHistory = true
+            // Opens Settings; picking a folder is what comes back.
+            sidebarRow("Settings", icon: .settings, on: library.showsSettings) {
+                endNewFolder()
+                library.showsSettings = true
             }
             .padding(.bottom, Theme.rowGap)
         }
@@ -135,23 +141,18 @@ struct HomeView: View {
 
     /// One line in the sidebar, at the layer row's measurements: 32 tall, the
     /// fill inset 4 with a 4 pt corner, the words 12 in.
-    private func sidebarRow(_ title: String, trailing: String? = nil, dim: Bool = false, on: Bool = false,
-                            action: @escaping () -> Void) -> some View {
+    private func sidebarRow(_ title: String, icon: Icon? = nil, dim: Bool = false,
+                            on: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 7) {
+                if let icon { IconView(icon, size: 16) }
                 Text(title)
                     .font(ThemeFont.label)
                     .lineLimit(1)
                 Spacer(minLength: 0)
-                if let trailing {
-                    Text(trailing)
-                        .font(ThemeFont.caption)
-                        .foregroundStyle(Theme.textTertiary)
-                }
             }
             .foregroundStyle(on ? Theme.textPrimary : dim ? Theme.textTertiary : Theme.textSecondary)
-            // As far in on the right as on the left, so a trailing word
-            // (Version History's build) clears the highlight's edge.
+            // As far in on the right as on the left.
             .padding(.horizontal, Theme.panelPad)
             .frame(height: Theme.listRow)
             .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
@@ -172,8 +173,7 @@ struct HomeView: View {
             .font(ThemeFont.label)
             .foregroundStyle(Theme.textPrimary)
             .focused($folderFocused)
-            // As far in on the right as on the left, so a trailing word
-            // (Version History's build) clears the highlight's edge.
+            // As far in on the right as on the left.
             .padding(.horizontal, Theme.panelPad)
             .frame(height: Theme.listRow)
             .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
@@ -203,7 +203,7 @@ struct HomeView: View {
             nameField(placeholder: "Folder name", onSubmit: { commitFolderRename(folder) },
                       onCancel: { renamingFolder = nil })
         } else {
-            sidebarRow(folder.name, on: library.selectedFolder == folder.url) {
+            sidebarRow(folder.name, on: !library.showsSettings && library.selectedFolder == folder.url) {
                 library.selectedFolder = folder.url
             }
             .background(dropHighlight(folder.url))

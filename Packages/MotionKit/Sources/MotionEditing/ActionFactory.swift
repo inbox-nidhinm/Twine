@@ -83,10 +83,14 @@ public enum ActionFactory {
     /// layer at that moment, which sets defaults that depend on it: a Resize
     /// grows from the current size, and Hide/Show does whichever is not
     /// already the case. `rowOrder` should put it after the layer's others.
+    /// `duration` and `easing` are what an ordinary action takes; a Show or
+    /// Hide is instant, and a counter, a sound fade and a Play keep lengths
+    /// of their own.
     public static func make(_ kind: ActionKind, for layer: Layer, at time: Double, state: LayerState,
-                            frameRate: FrameRate, rowOrder: Int, mediaLength: Double? = nil) -> Action {
+                            frameRate: FrameRate, rowOrder: Int, mediaLength: Double? = nil,
+                            duration ordinary: Double = defaultDuration, easing: Easing = .default) -> Action {
         let start = frameRate.snapped(max(time, 0))
-        let duration = frameRate.snapped(defaultDuration)
+        let duration = max(frameRate.snapped(ordinary), frameRate.frameDuration)
         let spec: ActionSpec
         var name: String?
         var counting = false
@@ -179,7 +183,7 @@ public enum ActionFactory {
         let length = kind == .visibility ? 0 : counting ? frameRate.snapped(counterDuration)
             : kind == .volume ? frameRate.snapped(fadeDuration)
             : playing ? max(frameRate.snapped(mediaLength ?? defaultDuration), frameRate.frameDuration) : duration
-        return Action(target: layer.id, start: start, duration: length,
+        return Action(target: layer.id, start: start, duration: length, easing: easing,
                       name: name, rowOrder: rowOrder, spec: spec)
     }
 

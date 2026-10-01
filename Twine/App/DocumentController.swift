@@ -10,6 +10,7 @@ final class DocumentController: NSDocumentController {
     }
 
     /// A new project in `folder`, or loose in the creations folder.
+    @MainActor
     func createAndOpenProject(in folder: URL? = nil) {
         do {
             let url = try Creations.makeProject(in: folder)

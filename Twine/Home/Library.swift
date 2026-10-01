@@ -31,7 +31,14 @@ final class Library {
     private(set) var items: [Item] = []
     private(set) var folders: [Folder] = []
     /// The folder the shelf shows, nil for All Projects.
-    var selectedFolder: URL?
+    /// The folder the shelf shows, nil for All Projects. Picking one is also
+    /// how Settings is left, as in re-Flip: every sidebar row takes you
+    /// somewhere, and none has to be remembered as switched on.
+    var selectedFolder: URL? {
+        didSet { showsSettings = false }
+    }
+    /// The Settings page in the shelf's place.
+    var showsSettings = false
     var showVersionHistory = false
     /// The project whose Info card is up.
     var info: Item?

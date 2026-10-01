@@ -75,6 +75,9 @@ final class AudioPreview {
         // A player still opening its files cannot start at a set moment;
         // the next tick tries again, a frame or two on.
         guard let player, player.status == .readyToPlay else { return }
+        // Kept in step while silent, so turning the sound back on in
+        // Settings is heard in its place.
+        player.isMuted = !AppSettings.shared.playsSound
         let clock = CACurrentMediaTime()
         if !isPlaying {
             start(player, at: time, clock: clock)

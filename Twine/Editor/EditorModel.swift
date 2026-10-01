@@ -125,8 +125,11 @@ final class EditorModel {
         didSet { UserDefaults.standard.set(snaps, forKey: Self.snapsKey) }
     }
     private static let snapsKey = "snapping"
-    /// Whether times read as frame numbers rather than seconds.
-    var showsFrames = false
+    /// Whether times read as frame numbers rather than seconds. Remembered,
+    /// and set in Settings too.
+    var showsFrames = AppSettings.shared.showsFrames {
+        didSet { AppSettings.shared.showsFrames = showsFrames }
+    }
 
     /// Where the last click landed, so Delete, Copy and Paste act on
     /// actions after a click in the timeline and on layers otherwise.
