@@ -67,8 +67,31 @@ public enum TextLayout {
     /// Whether `family` can be drawn as itself, rather than in the fallback.
     public static func isInstalled(_ family: String) -> Bool {
         if isSystem(family) { return true }
-        return installedFamilies.contains { $0.caseInsensitiveCompare(family) == .orderedSame }
+        _ = watchingFonts
+        let name = family.lowercased()
+        return installed.withLock { known in
+            if let known { return known.contains(name) }
+            let families = Set(installedFamilies.map { $0.lowercased() })
+            known = families
+            return families.contains(name)
+        }
     }
+
+    /// The installed families, lowercased, kept until fonts are added or
+    /// removed. Asking Core Text for the list takes about a tenth of a second
+    /// on a Mac with many fonts, and it was asked for each new text style:
+    /// opening a project with 16 styles spent 1.6 s on it.
+    private static let installed = Mutex<Set<String>?>(nil)
+
+    /// Fonts installed or removed while Twine runs are found again, and
+    /// text is set afresh in them.
+    private static let watchingFonts: Void = {
+        CFNotificationCenterAddObserver(CFNotificationCenterGetLocalCenter(), nil, { _, _, _, _, _ in
+            TextLayout.installed.withLock { $0 = nil }
+            TextLayout.fonts.withLock { $0.removeAll() }
+            TextLayout.layouts.withLock { $0 = Generations() }
+        }, kCTFontManagerRegisteredFontsChangedNotification, nil, .deliverImmediately)
+    }()
 
     public static var installedFamilies: [String] {
         (CTFontManagerCopyAvailableFontFamilyNames() as? [String]) ?? []

@@ -174,6 +174,15 @@ private func resolvedText(_ layer: Layer, _ actions: [Action], at time: Double) 
         #expect(!TextLayout.isInstalled(style.fontFamily))
         #expect(TextLayout.size(of: "Text", style: style, width: nil).width > 0)
     }
+
+    /// The installed list is asked for once, not for every new style: with
+    /// many fonts on the Mac each asking took a tenth of a second.
+    @Test func installedFontsAreFoundQuicklyWhateverTheirCase() {
+        #expect(TextLayout.isInstalled("Helvetica") && TextLayout.isInstalled("helvetica"))
+        let start = Date()
+        for i in 0..<200 { _ = TextLayout.isInstalled(i.isMultiple(of: 2) ? "Helvetica" : "No Such Family \(i)") }
+        #expect(Date().timeIntervalSince(start) < 0.05)
+    }
 }
 
 @Suite struct ShapeActionTests {
