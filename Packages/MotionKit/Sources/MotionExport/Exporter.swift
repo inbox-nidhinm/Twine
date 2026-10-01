@@ -193,6 +193,7 @@ public enum Exporter {
         // the half-written movie goes: a failed frame used to leave the
         // sound reading its files on its own queue.
         do {
+            let evaluation = EvaluationCache()
             for frame in 0..<timing.frameCount {
                 while !input.isReadyForMoreMediaData {
                     if job.isCancelled || writer.status == .failed { break }
@@ -209,7 +210,7 @@ public enum Exporter {
                 guard let pool = adaptor.pixelBufferPool,
                       CVPixelBufferPoolCreatePixelBuffer(nil, pool, &made) == kCVReturnSuccess, let buffer = made
                 else { throw ExportError.failed("There wasn't enough memory for the next frame.") }
-                renderer.render(evaluate(project, at: timing.time(ofFrame: frame), motionBlur: .export), into: buffer)
+                renderer.render(evaluate(project, at: timing.time(ofFrame: frame), motionBlur: .export, cache: evaluation), into: buffer)
                 if settings.format.keepsTransparency { unpremultiply(buffer) }
                 describe(buffer)
                 guard adaptor.append(buffer, withPresentationTime: timing.presentationTime(ofFrame: frame)) else {
@@ -260,9 +261,10 @@ public enum Exporter {
         // start and the next's, rounded from the exact times so they never drift.
         func hundredths(_ frame: Int) -> Int { Int((timing.presentationTime(ofFrame: frame).seconds * 100).rounded()) }
         do {
+            let evaluation = EvaluationCache()
             for frame in 0..<timing.frameCount {
                 if job.isCancelled { throw ExportError.cancelled }
-                renderer.render(evaluate(project, at: timing.time(ofFrame: frame), motionBlur: .export), into: buffer)
+                renderer.render(evaluate(project, at: timing.time(ofFrame: frame), motionBlur: .export, cache: evaluation), into: buffer)
                 CVPixelBufferLockBaseAddress(buffer, .readOnly)
                 defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
                 guard let base = CVPixelBufferGetBaseAddress(buffer) else { throw ExportError.failed("The frame couldn't be drawn.") }
@@ -345,10 +347,11 @@ public enum Exporter {
         let rowBytes = width * 4
         var row = Data(count: rowBytes * height)
         do {
+            let evaluation = EvaluationCache()
             for frame in 0..<timing.frameCount {
                 if job.isCancelled { throw ExportError.cancelled }
                 guard process.isRunning else { throw ExportError.failed(reason()) }
-                renderer.render(evaluate(project, at: timing.time(ofFrame: frame), motionBlur: .export), into: buffer)
+                renderer.render(evaluate(project, at: timing.time(ofFrame: frame), motionBlur: .export, cache: evaluation), into: buffer)
                 if alpha { unpremultiply(buffer) }
                 CVPixelBufferLockBaseAddress(buffer, .readOnly)
                 if let base = CVPixelBufferGetBaseAddress(buffer) {

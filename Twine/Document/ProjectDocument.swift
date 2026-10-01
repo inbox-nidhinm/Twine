@@ -58,9 +58,7 @@ final class ProjectDocument: NSDocument {
     nonisolated override func fileWrapper(ofType typeName: String) throws -> FileWrapper {
         let (json, thumbnail) = try MainActor.assumeIsolated { () throws -> (Data, Data?) in
             guard let store else { throw ProjectFileError.missingDocument }
-            let pictures = editorController?.media ?? MediaLibrary(locate: { [mediaURLs] in mediaURLs[$0] })
-            return (try ProjectFormat.encode(store.project), Thumbnail.png(of: store.project, pictures: pictures,
-                                                                             media: mediaURLs))
+            return (try ProjectFormat.encode(store.project), thumbnailForSaving(store.project))
         }
         let root = package ?? FileWrapper(directoryWithFileWrappers: [:])
 
@@ -223,8 +221,45 @@ final class ProjectDocument: NSDocument {
     /// Set once closed, when nothing may be staged or saved any more.
     private(set) var isClosed = false
 
+    /// Whether the thumbnail took long enough to draw to be felt as a pause
+    /// in every save (in a project of thousands of layers, a fifth of a
+    /// second or more), and whether a save has since left it as it was.
+    private var thumbnailIsSlow = false
+    private var thumbnailIsStale = false
+    /// Longer than this, and saves while editing leave the thumbnail alone.
+    private static let slowThumbnail = 0.05
+
+    /// The thumbnail to save, or nil to keep the one in the package. Only
+    /// the home screen shows it, and only once the project is closed, so
+    /// while it is slow it is drawn once, on closing, rather than with every
+    /// save a second after each edit.
+    private func thumbnailForSaving(_ project: Project) -> Data? {
+        if thumbnailIsSlow {
+            thumbnailIsStale = true
+            return nil
+        }
+        let began = CACurrentMediaTime()
+        let made = thumbnail(of: project)
+        thumbnailIsSlow = CACurrentMediaTime() - began > Self.slowThumbnail
+        thumbnailIsStale = false
+        return made
+    }
+
+    private func thumbnail(of project: Project) -> Data? {
+        let pictures = editorController?.media ?? MediaLibrary(locate: { [mediaURLs] in mediaURLs[$0] })
+        return Thumbnail.png(of: project, pictures: pictures, media: mediaURLs)
+    }
+
     override func close() {
         saveSoon?.invalidate()
+        // Saved by now, but with the thumbnail of some time before, if
+        // drawing it was slow: written into the package as the project
+        // closes, which is when the home screen comes to show it.
+        if thumbnailIsStale, !isClosed, !hasUnautosavedChanges, let url = fileURL, let project = store?.project,
+           let png = thumbnail(of: project) {
+            try? png.write(to: url.appendingPathComponent(ProjectFormat.thumbnailFileName), options: .atomic)
+            thumbnailIsStale = false
+        }
         isClosed = true
         super.close()
         // The copies made aside are in the package now, or were never

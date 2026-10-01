@@ -135,9 +135,10 @@ public enum TextLayout {
     }
 
     private static let layouts = Mutex(Generations())
-    /// Enough for every text in a busy scene, several times over, in each
-    /// generation.
-    private static let layoutLimit = 512
+    /// Enough for every text in a large scene in each generation. At 512, a
+    /// project with 630 texts (a Figma import of a few dozen screens) never
+    /// found them all, and laid most out again on every edit and frame.
+    private static let layoutLimit = 4096
 
     private static func makeFont(_ style: TextStyle) -> CTFont {
         let size = CGFloat(max(style.fontSize, 1))

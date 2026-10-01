@@ -77,32 +77,64 @@ public final class CoreAnimationRenderer: SceneRenderer {
         }
         contentLayer.backgroundColor = scene.background?.cgColor
 
-        var seen = Set<UUID>()
-        var children: [UUID?: [CALayer]] = [:]
-        for resolved in scene.layers {
-            let node = nodes[resolved.id] ?? {
-                let made = Node(scale: contentsScale)
-                made.flipsContents = flipsContents
-                nodes[resolved.id] = made
-                return made
-            }()
-            if case .text = resolved.content { node.setTextZoom(Self.textZoom(of: resolved, in: scene, scale: contentsScale)) }
-            node.update(resolved, media: media)
-            seen.insert(resolved.id)
-            children[resolved.parentID, default: []].append(node.container)
+        // Layers are read in place, by index: `for in` copied every one,
+        // which in a large project cost as much as comparing it.
+        let layers = scene.layers
+        // While every layer is where it was last time, under the same
+        // parent, the tree's shape is as it was and only the layers
+        // themselves need looking at.
+        var sameTree = layers.count == drawn.count
+        for i in layers.indices {
+            let id = layers[i].id
+            let node: Node
+            if sameTree, drawn[i].id == id, drawn[i].parent == layers[i].parentID {
+                node = drawn[i].node
+            } else {
+                sameTree = false
+                node = nodes[id] ?? {
+                    let made = Node(scale: contentsScale)
+                    made.flipsContents = flipsContents
+                    nodes[id] = made
+                    return made
+                }()
+            }
+            if case .text = layers[i].content { node.setTextZoom(Self.textZoom(of: layers[i], in: scene, scale: contentsScale)) }
+            node.update(layers[i], media: media)
         }
 
-        for (id, node) in nodes where !seen.contains(id) {
-            node.container.removeFromSuperlayer()
-            nodes[id] = nil
+        if !sameTree {
+            var seen = Set<UUID>(minimumCapacity: layers.count)
+            var children: [UUID?: [CALayer]] = [:]
+            var placed: [Drawn] = []
+            placed.reserveCapacity(layers.count)
+            for i in layers.indices {
+                guard let node = nodes[layers[i].id] else { continue }
+                seen.insert(layers[i].id)
+                children[layers[i].parentID, default: []].append(node.container)
+                placed.append(Drawn(id: layers[i].id, parent: layers[i].parentID, node: node))
+            }
+            for (id, node) in nodes where !seen.contains(id) {
+                node.container.removeFromSuperlayer()
+                nodes[id] = nil
+            }
+            Self.setSublayers(contentLayer, children[nil] ?? [])
+            for i in layers.indices {
+                guard case .group = layers[i].content, let node = nodes[layers[i].id] else { continue }
+                Self.setSublayers(node.children, children[layers[i].id] ?? [])
+            }
+            drawn = placed
         }
-
-        Self.setSublayers(contentLayer, children[nil] ?? [])
-        for resolved in scene.layers where resolved.content == .group {
-            if let node = nodes[resolved.id] { Self.setSublayers(node.children, children[resolved.id] ?? []) }
-        }
-        updateMasks(scene)
+        // Nothing to give or take away when no layer has a mask or had one.
+        if !(scene.masks.isEmpty && masks.isEmpty) { updateMasks(scene) }
     }
+
+    /// The layers as last drawn, in order, with their parents and nodes.
+    private struct Drawn {
+        let id: UUID
+        let parent: UUID?
+        let node: Node
+    }
+    private var drawn: [Drawn] = []
 
     /// Gives every masked layer its mask, drawn by a node of its own and
     /// placed in the masked layer's space, and takes masks away that have
@@ -329,15 +361,24 @@ final class Node {
         textKeys = [nil, nil]
     }
 
+    private static func refreshes(_ layer: ResolvedLayer) -> Bool {
+        switch layer.content {
+        case .video: true
+        case .shape(let shape): shape.fills.contains { $0.isImage }
+        case .group: layer.frame?.fills.contains { $0.isImage } == true
+        default: false
+        }
+    }
+
     func update(_ layer: ResolvedLayer, media: MediaProvider?) {
         // Pictures and video may arrive from the media library after the
         // layer first asks, so they are always looked at again.
-        switch layer.content {
-        case .video: last = nil
-        case .shape(let shape) where shape.fills.contains(where: \.isImage): last = nil
-        case .group where layer.frame?.fills.contains(where: \.isImage) == true: last = nil
-        default:
-            if layer == last { return }
+        if Self.refreshes(layer) {
+            last = nil
+        } else {
+            // Unwrapped first: comparing with the optional wrapped a copy
+            // of the layer every frame.
+            if let previous = last, previous == layer { return }
             last = layer
         }
         container.bounds = CGRect(origin: .zero, size: layer.size.cg)

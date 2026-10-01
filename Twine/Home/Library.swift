@@ -64,9 +64,13 @@ final class Library {
         let projects = top.filter(isProject).map { ($0, nil as URL?) }
             + found.flatMap { folder in contents(folder.url).filter(isProject).map { ($0, folder.url as URL?) } }
         let made = projects.map { url, folder in
-            let document = url.appendingPathComponent(ProjectFormat.documentFileName)
-            let modified = (try? document.resourceValues(forKeys: [.contentModificationDateKey]))?
-                .contentModificationDate ?? .distantPast
+            func modification(_ name: String) -> Date {
+                (try? url.appendingPathComponent(name).resourceValues(forKeys: [.contentModificationDateKey]))?
+                    .contentModificationDate ?? .distantPast
+            }
+            // The thumbnail counts too: a large project's is written on its
+            // own as it closes, after its last save.
+            let modified = max(modification(ProjectFormat.documentFileName), modification(ProjectFormat.thumbnailFileName))
             // Read again only when saved since: the whole document is read
             // for its size, which with many projects stuttered each time
             // the window came to the front.

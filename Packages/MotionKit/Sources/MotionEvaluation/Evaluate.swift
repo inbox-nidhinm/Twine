@@ -17,10 +17,138 @@ import MotionModel
 /// A layer moved by an action with motion blur on carries `motion`: where
 /// to draw it across the shutter, at `motionBlur`'s quality.
 public func evaluate(_ project: Project, at time: Double,
-                     motionBlur quality: MotionBlurQuality = .preview) -> ResolvedScene {
-    scene(of: project, at: time, tracks: ActionTracks(project.actions),
+                     motionBlur quality: MotionBlurQuality = .preview, cache: EvaluationCache? = nil) -> ResolvedScene {
+    scene(of: project, at: time, tracks: cache?.tracks(for: project.actions) ?? ActionTracks(project.actions),
           blur: MotionContext(samples: quality.samples, frame: project.composition.frameRate.frameDuration,
-                              exact: quality == .export))
+                              exact: quality == .export),
+          cache: cache)
+}
+
+/// What one evaluation can hand the next: the tracks, while the actions are
+/// the same, and every layer no action reaches as it was resolved, while
+/// the layer is the same. In a large project most layers never move, and
+/// working each out again every frame was most of the time a frame took
+/// (5,000 layers with 550 actions: 9.4 ms a frame).
+///
+/// One per caller (the canvas, an export), on one thread at a time.
+public final class EvaluationCache {
+    private var actions: [Action]?
+    private var madeTracks = ActionTracks([])
+    private var pictures: [UUID: Size2] = [:]
+    private var entries: [UUID: Entry] = [:]
+    private var runs: [UUID: Run] = [:]
+    /// Which evaluation each entry was last used by, so entries for layers
+    /// that went are let go.
+    private var generation = 0
+    private var used = 0
+    private var runsUsed = 0
+
+    /// A class, so looking one up copies nothing: copying the layer and
+    /// its resolved self out of the table for every layer cost more than
+    /// resolving it.
+    private final class Entry {
+        /// The layer as it was, without a group's children, which its own
+        /// resolved layer never reads.
+        let layer: Layer
+        let parent: UUID?
+        let resolved: ResolvedLayer?
+        var generation: Int
+
+        init(layer: Layer, parent: UUID?, resolved: ResolvedLayer?, generation: Int) {
+            self.layer = layer
+            self.parent = parent
+            self.resolved = resolved
+            self.generation = generation
+        }
+    }
+
+    /// A still group with everything inside it, in drawing order.
+    private final class Run {
+        let layer: Layer
+        let parent: UUID?
+        let resolved: [ResolvedLayer]
+        var generation: Int
+
+        init(layer: Layer, parent: UUID?, resolved: [ResolvedLayer], generation: Int) {
+            self.layer = layer
+            self.parent = parent
+            self.resolved = resolved
+            self.generation = generation
+        }
+    }
+
+    public init() {}
+
+    /// Comparing lists that were never changed since is immediate: they
+    /// share their storage.
+    func tracks(for actions: [Action]) -> ActionTracks {
+        if actions != self.actions {
+            self.actions = actions
+            madeTracks = ActionTracks(actions)
+        }
+        return madeTracks
+    }
+
+    func begin(pictures: [UUID: Size2]) {
+        if pictures != self.pictures {
+            self.pictures = pictures
+            entries.removeAll(keepingCapacity: true)
+            runs.removeAll(keepingCapacity: true)
+        }
+        generation += 1
+        used = 0
+        runsUsed = 0
+    }
+
+    func end() {
+        if runs.count > runsUsed * 2 + 64 {
+            runs = runs.filter { $0.value.generation == generation }
+        }
+        guard entries.count > used * 2 + 64 else { return }
+        entries = entries.filter { $0.value.generation == generation }
+    }
+
+    /// A still group and everything in it, as resolved last time, when it
+    /// and everything in it are the same.
+    func run(of group: Layer, parent: UUID?) -> [ResolvedLayer]? {
+        guard let entry = runs[group.id], entry.parent == parent, entry.layer == group else { return nil }
+        entry.generation = generation
+        used += entry.resolved.count
+        runsUsed += 1
+        return entry.resolved
+    }
+
+    func keep(_ run: [ResolvedLayer], of group: Layer, parent: UUID?) {
+        runsUsed += 1
+        runs[group.id] = Run(layer: group, parent: parent, resolved: run, generation: generation)
+    }
+
+    /// `layer` resolved as designed, from the last evaluation when it has
+    /// not changed since, else by `make`.
+    func resolved(_ layer: Layer, parent: UUID?, _ make: () -> ResolvedLayer?) -> ResolvedLayer? {
+        used += 1
+        let entry = entries[layer.id]
+        // Only a group is copied, to leave its children out.
+        if layer.isGroup, case .group(var group) = layer.content, !group.children.isEmpty {
+            group.children = []
+            var key = layer
+            key.content = .group(group)
+            if let entry, entry.parent == parent, entry.layer == key {
+                entry.generation = generation
+                return entry.resolved
+            }
+            let made = make()
+            entries[layer.id] = Entry(layer: key, parent: parent, resolved: made, generation: generation)
+            return made
+        }
+        if let entry, entry.parent == parent, entry.layer == layer {
+            entry.generation = generation
+            return entry.resolved
+        }
+        let made = make()
+        entries[layer.id] = Entry(layer: layer, parent: parent, resolved: made, generation: generation)
+        return made
+    }
 }
 
 /// What motion blur needs to know: how many copies, how long a frame is,
@@ -41,20 +169,35 @@ struct MotionContext {
 
 /// The composition as designed, with no actions applied: what Design mode
 /// shows.
-public func evaluateDesign(_ project: Project) -> ResolvedScene {
-    scene(of: project, at: 0, tracks: ActionTracks([]), blur: nil)
+public func evaluateDesign(_ project: Project, cache: EvaluationCache? = nil) -> ResolvedScene {
+    scene(of: project, at: 0, tracks: ActionTracks([]), blur: nil, cache: cache)
 }
 
-private func scene(of project: Project, at time: Double, tracks: ActionTracks, blur: MotionContext?) -> ResolvedScene {
+private func scene(of project: Project, at time: Double, tracks: ActionTracks, blur: MotionContext?,
+                   cache: EvaluationCache?) -> ResolvedScene {
     // Only worked out when some action has it, so a scene without costs one check.
     let blur = blur.flatMap { $0.samples > 1 && tracks.hasMotionBlur ? $0 : nil }
-    let all = project.allLayers
-    let soloing = all.contains { $0.isSoloed }
-    // A layer used as another's mask stops drawing on its own, and draws
-    // only through the layers it masks.
-    let maskSources = Set(all.compactMap { $0.mask?.layerID })
+    // Whether anything is soloed, and the layers used as another's mask,
+    // which stop drawing on their own and draw only through the layers
+    // they mask. Found in one pass that copies no layers.
+    var soloing = false
+    var maskSources = Set<UUID>()
+    var count = 0
+    func note(_ layers: [Layer]) {
+        // By place rather than `for in`, which copies every layer.
+        for i in layers.indices {
+            if layers[i].isSoloed { soloing = true }
+            if let mask = layers[i].mask { maskSources.insert(mask.layerID) }
+            if layers[i].isGroup { note(layers[i].children) }
+        }
+        count += layers.count
+    }
+    note(project.layers)
     let pictures = project.pictureSizes
+    cache?.begin(pictures: pictures)
+    defer { cache?.end() }
     var out: [ResolvedLayer] = []
+    out.reserveCapacity(count)
     /// The masks of the layers in `out`, by their place there, noted on the
     /// way rather than looked up afterwards: that searched the whole
     /// project for every layer, every frame, once any mask existed.
@@ -64,17 +207,54 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
         layer.children.contains { $0.isSoloed || hasSoloedDescendant($0) }
     }
 
+    /// The groups whose every layer, themselves included, no action reaches
+    /// and no mask touches: what they resolve to can only change with them.
+    var stillGroups = Set<UUID>()
+    if cache != nil, !soloing {
+        @discardableResult
+        func still(_ layers: [Layer]) -> Bool {
+            var all = true
+            for i in layers.indices {
+                var mine = tracks.isStill(layers[i].id) && layers[i].mask == nil && !maskSources.contains(layers[i].id)
+                if layers[i].isGroup {
+                    mine = still(layers[i].children) && mine
+                    if mine { stillGroups.insert(layers[i].id) }
+                }
+                all = all && mine
+            }
+            return all
+        }
+        still(project.layers)
+    }
+
     func walk(_ layers: [Layer], parent: UUID?, soloedAbove: Bool) {
         for layer in layers {
             guard layer.isVisible, !maskSources.contains(layer.id) else { continue }
             let soloed = soloedAbove || layer.isSoloed
             if soloing && !soloed && !(layer.isGroup && hasSoloedDescendant(layer)) { continue }
-            let state = tracks.state(of: layer, at: time)
-            // Hidden by an action: the layer and everything inside it.
-            guard state.isShown else { continue }
-            guard var resolved = resolve(layer, state: state, parent: parent, pictures: pictures,
-                                         animation: tracks.textAnimation(of: layer, at: time), time: time,
-                                         blur: blur) else { continue }
+            // A still group the same as last time, children and all, is
+            // what it was then. Lists never changed since compare at once.
+            let first = out.count
+            let whole = cache != nil && stillGroups.contains(layer.id)
+            if whole, let run = cache?.run(of: layer, parent: parent) {
+                out.append(contentsOf: run)
+                continue
+            }
+            defer { if whole { cache?.keep(Array(out[first...]), of: layer, parent: parent) } }
+            let made: ResolvedLayer?
+            if let cache, tracks.isStill(layer.id) {
+                made = cache.resolved(layer, parent: parent) {
+                    resolve(layer, state: LayerState(design: layer), parent: parent, pictures: pictures,
+                            animation: nil, time: time)
+                }
+            } else {
+                let state = tracks.state(of: layer, at: time)
+                // Hidden by an action: the layer and everything inside it.
+                guard state.isShown else { continue }
+                made = resolve(layer, state: state, parent: parent, pictures: pictures,
+                               animation: tracks.textAnimation(of: layer, at: time), time: time, blur: blur)
+            }
+            guard var resolved = made else { continue }
             if let blur { resolved.motion = motion(of: layer, resolved, tracks: tracks, at: time, blur) }
             if let mask = layer.mask { masked.append((out.count, mask)) }
             out.append(resolved)
@@ -84,6 +264,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
     walk(project.layers, parent: nil, soloedAbove: false)
 
     if !maskSources.isEmpty {
+        let all = project.allLayers
         var world = WorldTransforms(all: all, tracks: tracks, time: time, pictures: pictures, known: out)
         var masks: [ResolvedLayer] = []
         for id in maskSources {

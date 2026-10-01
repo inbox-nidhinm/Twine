@@ -415,7 +415,9 @@ enum SelfTest {
                 step(); return
             case "perfdragat":
                 // Presses at (n[0], n[1]) and drags right a point a step for n[2] steps.
+                let pressed = CACurrentMediaTime()
                 mouse(.leftMouseDown, n[0], n[1])
+                log(String(format: "PERF press %.1f ms", (CACurrentMediaTime() - pressed) * 1000))
                 let began = CACurrentMediaTime()
                 var k = 0
                 var worst = 0.0

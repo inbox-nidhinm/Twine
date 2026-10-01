@@ -146,3 +146,106 @@ struct PerformanceTests {
         print("BENCH offscreen 1080p frame: \(ms(CACurrentMediaTime() - start, frames: 60))")
     }
 }
+
+/// A very large project, as a Figma import makes: `frames` frames of about
+/// `count / frames` layers each (shapes, text, groups of four), with only
+/// `actions` actions, on the first layers found.
+func largeProject(layers count: Int = 5000, frames: Int = 50, actions: Int = 550) -> Project {
+    let base = stressProject(layers: count * 4 / 5)
+    var kept: [Action] = []
+    for action in base.actions where kept.count < actions {
+        kept.append(action)
+        
+    }
+    let per = max(1, base.layers.count / frames)
+    let framed = stride(from: 0, to: base.layers.count, by: per).enumerated().map { n, i in
+        var frame = Layer(name: "Frame \(n)",
+                          content: .group(GroupContent(children: Array(base.layers[i..<min(i + per, base.layers.count)]),
+                                                       clipsContent: true,
+                                                       frame: FrameStyle(fills: [Fill(paint: .solid(.white))]))),
+                          size: Size2(1920, 1080), position: .zero)
+        frame.transform.anchor = .zero
+        return frame
+    }
+    return Project(composition: base.composition, layers: framed, actions: kept)
+}
+
+extension PerformanceTests {
+    /// `TWINE_BENCH=1 TWINE_BENCH_LARGE=1 swift test -c release --filter largeStages`
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["TWINE_BENCH_LARGE"] != nil))
+    func largeStages() throws {
+        let project = largeProject()
+        print("BENCH large scene: \(project.allLayers.count) layers, \(project.actions.count) actions")
+        if let out = ProcessInfo.processInfo.environment["TWINE_BENCH_OUT"] {
+            try ProjectFormat.encode(project).write(to: URL(fileURLWithPath: out))
+        }
+        let frames = 60
+        let times = (0..<frames).map { Double($0) / 60 * 2.5 }
+
+        var start = CACurrentMediaTime()
+        let data = try ProjectFormat.encode(project)
+        print("BENCH large encode: \(ms(CACurrentMediaTime() - start, frames: 1)), \(data.count / 1024) KB")
+        start = CACurrentMediaTime()
+        _ = try ProjectFormat.decode(data)
+        print("BENCH large decode: \(ms(CACurrentMediaTime() - start, frames: 1))")
+
+        start = CACurrentMediaTime()
+        for _ in 0..<20 { _ = project.allLayers }
+        print("BENCH large allLayers: \(ms(CACurrentMediaTime() - start, frames: 20))")
+
+        start = CACurrentMediaTime()
+        var scenes: [ResolvedScene] = []
+        for t in times { scenes.append(evaluate(project, at: t)) }
+        print("BENCH large evaluate: \(ms(CACurrentMediaTime() - start, frames: frames))")
+
+        let cache = EvaluationCache()
+        _ = evaluate(project, at: 0, cache: cache)
+        start = CACurrentMediaTime()
+        for t in times { _ = evaluate(project, at: t, cache: cache) }
+        print("BENCH large evaluate, cached: \(ms(CACurrentMediaTime() - start, frames: frames))")
+
+        start = CACurrentMediaTime()
+        for _ in 0..<10 { _ = evaluateDesign(project) }
+        print("BENCH large evaluateDesign: \(ms(CACurrentMediaTime() - start, frames: 10))")
+        var edited = project
+        start = CACurrentMediaTime()
+        for i in 0..<10 {
+            // A drag step: one layer moves.
+            edited.layers[i].transform.position.x += 1
+            _ = evaluateDesign(edited, cache: cache)
+        }
+        print("BENCH large evaluateDesign, cached, one layer moving: \(ms(CACurrentMediaTime() - start, frames: 10))")
+        start = CACurrentMediaTime()
+        for _ in 0..<20 { _ = ActionTracks(project.actions) }
+        print("BENCH large ActionTracks build: \(ms(CACurrentMediaTime() - start, frames: 20))")
+
+        let renderer = CoreAnimationRenderer()
+        start = CACurrentMediaTime()
+        renderer.render(scenes[0])
+        print("BENCH large first layer tree: \(ms(CACurrentMediaTime() - start, frames: 1))")
+        start = CACurrentMediaTime()
+        for scene in scenes { renderer.render(scene) }
+        print("BENCH large layer tree update: \(ms(CACurrentMediaTime() - start, frames: frames))")
+        start = CACurrentMediaTime()
+        for _ in 0..<frames { renderer.render(scenes[frames - 1]) }
+        print("BENCH large layer tree, nothing changed: \(ms(CACurrentMediaTime() - start, frames: frames))")
+
+        let offscreen = try #require(OffscreenRenderer(pixelWidth: 1920, pixelHeight: 1080))
+        var buffer: CVPixelBuffer?
+        CVPixelBufferCreate(nil, 1920, 1080, kCVPixelFormatType_32BGRA,
+                            [kCVPixelBufferIOSurfacePropertiesKey: [String: Any]()] as CFDictionary, &buffer)
+        let pixels = try #require(buffer)
+        offscreen.render(scenes[0], into: pixels)
+        start = CACurrentMediaTime()
+        for scene in scenes.prefix(20) { offscreen.render(scene, into: pixels) }
+        print("BENCH large offscreen 1080p frame: \(ms(CACurrentMediaTime() - start, frames: 20))")
+
+        let thumbnail = try #require(OffscreenRenderer(pixelWidth: 320, pixelHeight: 180))
+        start = CACurrentMediaTime()
+        _ = thumbnail.image(of: scenes[0])
+        print("BENCH large thumbnail, first: \(ms(CACurrentMediaTime() - start, frames: 1))")
+        start = CACurrentMediaTime()
+        for _ in 0..<5 { _ = thumbnail.image(of: evaluate(project, at: 0)) }
+        print("BENCH large thumbnail, again: \(ms(CACurrentMediaTime() - start, frames: 5))")
+    }
+}

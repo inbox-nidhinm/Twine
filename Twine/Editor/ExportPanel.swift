@@ -497,12 +497,13 @@ private struct ExportPreview: NSViewRepresentable {
     func updateNSView(_ view: ExportPreviewView, context: Context) {
         var project = controller.project
         if !keepsTransparency { project.composition.background.isTransparent = false }
-        view.show(design ? evaluateDesign(project) : evaluate(project, at: time))
+        view.show(design ? evaluateDesign(project, cache: view.evaluation) : evaluate(project, at: time, cache: view.evaluation))
     }
 }
 
 final class ExportPreviewView: NSView {
     private let renderer = CoreAnimationRenderer()
+    let evaluation = EvaluationCache()
     private let world = CALayer()
     private let backdrop = CALayer()
     private var size = Size2(1, 1)

@@ -990,7 +990,7 @@ private struct MaskSection: View {
                     IconButton(icon: .plus, help: "Show this layer only where another layer draws") {
                         menus.show(entries(), at: CGPoint(x: addFrame.maxX - Theme.menuMinWidth, y: addFrame.maxY + 4))
                     }
-                    .disabled(candidates.isEmpty)
+                    .disabled(!controller.project.hasMaskCandidates(for: layer.id))
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { addFrame = $0 }
                 } else {
                     IconButton(icon: .minus, help: "Remove the mask") { set(nil) }

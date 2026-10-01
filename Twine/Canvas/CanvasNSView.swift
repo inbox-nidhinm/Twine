@@ -43,6 +43,8 @@ final class CanvasNSView: NSView {
     private var compositionSize: Size2?
 
     private(set) var scene: ResolvedScene?
+    /// Keeps the layers no action moves from one scene to the next.
+    private let evaluation = EvaluationCache()
     private(set) var project: Project?
     private(set) var selection: [UUID] = []
     private(set) var tool: Tool = .select
@@ -148,7 +150,7 @@ final class CanvasNSView: NSView {
             self.tool = tool
             window?.invalidateCursorRects(for: self)
         }
-        let scene = animating ? evaluate(project, at: time) : evaluateDesign(project)
+        let scene = animating ? evaluate(project, at: time, cache: evaluation) : evaluateDesign(project, cache: evaluation)
         self.scene = scene
         if compositionSize != scene.size {
             // A new size means the old zoom no longer frames anything useful.
@@ -459,23 +461,29 @@ final class CanvasNSView: NSView {
     func layer(at point: Vec2, deep: Bool) -> UUID? {
         guard let scene, let controller else { return nil }
         let tolerance = 5 / zoom
+        // Found once: asking for each layer searched the whole project for
+        // its groups, which over thousands of layers took seconds a click.
+        let locked = controller.project.lockedLayers
         for id in selection {
-            guard let mask = scene.mask(id), !controller.isLocked(id),
+            guard let mask = scene.mask(id), !locked.contains(id),
                   let world = scene.worldProjection(of: id), let local = world.inverted?.apply(point) else { continue }
             if hits(mask, at: local.cg, tolerance: tolerance / max(sqrt(abs(world.determinant)), 1e-6)) {
                 return id
             }
         }
-        for resolved in scene.layers.reversed() {
+        // By place, front first: `reversed()` and `for in` copied every
+        // layer looked at.
+        let layers = scene.layers
+        for i in layers.indices.reversed() {
             // A plain group draws nothing of its own; a frame does.
             // Through what is drawn, tilts and all, so a click lands on what it sees.
-            guard resolved.content != .group || resolved.frame != nil, !controller.isLocked(resolved.id),
-                  let world = scene.worldProjection(of: resolved.id), let local = world.inverted?.apply(point)?.cg else { continue }
+            guard layers[i].content != .group || layers[i].frame != nil, !locked.contains(layers[i].id),
+                  let world = scene.worldProjection(of: layers[i].id), let local = world.inverted?.apply(point)?.cg else { continue }
             // Scale the tolerance into the layer's space, so it is the same
             // few screen points whatever the layer's own scale.
             let localTolerance = tolerance / max(sqrt(abs(world.determinant)), 1e-6)
-            guard hits(resolved, at: local, tolerance: localTolerance), shows(resolved, at: local, in: scene) else { continue }
-            return deep ? resolved.id : inContext(resolved.id)
+            guard hits(layers[i], at: local, tolerance: localTolerance), shows(layers[i], at: local, in: scene) else { continue }
+            return deep ? layers[i].id : inContext(layers[i].id)
         }
         return nil
     }
@@ -500,6 +508,11 @@ final class CanvasNSView: NSView {
         let outline: ResolvedShape?
         if case .shape(let s) = resolved.content { outline = s } else { outline = resolved.frame }
         if let shape = outline {
+            // A shape's path lies within its box, so a point beyond the box
+            // and its widest stroke misses without the path being made, which
+            // for every layer under a moving pointer was most of the work.
+            let reach = (shape.strokes.map(\.width).max() ?? 0) / 2 + tolerance
+            guard CGRect(origin: .zero, size: resolved.size.cg).insetBy(dx: -reach, dy: -reach).contains(local) else { return false }
             let path = shape.path.cgPath
             if shape.isClosed && (!shape.fills.isEmpty || shape.strokes.isEmpty) && path.contains(local, using: shape.fillRule.cg) {
                 return true
@@ -538,7 +551,8 @@ final class CanvasNSView: NSView {
     /// layer drawn there goes into.
     func frame(under point: Vec2) -> UUID? {
         guard let scene, let controller else { return nil }
-        for resolved in scene.layers.reversed() where resolved.frame != nil && !controller.isLocked(resolved.id) {
+        let locked = controller.project.lockedLayers
+        for resolved in scene.layers.reversed() where resolved.frame != nil && !locked.contains(resolved.id) {
             guard let inverse = scene.worldTransform(of: resolved.id)?.inverted else { continue }
             if CGRect(origin: .zero, size: resolved.size.cg).contains(inverse.apply(point).cg) { return resolved.id }
         }
@@ -890,12 +904,24 @@ final class CanvasNSView: NSView {
     /// The boxes of every drawn layer except those in `moving` and anything
     /// inside them. Groups are left out: their layers are there instead.
     func targets(excluding moving: Set<UUID>) -> [Box] {
-        guard let scene, let project else { return [] }
+        guard let scene else { return [] }
         snap = nil
-        return scene.layers.compactMap { layer in
-            guard layer.content != .group || layer.frame != nil, !moving.contains(layer.id),
-                  project.ancestors(of: layer.id).allSatisfy({ !moving.contains($0) }) else { return nil }
-            return scene.bounds(of: layer.id)
+        // Groups found through the scene, a step at a time: asking the
+        // project for each layer's searched the whole tree every time, and
+        // a press in a project of 5,000 layers stuck for seconds.
+        func carried(_ id: UUID) -> Bool {
+            var parent = scene.parentID(of: id)
+            while let p = parent {
+                if moving.contains(p) { return true }
+                parent = scene.parentID(of: p)
+            }
+            return false
+        }
+        let layers = scene.layers
+        return layers.indices.compactMap { i in
+            guard layers[i].content != .group || layers[i].frame != nil, !moving.contains(layers[i].id),
+                  !carried(layers[i].id) else { return nil }
+            return scene.bounds(of: layers[i].id)
         }
     }
 

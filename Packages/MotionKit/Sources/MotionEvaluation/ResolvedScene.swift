@@ -57,26 +57,35 @@ public struct ResolvedScene: Sendable, Equatable {
     /// From a layer's own space into composition space, through every group
     /// it sits inside.
     public func worldTransform(of id: UUID) -> Affine? {
-        guard let layer = layer(id) else { return nil }
-        var transform = layer.transform
-        var parent = layer.parentID
-        while let pid = parent, let p = self.layer(pid) {
-            transform = transform.then(p.transform)
-            parent = p.parentID
+        guard var slot = index[id] else { return nil }
+        // Read in place: copying each layer out to read its transform cost
+        // more than the sums, for every layer a click or a drag looks at.
+        var transform = slot.isMask ? masks[slot.position].transform : layers[slot.position].transform
+        while let pid = parentID(at: slot), let up = index[pid] {
+            slot = up
+            transform = transform.then(slot.isMask ? masks[slot.position].transform : layers[slot.position].transform)
         }
         return transform
+    }
+
+    /// The group or frame a layer sits in, read without copying the layer.
+    public func parentID(of id: UUID) -> UUID? {
+        index[id].flatMap(parentID(at:))
+    }
+
+    private func parentID(at slot: Slot) -> UUID? {
+        slot.isMask ? masks[slot.position].parentID : layers[slot.position].parentID
     }
 
     /// From a layer's own space into composition space as it is drawn,
     /// through every group, tilts and all. Clicks and outlines follow this;
     /// editing works in `worldTransform`, which is flat.
     public func worldProjection(of id: UUID) -> Projective? {
-        guard let layer = layer(id) else { return nil }
-        var transform = layer.projection
-        var parent = layer.parentID
-        while let pid = parent, let p = self.layer(pid) {
-            transform = transform.then(p.projection)
-            parent = p.parentID
+        guard var slot = index[id] else { return nil }
+        var transform = slot.isMask ? masks[slot.position].projection : layers[slot.position].projection
+        while let pid = parentID(at: slot), let up = index[pid] {
+            slot = up
+            transform = transform.then(slot.isMask ? masks[slot.position].projection : layers[slot.position].projection)
         }
         return transform
     }
@@ -85,8 +94,9 @@ public struct ResolvedScene: Sendable, Equatable {
     /// the top-left, after rotation, scale, skew and tilt. Nil when a corner
     /// is turned past the viewer.
     public func worldCorners(of id: UUID) -> [Vec2]? {
-        guard let layer = layer(id), let world = worldProjection(of: id) else { return nil }
-        let corners = Box(origin: .zero, size: layer.size).corners.compactMap(world.apply)
+        guard let slot = index[id], let world = worldProjection(of: id) else { return nil }
+        let size = slot.isMask ? masks[slot.position].size : layers[slot.position].size
+        let corners = Box(origin: .zero, size: size).corners.compactMap(world.apply)
         return corners.count == 4 ? corners : nil
     }
 
@@ -99,7 +109,8 @@ public struct ResolvedScene: Sendable, Equatable {
         guard let layer = layer(id) else { return nil }
         // A frame's box is its own, as in Figma, whatever is inside it.
         guard layer.content == .group, layer.frame == nil else { return worldCorners(of: id).flatMap { Box(around: $0) } }
-        let inside = layers.filter { $0.parentID == id }.compactMap { bounds(of: $0.id) }
+        // By place, so no layer is copied out to be looked at.
+        let inside = layers.indices.filter { layers[$0].parentID == id }.compactMap { bounds(of: layers[$0].id) }
         guard let first = inside.first else { return nil }
         let all = inside.dropFirst().reduce(first) { $0.union($1) }
         guard layer.clipsContent, let own = worldCorners(of: id).flatMap({ Box(around: $0) }) else { return all }

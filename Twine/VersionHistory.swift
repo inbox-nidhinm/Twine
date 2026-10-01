@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 159
+    static let pushes = 160
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -48,6 +48,11 @@ enum VersionHistory {
             "Search in the preset picker. It opens ready to type: \"slide\" or \"blur\" narrows the tiles to the presets named so (their Out names and groups count too), and Return adds the first.",
             "New Project on the home screen, or ⌘N there, makes the project in the folder you are looking at.",
         ], fixes: [
+            "Very large projects are far quicker. In a project of 5,000 layers with 550 actions, playback runs at a full 60 frames a second (it was 25), scrubbing keeps up (8 ms a step, from 105), dragging a layer takes about 25 ms a step (from 50), and each edit is applied in under 2 ms. Twine now keeps everything no action moves as it was worked out last time, rather than working all of it out again every frame.",
+            "Pressing on the canvas in a project with thousands of layers no longer freezes Twine for several seconds before a drag starts. Lining up the snapping guides looked up every layer's groups by searching the whole project, once per layer.",
+            "Pointing at and clicking layers stays quick in a project with thousands of layers. Each layer under the pointer was checked for a locked group by searching the whole project.",
+            "Saving a very large project no longer pauses Twine for half a second after each edit. Its picture on the home screen is drawn as the project closes, rather than with every save.",
+            "Projects with more than 512 texts no longer lay all their text out again on every edit and frame.",
             "The colour picker follows a colour taken from the eyedropper or typed as a hex: its square and bars stayed on the colour it opened with.",
             "Duplicating or pasting a layer keeps motion blur on its actions. It was switched off on the copies.",
         ], misc: [

@@ -46,8 +46,8 @@ public enum Snapping {
         var result = Result.unsnapped
         for axis in [Axis.x, .y] where axes.contains(axis) {
             let span = Span(box, axis)
-            var candidates = lines(span.values, box: box, targets: targets, frame: frame, axis: axis)
-            candidates += spacing(box, targets: targets, axis: axis)
+            var candidates = lines(span.values, box: box, targets: targets, frame: frame, axis: axis, within: threshold)
+            candidates += spacing(box, targets: targets, axis: axis, within: threshold)
             guard let best = nearest(candidates, threshold: threshold) else { continue }
             apply(best, candidates, axis: axis, box: box, to: &result)
         }
@@ -62,7 +62,7 @@ public enum Snapping {
         var result = Result.unsnapped
         for axis in [Axis.x, .y] where axes.contains(axis) {
             let value = axis == .x ? p.x : p.y
-            let candidates = lines([value], box: box, targets: targets, frame: frame, axis: axis)
+            let candidates = lines([value], box: box, targets: targets, frame: frame, axis: axis, within: threshold)
             guard let best = nearest(candidates, threshold: threshold) else { continue }
             apply(best, candidates, axis: axis, box: box, to: &result)
         }
@@ -95,16 +95,24 @@ public enum Snapping {
 
     /// Edges and centres: each of `values` against each target's and the
     /// frame's edges and centre.
-    private static func lines(_ values: [Double], box: Box, targets: [Box], frame: Box, axis: Axis) -> [Candidate] {
+    ///
+    /// Only candidates within `reach` are kept: no other can win or be shown
+    /// beside the winner, and with thousands of targets making every one
+    /// was most of each drag step.
+    private static func lines(_ values: [Double], box: Box, targets: [Box], frame: Box, axis: Axis,
+                              within reach: Double) -> [Candidate] {
         var out: [Candidate] = []
-        for (target, isFrame) in targets.map({ ($0, false) }) + [(frame, true)] {
+        let reach = reach + 1e-6
+        func add(_ target: Box) {
             let t = Span(target, axis)
-            for tv in t.values {
-                for v in values {
-                    out.append(Candidate(offset: tv - v, guide: (tv, isFrame ? frame : target)))
+            for tv in [t.low, t.mid, t.high] {
+                for v in values where abs(tv - v) <= reach {
+                    out.append(Candidate(offset: tv - v, guide: (tv, target)))
                 }
             }
         }
+        for target in targets { add(target) }
+        add(frame)
         return out
     }
 
@@ -112,7 +120,8 @@ public enum Snapping {
     /// overlapping it across the axis): centred between its nearest
     /// neighbours either side, or one gap on from a neighbour, where the
     /// gap is one the neighbours already keep between themselves.
-    private static func spacing(_ box: Box, targets: [Box], axis: Axis) -> [Candidate] {
+    private static func spacing(_ box: Box, targets: [Box], axis: Axis, within reach: Double) -> [Candidate] {
+        let reach = reach + 1e-6
         let me = Span(box, axis)
         let row = targets.map { Span($0, axis) }.filter { $0.crossHigh > me.crossLow && $0.crossLow < me.crossHigh }
         guard !row.isEmpty else { return [] }
@@ -126,7 +135,8 @@ public enum Snapping {
             return Gap(axis: axis, start: a, end: b, cross: (lo + hi) / 2)
         }
 
-        if let before, let after, after.low - before.high > size {
+        if let before, let after, after.low - before.high > size,
+           abs((before.high + after.low - size) / 2 - me.low) <= reach {
             let low = (before.high + after.low - size) / 2
             let moved = Span(shifted(box, axis, by: low - me.low), axis)
             out.append(Candidate(offset: low - me.low, guide: nil,
@@ -134,27 +144,32 @@ public enum Snapping {
                                         gap(low + size, after.low, across: moved, after)]))
         }
 
-        // Gaps the row already keeps between neighbours.
+        // Gaps the row already keeps between neighbours: each with the first
+        // after it, in order, that starts past its end. The order is by
+        // start, so that one is found by halving rather than by looking
+        // through the rest, which was a pass over the row for every one.
         let sorted = row.sorted { $0.low < $1.low }
-        var pairs: [(Span, Span)] = []
         for (i, a) in sorted.enumerated() {
-            if let b = sorted[(i + 1)...].first(where: { $0.low >= a.high }) { pairs.append((a, b)) }
-        }
-        for (a, b) in pairs {
+            var lo = i + 1, hi = sorted.count
+            while lo < hi {
+                let m = (lo + hi) / 2
+                if sorted[m].low >= a.high { hi = m } else { lo = m + 1 }
+            }
+            guard lo < sorted.count else { continue }
+            let b = sorted[lo]
             let g = b.low - a.high
             guard g > 0 else { continue }
-            let shown = gap(a.high, b.low, across: a, b)
-            if let before {
+            if let before, abs(before.high + g - me.low) <= reach {
                 let low = before.high + g
                 let moved = Span(shifted(box, axis, by: low - me.low), axis)
                 out.append(Candidate(offset: low - me.low, guide: nil,
-                                     gaps: [shown, gap(before.high, low, across: before, moved)]))
+                                     gaps: [gap(a.high, b.low, across: a, b), gap(before.high, low, across: before, moved)]))
             }
-            if let after {
+            if let after, abs(after.low - g - size - me.low) <= reach {
                 let low = after.low - g - size
                 let moved = Span(shifted(box, axis, by: low - me.low), axis)
                 out.append(Candidate(offset: low - me.low, guide: nil,
-                                     gaps: [shown, gap(low + size, after.low, across: moved, after)]))
+                                     gaps: [gap(a.high, b.low, across: a, b), gap(low + size, after.low, across: moved, after)]))
             }
         }
         return out

@@ -61,8 +61,12 @@ final class EditorController {
     /// What the canvas shows: the design in Design mode, the moment at the
     /// playhead in Animate mode. Cheap enough to work out on demand.
     var scene: ResolvedScene {
-        editor.mode == .animate ? evaluate(store.project, at: editor.time) : evaluateDesign(store.project)
+        editor.mode == .animate ? evaluate(store.project, at: editor.time, cache: evaluation)
+            : evaluateDesign(store.project, cache: evaluation)
     }
+    /// Keeps the layers no action moves from one scene to the next, which in
+    /// a large project is most of the work.
+    private let evaluation = EvaluationCache()
 
     // MARK: Modes
 
@@ -90,12 +94,24 @@ final class EditorController {
 
     /// The selection with anything that no longer exists left out, such as a
     /// layer an undo just took away.
+    /// The selected layers' ids, in the layers' order. Read by walking the
+    /// tree in place: copying every layer out to filter them took a
+    /// millisecond a call in a large project, and the panels ask often.
     var selection: [UUID] {
-        let all = project.allLayers.map(\.id)
-        return all.filter(editor.selection.contains)
+        let picked = editor.selection
+        guard !picked.isEmpty else { return [] }
+        var out: [UUID] = []
+        project.forEachLayer { if picked.contains($0.id) { out.append($0.id) } }
+        return out
     }
 
-    var selectedLayers: [Layer] { selection.compactMap(project.layer(withID:)) }
+    var selectedLayers: [Layer] {
+        let picked = editor.selection
+        guard !picked.isEmpty else { return [] }
+        var out: [Layer] = []
+        project.forEachLayer { if picked.contains($0.id) { out.append($0) } }
+        return out
+    }
 
     func select(_ ids: [UUID], extending: Bool = false) {
         if extending {
@@ -125,10 +141,7 @@ final class EditorController {
 
     /// Whether a layer or anything above it is locked, so it cannot be picked
     /// on the canvas.
-    func isLocked(_ id: UUID) -> Bool {
-        let chain = project.ancestors(of: id) + [id]
-        return chain.contains { project.layer(withID: $0)?.isLocked == true }
-    }
+    func isLocked(_ id: UUID) -> Bool { project.isLocked(id) }
 
     // MARK: Running commands
 
@@ -1168,7 +1181,25 @@ final class EditorController {
     /// inside another selected one, and not locked. Design only: in Animate
     /// the canvas shows a moment, not the layout.
     private var arrangeable: [Layer] {
-        editor.mode == .design ? topmost(selectedLayers).filter { !isLocked($0.id) } : []
+        guard editor.mode == .design else { return [] }
+        let picked = editor.selection
+        guard !picked.isEmpty else { return [] }
+        // One walk, rather than the selection, its groups and their locks
+        // each searched for: the inspector asks on every redraw.
+        var out: [Layer] = []
+        func walk(_ list: [Layer], locked: Bool) {
+            for i in list.indices {
+                let lockedHere = locked || list[i].isLocked
+                if picked.contains(list[i].id) {
+                    // What it holds moves with it.
+                    if !lockedHere { out.append(list[i]) }
+                } else if list[i].isGroup {
+                    walk(list[i].children, locked: lockedHere)
+                }
+            }
+        }
+        walk(project.layers, locked: false)
+        return out
     }
 
     var canAlign: Bool { !arrangeable.isEmpty }
@@ -1218,8 +1249,18 @@ final class EditorController {
 
     /// Of a set of layers, the ones not inside another one of the set.
     func topmost(_ layers: [Layer]) -> [Layer] {
+        guard layers.count > 1 else { return layers }
         let ids = Set(layers.map(\.id))
-        return layers.filter { Set(project.ancestors(of: $0.id)).isDisjoint(with: ids) }
+        // Every parent found once, rather than each layer's groups searched for.
+        let parents = project.parents
+        return layers.filter { layer in
+            var parent = parents[layer.id]
+            while let p = parent {
+                if ids.contains(p) { return false }
+                parent = parents[p]
+            }
+            return true
+        }
     }
 
     // MARK: Clipboard

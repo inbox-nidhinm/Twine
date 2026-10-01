@@ -347,6 +347,10 @@ public struct ActionTracks: Sendable {
 
     public var isEmpty: Bool { tracks.isEmpty }
 
+    /// Whether no action reaches the layer, so it is as designed at every
+    /// moment.
+    func isStill(_ layer: UUID) -> Bool { tracks[layer] == nil && textPresets[layer] == nil }
+
     /// Whether any action has motion blur on, text presets included.
     public var hasMotionBlur: Bool {
         !blurs.isEmpty || textPresets.values.contains { $0.contains { ($0.action.motionBlur ?? 0) > 0 } }

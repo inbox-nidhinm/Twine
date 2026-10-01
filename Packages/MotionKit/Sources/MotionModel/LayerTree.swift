@@ -7,26 +7,91 @@ extension Project {
     }
 
     /// Every layer, parents before their children, back to front.
+    ///
+    /// Every layer is copied into the list, which in a project of thousands
+    /// takes a millisecond: anything that only looks goes through
+    /// `forEachLayer` instead.
     public var allLayers: [Layer] {
         var out: [Layer] = []
+        forEachLayer { out.append($0) }
+        return out
+    }
+
+    /// Visits every layer, parents before their children, back to front,
+    /// reading each where it is rather than copying it out. (`for in`
+    /// copies every layer it passes, and the trees here are searched for
+    /// every layer on screen.)
+    @inlinable
+    public func forEachLayer(_ body: (Layer) -> Void) {
+        // Through the list's own storage, so each layer is lent to `body`
+        // where it lies: handed over by index, every one was copied.
         func walk(_ list: [Layer]) {
-            for layer in list {
-                out.append(layer)
-                walk(layer.children)
+            list.withUnsafeBufferPointer { layers in
+                for i in layers.indices {
+                    body(layers[i])
+                    if layers[i].isGroup { walk(layers[i].children) }
+                }
             }
         }
         walk(layers)
-        return out
     }
 
     /// Where a layer sits: its parent group's id (nil at the top level) and its
     /// index among its siblings.
     public func location(of id: UUID) -> (parentID: UUID?, index: Int)? {
-        if let index = layers.firstIndex(where: { $0.id == id }) { return (nil, index) }
-        for layer in allLayers where layer.isGroup {
-            if let index = layer.children.firstIndex(where: { $0.id == id }) { return (layer.id, index) }
+        func look(in list: [Layer], parent: UUID?) -> (parentID: UUID?, index: Int)? {
+            for i in list.indices where list[i].id == id { return (parent, i) }
+            for i in list.indices where list[i].isGroup {
+                if let found = look(in: list[i].children, parent: list[i].id) { return found }
+            }
+            return nil
         }
-        return nil
+        return look(in: layers, parent: nil)
+    }
+
+    /// Every layer that is locked or sits in a locked group, which can be
+    /// neither picked nor moved on the canvas.
+    public var lockedLayers: Set<UUID> {
+        var out = Set<UUID>()
+        func walk(_ list: [Layer], locked: Bool) {
+            for i in list.indices {
+                let mine = locked || list[i].isLocked
+                if mine { out.insert(list[i].id) }
+                if list[i].isGroup { walk(list[i].children, locked: mine) }
+            }
+        }
+        walk(layers, locked: false)
+        return out
+    }
+
+    /// Whether a layer is locked or sits in a locked group: one walk, where
+    /// asking for its groups and then each of them searched the tree once
+    /// for each.
+    public func isLocked(_ id: UUID) -> Bool {
+        func look(in list: [Layer], locked: Bool) -> Bool? {
+            for i in list.indices {
+                let mine = locked || list[i].isLocked
+                if list[i].id == id { return mine }
+                if list[i].isGroup, let found = look(in: list[i].children, locked: mine) { return found }
+            }
+            return nil
+        }
+        return look(in: layers, locked: false) ?? false
+    }
+
+    /// Every layer's parent group, by id, for anything that asks for many
+    /// layers' places at once: asking `location(of:)` for each searched
+    /// the whole tree every time.
+    public var parents: [UUID: UUID] {
+        var out: [UUID: UUID] = [:]
+        func walk(_ list: [Layer], parent: UUID?) {
+            for i in list.indices {
+                if let parent { out[list[i].id] = parent }
+                if list[i].isGroup { walk(list[i].children, parent: list[i].id) }
+            }
+        }
+        walk(layers, parent: nil)
+        return out
     }
 
     /// The ids of every group between the top level and this layer, outermost
@@ -76,9 +141,9 @@ extension Project {
     }
 
     private static func find(_ id: UUID, in list: [Layer]) -> Layer? {
-        for layer in list {
-            if layer.id == id { return layer }
-            if let hit = find(id, in: layer.children) { return hit }
+        for i in list.indices {
+            if list[i].id == id { return list[i] }
+            if list[i].isGroup, let hit = find(id, in: list[i].children) { return hit }
         }
         return nil
     }
