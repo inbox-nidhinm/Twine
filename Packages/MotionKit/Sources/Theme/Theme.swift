@@ -6,7 +6,7 @@ import AppKit
 /// Taken from the "Flip Design System" page of the JUI Figma file
 /// (2XErpBfGuIGNU0DkL58Ute, node 171:2055), whose values in turn come from
 /// Flip's `FlipTheme`. The one deliberate difference is the accent: Twine is
-/// light blue where Flip is green, and the two tokens derived from the accent
+/// blue where Flip is green, and the two tokens derived from the accent
 /// (`rowSelected`, `accentHover`) are re-derived to match.
 ///
 /// Views read these and never write a literal. If a view needs a value that is
@@ -35,14 +35,14 @@ public enum Theme {
 
     // MARK: Accent (accent/*, row/*)
 
-    /// #4C9FEF. Everything that means *selected* or *in hand* reads this: rows,
+    /// #217FD8. Everything that means *selected* or *in hand* reads this: rows,
     /// the tool in hand, and the canvas's outlines, handles and marquee. One
     /// constant, so they cannot disagree. The inspector's controls stay out of
     /// it (they use `chosen`), so the panel reads as one quiet surface.
-    public static let accent = Color(red: 0x4C / 255, green: 0x9F / 255, blue: 0xEF / 255)
-    /// The accent under the pointer. Lighter rather than darker, because a
-    /// step down would read as disabled.
-    public static let accentHover = Color(red: 0x6E / 255, green: 0xB3 / 255, blue: 0xF3 / 255)
+    public static let accent = Color(red: 0x21 / 255, green: 0x7F / 255, blue: 0xD8 / 255)
+    /// #4D99E0, the accent under the pointer: a fifth of the way to white.
+    /// Lighter rather than darker, because a step down would read as disabled.
+    public static let accentHover = Color(red: 0x4D / 255, green: 0x99 / 255, blue: 0xE0 / 255)
     /// #33506C. A selected row. Mixed by eye rather than as the accent at some
     /// opacity over `panel`, which comes out greyer than the accent reads.
     public static let rowSelected = Color(red: 0x33 / 255, green: 0x50 / 255, blue: 0x6C / 255)

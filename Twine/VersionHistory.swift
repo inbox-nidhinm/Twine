@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 177
+    static let pushes = 178
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -50,6 +50,7 @@ enum VersionHistory {
             "Page Curl, a new preset in a new Flip group: the layer curls away from a corner like a page of Apple Books, as the pictures turn in Flip's onboarding, showing what is under it, with the back of the page in a lighter shade of the layer's colour and a shadow travelling with the fold. Out curls it off, In lays it down; pick the corner it lifts from in its settings. Half a second, eased in and out as Flip's is, and the same on the canvas and in exports.",
             "Page Turn, beside it in the Flip group: the layer swings on one edge like a page on its spine, the free edge lifting towards you until it is edge-on (Out), or coming down from the far side (In), as the onboarding's pages do. Pick the edge it hinges on in its settings.",
             "A card saying \"Opening\" with the project's name, and a turning ring, shows in the middle of the window while a large project opens, however it is opened (the home screen, the Finder, Open Recent). It keeps turning while Twine builds the editor, and appears only when opening takes longer than a moment, so small projects show nothing.",
+            "A deeper blue (#217FD8, from #4C9FEF) for everything that marks what is selected or in hand: the selection on the canvas, selected rows, the tool in hand, the main buttons, and the Figma plugin's panel.",
             "The onboarding's first page shows a looping video of Twine at work in place of its placeholder. The folder page has its own video, of the folder with your chosen folder's name under it: it waits until you choose a folder, then plays once, papers going into the folder, and stays on its last frame.",
             "Copy a scene onto another layer. Click a scene's row, copy, select another layer and paste: the scene's actions go onto that layer at the same times, each making its motion from where the new layer stands, as a scene of their own called \"Scene 1 copy\". Pasted onto several layers, each gets its own. Duplicating a whole scene, or a layer whose actions make a whole scene, also makes a new scene; copies of only some of a scene's actions still join it.",
         ], fixes: [
