@@ -14,6 +14,8 @@ public enum Channel: String, Hashable, Sendable, CaseIterable {
     case reveal
     /// A page curl, which only the Page Curl presets drive.
     case curl
+    /// How far the first stroke's dashes have travelled.
+    case dash
 }
 
 extension ActionKind {
@@ -28,6 +30,7 @@ extension ActionKind {
         case .color: return .fill
         case .stroke: return .stroke
         case .trim: return .trim
+        case .dash: return .dash
         case .cornerRadius: return .cornerRadius
         case .shadow: return .shadow
         case .layerBlur: return .layerBlur
@@ -148,6 +151,8 @@ public struct LayerState: Sendable, Equatable {
     public var reveal: Reveal = .none
     /// A page curl, from a Page Curl preset; `.none` otherwise.
     public var curl: Curl = .none
+    /// How far the first stroke's dashes have travelled, from Dash actions.
+    public var dash: DashTravel = .still
 
     /// The layer as it is designed, with no actions.
     public init(design layer: Layer) {
@@ -161,7 +166,7 @@ public struct LayerState: Sendable, Equatable {
         if let shape = layer.look {
             fill = shape.fills.last?.paint
             stroke = shape.strokes.first.map { StrokeLook(width: $0.width, paint: $0.paint) }
-            trim = shape.strokes.first.map { TrimRange(start: $0.trimStart, end: $0.trimEnd) }
+            trim = shape.strokes.first?.trim
             switch shape.geometry {
             case .rectangle(let radii): cornerRadii = radii
             case .ellipse(let a): arc = a
@@ -430,6 +435,7 @@ public struct ActionTracks: Sendable {
                 state.reveal = Reveal(walk(state.reveal.box, steps(list, { _ in nil }, Self.revealPart), at: time))
             case .curl:
                 state.curl = Curl(walk(state.curl.curl, steps(list, { _ in nil }, Self.curlPart), at: time))
+            case .dash: state.dash = walk(state.dash, list.compactMap(Self.dashStep), at: time)
             case .size: state.size = walk(state.size, list.compactMap(Self.sizeStep), at: time)
             case .visibility: state.isShown = MotionEvaluation.walk(1, Self.visibilitySteps(list), at: time) > 0.5
             // Only what the layer has: a Colour on a layer with no fill does nothing.
@@ -673,6 +679,15 @@ public struct ActionTracks: Sendable {
     private static func trimStep(_ a: Action) -> Step<TrimRange>? {
         guard case .trim(let tr) = a.spec else { return nil }
         return Step(a, initial: tr.initial, target: { _ in tr.end })
+    }
+
+    /// Dashes travel on from wherever earlier ones left them: the bar's
+    /// speed over its length, eased as the bar is.
+    private static func dashStep(_ a: Action) -> Step<DashTravel>? {
+        guard case .dash(let d) = a.spec else { return nil }
+        let way: Double = d.followsTrim || d.direction == .forward ? 1 : -1
+        let distance = d.speed * a.duration * way
+        return Step(a, initial: nil, target: { DashTravel(distance: $0.distance + distance, followsTrim: d.followsTrim) })
     }
 
     private static func cornerStep(_ a: Action) -> Step<CornerRadii>? {

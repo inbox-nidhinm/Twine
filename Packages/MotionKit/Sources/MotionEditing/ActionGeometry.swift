@@ -168,7 +168,8 @@ public enum ActionGeometry {
             a.spec = .stroke(k)
         case .trim(var t):
             guard let start = t.initial ?? state.trim else { return nil }
-            (t.initial, t.end) = (t.end, start)
+            // The amounts trade places; the way it draws stays the action's.
+            (t.initial, t.end) = (t.end, TrimRange(direction: t.end.direction, amount: start.amount))
             a.spec = .trim(t)
         case .cornerRadius(var r):
             guard let start = r.initial ?? state.cornerRadii else { return nil }
@@ -212,6 +213,12 @@ public enum ActionGeometry {
             guard let start = v.initial ?? state.volume else { return nil }
             (v.initial, v.end) = (v.end, start)
             a.spec = .volume(v)
+        // Backwards, dashes travel the other way; following a trim, they
+        // have no way of their own to turn.
+        case .dash(var d):
+            guard !d.followsTrim else { return nil }
+            d.direction = d.direction == .forward ? .backward : .forward
+            a.spec = .dash(d)
         case .visibility, .changeText, .play, .preset:
             return nil
         }

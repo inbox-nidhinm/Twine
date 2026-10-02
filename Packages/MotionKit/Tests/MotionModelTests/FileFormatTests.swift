@@ -88,7 +88,7 @@ func kitchenSinkProject() -> Project {
             initial: .solid(.white), end: .radialGradient(Gradient(stops: [GradientStop(position: 0.2, color: .black)]))))),
         Action(target: rect.id, start: 1, duration: 1, spec: .stroke(StrokeAction(
             end: StrokeLook(width: 8, paint: .linearGradient(Gradient(stops: [])))))),
-        Action(target: rect.id, start: 1, duration: 1, spec: .trim(TrimAction(initial: TrimRange(start: 0, end: 0), end: .whole))),
+        Action(target: rect.id, start: 1, duration: 1, spec: .trim(TrimAction(initial: TrimRange(amount: 0), end: .whole))),
         Action(target: rect.id, start: 1, duration: 1, spec: .cornerRadius(CornerRadiusAction(
             end: CornerRadii(topLeft: 1, topRight: 2, bottomRight: 3, bottomLeft: 4), isLinked: false))),
         Action(target: rect.id, start: 1, duration: 1, spec: .shadow(ShadowAction(initial: .noShadow, end: DropShadow(spread: -2)))),

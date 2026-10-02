@@ -65,6 +65,38 @@ import MotionEvaluation
         #expect(alpha(try image(at: 1), 100, 100) == 0)
     }
 
+    /// A 44 pixel level line across the middle of a 64 by 64 scene, x 10
+    /// to 54, with `stroke`.
+    private func line(_ stroke: Stroke) throws -> CGImage {
+        let path = BezierPath(subpaths: [Subpath(points: [PathPoint(Vec2(0, 0)), PathPoint(Vec2(44, 0))], isClosed: false)])
+        let layer = Layer(name: "L", content: .shape(ShapeContent(geometry: .path(path), fills: [], strokes: [stroke])),
+                          size: Size2(44, 0), position: Vec2(32, 32))
+        let project = Project(composition: Composition(width: 64, height: 64, background: Background(isTransparent: true)),
+                              layers: [layer])
+        let renderer = try #require(OffscreenRenderer(pixelWidth: 64, pixelHeight: 64))
+        return try #require(renderer.image(of: evaluate(project, at: 0)))
+    }
+
+    @Test func aTrimFromBothEndsLeavesTheMiddleOpen() throws {
+        var stroke = Stroke(paint: .solid(RGBA(1, 0, 0)), width: 4)
+        stroke.trim = TrimRange(direction: .toMiddle, amount: 0.5)
+        // A quarter of the line from each end: x 10 to 21 and 43 to 54.
+        let image = try line(stroke)
+        #expect(alpha(image, 13, 32) > 200 && alpha(image, 51, 32) > 200)
+        #expect(alpha(image, 32, 32) == 0 && alpha(image, 25, 32) == 0 && alpha(image, 39, 32) == 0)
+    }
+
+    @Test func dotsAreRoundAndSpacedByTheirGap() throws {
+        var stroke = Stroke(paint: .solid(RGBA(1, 0, 0)), width: 4, dashPattern: [0, 4])
+        stroke.dotted = true
+        // Dots 4 across, 8 apart from the line's start: centres at 10, 18, 26...
+        let image = try line(stroke)
+        #expect(alpha(image, 18, 32) > 200 && alpha(image, 26, 32) > 200)
+        #expect(alpha(image, 22, 32) == 0)
+        // Round: nothing at a dot's corner.
+        #expect(alpha(image, 20, 34) < 60)
+    }
+
     @Test func aTiltDrawsInPerspective() throws {
         // Turned 60° side to side, seen from 100 px: the right side, gone
         // away, is shorter (y 18 to 46 at x 39); the near left side longer

@@ -32,24 +32,28 @@ struct MenuEntry: Identifiable {
 /// The app draws its own menus, from the same card as the panels, rather than
 /// using `NSMenu`: a system menu brings its own corner, highlight and
 /// material, in a window that draws all three itself. One host per window,
-/// so opening a menu anywhere closes the one already up.
+/// so opening a menu anywhere closes the one already up. A menu opened from
+/// inside a card (the stroke settings' Trim menu) goes over the card and
+/// leaves it up: closing the menu goes back to the card.
 @MainActor
 @Observable
 final class MenuHost {
     private(set) var entries: [MenuEntry] = []
-    /// Where the card's top-left goes, in the window's own coordinates with
+    /// Where the menu's top-left goes, in the window's own coordinates with
     /// the origin at the top-left.
     private(set) var origin: CGPoint = .zero
-    /// When true, `origin.y` is where the card's bottom edge goes, for menus
+    /// When true, `origin.y` is where the menu's bottom edge goes, for menus
     /// raised from a bar along the bottom of the window.
     private(set) var growsUp = false
     /// A card raised by a control, such as the colour picker, drawn on the
-    /// same layer as menus and put away the same way.
+    /// same layer as menus and put away the same way, and where it goes.
     private(set) var popup: AnyView?
+    private(set) var popupOrigin: CGPoint = .zero
     var isOpen: Bool { !entries.isEmpty || popup != nil }
 
+    /// A menu, over the card that is up if any: nothing outside the card
+    /// can be clicked while it is up, so a menu then comes from the card.
     func show(_ entries: [MenuEntry], at origin: CGPoint, growsUp: Bool = false) {
-        popup = nil
         self.entries = entries
         self.origin = origin
         self.growsUp = growsUp
@@ -58,13 +62,19 @@ final class MenuHost {
     func showPopup<Content: View>(at origin: CGPoint, @ViewBuilder _ content: () -> Content) {
         entries = []
         popup = AnyView(content())
-        self.origin = origin
-        growsUp = false
+        popupOrigin = origin
     }
 
+    /// Puts the menu away, and the card under it if there is no menu.
     func dismiss() {
+        if !entries.isEmpty, popup != nil { return closeMenu() }
         entries = []
         popup = nil
+    }
+
+    /// Puts only the menu away, leaving any card it came from.
+    func closeMenu() {
+        entries = []
     }
 }
 
@@ -78,10 +88,7 @@ struct MenuLayer: View {
             GeometryReader { geo in
                 // Copied out first: alignment guides run in closures that may
                 // not reach back into the host or the proxy.
-                let origin = menus.origin
-                let growsUp = menus.growsUp
                 let bounds = geo.size
-                let inset = Theme.floatInset
                 ZStack(alignment: .topLeading) {
                     // A click anywhere outside the card puts the menu away and
                     // does nothing else, as a system menu would.
@@ -89,27 +96,41 @@ struct MenuLayer: View {
                         .contentShape(Rectangle())
                         .onTapGesture { menus.dismiss() }
 
-                    Group {
-                        if let popup = menus.popup {
-                            popup
-                        } else {
-                            MenuCard(entries: menus.entries) { menus.dismiss() }
-                        }
+                    if let popup = menus.popup {
+                        placed(popup, at: menus.popupOrigin, growsUp: false, in: bounds)
                     }
-                        .fixedSize()
-                        .alignmentGuide(.leading) { d in
-                            -min(origin.x, max(bounds.width - d.width - inset, 0))
+                    if !menus.entries.isEmpty {
+                        if menus.popup != nil {
+                            // Over a card: a click on the card away from the
+                            // menu only puts the menu away.
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture { menus.closeMenu() }
                         }
-                        .alignmentGuide(.top) { d in
-                            let top = growsUp ? origin.y - d.height : origin.y
-                            return -min(max(top, inset), max(bounds.height - d.height - inset, 0))
-                        }
+                        placed(AnyView(MenuCard(entries: menus.entries) { menus.dismiss() }),
+                               at: menus.origin, growsUp: menus.growsUp, in: bounds)
+                    }
                 }
                 .frame(width: bounds.width, height: bounds.height, alignment: .topLeading)
             }
             .ignoresSafeArea()
             .onExitCommand { menus.dismiss() }
         }
+    }
+
+    /// A card kept inside the window, its top-left at `origin` (its bottom
+    /// there when `growsUp`).
+    private func placed(_ card: AnyView, at origin: CGPoint, growsUp: Bool, in bounds: CGSize) -> some View {
+        let inset = Theme.floatInset
+        return card
+            .fixedSize()
+            .alignmentGuide(.leading) { d in
+                -min(origin.x, max(bounds.width - d.width - inset, 0))
+            }
+            .alignmentGuide(.top) { d in
+                let top = growsUp ? origin.y - d.height : origin.y
+                return -min(max(top, inset), max(bounds.height - d.height - inset, 0))
+            }
     }
 }
 

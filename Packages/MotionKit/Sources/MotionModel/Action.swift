@@ -83,6 +83,7 @@ public enum ActionSpec: Sendable, Equatable {
     case volume(VolumeAction)
     case skew(SkewAction)
     case tilt(TiltAction)
+    case dash(DashAction)
     /// A ready-made animation on one bar: several properties at once, with
     /// the settings its preset offers. See `PresetAction`.
     case preset(PresetAction)
@@ -113,6 +114,7 @@ public enum ActionSpec: Sendable, Equatable {
         case .volume: return .volume
         case .skew: return .skew
         case .tilt: return .tilt
+        case .dash: return .dash
         case .preset: return .preset
         }
     }
@@ -120,7 +122,7 @@ public enum ActionSpec: Sendable, Equatable {
 
 public enum ActionKind: String, Codable, Sendable, CaseIterable {
     case move, scale, rotate, opacity, resize, visibility
-    case color, stroke, trim, cornerRadius, shadow
+    case color, stroke, trim, dash, cornerRadius, shadow
     case layerBlur, backgroundBlur
     case letterSpacing, lineHeight, counter, changeText
     case arc, star, path
@@ -140,6 +142,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .color: return "Colour"
         case .stroke: return "Stroke"
         case .trim: return "Trim"
+        case .dash: return "Dashes"
         case .cornerRadius: return "Corner Radius"
         case .shadow: return "Shadow"
         case .layerBlur: return "Layer Blur"
@@ -163,7 +166,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     public var category: ActionCategory {
         switch self {
         case .move, .scale, .rotate, .opacity, .resize, .visibility, .skew, .tilt: return .transform
-        case .color, .stroke, .trim, .cornerRadius, .shadow: return .style
+        case .color, .stroke, .trim, .dash, .cornerRadius, .shadow: return .style
         case .layerBlur, .backgroundBlur: return .blur
         case .letterSpacing, .lineHeight, .counter, .changeText: return .text
         case .arc, .star, .path: return .shape
@@ -355,21 +358,78 @@ public struct StrokeAction: Codable, Sendable, Equatable {
     }
 }
 
-/// How much of a stroke is drawn, as fractions of the path's length from its
-/// start. 0 to 1 draws all of it; 0 to 0 draws none.
-public struct TrimRange: AnimatableValue {
-    public var start: Double
-    public var end: Double
-
-    public init(start: Double, end: Double) {
-        self.start = start
-        self.end = end
-    }
-
-    public static let whole = TrimRange(start: 0, end: 1)
+/// The way a trim draws its line: from the path's start to its end, from
+/// its end back to its start, from both ends meeting in the middle, or from
+/// the middle out to both ends.
+public enum TrimDirection: String, Codable, Sendable, CaseIterable {
+    case startToEnd = "start-to-end", endToStart = "end-to-start"
+    case toMiddle = "to-middle", fromMiddle = "from-middle"
 }
 
-/// The first stroke's trim, for lines that draw themselves on.
+/// How much of a stroke is drawn, and which way it grows: `amount` is the
+/// share of the path's length that shows, 0 none and 1 all of it, laid
+/// from where `direction` starts. (Until 2 October 2026 a trim was a start
+/// and an end along the path; older files are read as the nearest of these,
+/// `TrimRange(start:end:)`.)
+public struct TrimRange: AnimatableValue {
+    public var direction: TrimDirection
+    public var amount: Double
+
+    public init(direction: TrimDirection = .startToEnd, amount: Double) {
+        self.direction = direction
+        self.amount = amount
+    }
+
+    public static let whole = TrimRange(amount: 1)
+
+    /// The parts of the path that show, as fractions of its length, each
+    /// with whether it grows towards the path's end (`forward`) or its start.
+    public var pieces: [(start: Double, end: Double, forward: Bool)] {
+        let a = min(max(amount, 0), 1)
+        switch direction {
+        case .startToEnd: return [(0, a, true)]
+        case .endToStart: return [(1 - a, 1, false)]
+        case .toMiddle: return [(0, a / 2, true), (1 - a / 2, 1, false)]
+        case .fromMiddle: return [(0.5 - a / 2, 0.5, false), (0.5, 0.5 + a / 2, true)]
+        }
+    }
+
+    /// An old start and end along the path, as the way it reads best:
+    /// from the start when it starts there, to the end when it ends there,
+    /// else from the middle; `certain` is false when the range says
+    /// nothing of a way (all or none of the path).
+    public static func reading(start: Double, end: Double) -> (range: TrimRange, certain: Bool) {
+        let s = min(max(min(start, end), 0), 1), e = min(max(max(start, end), 0), 1)
+        let near = { (a: Double, b: Double) in abs(a - b) < 1e-9 }
+        if near(s, e) {
+            return near(s, 1) ? (TrimRange(direction: .endToStart, amount: 0), true)
+                : near(s, 0) ? (TrimRange(amount: 0), false) : (TrimRange(direction: .fromMiddle, amount: 0), true)
+        }
+        if near(s, 0) { return (TrimRange(amount: e), !near(e, 1)) }
+        if near(e, 1) { return (TrimRange(direction: .endToStart, amount: 1 - s), true) }
+        return (TrimRange(direction: .fromMiddle, amount: e - s), true)
+    }
+
+    private enum CodingKeys: String, CodingKey { case direction, amount, start, end }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let amount = try c.decodeIfPresent(Double.self, forKey: .amount) {
+            self.init(direction: try c.decodeIfPresent(TrimDirection.self, forKey: .direction) ?? .startToEnd, amount: amount)
+        } else {
+            self = Self.reading(start: try c.decode(Double.self, forKey: .start), end: try c.decode(Double.self, forKey: .end)).range
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(direction, forKey: .direction)
+        try c.encode(amount, forKey: .amount)
+    }
+}
+
+/// The first stroke's trim, for lines that draw themselves on. Its two
+/// values share one direction, which the inspector sets for both.
 public struct TrimAction: Codable, Sendable, Equatable {
     public var initial: TrimRange?
     public var end: TrimRange
@@ -378,6 +438,53 @@ public struct TrimAction: Codable, Sendable, Equatable {
         self.initial = initial
         self.end = end
     }
+
+    private enum CodingKeys: String, CodingKey { case initial, end }
+    private struct Old: Decodable { var start: Double?; var end: Double? }
+
+    /// Older actions stored a start and an end each side; the way the
+    /// action draws is read from whichever side tells it, and both take it,
+    /// so an old draw-on or wipe still plays the same way.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let oldEnd = try c.decode(Old.self, forKey: .end)
+        let oldInitial = try c.decodeIfPresent(Old.self, forKey: .initial)
+        guard let es = oldEnd.start, let ee = oldEnd.end else {
+            initial = try c.decodeIfPresent(TrimRange.self, forKey: .initial)
+            end = try c.decode(TrimRange.self, forKey: .end)
+            return
+        }
+        let readEnd = TrimRange.reading(start: es, end: ee)
+        let readInitial = oldInitial.flatMap { o in o.start.flatMap { s in o.end.map { TrimRange.reading(start: s, end: $0) } } }
+        let direction = readEnd.certain ? readEnd.range.direction
+            : readInitial?.certain == true ? readInitial!.range.direction : readEnd.range.direction
+        end = TrimRange(direction: direction, amount: readEnd.range.amount)
+        initial = readInitial.map { TrimRange(direction: direction, amount: $0.range.amount) }
+    }
+}
+
+/// Which way moving dashes travel along the path.
+public enum DashDirection: String, Codable, Sendable, CaseIterable {
+    case forward, backward
+}
+
+/// Sets a dashed or dotted first stroke moving along its path, at `speed`
+/// pixels a second for the length of the bar (eased as the bar is; Linear
+/// is a steady flow). With `followsTrim` the dashes travel the way the
+/// stroke's trim draws it, each part of it towards its growing tip, and
+/// `direction` is not used.
+public struct DashAction: Codable, Sendable, Equatable {
+    public var speed: Double
+    public var direction: DashDirection
+    public var followsTrim: Bool
+
+    public init(speed: Double = DashAction.standardSpeed, direction: DashDirection = .forward, followsTrim: Bool = false) {
+        self.speed = speed
+        self.direction = direction
+        self.followsTrim = followsTrim
+    }
+
+    public static let standardSpeed = 40.0
 }
 
 /// A rectangle's corners, in pixels.
@@ -729,7 +836,7 @@ public enum PresetCorner: String, Codable, Sendable, CaseIterable {
 extension ActionSpec: Codable {
     private enum CodingKeys: String, CodingKey {
         case type, move, scale, rotate, opacity, resize, visibility
-        case color, stroke, trim, cornerRadius, shadow, layerBlur, backgroundBlur
+        case color, stroke, trim, dash, cornerRadius, shadow, layerBlur, backgroundBlur
         case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume, skew, tilt, preset
     }
 
@@ -745,6 +852,7 @@ extension ActionSpec: Codable {
         case .color: self = .color(try c.decode(ColorAction.self, forKey: .color))
         case .stroke: self = .stroke(try c.decode(StrokeAction.self, forKey: .stroke))
         case .trim: self = .trim(try c.decode(TrimAction.self, forKey: .trim))
+        case .dash: self = .dash(try c.decode(DashAction.self, forKey: .dash))
         case .cornerRadius: self = .cornerRadius(try c.decode(CornerRadiusAction.self, forKey: .cornerRadius))
         case .shadow: self = .shadow(try c.decode(ShadowAction.self, forKey: .shadow))
         case .layerBlur: self = .layerBlur(try c.decode(LayerBlurAction.self, forKey: .layerBlur))
@@ -777,6 +885,7 @@ extension ActionSpec: Codable {
         case .color(let v): try c.encode(v, forKey: .color)
         case .stroke(let v): try c.encode(v, forKey: .stroke)
         case .trim(let v): try c.encode(v, forKey: .trim)
+        case .dash(let v): try c.encode(v, forKey: .dash)
         case .cornerRadius(let v): try c.encode(v, forKey: .cornerRadius)
         case .shadow(let v): try c.encode(v, forKey: .shadow)
         case .layerBlur(let v): try c.encode(v, forKey: .layerBlur)

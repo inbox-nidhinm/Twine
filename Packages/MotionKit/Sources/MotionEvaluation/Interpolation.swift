@@ -153,9 +153,17 @@ extension StrokeLook: Interpolatable {
     }
 }
 
+/// The way it draws is the end's: a Trim action draws its own way from the
+/// moment it starts, whatever the stroke's own trim was.
 extension TrimRange: Interpolatable {
     public static func interpolate(_ a: TrimRange, _ b: TrimRange, _ t: Double) -> TrimRange {
-        TrimRange(start: min(max(lerp(a.start, b.start, t), 0), 1), end: min(max(lerp(a.end, b.end, t), 0), 1))
+        TrimRange(direction: b.direction, amount: min(max(lerp(a.amount, b.amount, t), 0), 1))
+    }
+}
+
+extension DashTravel: Interpolatable {
+    public static func interpolate(_ a: DashTravel, _ b: DashTravel, _ t: Double) -> DashTravel {
+        DashTravel(distance: lerp(a.distance, b.distance, t), followsTrim: b.followsTrim)
     }
 }
 

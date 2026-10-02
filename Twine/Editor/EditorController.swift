@@ -650,6 +650,13 @@ final class EditorController {
             ActionFactory.make(kind, for: layer, at: editor.time, state: tracks.state(of: layer, at: editor.time),
                                frameRate: frameRate, rowOrder: 0, mediaLength: asset(ofLayer: layer.id)?.duration,
                                duration: AppSettings.shared.actionDuration, easing: AppSettings.shared.newActionEasing)
+        }.map { action in
+            // Dashes flow steadily, from the playhead to the end of the scene.
+            guard action.spec.kind == .dash else { return action }
+            var a = action
+            a.easing = .linear
+            a.duration = max(frameRate.snapped(project.composition.duration - a.start), a.duration)
+            return a
         }
         insertAndShow(made, name: made.first.map { "Add \($0.name)" } ?? "Add Action")
     }

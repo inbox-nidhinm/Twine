@@ -12,6 +12,7 @@ public enum Icon: String, CaseIterable, Sendable {
     case changeText
     case color
     case counter
+    case dash
     case filter
     case innerShadow
     case layerBlur
@@ -135,6 +136,12 @@ public enum Icon: String, CaseIterable, Sendable {
             "M5 8 L7 6 V18",
             "M5 18 H9",
             "M12 9 C12 7.3 13.3 6 15 6 C16.7 6 18 7.2 18 8.8 C18 11.5 12 13.5 12 18 H18"
+        ]
+        case .dash: return [   // Actions/dash.svg
+            "M3.5 12 H6",
+            "M9 12 H11.5",
+            "M14.5 12 H20",
+            "M17 9 L20 12 L17 15"
         ]
         case .filter: return [   // Actions/filter.svg
             "M4 5 H20 L14 12 V19 L10 17 V12 Z"

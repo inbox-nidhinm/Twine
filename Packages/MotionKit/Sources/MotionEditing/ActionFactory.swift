@@ -42,7 +42,11 @@ public enum ActionFactory {
             var kinds = transform
             // A picture has no colour to change.
             if let top = shape.fills.last, !top.paint.isImage { kinds.append(.color) }
-            if !shape.strokes.isEmpty { kinds += [.stroke, .trim] }
+            if let first = shape.strokes.first {
+                kinds += [.stroke, .trim]
+                // Only dashes or dots have anything to move.
+                if first.dotted || first.dashPattern.contains(where: { $0 > 0 }) { kinds.append(.dash) }
+            }
             if case .rectangle = shape.geometry { kinds.append(.cornerRadius) }
             kinds += [.shadow, .layerBlur, .backgroundBlur]
             if case .ellipse = shape.geometry { kinds.append(.arc) }
@@ -122,7 +126,9 @@ public enum ActionFactory {
             spec = .stroke(StrokeAction(end: StrokeLook(width: max(look.width + 4, look.width * 2), paint: look.paint)))
         case .trim:
             // Draws the line on: nothing until the action, then all of it.
-            spec = .trim(TrimAction(initial: TrimRange(start: 0, end: 0), end: .whole))
+            spec = .trim(TrimAction(initial: TrimRange(amount: 0), end: .whole))
+        case .dash:
+            spec = .dash(DashAction())
         case .cornerRadius:
             let radii = state.cornerRadii ?? .zero
             let most = min(state.size.width, state.size.height) / 2

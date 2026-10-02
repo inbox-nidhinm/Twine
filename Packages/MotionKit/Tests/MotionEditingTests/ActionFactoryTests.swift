@@ -25,7 +25,7 @@ import MotionEvaluation
     @Test func everyKindVisiblyDoesSomething() {
         var stroked = square
         if case .shape(var shape) = stroked.content {
-            shape.strokes = [Stroke(paint: .solid(.black), width: 2)]
+            shape.strokes = [Stroke(paint: .solid(.black), width: 2, dashPattern: [6, 4])]
             stroked.content = .shape(shape)
         }
         let text = LayerFactory.text(at: .zero, name: "T")

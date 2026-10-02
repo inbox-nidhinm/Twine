@@ -75,8 +75,8 @@ extension Stroke {
                           dashPattern: dashPattern, dashOffset: dashOffset)
         copy.isEnabled = isEnabled
         copy.width = width
-        copy.trimStart = trimStart
-        copy.trimEnd = trimEnd
+        copy.dotted = dotted
+        copy.trim = trim
         return copy
     }
 }

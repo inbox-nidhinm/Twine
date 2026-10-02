@@ -775,6 +775,40 @@ private struct StrokeSection: View {
     }
 }
 
+/// How a stroke's line is drawn, as its Style row offers.
+enum StrokeLine: CaseIterable {
+    case solid, dashed, dotted
+
+    var title: String {
+        switch self {
+        case .solid: "Solid"
+        case .dashed: "Dashed"
+        case .dotted: "Dotted"
+        }
+    }
+
+    static func of(_ stroke: Stroke) -> StrokeLine {
+        stroke.dotted ? .dotted : stroke.dashPattern.contains(where: { $0 > 0 }) ? .dashed : .solid
+    }
+
+    /// Turns `stroke` to this style, keeping its gap where it has one.
+    func apply(to stroke: inout Stroke) {
+        let gap = stroke.gap > 0 ? stroke.gap : 6
+        switch self {
+        case .solid:
+            stroke.dotted = false
+            stroke.dashPattern = []
+        case .dashed:
+            stroke.dotted = false
+            let dash = stroke.dashPattern.first ?? 0
+            stroke.dashPattern = [dash > 0 ? dash : 8, gap]
+        case .dotted:
+            stroke.dotted = true
+            stroke.dashPattern = [0, gap]
+        }
+    }
+}
+
 /// The stroke settings that are set once and left: trim, ends, corners and
 /// dashes. Raised from the Stroke section's settings button, and reads the
 /// layer afresh each time, so it follows every edit while it is up.
@@ -786,20 +820,19 @@ private struct StrokeSettings: View {
         if let layer = controller.project.layer(withID: layerID), let stroke = layer.look?.strokes.first {
             // A frame's stroke has no ends to trim.
             if !layer.isFrame {
-                LabeledRow(label: "Trim start") {
-                    UnitField(value: stroke.trimStart * 100, decimals: 1, suffix: "%",
+                MenuRow(label: "Trim", value: stroke.trim.direction.title, entries: {
+                    TrimDirection.allCases.map { d in
+                        .item(d.title, checked: d == stroke.trim.direction) { edit { $0.trim.direction = d } }
+                    }
+                })
+                .help("Which way the line is drawn: from its start, from its end, from both ends to meet in the middle, or from the middle out")
+                LabeledRow(label: "Drawn") {
+                    UnitField(value: stroke.trim.amount * 100, decimals: 1, suffix: "%",
                               accepts: { $0 >= 0 && $0 <= 100 }) { v in
-                        edit { $0.trimStart = v / 100 }
+                        edit { $0.trim.amount = v / 100 }
                     }
                 }
-                .help("How much of the path is left undrawn at its start. Animate it to draw a line on.")
-                LabeledRow(label: "Trim end") {
-                    UnitField(value: stroke.trimEnd * 100, decimals: 1, suffix: "%",
-                              accepts: { $0 >= 0 && $0 <= 100 }) { v in
-                        edit { $0.trimEnd = v / 100 }
-                    }
-                }
-                .help("Where along the path the stroke stops")
+                .help("How much of the line is drawn. Animate it with a Trim action to draw a line on.")
             }
             titled("Ends") {
                 SegmentRow(selection: stroke.cap, options: LineCap.allCases, title: { $0.rawValue.capitalized }) { c in
@@ -813,22 +846,31 @@ private struct StrokeSettings: View {
                 }
             }
             .help("How the stroke turns a corner")
-            HStack(spacing: 8) {
-                UnitField(unit: "Dash", value: stroke.dashPattern.first ?? 0, decimals: 1, accepts: { $0 >= 0 }) { v in
-                    edit { s in
-                        let gap = s.dashPattern.count > 1 ? s.dashPattern[1] : v
-                        s.dashPattern = v > 0 ? [v, gap] : []
-                    }
-                }
-                UnitField(unit: "Gap", value: stroke.dashPattern.count > 1 ? stroke.dashPattern[1] : 0,
-                          decimals: 1, accepts: { $0 >= 0 }) { v in
-                    edit { s in
-                        let dash = s.dashPattern.first ?? max(v, 1)
-                        s.dashPattern = [dash, v]
-                    }
+            titled("Style") {
+                SegmentRow(selection: StrokeLine.of(stroke), options: StrokeLine.allCases, title: \.title) { line in
+                    edit { line.apply(to: &$0) }
                 }
             }
-            .help("Dash and gap lengths in pixels. A dash of 0 is a solid line.")
+            .help("A solid line, dashes, or round dots")
+            switch StrokeLine.of(stroke) {
+            case .dashed:
+                HStack(spacing: 8) {
+                    UnitField(unit: "Dash", value: stroke.dashPattern.first ?? 0, decimals: 1, accepts: { $0 > 0 }) { v in
+                        edit { s in s.dashPattern = [v, s.gap] }
+                    }
+                    UnitField(unit: "Gap", value: stroke.gap, decimals: 1, accepts: { $0 >= 0 }) { v in
+                        edit { s in s.dashPattern = [s.dashPattern.first ?? v, v] }
+                    }
+                }
+                .help("Dash and gap lengths in pixels")
+            case .dotted:
+                UnitField(unit: "Gap", value: stroke.gap, decimals: 1, accepts: { $0 >= 0 }) { v in
+                    edit { s in s.dashPattern = [0, v] }
+                }
+                .help("The space between dots, in pixels")
+            case .solid:
+                EmptyView()
+            }
         }
     }
 

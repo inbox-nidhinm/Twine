@@ -512,8 +512,8 @@ final class Node {
         let path = shape.area
         var covered: CGPath? = shape.isClosed && !shape.fills.isEmpty ? path : nil
         for stroke in shape.strokes where stroke.width > 0 {
-            let dashed = stroke.dashPattern.isEmpty ? path
-                : path.copy(dashingWithPhase: stroke.dashOffset, lengths: stroke.dashPattern.map { CGFloat($0) })
+            let dashed = stroke.drawnPath ?? (stroke.dashPattern.isEmpty ? path
+                : path.copy(dashingWithPhase: stroke.dashOffset, lengths: stroke.dashPattern.map { CGFloat($0) }))
             let doubled = stroke.alignment != .center
             var band = dashed.copy(strokingWithWidth: stroke.width * (doubled ? 2 : 1), lineCap: stroke.cap.cg,
                                    lineJoin: stroke.join.cg, miterLimit: 10)
@@ -1063,10 +1063,14 @@ private final class PaintLayers {
             shape.lineWidth = stroke.width * (doubled ? 2 : 1)
             shape.lineCap = stroke.cap.ca
             shape.lineJoin = stroke.join.ca
-            shape.lineDashPattern = stroke.dashPattern.isEmpty ? nil : stroke.dashPattern.map { NSNumber(value: $0) }
-            shape.lineDashPhase = stroke.dashOffset
-            shape.strokeStart = stroke.trimStart
-            shape.strokeEnd = stroke.trimEnd
+            if let drawn = stroke.drawnPath {
+                // Trimmed: the stretches, already cut into their dashes.
+                shape.path = drawn
+                shape.lineDashPattern = nil
+            } else {
+                shape.lineDashPattern = stroke.dashPattern.isEmpty ? nil : stroke.dashPattern.map { NSNumber(value: $0) }
+                shape.lineDashPhase = stroke.dashOffset
+            }
             if doubled {
                 alignmentMask.frame = bounds
                 if stroke.alignment == .inside {

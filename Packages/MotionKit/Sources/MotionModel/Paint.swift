@@ -183,9 +183,14 @@ public struct Stroke: Codable, Sendable, Equatable, Identifiable {
     /// Alternating dash and gap lengths in pixels. Empty means a solid line.
     public var dashPattern: [Double]
     public var dashOffset: Double
-    /// How much of the path is drawn, as fractions of its length.
-    public var trimStart: Double
-    public var trimEnd: Double
+    /// Round dots in place of dashes, the gap (the pattern's second number)
+    /// the clear space between them. Left out of files when off.
+    public var dotted: Bool = false
+    /// How much of the path is drawn, and which way it grows.
+    public var trim: TrimRange = .whole
+
+    /// A dotted stroke's gap, or a dashed one's.
+    public var gap: Double { dashPattern.count > 1 ? dashPattern[1] : dashPattern.first ?? 0 }
 
     public init(id: UUID = UUID(), isEnabled: Bool = true, paint: Paint, width: Double = 1,
                 alignment: StrokeAlignment = .center, cap: LineCap = .butt, join: LineJoin = .miter,
@@ -199,8 +204,46 @@ public struct Stroke: Codable, Sendable, Equatable, Identifiable {
         self.join = join
         self.dashPattern = dashPattern
         self.dashOffset = dashOffset
-        self.trimStart = 0
-        self.trimEnd = 1
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, isEnabled, paint, width, alignment, cap, join, dashPattern, dashOffset, dotted, trim, trimStart, trimEnd
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        isEnabled = try c.decode(Bool.self, forKey: .isEnabled)
+        paint = try c.decode(Paint.self, forKey: .paint)
+        width = try c.decode(Double.self, forKey: .width)
+        alignment = try c.decode(StrokeAlignment.self, forKey: .alignment)
+        cap = try c.decode(LineCap.self, forKey: .cap)
+        join = try c.decode(LineJoin.self, forKey: .join)
+        dashPattern = try c.decode([Double].self, forKey: .dashPattern)
+        dashOffset = try c.decode(Double.self, forKey: .dashOffset)
+        dotted = try c.decodeIfPresent(Bool.self, forKey: .dotted) ?? false
+        if let trim = try c.decodeIfPresent(TrimRange.self, forKey: .trim) {
+            self.trim = trim
+        } else {
+            // Before 2 October 2026: a start and an end along the path.
+            trim = TrimRange.reading(start: try c.decodeIfPresent(Double.self, forKey: .trimStart) ?? 0,
+                                     end: try c.decodeIfPresent(Double.self, forKey: .trimEnd) ?? 1).range
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(isEnabled, forKey: .isEnabled)
+        try c.encode(paint, forKey: .paint)
+        try c.encode(width, forKey: .width)
+        try c.encode(alignment, forKey: .alignment)
+        try c.encode(cap, forKey: .cap)
+        try c.encode(join, forKey: .join)
+        try c.encode(dashPattern, forKey: .dashPattern)
+        try c.encode(dashOffset, forKey: .dashOffset)
+        if dotted { try c.encode(dotted, forKey: .dotted) }
+        if trim != .whole { try c.encode(trim, forKey: .trim) }
     }
 }
 

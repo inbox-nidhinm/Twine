@@ -1,5 +1,6 @@
 import CoreGraphics
 import MotionModel
+import MotionEvaluation
 
 extension BezierPath {
     /// The path as Core Graphics draws it. A segment whose handles are both
@@ -45,5 +46,26 @@ extension RGBA {
     public var cgColor: CGColor {
         CGColor(colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
                 components: [CGFloat(r), CGFloat(g), CGFloat(b), CGFloat(a)])!
+    }
+}
+
+extension ResolvedStroke {
+    /// What a trimmed stroke draws: the stretches its trim shows, each cut
+    /// into its dashes from its own place in the pattern (Core Animation
+    /// would start the pattern afresh at every stretch). Nil for a stroke
+    /// of the whole path, which is drawn from the shape's own path with
+    /// the layer's own dashes.
+    public var drawnPath: CGPath? {
+        guard let trimmed else { return nil }
+        let period = dashPattern.reduce(0, +)
+        guard period > 0 else { return trimmed.cgPath }
+        let lengths = dashPattern.map { CGFloat($0) }
+        let out = CGMutablePath()
+        for (i, subpath) in trimmed.subpaths.enumerated() {
+            var phase = (dashOffset + (i < dashStarts.count ? dashStarts[i] : 0)).truncatingRemainder(dividingBy: period)
+            if phase < 0 { phase += period }
+            out.addPath(BezierPath(subpaths: [subpath]).cgPath.copy(dashingWithPhase: phase, lengths: lengths))
+        }
+        return out
     }
 }

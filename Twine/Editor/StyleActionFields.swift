@@ -17,6 +17,7 @@ struct StyleValueFields: View {
         case .color(let c): color(c)
         case .stroke(let s): stroke(s)
         case .trim(let t): trim(t)
+        case .dash(let d): dash(d)
         case .cornerRadius(let r): corners(r)
         case .shadow(let s): shadow(s)
         case .layerBlur(let b): layerBlur(b)
@@ -82,31 +83,57 @@ struct StyleValueFields: View {
 
     @ViewBuilder private func trim(_ t: TrimAction) -> some View {
         let from = inherited?.trim ?? .whole
+        MenuRow(label: "Draws", value: t.end.direction.title, entries: {
+            TrimDirection.allCases.map { d in
+                .item(d.title, checked: d == t.end.direction) {
+                    editing("Trim Direction", Self.trim { a, _ in
+                        a.end.direction = d
+                        a.initial?.direction = d
+                    })
+                }
+            }
+        })
+        .help("Which way the line draws: from its start, from its end, from both ends to meet in the middle, or from the middle out")
         StackedRow(label: "From", accessory: { clearButton(t.initial != nil) { editing("Starting Trim", Self.trim { a, _ in a.initial = nil }) } }) {
-            OptionalField(value: t.initial.map { $0.start * 100 }, placeholder: from.start * 100,
+            OptionalField(value: t.initial.map { $0.amount * 100 }, placeholder: from.amount * 100,
                           decimals: 1, suffix: "%", accepts: Self.percent) { v in
-                editing("Starting Trim", Self.trim { a, st in
-                    a.initial = v.map { TrimRange(start: $0 / 100, end: (a.initial ?? st?.trim ?? .whole).end) }
-                })
-            }
-            OptionalField(value: t.initial.map { $0.end * 100 }, placeholder: from.end * 100,
-                          decimals: 1, suffix: "%", accepts: Self.percent) { v in
-                editing("Starting Trim", Self.trim { a, st in
-                    a.initial = v.map { TrimRange(start: (a.initial ?? st?.trim ?? .whole).start, end: $0 / 100) }
+                editing("Starting Trim", Self.trim { a, _ in
+                    a.initial = v.map { TrimRange(direction: a.end.direction, amount: $0 / 100) }
                 })
             }
         }
-        // No S and E letters: "100 %" only just fits beside the button.
-        .help("How much of the stroke is drawn when it starts: from the first number to the second, along the path. Set both to 0% to draw it on from nothing.")
+        .help("How much of the line is drawn when it starts. 0% draws it on from nothing.")
         StackedRow(label: "To", swap: swap) {
-            UnitField(value: t.end.start * 100, decimals: 1, suffix: "%", accepts: Self.percent) { v in
-                editing("Trim", Self.trim { a, _ in a.end.start = v / 100 })
-            }
-            UnitField(value: t.end.end * 100, decimals: 1, suffix: "%", accepts: Self.percent) { v in
-                editing("Trim", Self.trim { a, _ in a.end.end = v / 100 })
+            UnitField(value: t.end.amount * 100, decimals: 1, suffix: "%", accepts: Self.percent) { v in
+                editing("Trim", Self.trim { a, _ in a.end.amount = v / 100 })
             }
         }
-        .help("How much is drawn when it ends, from the first number to the second. 0% to 100% is the whole stroke.")
+        .help("How much of the line is drawn when it ends. 100% is all of it.")
+    }
+
+    // MARK: Dashes
+
+    @ViewBuilder private func dash(_ d: DashAction) -> some View {
+        LabeledRow(label: "Speed") {
+            UnitField(value: d.speed, decimals: 0, suffix: "px/s", accepts: { $0 >= 0 && $0 <= 100_000 }) { v in
+                editing("Dash Speed", Self.dash { a, _ in a.speed = v })
+            }
+        }
+        .help("How far the dashes travel each second")
+        ToggleRow(label: "Follow trim", isOn: d.followsTrim) {
+            editing(d.followsTrim ? "Stop Following Trim" : "Follow Trim", Self.dash { a, _ in a.followsTrim.toggle() })
+        }
+        .help("The dashes travel the way the stroke's trim draws it, each part towards its growing end")
+        if !d.followsTrim {
+            LabeledRow(label: "Direction") {
+                SegmentRow(selection: d.direction, options: DashDirection.allCases,
+                           title: { $0 == .forward ? "Towards the end" : "Towards the start" },
+                           icon: { $0 == .forward ? .arrowRight : .arrowLeft }) { way in
+                    editing("Dash Direction", Self.dash { a, _ in a.direction = way })
+                }
+            }
+            .help("Which way along the path the dashes travel")
+        }
     }
 
     // MARK: Corner radius
@@ -506,6 +533,9 @@ struct StyleValueFields: View {
     private static func trim(_ change: @escaping Change<TrimAction>) -> (inout Action, LayerState?) -> Void {
         { a, st in if case .trim(var v) = a.spec { change(&v, st); a.spec = .trim(v) } }
     }
+    private static func dash(_ change: @escaping Change<DashAction>) -> (inout Action, LayerState?) -> Void {
+        { a, st in if case .dash(var v) = a.spec { change(&v, st); a.spec = .dash(v) } }
+    }
     private static func corners(_ change: @escaping Change<CornerRadiusAction>) -> (inout Action, LayerState?) -> Void {
         { a, st in if case .cornerRadius(var v) = a.spec { change(&v, st); a.spec = .cornerRadius(v) } }
     }
@@ -648,5 +678,17 @@ private struct WordsField: View {
             .onChange(of: text) { _, now in if !focused { draft = now } }
             .onSubmit { if draft != text { commit(draft) } }
             .onChange(of: focused) { _, now in if !now, draft != text { commit(draft) } }
+    }
+}
+
+extension TrimDirection {
+    /// As the Trim menus name it.
+    var title: String {
+        switch self {
+        case .startToEnd: "Start to End"
+        case .endToStart: "End to Start"
+        case .toMiddle: "Both Ends to Middle"
+        case .fromMiddle: "Middle to Both Ends"
+        }
     }
 }

@@ -240,10 +240,14 @@ public struct ResolvedStroke: Sendable, Equatable {
     public var alignment: StrokeAlignment
     public var cap: LineCap
     public var join: LineJoin
+    /// Dash and gap lengths; a dot is a dash of no length.
     public var dashPattern: [Double]
     public var dashOffset: Double
-    public var trimStart: Double
-    public var trimEnd: Double
+    /// The stretches of the path its trim shows (`PathTrim`), or nil for the
+    /// whole path as it is, and where along the dash pattern each of its
+    /// subpaths starts, which `dashOffset` is added to.
+    public var trimmed: BezierPath?
+    public var dashStarts: [Double] = []
 }
 
 public struct ResolvedText: Sendable, Equatable {

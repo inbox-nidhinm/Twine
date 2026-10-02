@@ -110,11 +110,16 @@ private func gradient(_ colors: [RGBA], radial: Bool = false) -> Paint {
 
     @Test func trimDrawsOnAndHoldsItsStartBeforehand() {
         let layer = card()
-        let a = action(layer, .trim(TrimAction(initial: TrimRange(start: 0, end: 0), end: .whole)))
+        let a = action(layer, .trim(TrimAction(initial: TrimRange(amount: 0), end: .whole)))
+        let tracks = ActionTracks([a])
         // The entrance rule: nothing drawn before it starts.
-        #expect(shape(resolved(layer, [a], at: 0))?.strokes.first?.trimEnd == 0)
-        #expect(shape(resolved(layer, [a], at: 2))?.strokes.first?.trimEnd == 0.5)
-        #expect(shape(resolved(layer, [a], at: 3))?.strokes.first?.trimEnd == 1)
+        #expect(tracks.state(of: layer, at: 0).trim?.amount == 0)
+        #expect(tracks.state(of: layer, at: 2).trim?.amount == 0.5)
+        #expect(tracks.state(of: layer, at: 3).trim?.amount == 1)
+        #expect(shape(resolved(layer, [a], at: 0))?.strokes.first?.trimmed?.subpaths.isEmpty == true)
+        #expect(shape(resolved(layer, [a], at: 2))?.strokes.first?.trimmed != nil)
+        // All of it drawn is the path itself, closed and untrimmed.
+        #expect(shape(resolved(layer, [a], at: 3))?.strokes.first?.trimmed == nil)
     }
 
     @Test func cornersRoundOver() {

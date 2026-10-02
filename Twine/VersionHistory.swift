@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 174
+    static let pushes = 175
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -41,6 +41,9 @@ enum VersionHistory {
 
     static let builds: [Build] = [
         .init(date: "1 October 2026", title: "Large projects", features: [
+            "Moving dashes: a Dashes action sets a dashed or dotted stroke's dashes travelling along the line, at a speed you set and either way, from the playhead to the end of the scene unless you shorten its bar (Linear keeps the flow steady). Follow trim makes them travel the way the trim draws the line, each part towards its growing end.",
+            "Trim works by direction now: Start to End, End to Start, Both Ends to Middle or Middle to Both Ends, and how much of the line is drawn, in the stroke's settings and in the Trim action (From and To amounts), in place of the start and end numbers. Older projects keep their trims, read as the nearest of these.",
+            "Dotted lines: a stroke's Style is Solid, Dashed or Dotted. Dots are round, the Gap the clear space between them.",
             "Info on a project's right-click menu on the home screen: a card with when it was made and last saved, its size on disk and folder, the composition's size, length and frame rate, how many layers it has of each kind, and how many actions, presets and scenes are on its timeline, with where the last action ends. An open project's card counts its unsaved changes too.",
             "Settings, at the foot of the home screen's sidebar where Version History was (which is now a button at the foot of Settings, beside the build number). Each kind of setting is a card of rows, each with its icon, laid out in three columns when the window has room and two when it is narrower. Change where projects are kept; what a new project starts with (its size, from Landscape, Portrait, Square or 4K or typed, frame rate, length and background); how far the arrow keys nudge, with and without Shift; the easing and length a new action takes; whether times show as frames; whether sound plays while editing; and whether exports ask where to go or go straight into a folder, and are shown in the Finder when done. Each change is kept at once.",
             "Show Sound at the Bottom, on the timeline's right-click menu beside Show Times as Frames: every sound layer's rows move to the foot of the timeline, under everything that draws, keeping their own order, so new actions on other layers go above them. Rows in a scene stay with their scene. While it is on, dragging a row reorders it only among its own kind. Twine remembers the choice.",
@@ -49,6 +52,7 @@ enum VersionHistory {
             "A card saying \"Opening\" with the project's name, and a turning ring, shows in the middle of the window while a large project opens, however it is opened (the home screen, the Finder, Open Recent). It keeps turning while Twine builds the editor, and appears only when opening takes longer than a moment, so small projects show nothing.",
             "Copy a scene onto another layer. Click a scene's row, copy, select another layer and paste: the scene's actions go onto that layer at the same times, each making its motion from where the new layer stands, as a scene of their own called \"Scene 1 copy\". Pasted onto several layers, each gets its own. Duplicating a whole scene, or a layer whose actions make a whole scene, also makes a new scene; copies of only some of a scene's actions still join it.",
         ], fixes: [
+            "A menu opened from inside a card, such as the Trim menu in the stroke's settings, opens over the card and leaves it up, rather than closing it.",
             "The playhead's time and the ruler's numbers no longer spill over the play controls when the timeline is scrolled or the playhead is near the start: the ruler keeps to its own area, and the time stays whole at either end while the playhead is in view.",
             "Opening a project with text is far quicker on a Mac with many fonts. Each new text style asked macOS for the list of every installed font, about a tenth of a second each time; the list is now kept until fonts are added or removed. A large project of 316 texts in 16 styles opens in 0.8 s, from 2.6 s, and selecting text no longer waits on it either.",
             "Very large projects are far quicker. In a project of 5,000 layers with 550 actions, playback runs at a full 60 frames a second (it was 25), scrubbing keeps up (8 ms a step, from 105), dragging a layer takes about 25 ms a step (from 50), and each edit is applied in under 2 ms. Twine now keeps everything no action moves as it was worked out last time, rather than working all of it out again every frame.",

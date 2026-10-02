@@ -1065,6 +1065,7 @@ extension ActionKind {
         case .color: return .color
         case .stroke: return .stroke
         case .trim: return .trim
+        case .dash: return .dash
         case .cornerRadius: return .corners
         case .shadow: return .shadow
         case .layerBlur: return .layerBlur

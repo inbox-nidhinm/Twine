@@ -546,10 +546,7 @@ private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState, pict
             shape.strokes[0].width = look.width
             shape.strokes[0].paint = look.paint
         }
-        if let trim = state.trim {
-            shape.strokes[0].trimStart = trim.start
-            shape.strokes[0].trimEnd = trim.end
-        }
+        if let trim = state.trim { shape.strokes[0].trim = trim }
     }
     if let radii = state.cornerRadii, case .rectangle = shape.geometry { shape.geometry = .rectangle(cornerRadii: radii) }
     if let arc = state.arc, case .ellipse = shape.geometry { shape.geometry = .ellipse(arc: arc) }
@@ -569,14 +566,28 @@ private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState, pict
     let fills = shape.fills.filter(\.isEnabled).map { resolve($0.paint, size: size, pictures: pictures) }
     // A picture can only fill; a stroke with one is left for an importer to
     // turn into a picture of its own.
-    let strokes = shape.strokes.filter { $0.isEnabled && !$0.paint.isImage }.map { stroke in
-        ResolvedStroke(paint: resolve(stroke.paint, size: size, pictures: pictures),
-                       width: max(stroke.width, 0),
-                       alignment: closed ? stroke.alignment : .center,
-                       cap: stroke.cap, join: stroke.join,
-                       dashPattern: stroke.dashPattern.filter { $0 > 0 }, dashOffset: stroke.dashOffset,
-                       trimStart: min(max(stroke.trimStart, 0), 1),
-                       trimEnd: min(max(stroke.trimEnd, 0), 1))
+    let strokes = shape.strokes.indices.filter { shape.strokes[$0].isEnabled && !shape.strokes[$0].paint.isImage }.map { i in
+        let stroke = shape.strokes[i]
+        // Dash actions move the first stroke's dashes.
+        let travel = i == 0 ? state.dash : .still
+        let width = max(stroke.width, 0)
+        // A dot is a dash of no length with round ends, the gap the clear
+        // space between dots.
+        let pattern = stroke.dotted ? [0, max(stroke.gap, 0) + width] : stroke.dashPattern.filter { $0 > 0 }
+        let period = pattern.reduce(0, +)
+        // Travelling forward is the pattern moving towards the path's end
+        // (or, following the trim, each stretch's growing tip), which a
+        // falling phase gives.
+        var phase = stroke.dashOffset - travel.distance
+        if period > 0 { phase = phase.truncatingRemainder(dividingBy: period); if phase < 0 { phase += period } }
+        let trim = stroke.trim
+        let trimmed = trim == .whole && !travel.followsTrim ? nil : PathTrim.trimmed(path, trim, growing: travel.followsTrim)
+        return ResolvedStroke(paint: resolve(stroke.paint, size: size, pictures: pictures),
+                              width: width,
+                              alignment: closed ? stroke.alignment : .center,
+                              cap: stroke.dotted ? .round : stroke.cap, join: stroke.join,
+                              dashPattern: pattern, dashOffset: phase,
+                              trimmed: trimmed?.path, dashStarts: trimmed?.starts ?? [])
     }
     return ResolvedShape(path: path, isClosed: closed, fillRule: shape.fillRule, fills: fills, strokes: strokes)
 }
