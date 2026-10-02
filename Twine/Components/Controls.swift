@@ -218,8 +218,49 @@ struct CheckRow: View {
     }
 }
 
+/// The hover highlight of a row that has one highlight for the whole row,
+/// moved to the spot under the pointer, as the tool bar and every row of
+/// tabs have (`SegmentRow`).
+struct GlideHover<Spot: Hashable> {
+    /// What the pointer is over.
+    var hovered: Spot?
+    /// Where the highlight sits: the spot hovered, or after the pointer
+    /// leaves, the last one, while it fades there.
+    var place: Spot?
+}
+
+extension Binding {
+    /// Moving from one spot to the next slides the highlight there; coming
+    /// onto the row, it appears where the pointer is rather than sliding in
+    /// from where it last faded. Leaving waits a moment, since the next
+    /// spot's arrival may come just after, and only then fades it, if
+    /// nothing has taken it since.
+    @MainActor
+    func hover<Spot: Hashable>(_ spot: Spot, _ inside: Bool) where Value == GlideHover<Spot> {
+        if inside {
+            if wrappedValue.hovered == nil {
+                var still = Transaction()
+                still.disablesAnimations = true
+                withTransaction(still) { wrappedValue.place = spot }
+            }
+            withAnimation(Theme.hoverGlide) {
+                wrappedValue.place = spot
+                wrappedValue.hovered = spot
+            }
+        } else if wrappedValue.hovered == spot {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Theme.hoverLinger) {
+                guard wrappedValue.hovered == spot else { return }
+                withAnimation(Theme.hoverGlide) { wrappedValue.hovered = nil }
+            }
+        }
+    }
+}
+
 /// A row of mutually exclusive words, the chosen one raised in grey.
-/// Unlabelled: it sits under a header that already names it.
+/// Unlabelled: it sits under a header that already names it. As on the tool
+/// bar, one hover highlight slides from option to option under the pointer,
+/// and the chosen grey slides to the next option picked (the user's choice,
+/// 2 October 2026), both drawn behind the row rather than by each option.
 struct SegmentRow<Value: Hashable>: View {
     let selection: Value
     let options: [Value]
@@ -228,25 +269,57 @@ struct SegmentRow<Value: Hashable>: View {
     var icon: ((Value) -> Icon)? = nil
     let select: (Value) -> Void
 
+    @State private var glide = GlideHover<Value>()
+    /// Each option's box in the row.
+    @State private var frames: [Value: CGRect] = [:]
+
     var body: some View {
         HStack(spacing: 2) {
             ForEach(options, id: \.self) { option in
-                Segment(title: title(option), icon: icon?(option), isOn: option == selection) { select(option) }
+                Segment(title: title(option), icon: icon?(option), isOn: option == selection,
+                        isHovered: glide.hovered == option) { select(option) }
+                    .onHover { $glide.hover(option, $0) }
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(segmentSpace)) } action: { frames[option] = $0 }
             }
         }
+        .coordinateSpace(.named(segmentSpace))
+        .background(alignment: .topLeading) {
+            ZStack(alignment: .topLeading) {
+                if let place = glide.place, let box = frames[place] {
+                    highlight(Theme.rowHover, box)
+                        .opacity(glide.hovered == nil ? 0 : 1)
+                }
+                if let box = frames[selection] {
+                    highlight(Theme.chosen, box)
+                }
+            }
+        }
+        // The chosen grey and its white words change together.
+        .animation(Theme.hoverGlide, value: selection)
         .padding(Theme.trayPad)
         .background(RoundedRectangle(cornerRadius: Theme.radiusControl + 1).fill(Theme.panelRaised))
         .frame(height: Theme.panelRow + 4)
     }
+
+    private func highlight(_ fill: Color, _ box: CGRect) -> some View {
+        RoundedRectangle(cornerRadius: Theme.radiusRow)
+            .fill(fill)
+            .frame(width: box.width, height: box.height)
+            .offset(x: box.minX, y: box.minY)
+    }
 }
 
+/// The space a `SegmentRow` measures its options in. Outside the generic
+/// type, which cannot hold a stored constant.
+nonisolated private let segmentSpace = "segments"
+
+/// One option of a `SegmentRow`, which draws its highlights.
 private struct Segment: View {
     let title: String
     var icon: Icon? = nil
     let isOn: Bool
+    let isHovered: Bool
     let action: () -> Void
-
-    @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
@@ -259,14 +332,11 @@ private struct Segment: View {
                         .lineLimit(1)
                 }
             }
-                .foregroundStyle(isOn ? Theme.textOnColor : Theme.textSecondary)
+                .foregroundStyle(isOn ? Theme.textOnColor : isHovered ? Theme.textPrimary : Theme.textSecondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
-                    .fill(isOn ? Theme.chosen : hovering ? Theme.rowHover : .clear))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
         .help(icon == nil ? "" : title)
     }
 }

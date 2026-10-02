@@ -6,7 +6,7 @@ import MotionEvaluation
 import MotionExport
 import Theme
 
-/// The right panel. The Design and Animate switch sits at its head; below it,
+/// The right panel. The Animate and Design switch sits at its head; below it,
 /// whatever the selection can have done to it. With nothing selected, that is
 /// the composition itself. The Export button sits at the foot, always.
 struct InspectorPanel: View {
@@ -23,7 +23,7 @@ struct InspectorPanel: View {
                 controller.setMode($0)
             }
             .padding(Theme.panelPad)
-            .help("Design builds the layout, with no animation. Animate adds actions and brings up the timeline. (M)")
+            .help("Animate adds actions and brings up the timeline. Design builds the layout, with no animation. (M)")
 
             PanelDivider()
             ScrollView {

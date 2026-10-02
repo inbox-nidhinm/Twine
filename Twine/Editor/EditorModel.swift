@@ -9,11 +9,13 @@ import MotionEditing
 @MainActor
 @Observable
 final class EditorModel {
+    /// Animate first: it is Twine's main mode, the one a project opens in
+    /// and the left of the switch (the user's choice, 2 October 2026).
     enum Mode: String, CaseIterable {
-        /// Tools on the bottom bar, no timeline: building the frame.
-        case design
         /// The timeline in place of the tools: making it move.
         case animate
+        /// Tools on the bottom bar, no timeline: building the frame.
+        case design
 
         var title: String {
             switch self {
@@ -23,7 +25,7 @@ final class EditorModel {
         }
     }
 
-    var mode: Mode = .design
+    var mode: Mode = .animate
     var showLayers = true
     var showInspector = true
     var tool: Tool = .select

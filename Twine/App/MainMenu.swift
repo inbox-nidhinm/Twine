@@ -125,8 +125,8 @@ enum MainMenu {
         let menu = NSMenu(title: "View")
         // M works on the canvas and the timeline without being a menu key,
         // so an M typed into a field stays an M. The menu names it.
-        menu.addItem(item("Design", #selector(EditorWindowController.switchToDesignMode(_:))))
         menu.addItem(item("Animate", #selector(EditorWindowController.switchToAnimateMode(_:))))
+        menu.addItem(item("Design", #selector(EditorWindowController.switchToDesignMode(_:))))
         menu.addItem(item("Switch Mode    M", #selector(EditorWindowController.toggleMode(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Smart Guides", #selector(EditorWindowController.toggleSnapping(_:))))

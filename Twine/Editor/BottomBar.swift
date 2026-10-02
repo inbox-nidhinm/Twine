@@ -12,11 +12,9 @@ struct ToolBar: View {
 
     @Environment(MenuHost.self) private var menus
     @State private var chevronFrame: CGRect = .zero
-    /// What the pointer is over: a tool, or the shapes chevron.
-    @State private var hovered: Spot?
-    /// Where the highlight sits: the spot hovered, or after the pointer
-    /// leaves, the last one, while it fades there.
-    @State private var place: Spot?
+    /// What the pointer is over (a tool, or the shapes chevron), and where
+    /// the highlight sits.
+    @State private var glide = GlideHover<Spot>()
     /// Each spot's box in the bar.
     @State private var frames: [Spot: CGRect] = [:]
 
@@ -44,12 +42,12 @@ struct ToolBar: View {
         // in the row and pulled the new one back to itself.
         .background(alignment: .topLeading) {
             ZStack(alignment: .topLeading) {
-                if let place, let box = frames[place] {
+                if let place = glide.place, let box = frames[place] {
                     RoundedRectangle(cornerRadius: radius(place))
                         .fill(Theme.panelRaised)
                         .frame(width: box.width, height: box.height)
                         .offset(x: box.minX, y: box.minY)
-                        .opacity(hovered == nil ? 0 : 1)
+                        .opacity(glide.hovered == nil ? 0 : 1)
                 }
                 // The tool in hand, over the hover highlight, sliding to
                 // the next tool however it is picked (a click or its key).
@@ -73,36 +71,12 @@ struct ToolBar: View {
                   size: Theme.modeButton, iconBox: Theme.icon, hoverFill: .clear, onFill: .clear) {
             pick(tool)
         }
-        .onHover { hover(.tool(tool), $0) }
+        .onHover { $glide.hover(.tool(tool), $0) }
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { frames[.tool(tool)] = $0 }
     }
 
     private func radius(_ spot: Spot) -> CGFloat {
         spot == .chevron ? Theme.radiusRow : Theme.radius(forButton: Theme.modeButton)
-    }
-
-    /// Moving from one spot to the next slides the highlight there; coming
-    /// onto the bar, it appears where the pointer is rather than sliding in
-    /// from where it last faded. Leaving waits a moment, since the next
-    /// spot's arrival may come just after, and only then fades it, if
-    /// nothing has taken it since.
-    private func hover(_ spot: Spot, _ inside: Bool) {
-        if inside {
-            if hovered == nil {
-                var still = Transaction()
-                still.disablesAnimations = true
-                withTransaction(still) { place = spot }
-            }
-            withAnimation(Theme.hoverGlide) {
-                place = spot
-                hovered = spot
-            }
-        } else if hovered == spot {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Theme.hoverLinger) {
-                guard hovered == spot else { return }
-                withAnimation(Theme.hoverGlide) { hovered = nil }
-            }
-        }
     }
 
     private func pick(_ tool: Tool) {
@@ -123,12 +97,12 @@ struct ToolBar: View {
                        growsUp: true)
         } label: {
             IconView(.chevronDown, size: chevronGlyph)
-                .foregroundStyle(hovered == .chevron ? Theme.textPrimary : Theme.textTertiary)
+                .foregroundStyle(glide.hovered == .chevron ? Theme.textPrimary : Theme.textTertiary)
                 .frame(width: chevronGlyph + (Theme.modeButton - Theme.icon) / 2, height: Theme.modeButton)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hover(.chevron, $0) }
+        .onHover { $glide.hover(.chevron, $0) }
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { frames[.chevron] = $0 }
         .help("More shapes")
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { chevronFrame = $0 }
