@@ -231,7 +231,8 @@ struct SettingsPage: View {
                 .padding(.horizontal, Theme.panelPad)
                 .padding(.vertical, Theme.panelPad - Self.rowInset)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .floatingPanel()
+                // Flat on the page, with no shadow (the user's choice).
+                .floatingPanel(shadow: false)
         }
     }
 

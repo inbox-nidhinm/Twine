@@ -5,8 +5,9 @@ import Theme
 extension View {
     /// The card every panel, bar and popup is drawn on. Each one floats over the
     /// canvas, so each needs its own edge: a border alone reads as a seam and a
-    /// shadow alone as a smudge.
-    func floatingPanel(corner: CGFloat = Theme.radiusPanel) -> some View {
+    /// shadow alone as a smudge. A card lying flat on a page, as Settings'
+    /// are, takes no shadow.
+    func floatingPanel(corner: CGFloat = Theme.radiusPanel, shadow: Bool = true) -> some View {
         // The cursor area sits behind the fill, where it can never take a click.
         // It is there to claim the app's arrow back from a canvas underneath.
         background(CursorArea())
@@ -19,7 +20,7 @@ extension View {
             .overlay(RoundedRectangle(cornerRadius: corner)
                 .strokeBorder(Theme.border, lineWidth: 1))
             .clipShape(RoundedRectangle(cornerRadius: corner))
-            .shadow(color: Theme.shadow, radius: Theme.shadowRadius, y: Theme.shadowY)
+            .shadow(color: shadow ? Theme.shadow : .clear, radius: shadow ? Theme.shadowRadius : 0, y: shadow ? Theme.shadowY : 0)
     }
 }
 
