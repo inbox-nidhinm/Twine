@@ -30,6 +30,12 @@ final class TimelineRulerView: NSView {
 
     override var isFlipped: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    /// Since macOS 14 a view draws past its edges unless told not to: the
+    /// pill and the times near the start spilled over the transport.
+    override var clipsToBounds: Bool {
+        get { true }
+        set {}
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         guard let controller, let ctx = NSGraphicsContext.current?.cgContext else { return }
@@ -84,7 +90,12 @@ final class TimelineRulerView: NSView {
             .foregroundColor: NSColor(Theme.textOnColor),
         ]
         let size = time.size(withAttributes: pillText)
-        let pill = CGRect(x: px - (size.width + 22) / 2, y: mid - 11, width: size.width + 22, height: 22)
+        var pill = CGRect(x: px - (size.width + 22) / 2, y: mid - 11, width: size.width + 22, height: 22)
+        // Whole while the playhead is in view: at either end the pill is
+        // pushed in, and the line still marks the time.
+        if px >= 0, px <= bounds.width {
+            pill.origin.x = min(max(pill.minX, 0), bounds.width - pill.width)
+        }
         pillRect = pill
         ctx.addPath(CGPath(roundedRect: pill, cornerWidth: 11, cornerHeight: 11, transform: nil))
         ctx.fillPath()

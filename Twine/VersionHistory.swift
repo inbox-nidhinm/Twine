@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 173
+    static let pushes = 174
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -49,6 +49,7 @@ enum VersionHistory {
             "A card saying \"Opening\" with the project's name, and a turning ring, shows in the middle of the window while a large project opens, however it is opened (the home screen, the Finder, Open Recent). It keeps turning while Twine builds the editor, and appears only when opening takes longer than a moment, so small projects show nothing.",
             "Copy a scene onto another layer. Click a scene's row, copy, select another layer and paste: the scene's actions go onto that layer at the same times, each making its motion from where the new layer stands, as a scene of their own called \"Scene 1 copy\". Pasted onto several layers, each gets its own. Duplicating a whole scene, or a layer whose actions make a whole scene, also makes a new scene; copies of only some of a scene's actions still join it.",
         ], fixes: [
+            "The playhead's time and the ruler's numbers no longer spill over the play controls when the timeline is scrolled or the playhead is near the start: the ruler keeps to its own area, and the time stays whole at either end while the playhead is in view.",
             "Opening a project with text is far quicker on a Mac with many fonts. Each new text style asked macOS for the list of every installed font, about a tenth of a second each time; the list is now kept until fonts are added or removed. A large project of 316 texts in 16 styles opens in 0.8 s, from 2.6 s, and selecting text no longer waits on it either.",
             "Very large projects are far quicker. In a project of 5,000 layers with 550 actions, playback runs at a full 60 frames a second (it was 25), scrubbing keeps up (8 ms a step, from 105), dragging a layer takes about 25 ms a step (from 50), and each edit is applied in under 2 ms. Twine now keeps everything no action moves as it was worked out last time, rather than working all of it out again every frame.",
             "Pressing on the canvas in a project with thousands of layers no longer freezes Twine for several seconds before a drag starts. Lining up the snapping guides looked up every layer's groups by searching the whole project, once per layer.",
