@@ -99,6 +99,7 @@ public final class CoreAnimationRenderer: SceneRenderer {
                 }()
             }
             if case .text = layers[i].content { node.setTextZoom(Self.textZoom(of: layers[i], in: scene, scale: contentsScale)) }
+            if case .spread = layers[i].motion { node.setMotionZoom(Self.stretch(of: layers[i], in: scene)) }
             node.update(layers[i], media: media)
         }
 
@@ -170,12 +171,18 @@ public final class CoreAnimationRenderer: SceneRenderer {
     /// every frame, never below 1, and held so the picture stays within
     /// `TextImage.maxSide` pixels.
     static func textZoom(of layer: ResolvedLayer, in scene: ResolvedScene, scale: CGFloat) -> CGFloat {
+        let side = max(layer.size.width, layer.size.height, 1)
+        return min(stretch(of: layer, in: scene), CGFloat(max(1, TextImage.maxSide / (side * max(Double(scale), 1)))))
+    }
+
+    /// How much bigger than its own size a layer shows, through its own
+    /// scale and every group's and frame's around it, rounded up in steps
+    /// of about 41% (a half power of two), never below 1.
+    static func stretch(of layer: ResolvedLayer, in scene: ResolvedScene) -> CGFloat {
         guard let w = scene.worldTransform(of: layer.id) else { return 1 }
         let stretch = max(hypot(w.a, w.b), hypot(w.c, w.d))
         guard stretch.isFinite, stretch > 1.001 else { return 1 }
-        let stepped = pow(2, (log2(stretch) * 2).rounded(.up) / 2)
-        let side = max(layer.size.width, layer.size.height, 1)
-        return CGFloat(max(1, min(stepped, TextImage.maxSide / (side * max(Double(scale), 1)))))
+        return CGFloat(pow(2, (log2(stretch) * 2).rounded(.up) / 2))
     }
 
     /// Only touches the tree when the order actually changed.
@@ -318,6 +325,9 @@ final class Node {
     /// finer than `scale`.
     private var textZoom: CGFloat = 1
     private var textScale: CGFloat { scale * textZoom }
+    /// How much bigger than its own size the layer shows while it blurs,
+    /// so its copies' one picture is drawn fine enough.
+    private var motionZoom: CGFloat = 1
     /// A video layer's frame.
     private var mediaLayer: CALayer?
     /// While a text preset moves a text's letters, words or lines one by
@@ -363,6 +373,12 @@ final class Node {
         textZoom = zoom
         last = nil
         textKeys = [nil, nil]
+    }
+
+    func setMotionZoom(_ zoom: CGFloat) {
+        guard zoom != motionZoom else { return }
+        motionZoom = zoom
+        last = nil
     }
 
     private static func refreshes(_ layer: ResolvedLayer) -> Bool {
@@ -668,7 +684,7 @@ final class Node {
             container.sublayers = [made.copies]
             motionCopies = made
         }
-        motionCopies?.apply(motion, size: size.cg)
+        motionCopies?.apply(motion, size: size.cg, scale: scale * motionZoom)
     }
 
     /// The back of a curling page, made again only when its colour, size
@@ -872,6 +888,14 @@ enum RevealLayers {
 /// are added, which with many copies adds up (24 copies of an off-white of
 /// 247 came to white), so exports draw each moment whole and average in
 /// full precision instead (`OffscreenRenderer`, `MotionSpread.exact`).
+///
+/// The body is drawn once into a picture and the copies are made of that
+/// picture (`shouldRasterize`): left to itself, the replicator drew every
+/// layer inside the body again for every copy, so a blurring group of 500
+/// layers was 4,000 layers a frame, 130 ms on the canvas where it drew in
+/// 11 sharp. The picture is drawn at the layer's size on screen, held to
+/// `maxPicture` pixels a side, a little soft only when zoomed far in on a
+/// large group, which the blur smears anyway.
 final class MotionCopies {
     let copies = CAReplicatorLayer()
     let body = CALayer()
@@ -886,7 +910,7 @@ final class MotionCopies {
         copies.addSublayer(body)
     }
 
-    func apply(_ motion: MotionSpread, size: CGSize) {
+    func apply(_ motion: MotionSpread, size: CGSize, scale: CGFloat) {
         let bounds = CGRect(origin: .zero, size: size)
         if copies.bounds != bounds {
             copies.bounds = bounds
@@ -897,6 +921,10 @@ final class MotionCopies {
             copies.instanceTransform = step.caTransform
             body.opacity = 1 / Float(count)
             if body.compositingFilter == nil { body.compositingFilter = add }
+            let side = max(size.width, size.height, 1)
+            let pictureScale = max(1, min(scale, Self.maxPicture / side))
+            if body.rasterizationScale != pictureScale { body.rasterizationScale = pictureScale }
+            if !body.shouldRasterize { body.shouldRasterize = true }
             // Just under full, so the copies are drawn together, apart,
             // before they are laid over the rest: a group only forms when
             // it fades.
@@ -906,9 +934,13 @@ final class MotionCopies {
             copies.instanceTransform = CATransform3DIdentity
             body.opacity = 1
             body.compositingFilter = nil
+            body.shouldRasterize = false
             copies.opacity = 1
         }
     }
+
+    /// The most pixels a side the body's picture is drawn at.
+    static let maxPicture: CGFloat = 4096
 
     /// Fades by a thousandth, which no pixel shows.
     static let grouped: Float = 0.999
@@ -951,7 +983,7 @@ private final class TextUnitLayer {
         holder.bounds = CGRect(origin: .zero, size: size)
         holder.position = .zero
         holder.transform = (unit.motion.placed ?? unit.transform).caTransform
-        motion.apply(unit.motion, size: size)
+        motion.apply(unit.motion, size: size, scale: image.scale)
         holder.opacity = Float(unit.opacity)
         if unit.blur != blur {
             blur = unit.blur

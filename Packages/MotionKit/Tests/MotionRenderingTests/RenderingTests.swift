@@ -125,6 +125,33 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
         #expect(pixel(over, 26, 8).r > 245 && pixel(over, 26, 8).g > 25 && pixel(over, 26, 8).g < 80, "\(pixel(over, 26, 8))")
     }
 
+    @Test func aBlurringGroupDrawsWhatLiesOutsideItsBox() throws {
+        // On the canvas a blurring layer's copies are made from one picture
+        // of it; a group's children outside its box must still be in it.
+        let inside = shape(at: .zero, size: Size2(8, 8))
+        let outside = shape(fill: RGBA(0, 0, 1), at: Vec2(30, 40), size: Size2(8, 8))
+        var group = Layer(name: "G", content: .group(GroupContent(children: [inside, outside])),
+                          size: Size2(16, 16), position: .zero)
+        group.transform.anchor = .zero
+        // 20 px a second at 10 fps: the copies spread over 2 px.
+        var slide = Action(target: group.id, start: 0, duration: 2, easing: .linear,
+                           spec: .move(MoveAction(mode: .by, end: Vec2(40, 0))))
+        slide.motionBlur = 1
+        let composition = Composition(width: 64, height: 64, frameRate: FrameRate(frames: 10),
+                                      background: Background(isTransparent: true))
+        let project = Project(composition: composition, layers: [group], actions: [slide])
+        let scene = evaluate(project, at: 1, motionBlur: .preview)
+        guard case .spread = try #require(scene.layer(group.id)).motion else {
+            Issue.record("the group does not blur")
+            return
+        }
+        let image = try #require(OffscreenRenderer(pixelWidth: 64, pixelHeight: 64)?.image(of: scene))
+        // At 1 s the group is 20 px along: its own square at x 20 to 28, the
+        // one outside its box at 50 to 58.
+        #expect(pixel(image, 24, 4).r > 245 && pixel(image, 24, 4).a > 245, "\(pixel(image, 24, 4))")
+        #expect(pixel(image, 54, 44).b > 245 && pixel(image, 54, 44).a > 245, "\(pixel(image, 54, 44))")
+    }
+
     @Test func motionBlurKeepsAColourWhereEveryCopyCovers() throws {
         // A light card moving slowly: where every moment covers it, the
         // average is the card's own colour. Drawn as 24 copies at a 24th of

@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 178
+    static let pushes = 179
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -62,6 +62,7 @@ enum VersionHistory {
             "Pointing at and clicking layers stays quick in a project with thousands of layers. Each layer under the pointer was checked for a locked group by searching the whole project.",
             "Saving a very large project no longer pauses Twine for half a second after each edit. Its picture on the home screen is drawn as the project closes, rather than with every save.",
             "Projects with more than 512 texts no longer lay all their text out again on every edit and frame.",
+            "Playback no longer stutters while a large group moves with motion blur. Each of the blur's eight copies drew every layer in the group again, so a group of 500 layers was 4,000 layers a frame and slowed the whole Mac; the group is now drawn once and its copies made from that picture. In a project whose screens slide in with motion blur, the slowest frames draw in about 50 ms, from 400.",
         ], misc: [
             "The picture at the top of a project's Info card fills the card's width at its own shape, rather than shrinking to a fixed height with space at its sides; a tall one is cut to a square, as on the home screen's cards.",
             "Cancel in the export window is a plain grey button while an export runs, rather than blue: it is not the thing the window is for.",
