@@ -270,6 +270,12 @@ public enum Theme {
     public static let onboardingButton: CGFloat = 28
     public static let onboardingRow: CGFloat = 30
     public static let onboardingFolderRow: CGFloat = 34
+    /// The size the onboarding's artwork is drawn at, in its own pixels, and
+    /// the folder's name in it: its type size and its baseline from the top,
+    /// as the designer set it under the folder.
+    public static let onboardingArtwork = CGSize(width: 746, height: 886)
+    public static let onboardingFolderName: CGFloat = 38
+    public static let onboardingFolderBaseline: CGFloat = 651
     public static let radiusCard: CGFloat = 12
     /// The home screen's Info card on a project: its width, which its
     /// thumbnail spans.

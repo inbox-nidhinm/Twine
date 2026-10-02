@@ -575,6 +575,11 @@ enum SelfTest {
             case "onboarding":
                 // Raises the onboarding card, as Help > Show Onboarding does.
                 OnboardingState.shared.show()
+                if parts.count > 1, let page = Int(parts[1]) { OnboardingState.shared.page = page }
+            case "folderchosen":
+                // As choosing a folder on the onboarding's folder page does to
+                // its video, without the panel.
+                OnboardingState.shared.folderChoices += 1
             case "home":
                 // Home, as the layers panel's button does.
                 HomeWindowController.shared.showWindow(nil)

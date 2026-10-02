@@ -18,6 +18,9 @@ final class OnboardingState {
     /// The feature the last page is showing. It opens on the first, so there
     /// is always something beside the list.
     var feature = OnboardingFeature.allCases[0]
+    /// How many times a folder has been chosen since the card came up. The
+    /// folder page's video waits for the first and plays once for each.
+    var folderChoices = 0
 
     private static let seenKey = "hasSeenOnboarding"
 
@@ -31,6 +34,7 @@ final class OnboardingState {
     func show() {
         page = 0
         feature = OnboardingFeature.allCases[0]
+        folderChoices = 0
         isShowing = true
     }
 
@@ -230,7 +234,9 @@ struct OnboardingView: View {
             switch state.page {
             case 0: OnboardingArt(name: "onboarding-intro")
             // The folder's name is whichever was chosen, so the app writes it.
-            case 1: OnboardingArt(name: "onboarding-folder", caption: folder.lastPathComponent)
+            // Its video fills the folder, so it plays when one is chosen.
+            case 1: OnboardingArt(name: "onboarding-folder", caption: folder.lastPathComponent,
+                                  plays: state.folderChoices)
             default:
                 OnboardingArt(name: state.feature.art)
                     .id(state.feature)
@@ -274,6 +280,7 @@ struct OnboardingView: View {
         Creations.chooseFolder(for: MainWindow.window) { chosen in
             guard chosen else { return }
             folder = Creations.folder
+            state.folderChoices += 1
             folderChanged()
         }
     }
@@ -330,13 +337,16 @@ struct OnboardingView: View {
 /// all it takes to replace a placeholder.
 private struct OnboardingArt: View {
     let name: String
-    /// Written over the artwork, such as the chosen folder's name.
+    /// Written under the folder in the artwork: the chosen folder's name.
     var caption: String?
+    /// Nil loops the video. A count plays it once each time it goes up,
+    /// holding the first frame until then and the last after.
+    var plays: Int?
 
     var body: some View {
         ZStack {
             if let url = Self.file(name, ["mp4", "mov"]) {
-                LoopingVideo(url: url)
+                LoopingVideo(url: url, plays: plays)
             } else if let image = Self.image(name) {
                 Image(nsImage: image)
                     .resizable()
@@ -347,16 +357,43 @@ private struct OnboardingArt: View {
                     .foregroundStyle(Theme.textTertiary)
             }
         }
-        .overlay(alignment: .bottom) {
+        .overlay {
             if let caption {
-                Text(caption)
-                    .font(ThemeFont.title)
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .padding(.horizontal, Theme.onboardingPad)
-                    .padding(.bottom, Theme.onboardingPad * 2)
+                GeometryReader { space in
+                    FolderName(text: caption, in: space.size)
+                }
             }
+        }
+    }
+
+    /// The name set where the designer put it, under the folder: the
+    /// artwork fills its box as the video does, cut evenly off two sides,
+    /// and the type is placed and sized in the artwork's own pixels, scaled
+    /// with it.
+    private struct FolderName: View {
+        let text: String
+        let box: CGSize
+
+        init(text: String, in box: CGSize) {
+            self.text = text
+            self.box = box
+        }
+
+        var body: some View {
+            let art = Theme.onboardingArtwork
+            let scale = max(box.width / art.width, box.height / art.height)
+            let top = (box.height - art.height * scale) / 2
+            let baseline = top + Theme.onboardingFolderBaseline * scale
+            Text(text)
+                .font(.system(size: Theme.onboardingFolderName * scale))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .padding(.horizontal, Theme.onboardingPad)
+                .frame(width: box.width)
+                // The baseline, not the box, goes to its place.
+                .alignmentGuide(.top) { $0[.lastTextBaseline] - baseline }
+                .frame(width: box.width, height: box.height, alignment: .top)
         }
     }
 
@@ -375,13 +412,17 @@ private struct OnboardingArt: View {
     }
 }
 
-/// A silent video playing round and round, filling its box.
+/// A silent video filling its box, playing round and round, or with `plays`
+/// once each time the count goes up.
 private struct LoopingVideo: NSViewRepresentable {
     let url: URL
+    var plays: Int?
 
     func makeNSView(context: Context) -> VideoView { VideoView() }
 
-    func updateNSView(_ view: VideoView, context: Context) { view.play(url) }
+    func updateNSView(_ view: VideoView, context: Context) {
+        if let plays { view.play(url, times: plays) } else { view.play(url) }
+    }
 
     static func dismantleNSView(_ view: VideoView, coordinator: ()) { view.stop() }
 
@@ -390,6 +431,8 @@ private struct LoopingVideo: NSViewRepresentable {
         private let playerLayer = AVPlayerLayer()
         private var looper: AVPlayerLooper?
         private var url: URL?
+        /// The plays already started, for a video that plays once.
+        private var played: Int?
 
         init() {
             super.init(frame: .zero)
@@ -416,6 +459,38 @@ private struct LoopingVideo: NSViewRepresentable {
             self.url = url
             looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
             player.play()
+        }
+
+        /// Once from the start whenever `times` goes up. Made with plays
+        /// already counted (the page turned back to), it rests on the last
+        /// frame; with none, on the first.
+        func play(_ url: URL, times: Int) {
+            if url != self.url {
+                self.url = url
+                looper = nil
+                // Kept at the end rather than taken off the queue, so the
+                // last frame stays.
+                player.actionAtItemEnd = .pause
+                let item = AVPlayerItem(url: url)
+                player.removeAllItems()
+                player.insert(item, after: nil)
+                played = times
+                if times > 0 { rest(atEndOf: item) }
+                return
+            }
+            guard let played, times > played else { return }
+            self.played = times
+            player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero) { [player] _ in
+                player.play()
+            }
+        }
+
+        private func rest(atEndOf item: AVPlayerItem) {
+            Task { @MainActor [player] in
+                guard let length = try? await item.asset.load(.duration) else { return }
+                let last = CMTimeSubtract(length, CMTime(value: 1, timescale: 120))
+                await player.seek(to: last, toleranceBefore: .zero, toleranceAfter: .zero)
+            }
         }
 
         func stop() {
