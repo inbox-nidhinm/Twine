@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 181
+    static let pushes = 182
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -51,7 +51,7 @@ enum VersionHistory {
             "Page Turn, beside it in the Flip group: the layer swings on one edge like a page on its spine, the free edge lifting towards you until it is edge-on (Out), or coming down from the far side (In), as the onboarding's pages do. Pick the edge it hinges on in its settings.",
             "A card saying \"Opening\" with the project's name, and a turning ring, shows in the middle of the window while a large project opens, however it is opened (the home screen, the Finder, Open Recent). It keeps turning while Twine builds the editor, and appears only when opening takes longer than a moment, so small projects show nothing.",
             "A deeper blue (#217FD8, from #4C9FEF) for everything that marks what is selected or in hand: the selection on the canvas, selected rows, the tool in hand, the main buttons, and the Figma plugin's panel.",
-            "The onboarding's first page shows a looping video of Twine at work in place of its placeholder. The folder page has its own video, of the folder with your chosen folder's name under it: it waits until you choose a folder, then plays once, papers going into the folder, and stays on its last frame.",
+            "The onboarding's first page shows a looping video of Twine at work in place of its placeholder. The folder page has its own video, of the folder with your chosen folder's name under it: a second after the page turns over, papers go into the folder, and it stays on its last frame. Choosing a different folder plays it again.",
             "Animate is Twine's main mode: a project opens in it, and it is now the left of the switch at the top of the inspector, with Design on the right. The View menu lists them in the same order.",
             "Every row of tabs glides as the tool bar does: the mode switch, a fill's Solid, Linear, Radial and Image, a stroke's Style, Caps and Joins, a preset's direction, corner and In or Out, and the rest. A highlight slides from option to option under the pointer, and the chosen grey slides across to the one you pick.",
             "Copy a scene onto another layer. Click a scene's row, copy, select another layer and paste: the scene's actions go onto that layer at the same times, each making its motion from where the new layer stands, as a scene of their own called \"Scene 1 copy\". Pasted onto several layers, each gets its own. Duplicating a whole scene, or a layer whose actions make a whole scene, also makes a new scene; copies of only some of a scene's actions still join it.",

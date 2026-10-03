@@ -18,9 +18,17 @@ final class OnboardingState {
     /// The feature the last page is showing. It opens on the first, so there
     /// is always something beside the list.
     var feature = OnboardingFeature.allCases[0]
-    /// How many times a folder has been chosen since the card came up. The
-    /// folder page's video waits for the first and plays once for each.
-    var folderChoices = 0
+    /// How many times the folder page's video has been asked to play since
+    /// the card came up: once when the page first lands, and again each time
+    /// the folder changes (the user's choice, 3 October 2026; it used to wait
+    /// for a folder to be chosen).
+    var folderPlays = 0
+    /// The folder page's video has played since the card came up, so
+    /// turning back to it later leaves the video on its last frame.
+    var folderPageLanded = false
+    /// How long the folder page lies still before its video first plays
+    /// (the user's choice, 3 October 2026).
+    static let folderVideoWait: Double = 1
 
     private static let seenKey = "hasSeenOnboarding"
 
@@ -34,7 +42,8 @@ final class OnboardingState {
     func show() {
         page = 0
         feature = OnboardingFeature.allCases[0]
-        folderChoices = 0
+        folderPlays = 0
+        folderPageLanded = false
         isShowing = true
     }
 
@@ -234,9 +243,10 @@ struct OnboardingView: View {
             switch state.page {
             case 0: OnboardingArt(name: "onboarding-intro")
             // The folder's name is whichever was chosen, so the app writes it.
-            // Its video fills the folder, so it plays when one is chosen.
+            // Its video fills the folder: it plays as the page first lands,
+            // and again whenever the folder changes.
             case 1: OnboardingArt(name: "onboarding-folder", caption: folder.lastPathComponent,
-                                  plays: state.folderChoices)
+                                  plays: state.folderPlays)
             default:
                 OnboardingArt(name: state.feature.art)
                     .id(state.feature)
@@ -272,15 +282,26 @@ struct OnboardingView: View {
             // Set without animating, so it arrives from the far side.
             leaf = -away
             withAnimation(.easeOut(duration: 0.26)) { leaf = 0 }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) { turning = false }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
+                turning = false
+                // Played once the page has lain flat a moment, not while it
+                // turns, unless the page was left or a folder chosen first.
+                guard state.page == 1, !state.folderPageLanded else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + OnboardingState.folderVideoWait) {
+                    guard state.isShowing, state.page == 1, !state.folderPageLanded else { return }
+                    state.folderPageLanded = true
+                    state.folderPlays += 1
+                }
+            }
         }
     }
 
     private func chooseFolder() {
         Creations.chooseFolder(for: MainWindow.window) { chosen in
-            guard chosen else { return }
+            guard chosen, Creations.folder.standardizedFileURL.path != folder.standardizedFileURL.path else { return }
             folder = Creations.folder
-            state.folderChoices += 1
+            state.folderPageLanded = true
+            state.folderPlays += 1
             folderChanged()
         }
     }
