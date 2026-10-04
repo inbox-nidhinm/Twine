@@ -36,6 +36,7 @@ enum MediaImport {
                   var h = properties[kCGImagePropertyPixelHeight] as? Int else { return nil }
             // Orientations 5 to 8 are turned a quarter, so width and height swap.
             if let o = properties[kCGImagePropertyOrientation] as? Int, o >= 5 { swap(&w, &h) }
+            guard FileSafety.pictureFileFits(width: Double(w), height: Double(h)) else { return nil }
             asset.pixelWidth = w
             asset.pixelHeight = h
         case .video:
@@ -56,6 +57,21 @@ enum MediaImport {
             asset.hasAudio = true
         }
         return asset
+    }
+
+    /// Whether `url` is a picture too large to take in
+    /// (`FileSafety.pictureFileFits`), read from its header alone.
+    static func isOversizedPicture(_ url: URL) -> Bool {
+        guard kind(of: url) == .image, let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let w = properties[kCGImagePropertyPixelWidth] as? Int,
+              let h = properties[kCGImagePropertyPixelHeight] as? Int else { return false }
+        return !FileSafety.pictureFileFits(width: Double(w), height: Double(h))
+    }
+
+    /// What a notice says of pictures too large to take in.
+    static func oversizedNotice(_ names: [String]) -> String {
+        names.count == 1 ? "\(names[0]) is too large to import." : "\(names.joined(separator: ", ")) are too large to import."
     }
 
     /// SHA-256 of the file, read a megabyte at a time so a long video never

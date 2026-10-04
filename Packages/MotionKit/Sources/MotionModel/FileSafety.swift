@@ -42,6 +42,27 @@ public enum FileSafety {
             && max(width, height) <= Double(largestPictureSide) && width * height <= Double(mostPicturePixels)
     }
 
+    /// The largest picture file Twine takes in at all (4 October 2026).
+    /// Larger than `pictureFits` allows, it is drawn shrunk to fit
+    /// (`pictureDrawingScale`), which keeps a big photo usable; past these
+    /// even shrinking it takes seconds and gigabytes as it is read, every
+    /// time the project opens, so it is refused.
+    public static let largestPictureFileSide = 65_535
+    public static let mostPictureFilePixels = 400_000_000
+
+    /// Whether a picture file `width` by `height` pixels may come in.
+    public static func pictureFileFits(width: Double, height: Double) -> Bool {
+        width.isFinite && height.isFinite && width >= 1 && height >= 1
+            && max(width, height) <= Double(largestPictureFileSide) && width * height <= Double(mostPictureFilePixels)
+    }
+
+    /// How much a picture `width` by `height` pixels is shrunk when drawn,
+    /// so it is within `pictureFits`: 1 for every picture already within.
+    public static func pictureDrawingScale(width: Double, height: Double) -> Double {
+        guard width >= 1, height >= 1, width.isFinite, height.isFinite else { return 1 }
+        return min(1, Double(largestPictureSide) / max(width, height), (Double(mostPicturePixels) / (width * height)).squareRoot())
+    }
+
     /// A polygon's sides or a star's points as Twine draws them.
     public static func corners(_ count: Int) -> Int { min(max(count, 3), maxCorners) }
 

@@ -21,6 +21,20 @@ enum WebMConversion {
 
     static func isWebM(_ url: URL) -> Bool { url.pathExtension.lowercased() == "webm" }
 
+    /// What ffmpeg is told before the file, so it reads it as WebM and from
+    /// the disk only. Left to itself it judges a file by what is in it, and a
+    /// `.webm` that was really a list of other files (ffmpeg's concat or
+    /// playlist formats) made it read those and put them in the movie, which
+    /// the project then kept (4 October 2026).
+    private static let readAsWebM = ["-f", "matroska", "-protocol_whitelist", "file"]
+
+    /// Whether the file starts as every WebM does (Matroska's EBML header).
+    private static func startsAsWebM(_ url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        return (try? handle.read(upToCount: 4)) == Data([0x1A, 0x45, 0xDF, 0xA3])
+    }
+
     /// Where Homebrew and other installers put ffmpeg. An app started from
     /// the Finder does not see the shell's search path, so it looks itself.
     private static let places = ["/opt/homebrew/bin", "/usr/local/bin", "/opt/local/bin", "/usr/bin"]
@@ -34,6 +48,7 @@ enum WebMConversion {
     /// far through the clip ffmpeg has got, from 0 to 1, on another thread.
     static func convert(_ url: URL, progress: (@Sendable (Double) -> Void)? = nil) async throws -> URL {
         guard let ffmpeg = tool("ffmpeg") else { throw Failure.noFFmpeg }
+        guard startsAsWebM(url) else { throw Failure.failed("\(url.lastPathComponent) isn't a WebM file.") }
         let stopsBefore = stops.withLock { $0 }
         let video = await probe(url)
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Twine WebM", isDirectory: true)
@@ -44,7 +59,7 @@ enum WebMConversion {
         if video.hasAlpha { input += ["-c:v", video.codec == "vp8" ? "libvpx" : "libvpx-vp9"] }
         // ffmpeg reports how far it has got on its output, a line at a time.
         input += ["-progress", "pipe:1", "-nostats"]
-        input += ["-i", url.path, "-map", "0:v:0", "-map", "0:a?", "-fps_mode", "passthrough"]
+        input += readAsWebM + ["-i", url.path, "-map", "0:v:0", "-map", "0:a?", "-fps_mode", "passthrough"]
         let attempts: [[String]] = video.hasAlpha
             ? [["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le", "-c:a", "pcm_s16le"]]
             : [["-c:v", "hevc_videotoolbox", "-q:v", "70", "-tag:v", "hvc1", "-pix_fmt", "yuv420p",
@@ -76,7 +91,7 @@ enum WebMConversion {
     /// the clip's length in seconds when the file says.
     private static func probe(_ url: URL) async -> (codec: String, hasAlpha: Bool, duration: Double?) {
         guard let ffprobe = tool("ffprobe"),
-              let (_, output) = try? await run(ffprobe, ["-v", "error", "-select_streams", "v:0",
+              let (_, output) = try? await run(ffprobe, ["-v", "error"] + readAsWebM + ["-select_streams", "v:0",
                                                         "-show_entries", "stream=codec_name:stream_tags=alpha_mode:format=duration",
                                                         "-of", "default=noprint_wrappers=1", url.path], readsOutput: true)
         else { return ("vp9", false, nil) }

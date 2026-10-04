@@ -359,6 +359,7 @@ final class EditorController {
             var commands: [EditorCommand] = []
             var added: [UUID] = []
             var skipped = false
+            var oversized: [String] = []
             let composition = project.composition
             let center = point ?? Vec2(Double(composition.width) / 2, Double(composition.height) / 2)
             var offset = 0.0
@@ -376,6 +377,7 @@ final class EditorController {
                         known.append(asset)
                     }
                 } else {
+                    if MediaImport.isOversizedPicture(url) { oversized.append(url.lastPathComponent); continue }
                     guard var described = await MediaImport.describe(url) else { skipped = true; continue }
                     if let existing = known.first(where: { $0.contentHash == described.contentHash }) {
                         described = existing
@@ -402,6 +404,8 @@ final class EditorController {
                 added.append(layer.id)
             }
             if skipped { NSSound.beep() }
+            // Said after the work's own last word, so it is not written over.
+            defer { if !oversized.isEmpty { editor.showNotice(MediaImport.oversizedNotice(oversized)) } }
             guard !commands.isEmpty, perform(.batch(commands, name: added.count == 1 ? "Import" : "Import Files")) else {
                 editor.finishWork(work, done: nil)
                 return
@@ -435,6 +439,10 @@ final class EditorController {
             let brought = await bringInWebM(url, known: project.media, work: work)
             editor.finishWork(work, done: brought == nil ? nil : "Imported \(url.lastPathComponent)")
             return brought
+        }
+        if MediaImport.isOversizedPicture(url) {
+            editor.showNotice(MediaImport.oversizedNotice([url.lastPathComponent]))
+            return nil
         }
         let work = editor.beginWork("Importing \(url.lastPathComponent)", after: 0.4)
         guard let document, let described = await MediaImport.describe(url), described.kind == kind else {

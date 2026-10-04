@@ -3,6 +3,7 @@ import AVFoundation
 import CoreImage
 import CoreGraphics
 import ImageIO
+import MotionModel
 import VideoToolbox
 
 /// Where a renderer gets the pictures for image and video layers.
@@ -55,19 +56,28 @@ public final class MediaLibrary: MediaProvider {
 
     /// The whole picture, turned the way its camera says it should be, in
     /// sRGB like everything else the renderer draws.
+    ///
+    /// A picture past `FileSafety.pictureFits` is read shrunk to fit it, as
+    /// it is read, so it never takes more memory than the largest allowed;
+    /// one past `FileSafety.pictureFileFits` is not read at all (4 October
+    /// 2026: a few megabytes of PNG can say it is 30,000 pixels square).
     static func loadImage(_ url: URL) -> CGImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
         let orientation = properties?[kCGImagePropertyOrientation] as? Int ?? 1
+        let width = Double(properties?[kCGImagePropertyPixelWidth] as? Int ?? 0)
+        let height = Double(properties?[kCGImagePropertyPixelHeight] as? Int ?? 0)
+        guard FileSafety.pictureFileFits(width: width, height: height) else { return nil }
+        let scale = FileSafety.pictureDrawingScale(width: width, height: height)
         let loaded: CGImage?
-        if orientation == 1 {
+        if orientation == 1, scale == 1 {
             loaded = CGImageSourceCreateImageAtIndex(source, 0, nil)
         } else {
-            let longest = max(properties?[kCGImagePropertyPixelWidth] as? Int ?? 0, properties?[kCGImagePropertyPixelHeight] as? Int ?? 0)
+            let longest = (max(width, height) * scale).rounded(.down)
             loaded = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
                 kCGImageSourceCreateThumbnailWithTransform: true,
-                kCGImageSourceThumbnailMaxPixelSize: max(longest, 1),
+                kCGImageSourceThumbnailMaxPixelSize: max(Int(longest), 1),
             ] as CFDictionary)
         }
         guard let image = loaded else { return nil }
