@@ -568,7 +568,9 @@ final class EditorController {
             // Read on a worker thread: a large drawing takes a while, and the
             // app should not freeze meanwhile.
             let reading = Task.detached(priority: .userInitiated) { () -> SVGImport.Result? in
-                guard let data = try? Data(contentsOf: url) else { return nil }
+                // Read whole into memory, so a file far past any drawing is refused first.
+                guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= SVGImport.largestFile,
+                      let data = try? Data(contentsOf: url) else { return nil }
                 return try? SVGImport.read(data, name: name, center: center, fitting: fitting)
             }
             guard let read = await reading.value else { return NSSound.beep() }
@@ -965,7 +967,7 @@ final class EditorController {
     /// How many actions the pasteboard holds.
     var copiedActionCount: Int {
         guard let data = NSPasteboard.general.data(forType: Self.actionPasteboardType),
-              let clipboard = try? JSONDecoder().decode(ActionClipboard.self, from: data) else { return 0 }
+              let clipboard = ActionClipboard.read(data) else { return 0 }
         return clipboard.actions.count
     }
 
@@ -978,7 +980,7 @@ final class EditorController {
     /// are selected.
     func pasteActions(onto layers: [Layer]? = nil) {
         guard let data = NSPasteboard.general.data(forType: Self.actionPasteboardType),
-              let clipboard = try? JSONDecoder().decode(ActionClipboard.self, from: data) else { return }
+              let clipboard = ActionClipboard.read(data) else { return }
         let targets = layers ?? selectedLayers
         let whole = clipboard.scenes ?? []
         let sources = Set(clipboard.actions.map(\.targetLayerID))
@@ -1296,6 +1298,15 @@ final class EditorController {
         var actions: [Action]
         /// The scenes the layers' actions make whole; nil in older copies.
         var scenes: [TimelineScene]?
+
+        /// A copy read from the clipboard, which any app can write to: its
+        /// numbers, times and type sizes held in range, as a project file's are.
+        static func read(_ data: Data) -> LayerClipboard? {
+            guard var clipboard = try? JSONDecoder().decode(LayerClipboard.self, from: FileSafety.numbersHeld(data)) else { return nil }
+            clipboard.layers = FileSafety.held(clipboard.layers)
+            clipboard.actions = FileSafety.held(clipboard.actions)
+            return clipboard
+        }
     }
 
     func copySelection() {
@@ -1330,7 +1341,7 @@ final class EditorController {
         // Copying clears the pasteboard, so it holds layers or actions, never both.
         if NSPasteboard.general.data(forType: Self.actionPasteboardType) != nil { return pasteActions() }
         guard let data = NSPasteboard.general.data(forType: Self.pasteboardType),
-              let clipboard = try? JSONDecoder().decode(LayerClipboard.self, from: data) else { return }
+              let clipboard = LayerClipboard.read(data) else { return }
         var map: [UUID: UUID] = [:]
         let copies = clipboard.layers.map { $0.duplicated(recordingIDs: &map) }.map { $0.remappingMasks(map) }
         let pairs = Project(actions: clipboard.actions).actionCopyPairs(for: map)

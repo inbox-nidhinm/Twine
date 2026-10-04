@@ -151,6 +151,8 @@ public enum FigmaImport {
 
     public enum ReadError: Error, Equatable {
         case notAPayload, newerVersion, empty
+        /// Its SVG parts together need more drawing than any paste should.
+        case tooComplex
     }
 
     /// Whether `text` is a copy from the plugin, without reading it all.
@@ -158,12 +160,18 @@ public enum FigmaImport {
         text.prefix(80).contains("\"\(FigmaPayload.formatName)\"")
     }
 
-    public static func read(_ text: String) throws -> Result {
-        guard isPayload(text), let payload = try? JSONDecoder().decode(FigmaPayload.self, from: Data(text.utf8)),
+    /// `budget` is what the paste's SVG parts may have the system draw,
+    /// together.
+    public static func read(_ text: String, budget: SVGImport.Budget = SVGImport.Budget()) throws -> Result {
+        // Any app can put text on the clipboard, so its numbers are held in
+        // range as a project file's are, before and after building.
+        guard isPayload(text),
+              let payload = try? JSONDecoder().decode(FigmaPayload.self, from: FileSafety.numbersHeld(Data(text.utf8))),
               payload.format == FigmaPayload.formatName else { throw ReadError.notAPayload }
         guard payload.version <= 1 else { throw ReadError.newerVersion }
-        var builder = FigmaBuilder(images: payload.images)
-        let layers = Finite.layers(builder.layers(payload.nodes, parent: .identity))
+        var builder = FigmaBuilder(images: payload.images, budget: budget)
+        let layers = FileSafety.held(Finite.layers(builder.layers(payload.nodes, parent: .identity)))
+        guard !builder.tooComplex else { throw ReadError.tooComplex }
         let boxes = layers.compactMap(Arrangement.box(of:))
         guard let first = boxes.first else { throw ReadError.empty }
         return Result(layers: layers, bounds: boxes.dropFirst().reduce(first) { $0.union($1) },
@@ -179,8 +187,15 @@ private struct FigmaBuilder {
     /// Figma image hashes already added, by the id Twine gave them.
     private var added: [String: UUID] = [:]
     private(set) var missingFonts: Set<String> = []
+    /// What every SVG in the paste may have drawn by the system, together.
+    private let budget: SVGImport.Budget
+    /// Set when an SVG was past the budget or its own limits.
+    private(set) var tooComplex = false
 
-    init(images: [String: String]) { self.images = images }
+    init(images: [String: String], budget: SVGImport.Budget) {
+        self.images = images
+        self.budget = budget
+    }
 
     /// Siblings, back to front. A mask masks every sibling in front of it,
     /// as in Figma, until the next mask.
@@ -424,7 +439,7 @@ private struct FigmaBuilder {
     private mutating func add(_ data: Data, name: String) -> MediaAsset? {
         let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         if let known = media.first(where: { $0.asset.contentHash == hash }) { return known.asset }
-        guard let size = SVGPictures.pixelSize(of: data) else { return nil }
+        guard let size = SVGPictures.pixelSize(of: data), FileSafety.pictureFits(width: size.width, height: size.height) else { return nil }
         let ext = data.starts(with: [0xFF, 0xD8]) ? "jpg" : data.starts(with: [0x47, 0x49, 0x46]) ? "gif" : "png"
         let id = UUID()
         let asset = MediaAsset(id: id, kind: .image, fileName: "\(id.uuidString).\(ext)", originalName: "\(name).\(ext)",
@@ -519,8 +534,16 @@ private struct FigmaBuilder {
     /// A layer Figma wrote as SVG, read by Twine's SVG reader into a group
     /// at the SVG's box in the page.
     private mutating func svgLayer(_ node: FigmaPayload.Node, into intoParent: Affine) -> Layer? {
-        guard let svg = node.svg, let b = node.bounds, b.count == 4,
-              let read = try? SVGImport.read(Data(svg.utf8), name: node.name, center: Size2(b[2], b[3]).center) else { return nil }
+        guard let svg = node.svg, let b = node.bounds, b.count == 4 else { return nil }
+        let read: SVGImport.Result
+        do {
+            read = try SVGImport.read(Data(svg.utf8), name: node.name, center: Size2(b[2], b[3]).center, budget: budget)
+        } catch SVGImport.ReadError.tooComplex {
+            tooComplex = true
+            return nil
+        } catch {
+            return nil
+        }
         for item in read.media where !media.contains(where: { $0.asset.contentHash == item.asset.contentHash }) { media.append(item) }
         var layer = LayerFactory.group(in: Box(origin: .zero, size: read.layer.size), children: read.layer.children, name: node.name)
         place(&layer, local: Affine.translation(Vec2(b[0], b[1])).then(intoParent), box: Box(origin: .zero, size: layer.size))

@@ -335,6 +335,14 @@ public struct ActionClipboard: Codable, Sendable {
     /// The scenes copied whole, so a paste makes them again (`Scenes.copying`).
     public var scenes: [TimelineScene]?
 
+    /// A copy read from the clipboard, which any app can write to: its
+    /// numbers and times held in range, as a project file's are.
+    public static func read(_ data: Data) -> ActionClipboard? {
+        guard var clipboard = try? JSONDecoder().decode(ActionClipboard.self, from: FileSafety.numbersHeld(data)) else { return nil }
+        clipboard.actions = FileSafety.held(clipboard.actions)
+        return clipboard
+    }
+
     public init(actions: [Action], origins: [UUID: ActionOrigin]? = nil, scenes: [TimelineScene]? = nil) {
         self.actions = actions
         self.origins = origins

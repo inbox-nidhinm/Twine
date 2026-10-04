@@ -125,4 +125,132 @@ import MotionModel
         }
         #expect(points == FigmaImport.maxPoints && sides == FigmaImport.maxPoints)
     }
+
+    // MARK: Encodings (4 October 2026)
+
+    /// Ten times the one before, at each of eight levels: a billion letters.
+    private var laughs: String {
+        var entities = #"<!ENTITY a0 "aaaaaaaaaa">"#
+        for level in 1...8 { entities += "<!ENTITY a\(level) \"" + String(repeating: "&a\(level - 1);", count: 10) + "\">" }
+        return #"<?xml version="1.0" encoding="UTF-16"?><!DOCTYPE svg [\#(entities)]><svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><text>&a8;</text></svg>"#
+    }
+
+    @Test func entitiesInUTF16AreStillSeen() throws {
+        var marked = Data([0xFF, 0xFE])
+        marked.append(try #require(laughs.data(using: .utf16LittleEndian)))
+        #expect(throws: SVGImport.ReadError.entities) { try read(marked) }
+        let unmarked = try #require(laughs.data(using: .utf16BigEndian))
+        #expect(throws: SVGImport.ReadError.entities) { try read(unmarked) }
+        let wide = try #require(laughs.data(using: .utf32LittleEndian))
+        #expect(throws: SVGImport.ReadError.entities) { try read(wide) }
+    }
+
+    @Test func aPlainSVGInUTF16StillReads() throws {
+        let text = #"<?xml version="1.0" encoding="UTF-16"?><svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="10" height="10"/></svg>"#
+        var data = Data([0xFE, 0xFF])
+        data.append(try #require(text.data(using: .utf16BigEndian)))
+        #expect(try read(data).layer.children.count == 1)
+    }
+
+    @Test func onlyEncodingsThatWriteLettersAsThemselvesAreRead() throws {
+        let body = #"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="10" height="10"/></svg>"#
+        // Plain bytes claiming to be wide would be read as something else.
+        #expect(throws: SVGImport.ReadError.notSVG) { try read(Data((#"<?xml version="1.0" encoding="UTF-16"?>"# + body).utf8)) }
+        #expect(throws: SVGImport.ReadError.notSVG) { try read(Data((#"<?xml version="1.0" encoding="IBM037"?>"# + body).utf8)) }
+        #expect(throws: SVGImport.ReadError.notSVG) { try read(Data(body.utf8) + Data([0])) }
+        for name in ["UTF-8", "iso-8859-1", "windows-1252", "US-ASCII"] {
+            #expect(try read(Data((#"<?xml version="1.0" encoding='\#(name)'?>"# + body).utf8)).layer.children.count == 1)
+        }
+    }
+
+    // MARK: What the system draws
+
+    /// `<use>`s ten of the one before at each of nine levels, in `defs`,
+    /// where the reader never walks.
+    private var multiplyingDefinitions: String {
+        var defs = #"<rect id="l0" width="1" height="1"/>"#
+        for level in 1...9 {
+            defs += #"<g id="l\#(level)">"# + String(repeating: ##"<use href="#l\##(level - 1)"/>"##, count: 10) + "</g>"
+        }
+        return defs
+    }
+
+    @Test func usesMultiplyingInsideATextsPatternAreRefused() {
+        let pattern = ##"<pattern id="p" width="10" height="10" patternUnits="userSpaceOnUse"><use href="#l9"/></pattern>"##
+        let started = Date()
+        #expect(throws: SVGImport.ReadError.tooComplex) {
+            try read(svg("<defs>\(pattern)\(multiplyingDefinitions)</defs><text y=\"20\" fill=\"url(#p)\">Hi</text>"))
+        }
+        #expect(Date().timeIntervalSince(started) < 5)
+    }
+
+    @Test func aPictureCarriesOnlyTheDefinitionsItUses() throws {
+        let gradient = #"<linearGradient id="g"><stop offset="0" stop-color="red"/><stop offset="1" stop-color="blue"/></linearGradient>"#
+        let started = Date()
+        let r = try read(svg("<defs>\(gradient)\(multiplyingDefinitions)</defs><text y=\"20\" font-size=\"20\" fill=\"url(#g)\">Hi</text>"))
+        #expect(r.pictureCount == 1)
+        #expect(Date().timeIntervalSince(started) < 5)
+    }
+
+    @Test func picturesDrawnTogetherKeepToTheBudget() throws {
+        let texts = String(repeating: #"<text y="20" font-size="20">Hi</text>"#, count: 3)
+        let budget = SVGImport.Budget()
+        budget.pixels = SVGPictures.pixels(size: Size2(100, 100), scale: 2) * 2
+        #expect(throws: SVGImport.ReadError.tooComplex) {
+            try SVGImport.read(svg(texts), name: "Test", center: Vec2(50, 50), budget: budget)
+        }
+        #expect(try SVGImport.read(svg(texts), name: "Test", center: Vec2(50, 50)).pictureCount == 3)
+    }
+
+    /// A real PNG one pixel wider than any picture taken in. (ImageIO
+    /// itself refuses one whose data is too short for the size it claims.)
+    private var tooWide: String {
+        get throws {
+            let rep = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: FileSafety.largestPictureSide + 1, pixelsHigh: 1,
+                                                    bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                    colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+            return try #require(rep.representation(using: .png, properties: [:])).base64EncodedString()
+        }
+    }
+
+    @Test func aPictureTooLargeIsLeftOut() throws {
+        let png = try tooWide
+        #expect(SVGPictures.pixelSize(of: try #require(Data(base64Encoded: png))) == Size2(Double(FileSafety.largestPictureSide + 1), 1))
+        let r = try read(svg(#"<image width="10" height="10" href="data:image/png;base64,\#(png)"/><rect width="5" height="5"/>"#))
+        #expect(r.media.isEmpty)
+        #expect(r.layer.children.count == 1)
+        #expect(FileSafety.pictureFits(width: 4096, height: 4096))
+        #expect(!FileSafety.pictureFits(width: 16_385, height: 10))
+        #expect(!FileSafety.pictureFits(width: 12_000, height: 12_000))
+    }
+
+    @Test func aFigmaPasteWithHugeTextAndGiantPicturesIsHeld() throws {
+        let json = ##"""
+        {"format": "twine.figma", "version": 1, "images": {"p": "\##(try tooWide)"}, "nodes": [
+          {"kind": "text", "name": "T", "transform": [1, 0, 0, 1, 0, 0], "width": 200, "height": 40,
+           "text": {"characters": "Hi", "family": "Helvetica", "style": "Regular", "size": 1e300, "letterSpacing": -1e300, "lineHeight": 1e400}},
+          {"kind": "rectangle", "name": "R", "transform": [1, 0, 0, 1, 0, 0], "width": 10, "height": 10,
+           "strokeWeight": 1e300, "fills": [{"type": "IMAGE", "image": "p", "scaleMode": "FILL"}],
+           "effects": [{"type": "LAYER_BLUR", "radius": 1e300}]}]}
+        """##
+        let r = try FigmaImport.read(json)
+        guard case .text(let t) = r.layers.first?.content else { Issue.record("not text"); return }
+        #expect(t.fontSize == FileSafety.fontSizes.upperBound)
+        #expect(t.letterSpacing == -FileSafety.limit && t.lineHeight == FileSafety.limit)
+        #expect(r.media.isEmpty)
+        #expect(r.layers.last?.look?.strokes.first?.width ?? 0 <= FileSafety.limit)
+    }
+
+    @Test func aFigmaPasteOfManyDrawnSVGsIsRefusedAsAWhole() throws {
+        let one = #"<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='1024'><text y='20'>Hi</text></svg>"#
+        let node = #"{"kind": "svg", "name": "S", "transform": [1, 0, 0, 1, 0, 0], "width": 1024, "height": 1024, "svg": "\#(one)", "bounds": [0, 0, 1024, 1024]}"#
+        // Each draws 4 million pixels; a budget of two and a half stops at
+        // the third, in place of the 4 billion pixels of a real paste,
+        // which take about ten seconds in a release build.
+        let json = #"{"format": "twine.figma", "version": 1, "images": {}, "nodes": ["# + Array(repeating: node, count: 5).joined(separator: ",") + "]}"
+        let budget = SVGImport.Budget()
+        budget.pixels = SVGPictures.pixels(size: Size2(1024, 1024), scale: 2) * 2.5
+        #expect(throws: FigmaImport.ReadError.tooComplex) { try FigmaImport.read(json, budget: budget) }
+        #expect(budget.pixels < 0)
+    }
 }

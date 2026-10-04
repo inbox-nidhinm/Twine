@@ -44,24 +44,80 @@ public enum SVGImport {
         case tooComplex
     }
 
+    /// The largest SVG file read, in bytes: far past any drawing (Figma's
+    /// largest exports are a few tens of megabytes), and read whole.
+    public static let largestFile = 256_000_000
+
     /// How deep elements may nest, counting each `use` as a level.
     static let maxDepth = 256
     /// How many elements may be read, counting each one a `use` repeats.
     static let maxElements = 100_000
+    /// How many elements all the pictures drawn from one file may take
+    /// together, counted as `maxElements` is.
+    static let maxPictureWork = 1_000_000
+    /// How many pixels all the pictures drawn from one file may cover
+    /// together. Each is drawn the size of the whole drawing, so a small
+    /// file of many texts, or many pasted from Figma, could take hours;
+    /// this is some five hundred pictures of a full HD drawing at twice its
+    /// size, or sixty of the largest, about ten seconds in a release build.
+    static let maxPicturePixels = 4_000_000_000.0
+
+    /// What the system's drawing may still be handed, shared by every SVG in
+    /// one Figma paste so the paste as a whole is held to it.
+    public final class Budget: @unchecked Sendable {
+        var work = SVGImport.maxPictureWork
+        var pixels = SVGImport.maxPicturePixels
+        public init() {}
+    }
 
     /// Reads `data` as an SVG. The frame is named `name`, centred on
     /// `center`, and shrunk to fit `fitting` if it is larger. Pictures are
     /// drawn at `pictureScale` times their size.
     public static func read(_ data: Data, name: String, center: Vec2 = .zero, fitting: Size2? = nil,
-                            pictureScale: Double = 2) throws -> Result {
+                            pictureScale: Double = 2, budget: Budget = Budget()) throws -> Result {
+        guard let data = utf8(data) else { throw ReadError.notSVG }
         guard !declaresRiskyEntities(data) else { throw ReadError.entities }
         guard nesting(of: data, limit: maxDepth) <= maxDepth else { throw ReadError.tooComplex }
         guard let document = try? XMLDocument(data: data, options: [.nodePreserveWhitespace, .nodeLoadExternalEntitiesNever]),
               let root = document.rootElement(), root.localName == "svg" else { throw ReadError.notSVG }
-        var reader = Reader(document: document, root: root, pictureScale: pictureScale)
+        var reader = Reader(document: document, root: root, pictureScale: pictureScale, budget: budget)
         let result = reader.read(name: name, center: center, fitting: fitting)
         guard !reader.tooComplex else { throw ReadError.tooComplex }
         return result
+    }
+
+    /// The file in UTF-8, or nil when it is in an encoding read otherwise.
+    /// The checks below look for markup by its bytes, which only works when
+    /// `<!ENTITY` is written as those bytes: a file in UTF-16 slipped past
+    /// them, and its entities grew a few bytes into gigabytes (4 October
+    /// 2026). UTF-16 and UTF-32 are turned into UTF-8, with the declaration
+    /// saying so; any other encoding must be one that writes plain letters
+    /// as themselves (UTF-8, ASCII, the Latin and Windows single-byte ones).
+    static func utf8(_ data: Data) -> Data? {
+        let head = [UInt8](data.prefix(4))
+        let wide: [([UInt8], String.Encoding, Int)] = [
+            ([0x00, 0x00, 0xFE, 0xFF], .utf32BigEndian, 4), ([0xFF, 0xFE, 0x00, 0x00], .utf32LittleEndian, 4),
+            ([0xFE, 0xFF], .utf16BigEndian, 2), ([0xFF, 0xFE], .utf16LittleEndian, 2),
+            ([0x00, 0x00, 0x00, 0x3C], .utf32BigEndian, 0), ([0x3C, 0x00, 0x00, 0x00], .utf32LittleEndian, 0),
+            ([0x00, 0x3C], .utf16BigEndian, 0), ([0x3C, 0x00], .utf16LittleEndian, 0),
+        ]
+        if let (_, encoding, mark) = wide.first(where: { head.starts(with: $0.0) }) {
+            guard let text = String(data: Data(data.dropFirst(mark)), encoding: encoding) else { return nil }
+            let declared = text.replacingOccurrences(of: #"^(<\?xml[^>]*?encoding\s*=\s*)(["'])[^"']*\2"#,
+                                                     with: "$1$2UTF-8$2", options: .regularExpression)
+            return Data(declared.utf8)
+        }
+        // No letter in these encodings has a zero byte; in every other one
+        // (EBCDIC aside, which declares itself) most do.
+        guard !data.contains(0) else { return nil }
+        let start = String(decoding: data.prefix(200), as: UTF8.self)
+        guard start.hasPrefix("<?xml") || start.hasPrefix("\u{FEFF}<?xml") else { return data }
+        let declaration = start[..<(start.range(of: "?>")?.upperBound ?? start.endIndex)]
+        guard let found = declaration.range(of: #"encoding\s*=\s*["']([^"']+)["']"#, options: .regularExpression) else { return data }
+        let name = declaration[found].split(whereSeparator: { $0 == "\"" || $0 == "'" }).dropFirst().first.map { $0.lowercased() } ?? ""
+        let plain = ["utf-8", "utf8", "us-ascii", "ascii", "latin1", "iso-latin-1"].contains(name)
+            || name.hasPrefix("iso-8859-") || name.hasPrefix("windows-125")
+        return plain ? data : nil
     }
 
     /// Whether the file declares an entity that is a file or a web address
@@ -195,8 +251,11 @@ private struct Reader {
     private var visited = 0
     /// Set once the file nests or repeats past the limits; reading stops.
     private(set) var tooComplex = false
+    /// What the system's drawing may still be handed for pictures.
+    let budget: SVGImport.Budget
 
-    init(document: XMLDocument, root: XMLElement, pictureScale: Double) {
+    init(document: XMLDocument, root: XMLElement, pictureScale: Double, budget: SVGImport.Budget) {
+        self.budget = budget
         self.document = document
         self.root = root
         self.pictureScale = pictureScale
@@ -688,7 +747,7 @@ private struct Reader {
     private mutating func add(_ data: Data, ext: String, originalName: String) -> MediaAsset? {
         let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         if let known = media.first(where: { $0.asset.contentHash == hash }) { return known.asset }
-        guard let size = SVGPictures.pixelSize(of: data) else { return nil }
+        guard let size = SVGPictures.pixelSize(of: data), FileSafety.pictureFits(width: size.width, height: size.height) else { return nil }
         let id = UUID()
         let asset = MediaAsset(id: id, kind: .image, fileName: "\(id.uuidString).\(ext)", originalName: "\(originalName).\(ext)",
                                contentHash: hash, pixelWidth: Int(size.width), pixelHeight: Int(size.height))
@@ -812,7 +871,9 @@ private struct Reader {
     /// placed there. `ctm` is its parent's, so it sits where it did.
     private mutating func picture(of element: XMLElement, ctm: Affine) -> Layer? {
         guard viewport.width > 0, viewport.height > 0 else { return nil }
-        let svg = pictureSVG(element, ctm: ctm)
+        budget.pixels -= SVGPictures.pixels(size: viewport, scale: pictureScale)
+        guard budget.pixels >= 0 else { tooComplex = true; return nil }
+        guard let svg = pictureSVG(element, ctm: ctm) else { return nil }
         let name = layerName(element, fallback: element.localName == "text" ? "Text" : "Picture")
         guard let drawn = SVGPictures.draw(svg, size: viewport, scale: pictureScale),
               let asset = add(drawn.png, ext: "png", originalName: name) else { return nil }
@@ -826,12 +887,19 @@ private struct Reader {
     }
 
     /// An SVG the size of the whole viewport holding the element, inside its
-    /// ancestors' own styles (so it inherits what it did), with every
-    /// definition and style sheet of the original.
-    private func pictureSVG(_ element: XMLElement, ctm: Affine) -> String {
-        var defs = ""
-        for node in (try? document.nodes(forXPath: "//*[local-name()='defs' or local-name()='style']")) ?? [] {
-            defs += node.xmlString
+    /// ancestors' own styles (so it inherits what it did), with every style
+    /// sheet of the original and the definitions it refers to. Nil, and the
+    /// file too complex, when drawing it would take more than
+    /// `maxElements`, or all the pictures together more than
+    /// `maxPictureWork`, counting each element once for every `use` that
+    /// repeats it: the reader never walks into definitions, and the system's
+    /// drawing repeats them without limit, so a kilobyte of uses of uses
+    /// once took it hours (4 October 2026). It used to be handed every
+    /// definition for every picture.
+    private mutating func pictureSVG(_ element: XMLElement, ctm: Affine) -> String? {
+        var styles = ""
+        for node in (try? document.nodes(forXPath: "//*[local-name()='style']")) ?? [] {
+            styles += node.xmlString
         }
         var ancestors: [XMLElement] = []
         var current = element.parent as? XMLElement
@@ -854,11 +922,78 @@ private struct Reader {
             open += "<g\(attrs)>"
             close = "</g>" + close
         }
+        let body = Self.drawable(element)
+        // What the picture refers to, and what that refers to, each once:
+        // never the element itself or what holds it, which would loop.
+        var included: [XMLElement] = []
+        var pending = Self.references(in: body + open + styles)
+        var seen: Set<String> = []
+        while let id = pending.popLast() {
+            guard seen.insert(id).inserted, let target = ids[id], !Self.contains(target, element), !Self.contains(element, target),
+                  !included.contains(where: { Self.contains($0, target) }) else { continue }
+            guard seen.count <= SVGImport.maxElements else { tooComplex = true; return nil }
+            included.removeAll { Self.contains(target, $0) }
+            included.append(target)
+            pending += Self.references(in: target.xmlString)
+        }
+        var sizes: [ObjectIdentifier: Int] = [:]
+        let work = ([element] + included).reduce(0) { $0 + expandedSize($1, sizes: &sizes, depth: 0) }
+        budget.work -= work
+        guard work <= SVGImport.maxElements, budget.work >= 0 else { tooComplex = true; return nil }
+        let defs = "<defs>" + included.map(\.xmlString).joined() + "</defs>" + styles
+        // A picture inside too large to take in is too large for the
+        // system to draw either: it would decode it whole.
+        guard !Self.carriesOversizedPicture(body + defs) else { return nil }
         let m = ctm
         return """
         <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="\(viewport.width)" height="\(viewport.height)" viewBox="0 0 \(viewport.width) \(viewport.height)">\
-        \(defs)<g transform="matrix(\(m.a) \(m.b) \(m.c) \(m.d) \(m.tx) \(m.ty))">\(open)\(Self.drawable(element))\(close)</g></svg>
+        \(defs)<g transform="matrix(\(m.a) \(m.b) \(m.c) \(m.d) \(m.tx) \(m.ty))">\(open)\(body)\(close)</g></svg>
         """
+    }
+
+    /// How many elements drawing `element` takes, each `use` counted as
+    /// what it repeats, up to one past `maxElements`. A `use` reaching what
+    /// holds it counts nothing, as nothing is drawn for it.
+    private func expandedSize(_ element: XMLElement, sizes: inout [ObjectIdentifier: Int], depth: Int) -> Int {
+        let key = ObjectIdentifier(element)
+        if let known = sizes[key] { return known }
+        let over = SVGImport.maxElements + 1
+        guard depth < SVGImport.maxDepth else { return over }
+        sizes[key] = 0
+        var total = 1
+        for child in element.children?.compactMap({ $0 as? XMLElement }) ?? [] where total <= over {
+            total += expandedSize(child, sizes: &sizes, depth: depth + 1)
+        }
+        if element.localName == "use", total <= over,
+           let target = reference(attr(element, "href") ?? attr(element, "xlink:href")) {
+            total += expandedSize(target, sizes: &sizes, depth: depth + 1)
+        }
+        total = min(total, over)
+        sizes[key] = total
+        return total
+    }
+
+    /// Whether `text` holds a picture (as a `data:` address) past
+    /// `FileSafety.pictureFits`, or one that cannot be read.
+    private static func carriesOversizedPicture(_ text: String) -> Bool {
+        guard text.contains("data:image/"),
+              let expression = try? NSRegularExpression(pattern: #"data:image/[^;,"']*;base64,([A-Za-z0-9+/=\s]+)"#) else { return false }
+        return expression.matches(in: text, range: NSRange(text.startIndex..., in: text)).contains { match in
+            guard let range = Range(match.range(at: 1), in: text),
+                  let data = Data(base64Encoded: String(text[range]), options: .ignoreUnknownCharacters),
+                  let size = SVGPictures.pixelSize(of: data) else { return true }
+            return !FileSafety.pictureFits(width: size.width, height: size.height)
+        }
+    }
+
+    /// The ids `text` refers to, by `url(#...)` or `href="#..."`.
+    private static func references(in text: String) -> [String] {
+        let pattern = #"(?:url\((?:\s|['"]|&quot;|&apos;)*#|href\s*=\s*["']#)([^'"\)\s&]+)"#
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let whole = NSRange(text.startIndex..., in: text)
+        return expression.matches(in: text, range: whole).compactMap { match in
+            Range(match.range(at: 1), in: text).map { String(text[$0]) }
+        }
     }
 
     /// The element as the system draws it right. It places a `<tspan>` with

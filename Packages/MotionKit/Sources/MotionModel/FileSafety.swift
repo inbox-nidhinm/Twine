@@ -29,6 +29,19 @@ public enum FileSafety {
             && !name.contains("/") && !name.contains(":") && !name.contains("\0")
     }
 
+    /// The widest or tallest picture taken in from inside another file (an
+    /// SVG's or a Figma paste's), and the most pixels: a picture of a few
+    /// kilobytes can claim a size that takes gigabytes to show, every time
+    /// the project opens. Figma itself keeps pictures to 4,096 a side.
+    public static let largestPictureSide = 16_384
+    public static let mostPicturePixels = 100_000_000
+
+    /// Whether a picture `width` by `height` pixels may come in.
+    public static func pictureFits(width: Double, height: Double) -> Bool {
+        width.isFinite && height.isFinite && width >= 1 && height >= 1
+            && max(width, height) <= Double(largestPictureSide) && width * height <= Double(mostPicturePixels)
+    }
+
     /// A polygon's sides or a star's points as Twine draws them.
     public static func corners(_ count: Int) -> Int { min(max(count, 3), maxCorners) }
 
@@ -36,8 +49,9 @@ public enum FileSafety {
     /// written as `limit`, keeping its sign. Only numbers that could be that
     /// large are read: those with ten or more whole digits or a positive
     /// exponent. Text in strings is left alone. Nothing is copied when every
-    /// number is in range, which is every file Twine wrote.
-    static func numbersHeld(_ data: Data) -> Data {
+    /// number is in range, which is every file Twine wrote. Project files,
+    /// Figma pastes and Twine's own clipboard all come through it.
+    public static func numbersHeld(_ data: Data) -> Data {
         var edits: [(range: Range<Int>, negative: Bool)] = []
         data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
             let n = raw.count
@@ -101,14 +115,8 @@ extension Project {
         let biggest = FileSafety.largestComposition
         p.composition.width = min(max(p.composition.width, 1), biggest)
         p.composition.height = min(max(p.composition.height, 1), biggest)
-        p.composition.duration = Self.time(p.composition.duration)
-        p.actions = p.actions.map { action in
-            var a = action
-            a.start = Self.time(a.start)
-            a.duration = Self.time(a.duration)
-            a.motionBlur = a.motionBlur.map { min(max($0, 0), 1) }
-            return a
-        }
+        p.composition.duration = FileSafety.time(p.composition.duration)
+        p.actions = FileSafety.held(p.actions)
         p.media = p.media.map { asset in
             var m = asset
             if !FileSafety.isPlainName(m.fileName) {
@@ -118,30 +126,44 @@ extension Project {
                 let plain = !ext.isEmpty && ext.count <= 8 && ext.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber) }
                 m.fileName = m.id.uuidString + (plain ? "." + ext : "")
             }
-            m.duration = m.duration.map(Self.time)
+            m.duration = m.duration.map(FileSafety.time)
             return m
         }
-        p.layers = Self.held(p.layers)
+        p.layers = FileSafety.held(p.layers)
         return p
     }
+}
 
-    private static func time(_ t: Double) -> Double { min(max(t, 0), Composition.longest) }
+extension FileSafety {
+    static func time(_ t: Double) -> Double { min(max(t, 0), Composition.longest) }
 
-    private static func held(_ layers: [Layer]) -> [Layer] {
+    /// Actions with their times within a day and motion blur within a frame.
+    public static func held(_ actions: [Action]) -> [Action] {
+        actions.map { action in
+            var a = action
+            a.start = time(a.start)
+            a.duration = time(a.duration)
+            a.motionBlur = a.motionBlur.map { min(max($0, 0), 1) }
+            return a
+        }
+    }
+
+    /// Layers, and everything inside them, with type sizes in `fontSizes`
+    /// and polygon and star corners within `maxCorners`.
+    public static func held(_ layers: [Layer]) -> [Layer] {
         layers.map { layer in
             var l = layer
             switch l.content {
             case .text(var text):
-                let sizes = FileSafety.fontSizes
-                guard !sizes.contains(text.fontSize) else { break }
-                text.fontSize = min(max(text.fontSize, sizes.lowerBound), sizes.upperBound)
+                guard !fontSizes.contains(text.fontSize) else { break }
+                text.fontSize = min(max(text.fontSize, fontSizes.lowerBound), fontSizes.upperBound)
                 l.content = .text(text)
             case .shape(var shape):
                 switch shape.geometry {
-                case .polygon(let sides) where FileSafety.corners(sides) != sides:
-                    shape.geometry = .polygon(sides: FileSafety.corners(sides))
-                case .star(let points, let inner, let corner) where FileSafety.corners(points) != points:
-                    shape.geometry = .star(points: FileSafety.corners(points), innerRadius: inner, cornerRadius: corner)
+                case .polygon(let sides) where corners(sides) != sides:
+                    shape.geometry = .polygon(sides: corners(sides))
+                case .star(let points, let inner, let corner) where corners(points) != points:
+                    shape.geometry = .star(points: corners(points), innerRadius: inner, cornerRadius: corner)
                 default:
                     break
                 }

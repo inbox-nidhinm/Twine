@@ -13,8 +13,7 @@ enum SVGPictures {
     /// nothing.
     static func draw(_ svg: String, size: Size2, scale: Double) -> (png: Data, box: Box)? {
         guard size.width.isFinite, size.height.isFinite, scale.isFinite, let image = NSImage(data: Data(svg.utf8)) else { return nil }
-        // At most 8192 pixels a side, however large the drawing.
-        let s = min(scale, 8192 / max(size.width, size.height, 1))
+        let s = drawingScale(size: size, scale: scale)
         let w = Int((size.width * s).rounded(.up)), h = Int((size.height * s).rounded(.up))
         guard w > 0, h > 0, let context = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
                                                   space: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -42,6 +41,18 @@ enum SVGPictures {
         guard CGImageDestinationFinalize(destination) else { return nil }
         let box = Box(minX: Double(minX) / s, minY: Double(minY) / s, maxX: Double(maxX + 1) / s, maxY: Double(maxY + 1) / s)
         return (data as Data, box)
+    }
+
+    /// At most 8192 pixels a side, however large the drawing.
+    private static func drawingScale(size: Size2, scale: Double) -> Double {
+        min(scale, 8192 / max(size.width, size.height, 1))
+    }
+
+    /// How many pixels `draw` covers for a drawing `size` at `scale`.
+    static func pixels(size: Size2, scale: Double) -> Double {
+        guard size.width.isFinite, size.height.isFinite, scale.isFinite else { return 0 }
+        let s = drawingScale(size: size, scale: scale)
+        return (size.width * s).rounded(.up) * (size.height * s).rounded(.up)
     }
 
     /// A picture file's size in pixels, the way round it shows.

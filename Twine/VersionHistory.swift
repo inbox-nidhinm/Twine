@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 183
+    static let pushes = 184
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -67,6 +67,8 @@ enum VersionHistory {
             "Playback no longer stutters while a large group moves with motion blur. Each of the blur's eight copies drew every layer in the group again, so a group of 500 layers was 4,000 layers a frame and slowed the whole Mac; the group is now drawn once and its copies made from that picture. In a project whose screens slide in with motion blur, the slowest frames draw in about 50 ms, from 400.",
             "A project from someone else can no longer reach files outside itself. A picture or video in a project is found by its file name, and a name with a path in it, or a file that was a link elsewhere on the Mac, made Twine show that outside file and copy it into the project when saving. Such a picture now shows grey, and nothing outside the project is read or copied.",
             "A damaged or hand-edited project no longer stops Twine as it opens. Numbers far past anything Twine makes, such as a Volume fade billions of years long, a star with a trillion points or an enormous type size, are brought back to the largest Twine allows as the file is read.",
+            "SVG files and Figma pastes made to stall Twine are refused, rather than freezing it or filling the memory: an SVG saved in UTF-16 could hide entities that grow a few bytes into gigabytes, and a small one could make macOS's drawing of its text repeat its definitions for hours. Each picture drawn for an SVG now carries only the definitions it uses, and the drawing for one import or paste is held to a limit.",
+            "A Figma paste with numbers far past anything Figma makes, such as an enormous type size, no longer stops Twine; they are held to the same limits as a project file, as are layers and actions pasted from Twine's own copy. Pictures over 16,384 pixels a side or 100 million pixels inside an SVG or a paste are left out.",
         ], misc: [
             "The picture at the top of a project's Info card fills the card's width at its own shape, rather than shrinking to a fixed height with space at its sides; a tall one is cut to a square, as on the home screen's cards.",
             "Settings' cards lie flat on the page, with no shadow under them.",
