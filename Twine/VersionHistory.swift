@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 185
+    static let pushes = 186
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -72,6 +72,8 @@ enum VersionHistory {
             "Importing a WebM that is really something else is refused with a note, rather than handed to ffmpeg to work out: a file named .webm that was a list of other files made ffmpeg read those into the movie, which the project then kept.",
             "Very large pictures are safe to import. Over 16,384 pixels a side or 100 million pixels, a picture is shown at that size, so a big photo still comes in; past 400 million pixels or 65,535 a side it is refused with a note, since even shrinking it as it opens takes seconds and gigabytes. Projects that already hold one show it the same way.",
         ], misc: [
+            "Twine runs with macOS's hardened runtime, so other programs on the Mac cannot slip their code into it or attach to it while it runs.",
+            "The test tools' driver can no longer end up in the app by being left in: it is built only into the separate test copy, and building the app refuses while it is in place.",
             "The picture at the top of a project's Info card fills the card's width at its own shape, rather than shrinking to a fixed height with space at its sides; a tall one is cut to a square, as on the home screen's cards.",
             "Settings' cards lie flat on the page, with no shadow under them.",
             "Cancel in the export window is a plain grey button while an export runs, rather than blue: it is not the thing the window is for.",

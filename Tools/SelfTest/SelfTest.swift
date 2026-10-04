@@ -3,6 +3,7 @@ import MotionModel
 import MotionEditing
 import MotionEvaluation
 
+#if SELFTEST
 // Test driver for the separate test copy of the app. Installed into the app
 // by Tools/SelfTest/install-hook.sh and taken out again by remove-hook.sh;
 // never committed inside Twine/. Runs a script of clicks,
@@ -691,3 +692,10 @@ enum SelfTest {
         }
     }
 }
+#else
+/// Compiled only into the test copy (make-test-app.sh): anywhere else the
+/// hook does nothing, even if it was left in.
+enum SelfTest {
+    static func run(window: NSWindow, controller: EditorController, menus: MenuHost) {}
+}
+#endif

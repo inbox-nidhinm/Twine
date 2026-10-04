@@ -8,7 +8,7 @@ A kit for checking changes in the real app without touching the copy the user ha
 Tools/SelfTest/install-hook.sh              # puts SelfTest.swift into the app
 Tools/SelfTest/make-test-app.sh             # builds build/TwineTest.app (debug; pass release to measure speed)
 Tools/SelfTest/run.sh Actions t1 "wait 1;seek 1;shot a"         # projects open in Animate; key m goes to Design
-Tools/SelfTest/remove-hook.sh               # always, before committing
+Tools/SelfTest/remove-hook.sh               # always, before committing (make-app.sh refuses until it is run)
 ```
 
 The test copy's home screen lists `$OUTROOT/Creations` (or `$TWINE_TEST_CREATIONS`), set through `TWINE_CREATIONS`, so it never sees or changes the projects in use.

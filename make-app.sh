@@ -18,11 +18,22 @@ esac
 
 VERSION=$(grep -c '^        \.init(date:' Twine/VersionHistory.swift)
 
+# The test driver (Tools/SelfTest) is compiled only into the test copy,
+# which make-test-app.sh builds with TWINE_SELFTEST_BUILD=1. Any other build
+# refuses while it is installed, so it can never ship by being forgotten.
+EXTRA=()
+if [[ -n "${TWINE_SELFTEST_BUILD:-}" ]]; then
+    EXTRA=('OTHER_SWIFT_FLAGS=$(inherited) -D SELFTEST')
+elif [[ -e Twine/App/SelfTest.swift ]] || grep -q "SelfTest.run" Twine/Document/EditorWindowController.swift; then
+    echo "The test driver is installed. Run Tools/SelfTest/remove-hook.sh first."
+    exit 1
+fi
+
 LOG=build/xcodebuild.log
 mkdir -p build
 if ! xcodebuild -project Twine.xcodeproj -scheme Twine -configuration "$CONFIG" \
         -derivedDataPath build/DerivedData \
-        MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$VERSION" \
+        MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$VERSION" ${EXTRA[@]+"${EXTRA[@]}"} \
         build > "$LOG" 2>&1; then
     grep -E "error:" "$LOG" | sort -u || true
     echo "build failed, full log in $LOG"
