@@ -49,4 +49,43 @@ import MotionModel
         let q = GradientEditing.snapped(Vec2(7, 7.5), around: .zero)
         #expect(abs(atan2(q.y, q.x) * 180 / .pi - 45) < 1e-9)
     }
+
+    @Test func theThirdHandleSetsHowFarTheOvalReachesAcross() {
+        // A 200 by 100 box, the line from the centre to the right edge: 100 px.
+        let size = Size2(200, 100)
+        var g = Gradient(stops: [], start: Vec2(0.5, 0.5), end: Vec2(1, 0.5))
+        // A circle's third handle is 100 px below the centre: a whole box down.
+        let p = GradientEditing.acrossPoint(of: g, in: size)
+        #expect(abs(p.x - 0.5) < 1e-9 && abs(p.y - 1.5) < 1e-9)
+        // Dragged to 40 px below (sideways along the line counts for nothing).
+        g = GradientEditing.reachingAcross(g, to: Vec2(0.7, 0.9), in: size)
+        #expect(abs(g.aspect - 0.4) < 1e-9)
+        #expect(g.end == Vec2(1, 0.5))
+        let q = GradientEditing.acrossPoint(of: g, in: size)
+        #expect(abs(q.y - 0.9) < 1e-9)
+        // Back to the line: as thin as it goes, never nothing.
+        #expect(GradientEditing.reachingAcross(g, to: Vec2(0.2, 0.5), in: size).aspect == Gradient.aspects.lowerBound)
+    }
+
+    @Test func aCircleKeepsNoReachAcrossInItsFile() throws {
+        var g = Gradient(stops: [], start: Vec2(0.5, 0.5), end: Vec2(1, 0.5))
+        #expect(g.across == nil)
+        g.aspect = 1
+        #expect(g.across == nil)
+        #expect(!String(decoding: try JSONEncoder().encode(g), as: UTF8.self).contains("across"))
+        g.aspect = 0.5
+        let back = try JSONDecoder().decode(Gradient.self, from: try JSONEncoder().encode(g))
+        #expect(back.aspect == 0.5)
+    }
+
+    @Test func anOvalFromTwoAxesKeepsItsReachAcrossInPixels() {
+        // SVG's and Figma's own way: the ends of both axes. A circle of half
+        // the box in a 200 by 100 box is an oval twice as wide as tall.
+        let g = Gradient.radial(stops: [], center: Vec2(0.5, 0.5), edge: Vec2(1, 0.5), edgeAcross: Vec2(0.5, 1),
+                                in: Size2(200, 100))
+        #expect(abs(g.aspect - 0.5) < 1e-9)
+        let square = Gradient.radial(stops: [], center: Vec2(0.5, 0.5), edge: Vec2(1, 0.5), edgeAcross: Vec2(0.5, 1),
+                                     in: Size2(100, 100))
+        #expect(square.across == nil)
+    }
 }

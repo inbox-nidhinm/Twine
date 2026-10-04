@@ -154,6 +154,20 @@ private func near(_ a: Double, _ b: Double, _ e: Double = 1e-6) -> Bool { abs(a 
         #expect(r.media.count == 1)
     }
 
+    @Test func aStretchedRadialGradientComesInAsAnOval() throws {
+        // Figma's transform doubles x into the gradient's space, so its
+        // circle is half as wide as tall in this square: 25 px along its
+        // line (to the right), 50 px across.
+        let json = payload(##"""
+        {"kind": "rectangle", "name": "R", "transform": [1, 0, 0, 1, 0, 0], "width": 100, "height": 100, "fills": [
+          {"type": "GRADIENT_RADIAL", "transform": [2, 0, 0, 1, -0.5, 0], "stops": [{"position": 0, "color": {"r": 1, "g": 0, "b": 0, "a": 1}}, {"position": 1, "color": {"r": 0, "g": 0, "b": 1, "a": 1}}]}]}
+        """##)
+        let r = try FigmaImport.read(json)
+        guard case .radialGradient(let g)? = r.layers.first?.look?.fills.first?.paint else { Issue.record("no gradient"); return }
+        #expect(g.start == Vec2(0.5, 0.5) && g.end == Vec2(0.75, 0.5))
+        #expect(abs(g.aspect - 2) < 1e-9)
+    }
+
     @Test func angularGradientsComeInTurningTheSameWay() throws {
         let stops = ##""stops": [{"position": 0.25, "color": {"r": 1, "g": 0, "b": 0, "a": 1}}, {"position": 1, "color": {"r": 0, "g": 0, "b": 1, "a": 1}}]"##
         let json = payload(##"""

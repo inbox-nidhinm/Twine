@@ -109,6 +109,15 @@ private func near(_ a: Double, _ b: Double, _ e: Double = 1e-6) -> Bool { abs(a 
         #expect(near(u.start.x, 0.25) && near(u.end.x, 0.75), "user space points, measured in the box")
     }
 
+    @Test func aRadialGradientInAnUnevenBoxIsAnOval() throws {
+        // In box units, a circle of half the box in a 200 by 100 rectangle
+        // reaches 100 px across and 50 px down.
+        let layer = try #require(only(try read(##"<defs><radialGradient id="g"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient></defs><rect width="200" height="100" fill="url(#g)"/>"##)))
+        guard case .radialGradient(let g)? = layer.look?.fills.first?.paint else { Issue.record("no gradient"); return }
+        #expect(near(g.start.x, 0.5) && near(g.end.x, 1) && near(g.end.y, 0.5))
+        #expect(near(g.aspect, 0.5))
+    }
+
     @Test func aClipPathBecomesAMask() throws {
         let r = try read(##"<defs><clipPath id="c"><rect x="10" y="10" width="50" height="50" rx="8"/></clipPath></defs><g clip-path="url(#c)"><rect width="100" height="100" fill="red"/></g>"##)
         // In a mask group of its own, so it masks only what it clipped.

@@ -530,7 +530,7 @@ final class Node {
         return paints.map { paint -> Double in
             switch paint {
             case .solid(let c): return c.a
-            case .linear(let stops, _, _), .radial(let stops, _, _), .angular(let stops, _, _): return stops.map(\.color.a).max() ?? 0
+            case .linear(let stops, _, _), .radial(let stops, _, _, _), .angular(let stops, _, _): return stops.map(\.color.a).max() ?? 0
             case .image(let image): return image.opacity
             }
         }.max() ?? 1
@@ -1110,6 +1110,10 @@ private final class PaintLayers {
         // stroke, so a stroke's gradient does not stop at the layer's edge.
         let reach = stroke.map { $0.width * 2 } ?? 0
         let box = bounds.insetBy(dx: -reach, dy: -reach)
+        // Only a turned oval moves these off level (see `placeTurned`);
+        // set only when it did, as setting it at all costs a redraw.
+        if !CATransform3DIsIdentity(gradient.transform) { gradient.transform = CATransform3DIdentity }
+        if !CATransform3DIsIdentity(shape.transform) { shape.transform = CATransform3DIdentity }
         gradient.frame = box
         shape.frame = CGRect(x: -box.minX, y: -box.minY, width: bounds.width, height: bounds.height)
         func unit(_ p: Vec2) -> CGPoint {
@@ -1123,12 +1127,26 @@ private final class PaintLayers {
             gradient.locations = stops.map { NSNumber(value: $0.position) }
             gradient.startPoint = unit(start)
             gradient.endPoint = unit(end)
-        case .radial(let stops, let center, let radius):
+        case .radial(let stops, let center, let edge, let aspect):
             gradient.type = .radial
             gradient.colors = stops.map(\.color.cgColor)
             gradient.locations = stops.map { NSNumber(value: $0.position) }
-            gradient.startPoint = unit(center)
-            gradient.endPoint = unit(Vec2(center.x + radius, center.y + radius))
+            let dx = edge.x - center.x, dy = edge.y - center.y
+            let radius = hypot(dx, dy)
+            // Core Animation draws a level oval, its reach each way the end
+            // point's distance from the start: a circle, or an oval whose
+            // line runs level or upright, is drawn so.
+            let reach: Vec2?
+            if aspect == 1 || radius == 0 { reach = Vec2(radius, radius) }
+            else if abs(dy) <= radius * 1e-6 { reach = Vec2(radius, radius * aspect) }
+            else if abs(dx) <= radius * 1e-6 { reach = Vec2(radius * aspect, radius) }
+            else { reach = nil }
+            if let reach {
+                gradient.startPoint = unit(center)
+                gradient.endPoint = unit(Vec2(center.x + reach.x, center.y + reach.y))
+            } else {
+                placeTurned(gradient, center: center, radius: radius, angle: atan2(dy, dx), aspect: aspect, covering: box)
+            }
         case .angular(let stops, let center, let toward):
             gradient.type = .conic
             gradient.colors = stops.map(\.color.cgColor)
@@ -1142,6 +1160,39 @@ private final class PaintLayers {
 }
 
 extension PaintLayers {
+    /// A radial gradient whose oval is turned, which Core Animation cannot
+    /// draw: the gradient layer is laid out in a space where the oval is a
+    /// circle of `radius` and turned and squashed into the layer's pixels
+    /// (its transform), large enough to cover `box` there; the shape that
+    /// masks it is carried back through the inverse, so the outline stays put.
+    fileprivate func placeTurned(_ gradient: CAGradientLayer, center: Vec2, radius: Double, angle: Double, aspect: Double,
+                                 covering box: CGRect) {
+        // Squash across, then turn: from the circle's space into pixels.
+        let squash = CGAffineTransform(rotationAngle: angle).scaledBy(x: 1, y: aspect)
+        let unsquash = squash.inverted()
+        let corners = [CGPoint(x: box.minX, y: box.minY), CGPoint(x: box.maxX, y: box.minY),
+                       CGPoint(x: box.maxX, y: box.maxY), CGPoint(x: box.minX, y: box.maxY)]
+            .map { CGPoint(x: $0.x - center.x, y: $0.y - center.y).applying(unsquash) }
+        let minX = corners.map(\.x).min()!, maxX = corners.map(\.x).max()!
+        let minY = corners.map(\.y).min()!, maxY = corners.map(\.y).max()!
+        let width = max(maxX - minX, 1), height = max(maxY - minY, 1)
+        // The centre in the circle's space, from the corner of its bounds.
+        let middle = CGPoint(x: -minX, y: -minY)
+        let placed = middle.applying(squash)
+        let origin = CGPoint(x: center.x - placed.x, y: center.y - placed.y)
+        gradient.bounds = CGRect(x: 0, y: 0, width: width, height: height)
+        gradient.position = origin
+        gradient.setAffineTransform(squash)
+        gradient.startPoint = CGPoint(x: middle.x / width, y: middle.y / height)
+        gradient.endPoint = CGPoint(x: (middle.x + radius) / width, y: (middle.y + radius) / height)
+        // The shape's pixels into the gradient's space: back through the
+        // squash, from where the gradient now sits.
+        let shift = origin.applying(unsquash)
+        shape.position = .zero
+        shape.setAffineTransform(CGAffineTransform(a: unsquash.a, b: unsquash.b, c: unsquash.c, d: unsquash.d,
+                                                   tx: -shift.x, ty: -shift.y))
+    }
+
     /// The picture where its fill places it, turned and (off screen) turned
     /// over, inside the shape. A missing file shows grey, so the shape can
     /// still be seen and picked.

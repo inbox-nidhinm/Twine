@@ -124,6 +124,8 @@ enum CanvasDrag {
     struct GradientDrag {
         enum Part: Equatable {
             case start, end, line
+            /// A radial gradient's third handle.
+            case across
             case stop(Int)
 
             var isStop: Bool {

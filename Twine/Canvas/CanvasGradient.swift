@@ -14,7 +14,9 @@ import MotionEvaluation
 /// it go, so Delete deletes the layer again). Escape hides the line until
 /// the selection changes, giving back the handles under it; with Command
 /// the anchor moves as usual. A radial or angular gradient's line runs
-/// from its centre to its edge, its circle drawn.
+/// from its centre to its edge, its circle drawn; a radial one has a third
+/// handle across its line, which stretches the circle into an oval (as in
+/// Figma), the oval drawn.
 ///
 /// In Animate the line is a Colour or Stroke action's (4 October 2026):
 /// with one such action selected whose end is a gradient, the line edits
@@ -39,6 +41,8 @@ extension CanvasNSView {
         let start: CGPoint
         let end: CGPoint
         let stops: [CGPoint]
+        /// A radial gradient's third handle, in view points.
+        let across: CGPoint?
 
         func local(_ unit: Vec2) -> Vec2 { Vec2(unit.x * size.width, unit.y * size.height) }
         func unit(_ local: Vec2) -> Vec2 { Vec2(local.x / size.width, local.y / size.height) }
@@ -105,25 +109,31 @@ extension CanvasNSView {
         let stops = gradient.stops.map { stop in
             CGPoint(x: start.x + (end.x - start.x) * stop.position, y: start.y + (end.y - start.y) * stop.position)
         }
+        var across: CGPoint?
+        if case .radialGradient = paint { across = view(GradientEditing.acrossPoint(of: gradient, in: size)) }
         return GradientPlace(edit: edit, layer: layer, paint: paint, gradient: gradient, action: action, size: size, world: world,
-                             toLocal: toLocal, start: start, end: end, stops: stops)
+                             toLocal: toLocal, start: start, end: end, stops: stops, across: across)
     }
 
     func gradientMarks() -> CanvasOverlay.GradientMarks? {
         guard let place = gradientPlace() else { return nil }
         var circle: CGPath?
         if place.paint.isCentred {
-            // The circle in the layer's own pixels, drawn through its
-            // transform, so a scaled or turned layer's is too.
+            // The circle (a radial one's oval, turned with its line) in the
+            // layer's own pixels, drawn through its transform, so a scaled
+            // or turned layer's is too.
             let c = place.local(place.gradient.start), e = place.local(place.gradient.end)
             let r = hypot(e.x - c.x, e.y - c.y)
             let o = compositionToView(.zero), t = place.world
-            var toView = CGAffineTransform(a: t.a * zoom, b: t.b * zoom, c: t.c * zoom, d: t.d * zoom,
-                                           tx: t.tx * zoom + o.x, ty: t.ty * zoom + o.y)
-            circle = CGPath(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2), transform: &toView)
+            let world = CGAffineTransform(a: t.a * zoom, b: t.b * zoom, c: t.c * zoom, d: t.d * zoom,
+                                          tx: t.tx * zoom + o.x, ty: t.ty * zoom + o.y)
+            let reach = place.across == nil ? r : r * place.gradient.aspect
+            var toView = CGAffineTransform(rotationAngle: atan2(e.y - c.y, e.x - c.x))
+                .concatenating(CGAffineTransform(translationX: c.x, y: c.y)).concatenating(world)
+            circle = CGPath(ellipseIn: CGRect(x: -r, y: -reach, width: r * 2, height: reach * 2), transform: &toView)
         }
         return CanvasOverlay.GradientMarks(
-            start: place.start, end: place.end, circle: circle,
+            start: place.start, end: place.end, circle: circle, across: place.across,
             stops: place.gradient.stops.indices.map { i in
                 (place.stops[i], place.gradient.stops[i].color.cgColor, i == place.edit.stop)
             })
@@ -146,6 +156,8 @@ extension CanvasNSView {
             part = .end
         } else if distance(place.start) <= CanvasHandles.hitRadius {
             part = .start
+        } else if let across = place.across, distance(across) <= CanvasHandles.hitRadius {
+            part = .across
         } else if let stop = place.stops.indices
             .filter({ distance(place.stops[$0]) <= CanvasHandles.hitRadius })
             .min(by: { distance(place.stops[$0]) < distance(place.stops[$1]) }) {
@@ -185,6 +197,8 @@ extension CanvasNSView {
             let fixed = composition(edit.part == .start ? g.end : g.start)
             let reach = shift ? GradientEditing.snapped(point, around: fixed) : point
             if edit.part == .start { g.start = unit(reach) } else { g.end = unit(reach) }
+        case .across:
+            g = GradientEditing.reachingAcross(g, to: unit(point), in: place.size)
         case .line:
             let shift = place.unit(place.toLocal.applyToVector(point - edit.start))
             g.start = g.start + shift

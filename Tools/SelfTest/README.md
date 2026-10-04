@@ -57,7 +57,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `pasteimage PATH [png\|tiff\|jpeg]`, `pastefile PATH` | Paste with the picture file's bytes copied as that type, or with the file copied as the Finder does, on a pasteboard of the kit's own |
 | `tree` | Logs every layer under its parent: kind (frame, group, picture...), place, size, scale, clipping, fills and strokes, then the selection and the last undo |
 | `picture` | Logs the selected picture or video: file, mode, crop, turns, actions, whether it is being cropped, and while cropping the picture's and the box's corners in the window, to drag |
-| `actiongradient`, `gradient` | Makes the selected Colour or Stroke actions end on a red to blue linear gradient; logs the gradient line the canvas shows (whose, which paint, its ends and stops, and its ends' places in the window, to drag) |
+| `actiongradient [radial]`, `fillgradient [radial]`, `gradient` | Makes the selected Colour or Stroke actions end on a red to blue gradient (linear, or radial from the middle), or the selected layer's top fill; logs the gradient line the canvas shows (whose, which paint, its ends, stops and oval, and its handles' places in the window, to drag) |
 | `offers` | Logs what Add Action and Add Preset offer for the selection |
 | `add KIND` | Adds an action by its kind's name (`move`, `path`, `volume`...), as the Add Action menu does |
 | `warp SX SY TX TY` | Sets the selected layer's skew and tilt, as the Layer fields do |

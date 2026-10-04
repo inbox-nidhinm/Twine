@@ -555,13 +555,24 @@ enum SelfTest {
                     }.joined(separator: " ")
                 }
                 log(line)
-            case "actiongradient":
-                // Makes the selected Colour or Stroke actions end on a linear
-                // gradient from red to blue, left to right, as picking Linear
-                // in the inspector does with stops of the kit's choosing.
+            case "actiongradient", "fillgradient":
+                // Makes the selected Colour or Stroke actions end on a
+                // gradient from red to blue (linear, left to right, or with
+                // "radial" from the middle), or the selected layer's top
+                // fill, as picking it in the inspector does with stops of
+                // the kit's choosing.
+                let radial = parts.count > 1 && parts[1] == "radial"
                 let g = MotionModel.Gradient(stops: [GradientStop(position: 0, color: RGBA(1, 0, 0)),
-                                                     GradientStop(position: 1, color: RGBA(0, 0, 1))])
-                controller.editActions("Gradient") { a in a = a.with(.linearGradient(g), initial: false) }
+                                                     GradientStop(position: 1, color: RGBA(0, 0, 1))],
+                                             start: radial ? Vec2(0.5, 0.5) : Vec2(0, 0.5), end: Vec2(1, 0.5))
+                let paint: Paint = radial ? .radialGradient(g) : .linearGradient(g)
+                if parts[0] == "actiongradient" {
+                    controller.editActions("Gradient") { a in a = a.with(paint, initial: false) }
+                } else if var layer = controller.selectedLayers.first, var look = layer.look, let top = look.topFillIndex {
+                    look.fills[top].paint = paint
+                    layer.look = look
+                    controller.perform(.batch([.updateLayers([layer])], name: "Gradient"))
+                } else { log("FILLGRADIENT none") }
             case "gradient":
                 // The gradient line the canvas shows: whose, which paint, its
                 // stops, and its ends and stops in the window, to drag.
@@ -575,6 +586,7 @@ enum SelfTest {
                 let g = place.gradient
                 log("GRADIENT \(place.layer.name) slot=\(place.edit.slot) action=\(place.action?.name ?? "-") start=\(f(g.start.x)),\(f(g.start.y)) end=\(f(g.end.x)),\(f(g.end.y))"
                     + " stops=\(g.stops.map { f($0.position) }) startxy=\(xy(place.start)) endxy=\(xy(place.end))"
+                    + " aspect=\(f(g.aspect)) acrossxy=\(place.across.map(xy) ?? "-")"
                     + " time=\(String(format: "%.3f", controller.editor.time)) undo=\(controller.store.undoManager.undoActionName)")
             case "library":
                 // The home screen's folders and projects, each with its folder.

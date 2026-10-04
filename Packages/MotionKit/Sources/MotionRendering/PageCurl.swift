@@ -87,7 +87,7 @@ public enum PageCurlFilter {
         if let fill = layer.look?.fills.last {
             switch fill {
             case .solid(let c): ground = c
-            case .linear(let stops, _, _), .radial(let stops, _, _), .angular(let stops, _, _): if let first = stops.first { ground = first.color }
+            case .linear(let stops, _, _), .radial(let stops, _, _, _), .angular(let stops, _, _): if let first = stops.first { ground = first.color }
             case .image: break
             }
         } else if case .text(let text) = layer.content {

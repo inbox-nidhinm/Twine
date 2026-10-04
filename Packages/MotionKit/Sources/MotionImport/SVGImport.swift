@@ -689,7 +689,11 @@ private struct Reader {
         }
         let c = Vec2(coordinate("cx", boxUnits ? 0.5 : 50), coordinate("cy", boxUnits ? 0.5 : 50))
         let r = coordinate("r", boxUnits ? 0.5 : 50)
-        return .radialGradient(Gradient(stops: stops, start: unit(c), end: unit(Vec2(c.x + r, c.y))))
+        // Its circle comes through the transforms as an oval where they
+        // stretch one way more than the other (a box that is not square,
+        // in box units, does).
+        return .radialGradient(Gradient.radial(stops: stops, center: unit(c), edge: unit(Vec2(c.x + r, c.y)),
+                                               edgeAcross: unit(Vec2(c.x, c.y + r)), in: layer.size))
     }
 
     /// A pattern that is one picture, as Figma writes a picture fill: the

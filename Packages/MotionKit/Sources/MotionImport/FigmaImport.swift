@@ -346,7 +346,7 @@ private struct FigmaBuilder {
         let top = paints.lastIndex { $0.type == "IMAGE" && $0.visible != false } ?? paints.lastIndex { $0.type == "IMAGE" }
         return paints.enumerated().compactMap { i, paint in
             guard paint.type != "IMAGE" || i == top else { return nil }
-            return self.paint(paint).map { Fill(isEnabled: paint.visible ?? true, paint: $0) }
+            return self.paint(paint, size: Size2(node.width, node.height)).map { Fill(isEnabled: paint.visible ?? true, paint: $0) }
         }
     }
 
@@ -368,7 +368,7 @@ private struct FigmaBuilder {
     private mutating func strokes(_ node: FigmaPayload.Node, closed: Bool) -> [Stroke] {
         guard let weight = node.strokeWeight, weight > 0 else { return [] }
         return (node.strokes ?? []).compactMap { paint in
-            guard let p = self.paint(paint), !p.isImage else { return nil }
+            guard let p = self.paint(paint, size: Size2(node.width, node.height)), !p.isImage else { return nil }
             var stroke = Stroke(isEnabled: paint.visible ?? true, paint: p, width: weight)
             if closed { stroke.alignment = node.strokeAlign == "INSIDE" ? .inside : node.strokeAlign == "OUTSIDE" ? .outside : .center }
             stroke.cap = node.cap == "ROUND" ? .round : node.cap == "SQUARE" ? .square : .butt
@@ -383,7 +383,9 @@ private struct FigmaBuilder {
         return RGBA(c.r, c.g, c.b, (c.a ?? 1) * opacity)
     }
 
-    private mutating func paint(_ paint: FigmaPayload.Paint) -> Paint? {
+    /// A Figma paint on a layer of `size`, which an oval's reach across is
+    /// measured in.
+    private mutating func paint(_ paint: FigmaPayload.Paint, size: Size2) -> Paint? {
         let opacity = paint.opacity ?? 1
         switch paint.type {
         case "SOLID":
@@ -407,7 +409,10 @@ private struct FigmaBuilder {
                 let turned = mirrored ? stops.map { GradientStop(position: 1 - $0.position, color: $0.color) } : stops
                 return .angularGradient(Gradient(stops: turned, start: center, end: edge))
             }
-            return .radialGradient(Gradient(stops: stops, start: center, end: edge))
+            // Figma's circle reaches to both (1, 0.5) and (0.5, 1): an oval
+            // once its transform stretches one more than the other.
+            return .radialGradient(Gradient.radial(stops: stops, center: center, edge: edge,
+                                                   edgeAcross: t.apply(Vec2(0.5, 1)), in: size))
         case "IMAGE":
             guard let hash = paint.image, let id = image(hash) else { return nil }
             var p = ImagePaint(mediaID: id, opacity: opacity)

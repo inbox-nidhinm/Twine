@@ -86,7 +86,7 @@ extension MotionModel.Gradient: Interpolatable {
             }
         }
         return MotionModel.Gradient(stops: stops, start: .interpolate(a.start, b.start, t),
-                                    end: .interpolate(a.end, b.end, t))
+                                    end: .interpolate(a.end, b.end, t), across: lerp(a.aspect, b.aspect, t))
     }
 
     /// The colour a gradient shows at `position`, as Core Animation draws it:

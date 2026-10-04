@@ -300,6 +300,9 @@ nonisolated final class CanvasOverlay: CALayer {
         var start: CGPoint
         var end: CGPoint
         var circle: CGPath?
+        /// A radial gradient's third handle, across its line, which sets how
+        /// far its oval reaches that way.
+        var across: CGPoint?
         var stops: [(point: CGPoint, color: CGColor, picked: Bool)]
     }
 
@@ -319,11 +322,15 @@ nonisolated final class CanvasOverlay: CALayer {
         line.move(to: marks.start)
         line.addLine(to: marks.end)
         if let circle = marks.circle { line.addPath(circle) }
+        if let across = marks.across {
+            line.move(to: marks.start)
+            line.addLine(to: across)
+        }
         gradientShade.path = line
         gradientLine.path = line
         let ends = CGMutablePath()
         let r = Self.gradientEndRadius
-        for p in [marks.start, marks.end] { ends.addEllipse(in: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)) }
+        for p in [marks.start, marks.end] + (marks.across.map { [$0] } ?? []) { ends.addEllipse(in: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)) }
         gradientEnds.path = ends
         // A dot per stop, kept and recoloured while their count holds.
         var dots = (gradientStops.sublayers as? [CAShapeLayer]) ?? []

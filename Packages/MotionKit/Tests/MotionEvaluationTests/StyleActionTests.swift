@@ -50,6 +50,15 @@ private func gradient(_ colors: [RGBA], radial: Bool = false) -> Paint {
         #expect(mid.r > 0.99 && mid.g > 0.2 && mid.g < 0.9)
     }
 
+    @Test func anOvalBlendsItsReachAcross() {
+        let circle = Paint.radialGradient(Gradient(stops: [GradientStop(position: 0, color: red), GradientStop(position: 1, color: blue)],
+                                                   start: Vec2(0.5, 0.5), end: Vec2(1, 0.5)))
+        var oval = circle.gradient!
+        oval.aspect = 0.2
+        let mid = Paint.interpolate(circle, .radialGradient(oval), 0.5)
+        #expect(abs((mid.gradient?.aspect ?? 0) - 0.6) < 1e-9)
+    }
+
     @Test func aLayerWithNoFillIgnoresIt() {
         let layer = card(fills: [])
         let a = action(layer, .color(ColorAction(end: .solid(red))))

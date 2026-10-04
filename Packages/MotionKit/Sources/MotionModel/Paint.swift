@@ -191,11 +191,45 @@ public struct Gradient: AnimatableValue {
     public var stops: [GradientStop]
     public var start: Vec2
     public var end: Vec2
+    /// A radial gradient's reach across its line, as a share of its reach
+    /// along it, both in the layer's pixels: Figma's third handle, which
+    /// makes the circle an oval (4 October 2026). Nil is 1, a circle, and is
+    /// what is kept then, so files without ovals do not mention it. Linear
+    /// and angular gradients ignore it.
+    public var across: Double?
 
-    public init(stops: [GradientStop], start: Vec2 = Vec2(0, 0.5), end: Vec2 = Vec2(1, 0.5)) {
+    public init(stops: [GradientStop], start: Vec2 = Vec2(0, 0.5), end: Vec2 = Vec2(1, 0.5), across: Double? = nil) {
         self.stops = stops
         self.start = start
         self.end = end
+        self.across = Self.kept(across)
+    }
+
+    /// The reach across as a share of the reach along, 1 for a circle.
+    public var aspect: Double {
+        get { across ?? 1 }
+        set { across = Self.kept(newValue) }
+    }
+
+    /// The smallest and largest ovals kept: past them it draws as a line.
+    public static let aspects: ClosedRange<Double> = 0.001...1000
+
+    private static func kept(_ value: Double?) -> Double? {
+        guard let value, value.isFinite, abs(value - 1) > 1e-9 else { return nil }
+        return min(max(value, aspects.lowerBound), aspects.upperBound)
+    }
+
+    /// A radial gradient from its centre and the ends of its two axes, all
+    /// as fractions of a box of `size`, as Figma and SVG give one: the reach
+    /// across is how far the second end lies from the first axis's line,
+    /// in pixels, so an oval leaning off square comes in as the nearest
+    /// upright one.
+    public static func radial(stops: [GradientStop], center: Vec2, edge: Vec2, edgeAcross: Vec2, in size: Size2) -> Gradient {
+        func px(_ v: Vec2) -> Vec2 { Vec2(v.x * size.width, v.y * size.height) }
+        let along = px(edge - center), off = px(edgeAcross - center)
+        let length = hypot(along.x, along.y)
+        let across = length > 0 ? abs(along.x * off.y - along.y * off.x) / length / length : 1
+        return Gradient(stops: stops, start: center, end: edge, across: across)
     }
 }
 

@@ -90,5 +90,32 @@ public enum GradientEditing {
         return Vec2(pivot.x + cos(angle) * length, pivot.y + sin(angle) * length)
     }
 
+    /// Where a radial gradient's third handle sits, as a fraction of a box
+    /// of `size`: out from the centre across its line, a quarter turn
+    /// clockwise from the end on screen, as far as the oval reaches that way.
+    public static func acrossPoint(of gradient: Gradient, in size: Size2) -> Vec2 {
+        let along = pixels(gradient.end - gradient.start, size)
+        let off = Vec2(-along.y * gradient.aspect, along.x * gradient.aspect)
+        return gradient.start + units(off, size)
+    }
+
+    /// The gradient with its oval reaching across to `point` (a fraction of
+    /// a box of `size`): how far the point lies from the line through the
+    /// centre and the end, in pixels, against how far the end is. The end
+    /// stays where it is, so the line keeps its turn and length.
+    public static func reachingAcross(_ gradient: Gradient, to point: Vec2, in size: Size2) -> Gradient {
+        let along = pixels(gradient.end - gradient.start, size), off = pixels(point - gradient.start, size)
+        let length = hypot(along.x, along.y)
+        guard length > 0 else { return gradient }
+        var g = gradient
+        g.aspect = max(abs(along.x * off.y - along.y * off.x) / length / length, Gradient.aspects.lowerBound)
+        return g
+    }
+
+    private static func pixels(_ unit: Vec2, _ size: Size2) -> Vec2 { Vec2(unit.x * size.width, unit.y * size.height) }
+    private static func units(_ px: Vec2, _ size: Size2) -> Vec2 {
+        Vec2(size.width != 0 ? px.x / size.width : 0, size.height != 0 ? px.y / size.height : 0)
+    }
+
     private static func clamped(_ p: Double) -> Double { p.isFinite ? min(max(p, 0), 1) : 0 }
 }

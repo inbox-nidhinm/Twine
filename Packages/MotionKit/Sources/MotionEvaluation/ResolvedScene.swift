@@ -212,9 +212,10 @@ public enum ResolvedPaint: Sendable, Equatable {
     case solid(RGBA)
     /// `start` and `end` in the layer's pixel space.
     case linear(stops: [GradientStop], start: Vec2, end: Vec2)
-    /// `center` and `radius` in pixels. The radius is the distance from the
-    /// centre to the model's edge point.
-    case radial(stops: [GradientStop], center: Vec2, radius: Double)
+    /// `center` and `edge` in pixels: the last stop lies on an oval round
+    /// the centre through the edge point, reaching `aspect` times as far
+    /// across the line from the centre to the edge as along it (1 is a circle).
+    case radial(stops: [GradientStop], center: Vec2, edge: Vec2, aspect: Double)
     /// `center` and the point `toward` which the first stop lies, in
     /// pixels; the stops go a whole turn clockwise from there.
     case angular(stops: [GradientStop], center: Vec2, toward: Vec2)
