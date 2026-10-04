@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import AVFoundation
 import CryptoKit
 import ImageIO
@@ -72,6 +72,63 @@ enum MediaImport {
     /// What a notice says of pictures too large to take in.
     static func oversizedNotice(_ names: [String]) -> String {
         names.count == 1 ? "\(names[0]) is too large to import." : "\(names.joined(separator: ", ")) are too large to import."
+    }
+
+    // MARK: The clipboard
+
+    /// Files copied in the Finder that can be imported (pictures, video,
+    /// sound and SVG drawings). Nil when the clipboard holds no files; empty
+    /// when it holds only files of other kinds, whose icon the Finder also
+    /// puts there as a picture, which is not what was copied.
+    static func copiedFiles(on board: NSPasteboard) -> [URL]? {
+        guard let urls = board.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
+              !urls.isEmpty else { return nil }
+        return urls.filter { kind(of: $0) != nil || $0.pathExtension.lowercased() == "svg" }
+    }
+
+    /// A picture's own types, best first, each with the extension it is kept under.
+    private static let pictureTypes: [(type: NSPasteboard.PasteboardType, ext: String)] = [
+        (.png, "png"),
+        (NSPasteboard.PasteboardType(UTType.jpeg.identifier), "jpg"),
+        (NSPasteboard.PasteboardType(UTType.heic.identifier), "heic"),
+        (.tiff, "tiff"),
+    ]
+
+    /// A copied picture (a screenshot, a picture copied in a browser or as
+    /// PNG from Figma) as file bytes and the extension to keep them under.
+    /// TIFF, which the system copies uncompressed, is kept as PNG.
+    enum CopiedPicture {
+        case picture(Data, ext: String)
+        /// Past `FileSafety.pictureFileFits`, judged from its header.
+        case tooLarge
+    }
+
+    static func copiedPicture(on board: NSPasteboard) -> CopiedPicture? {
+        for (type, ext) in pictureTypes {
+            guard let data = board.data(forType: type),
+                  let source = CGImageSourceCreateWithData(data as CFData, nil) else { continue }
+            // A TIFF from the system can hold the picture at several sizes: take the largest.
+            let sizes = (0..<CGImageSourceGetCount(source)).compactMap { i -> (index: Int, w: Int, h: Int)? in
+                guard let p = CGImageSourceCopyPropertiesAtIndex(source, i, nil) as? [CFString: Any],
+                      let w = p[kCGImagePropertyPixelWidth] as? Int, let h = p[kCGImagePropertyPixelHeight] as? Int
+                else { return nil }
+                return (i, w, h)
+            }
+            guard let largest = sizes.max(by: { $0.w * $0.h < $1.w * $1.h }) else { continue }
+            guard FileSafety.pictureFileFits(width: Double(largest.w), height: Double(largest.h)) else { return .tooLarge }
+            if type != .tiff { return .picture(data, ext: ext) }
+            guard let png = pngData(from: source, at: largest.index) else { continue }
+            return .picture(png, ext: "png")
+        }
+        return nil
+    }
+
+    /// One picture of `source` written as PNG, its colour space kept.
+    private static func pngData(from source: CGImageSource, at index: Int) -> Data? {
+        let out = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(out, UTType.png.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImageFromSource(destination, source, index, nil)
+        return CGImageDestinationFinalize(destination) ? out as Data : nil
     }
 
     /// SHA-256 of the file, read a megabyte at a time so a long video never

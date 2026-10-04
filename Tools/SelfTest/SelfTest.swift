@@ -606,6 +606,21 @@ enum SelfTest {
                 // without touching the clipboard in use.
                 guard let text = try? String(contentsOfFile: parts[1], encoding: .utf8) else { log("PASTEFIGMA unreadable"); break }
                 controller.pasteFromFigma(text)
+            case "pasteimage", "pastefile":
+                // As Paste with a copied picture (its bytes as `parts[2]`: png,
+                // tiff or jpeg, png by default) or a file copied in the Finder,
+                // on a pasteboard of the kit's own, leaving the clipboard alone.
+                let board = NSPasteboard(name: NSPasteboard.Name("com.nidhin.twine.selftest"))
+                board.clearContents()
+                let url = URL(fileURLWithPath: parts[1])
+                if parts[0] == "pastefile" {
+                    board.writeObjects([url as NSURL])
+                } else {
+                    guard let data = try? Data(contentsOf: url) else { log("PASTEIMAGE unreadable"); break }
+                    let kind = parts.count > 2 ? parts[2] : "png"
+                    board.setData(data, forType: kind == "tiff" ? .tiff : kind == "jpeg" ? NSPasteboard.PasteboardType("public.jpeg") : .png)
+                }
+                controller.paste(from: board)
             case "composition":
                 let c = controller.project.composition
                 log("COMPOSITION \(c.width)x\(c.height) notice=\(controller.editor.notice?.text ?? "-")")

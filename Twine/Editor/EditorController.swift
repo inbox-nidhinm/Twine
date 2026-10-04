@@ -345,74 +345,79 @@ final class EditorController {
     /// used again rather than stored twice. Files that are none of these, or
     /// will not open, are skipped with a beep.
     func importMedia(_ urls: [URL], at point: Vec2? = nil) {
-        guard let document else { return }
+        guard document != nil else { return }
         // SVG files are drawings to take apart, not pictures.
         let drawings = urls.filter { $0.pathExtension.lowercased() == "svg" }
         let urls = urls.filter { $0.pathExtension.lowercased() != "svg" }
         for (i, url) in drawings.enumerated() { importSVG(url, at: point.map { Vec2($0.x + Double(i) * 20, $0.y + Double(i) * 20) }) }
         guard !urls.isEmpty else { return }
-        Task { @MainActor in
-            // A notice follows the import once it takes a moment, a WebM's
-            // conversion at once, and says when it is done.
-            let label = urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files"
-            let work = editor.beginWork("Importing \(label)", after: urls.contains(where: WebMConversion.isWebM) ? 0 : 0.4)
-            var commands: [EditorCommand] = []
-            var added: [UUID] = []
-            var skipped = false
-            var oversized: [String] = []
-            let composition = project.composition
-            let center = point ?? Vec2(Double(composition.width) / 2, Double(composition.height) / 2)
-            var offset = 0.0
-            var known = project.media
-            // Play bars go at the bottom of the timeline, in import order.
-            var nextRow = ActionFactory.nextRowOrder(in: project)
-            for url in urls {
-                let asset: MediaAsset
-                if WebMConversion.isWebM(url) {
-                    guard let brought = await bringInWebM(url, known: known, work: work) else { continue }
-                    if urls.count > 1 { editor.updateWork(work, text: "Importing \(label)", fraction: nil) }
-                    asset = brought.asset
-                    if brought.isNew {
-                        commands.append(.addMedia(asset))
-                        known.append(asset)
-                    }
+        Task { @MainActor in await importFiles(urls, at: point) }
+    }
+
+    /// The import itself, done once every file is in or skipped. `label`
+    /// names what is imported in the notice (the file's name, or the count).
+    private func importFiles(_ urls: [URL], at point: Vec2?, label: String? = nil, undoName: String? = nil) async {
+        guard let document else { return }
+        // A notice follows the import once it takes a moment, a WebM's
+        // conversion at once, and says when it is done.
+        let label = label ?? (urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files")
+        let work = editor.beginWork("Importing \(label)", after: urls.contains(where: WebMConversion.isWebM) ? 0 : 0.4)
+        var commands: [EditorCommand] = []
+        var added: [UUID] = []
+        var skipped = false
+        var oversized: [String] = []
+        let composition = project.composition
+        let center = point ?? Vec2(Double(composition.width) / 2, Double(composition.height) / 2)
+        var offset = 0.0
+        var known = project.media
+        // Play bars go at the bottom of the timeline, in import order.
+        var nextRow = ActionFactory.nextRowOrder(in: project)
+        for url in urls {
+            let asset: MediaAsset
+            if WebMConversion.isWebM(url) {
+                guard let brought = await bringInWebM(url, known: known, work: work) else { continue }
+                if urls.count > 1 { editor.updateWork(work, text: "Importing \(label)", fraction: nil) }
+                asset = brought.asset
+                if brought.isNew {
+                    commands.append(.addMedia(asset))
+                    known.append(asset)
+                }
+            } else {
+                if MediaImport.isOversizedPicture(url) { oversized.append(url.lastPathComponent); continue }
+                guard var described = await MediaImport.describe(url) else { skipped = true; continue }
+                if let existing = known.first(where: { $0.contentHash == described.contentHash }) {
+                    described = existing
                 } else {
-                    if MediaImport.isOversizedPicture(url) { oversized.append(url.lastPathComponent); continue }
-                    guard var described = await MediaImport.describe(url) else { skipped = true; continue }
-                    if let existing = known.first(where: { $0.contentHash == described.contentHash }) {
-                        described = existing
-                    } else {
-                        do { try await document.stage(url, as: described.fileName) } catch { skipped = true; continue }
-                        commands.append(.addMedia(described))
-                        known.append(described)
-                    }
-                    asset = described
+                    do { try await document.stage(url, as: described.fileName) } catch { skipped = true; continue }
+                    commands.append(.addMedia(described))
+                    known.append(described)
                 }
-                let name = url.deletingPathExtension().lastPathComponent
-                let layer = LayerFactory.media(asset, center: Vec2(center.x + offset, center.y + offset),
-                                               fitting: composition.size, name: name)
-                offset += 20
-                commands.append(.insertLayers([layer], parentID: nil, index: nil))
-                if asset.kind != .image {
-                    let start = editor.mode == .animate ? frameRate.snapped(editor.time) : 0
-                    let play = Action(target: layer.id, start: start,
-                                      duration: max(frameRate.snapped(asset.duration ?? 1), frameRate.frameDuration),
-                                      name: "Play", rowOrder: nextRow, spec: .play(PlayAction()))
-                    nextRow += 1
-                    commands.append(.insertActions([play]))
-                }
-                added.append(layer.id)
+                asset = described
             }
-            if skipped { NSSound.beep() }
-            // Said after the work's own last word, so it is not written over.
-            defer { if !oversized.isEmpty { editor.showNotice(MediaImport.oversizedNotice(oversized)) } }
-            guard !commands.isEmpty, perform(.batch(commands, name: added.count == 1 ? "Import" : "Import Files")) else {
-                editor.finishWork(work, done: nil)
-                return
+            let name = url.deletingPathExtension().lastPathComponent
+            let layer = LayerFactory.media(asset, center: Vec2(center.x + offset, center.y + offset),
+                                           fitting: composition.size, name: name)
+            offset += 20
+            commands.append(.insertLayers([layer], parentID: nil, index: nil))
+            if asset.kind != .image {
+                let start = editor.mode == .animate ? frameRate.snapped(editor.time) : 0
+                let play = Action(target: layer.id, start: start,
+                                  duration: max(frameRate.snapped(asset.duration ?? 1), frameRate.frameDuration),
+                                  name: "Play", rowOrder: nextRow, spec: .play(PlayAction()))
+                nextRow += 1
+                commands.append(.insertActions([play]))
             }
-            select(added)
-            editor.finishWork(work, done: "Imported \(added.count == urls.count ? label : "\(added.count) of \(urls.count) files")")
+            added.append(layer.id)
         }
+        if skipped { NSSound.beep() }
+        // Said after the work's own last word, so it is not written over.
+        defer { if !oversized.isEmpty { editor.showNotice(MediaImport.oversizedNotice(oversized)) } }
+        guard !commands.isEmpty, perform(.batch(commands, name: undoName ?? (added.count == 1 ? "Import" : "Import Files"))) else {
+            editor.finishWork(work, done: nil)
+            return
+        }
+        select(added)
+        editor.finishWork(work, done: "Imported \(added.count == urls.count ? label : "\(added.count) of \(urls.count) files")")
     }
 
     // MARK: Pictures and video
@@ -1360,19 +1365,53 @@ final class EditorController {
 
     var canPaste: Bool {
         let board = NSPasteboard.general
-        return board.data(forType: Self.pasteboardType) != nil || board.data(forType: Self.actionPasteboardType) != nil
-            || board.string(forType: .string).map(FigmaImport.isPayload) == true
+        if board.data(forType: Self.pasteboardType) != nil || board.data(forType: Self.actionPasteboardType) != nil
+            || board.string(forType: .string).map(FigmaImport.isPayload) == true { return true }
+        // Copied files are pasted only when they can be imported (their icons are not).
+        if let files = MediaImport.copiedFiles(on: board) { return !files.isEmpty }
+        return board.canReadItem(withDataConformingToTypes: [UTType.image.identifier])
     }
 
     /// Pastes in place, in front of everything at the top level. Every pasted
     /// layer is a new layer with new ids, however many times it is pasted.
-    func paste() {
+    /// Files copied in the Finder are imported, and a copied picture comes in
+    /// as an imported one does. `board` is the clipboard, or the test kit's own.
+    func paste(from board: NSPasteboard = .general) {
         // A copy from the Twine plugin in Figma.
-        if let text = NSPasteboard.general.string(forType: .string), FigmaImport.isPayload(text) { return pasteFromFigma(text) }
+        if let text = board.string(forType: .string), FigmaImport.isPayload(text) { return pasteFromFigma(text) }
         // Copying clears the pasteboard, so it holds layers or actions, never both.
-        if NSPasteboard.general.data(forType: Self.actionPasteboardType) != nil { return pasteActions() }
-        guard let data = NSPasteboard.general.data(forType: Self.pasteboardType),
-              let clipboard = LayerClipboard.read(data) else { return }
+        if board.data(forType: Self.actionPasteboardType) != nil { return pasteActions() }
+        if let data = board.data(forType: Self.pasteboardType) {
+            guard let clipboard = LayerClipboard.read(data) else { return }
+            return pasteLayers(clipboard)
+        }
+        if let files = MediaImport.copiedFiles(on: board) {
+            return files.isEmpty ? NSSound.beep() : importMedia(files)
+        }
+        switch MediaImport.copiedPicture(on: board) {
+        case .picture(let data, let ext): pastePicture(data, ext: ext)
+        case .tooLarge: editor.showNotice("The copied image is too large to paste.")
+        case nil: break
+        }
+    }
+
+    /// A copied picture, written to a file of its own for a moment and
+    /// imported from there, so it is stored, and found again by its bytes,
+    /// exactly as a picture file is.
+    private func pastePicture(_ data: Data, ext: String) {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Twine Paste \(UUID().uuidString)")
+        let file = folder.appendingPathComponent("Pasted Image").appendingPathExtension(ext)
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try data.write(to: file)
+        } catch { return NSSound.beep() }
+        Task { @MainActor in
+            await importFiles([file], at: nil, label: "pasted image", undoName: "Paste Image")
+            try? FileManager.default.removeItem(at: folder)
+        }
+    }
+
+    private func pasteLayers(_ clipboard: LayerClipboard) {
         var map: [UUID: UUID] = [:]
         let copies = clipboard.layers.map { $0.duplicated(recordingIDs: &map) }
         let pairs = Project(actions: clipboard.actions).actionCopyPairs(for: map)
