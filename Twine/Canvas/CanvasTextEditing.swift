@@ -38,7 +38,7 @@ extension CanvasNSView: NSTextInputClient, NSMenuItemValidation {
     /// Starts typing into `id`, with every letter selected, or with the
     /// caret at `point` (in composition space) when given.
     func beginTextEditing(_ id: UUID, selectAll: Bool, at point: Vec2? = nil) {
-        guard let controller, !animating, textSession == nil,
+        guard let controller, textSession == nil, !controller.editor.isPlaying,
               let layer = controller.project.layer(withID: id), case .text(let content) = layer.content else { return }
         controller.select([id])
         var session = TextSession(layerID: id, text: EditableText(text: content.text, selectAll: selectAll))

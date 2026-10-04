@@ -33,7 +33,9 @@ struct PathSession: Equatable {
 /// handles, Option-drag a handle to move it alone, Delete to take points out,
 /// and the pen on a segment to add one. A rectangle, ellipse, polygon or star
 /// becomes a path at its first change. In Animate a selected Path action
-/// shows its end shape, whose points move but cannot be added or taken away.
+/// shows its end shape, whose points move but cannot be added or taken away;
+/// the pen draws new paths there too (5 October 2026), but a shape's points
+/// are edited only in Design.
 extension CanvasNSView {
     var isEditingPoints: Bool { pathSession?.target == .layer }
     var isDrawingPath: Bool { pathSession?.drawingFrom != nil }
@@ -88,7 +90,8 @@ extension CanvasNSView {
         if let session = pathSession {
             switch session.target {
             case .layer:
-                guard !animating, selection == [session.layerID], tool == .select || tool == .pen,
+                // In Animate, only a path being drawn keeps its points showing.
+                guard !animating || session.drawingFrom != nil, selection == [session.layerID], tool == .select || tool == .pen,
                       let layer = project.layer(withID: session.layerID), let path = PathEditing.path(of: layer) else {
                     let wasDrawing = session.drawingFrom != nil
                     pathSession = nil
@@ -351,7 +354,7 @@ extension CanvasNSView {
     /// when the canvas should treat it as an ordinary click.
     func pathMouseDown(_ event: NSEvent, at point: Vec2, viewPoint: CGPoint) -> Bool {
         guard controller != nil else { return false }
-        if tool == .pen, !animating {
+        if tool == .pen {
             penMouseDown(event, at: point, viewPoint: viewPoint)
             return true
         }
@@ -513,6 +516,8 @@ extension CanvasNSView {
     private func penTarget() -> PathSession? {
         guard let controller else { return nil }
         if let session = pathSession, session.target == .layer { return session }
+        // In Animate the pen only draws new paths: a shape's points are Design's.
+        if animating { return nil }
         guard selection.count == 1, let id = selection.first, let layer = controller.project.layer(withID: id),
               PathEditing.canEditPoints(layer), !controller.isLocked(id) else { return nil }
         return PathSession(layerID: id, target: .layer)
@@ -636,7 +641,7 @@ extension CanvasNSView {
     /// Pointers while the pen is in hand or points are showing. Returns false
     /// to let the canvas set its usual hover and pointer.
     func pathMouseMoved(_ viewPoint: CGPoint, event: NSEvent) -> Bool {
-        if tool == .pen, !animating {
+        if tool == .pen {
             setHover(nil)
             var cursor = Cursors.pen
             if var session = penTarget(), let path = sessionPath(session), let t = pathTransform(session) {

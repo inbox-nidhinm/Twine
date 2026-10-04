@@ -143,6 +143,14 @@ public enum Arrangement {
         return carried(layer, by: inverse)
     }
 
+    /// The same, into a parent drawn by `parentWorld` (its own space into
+    /// the composition's): in Animate, the parent as it is at the playhead,
+    /// so a layer drawn into a moving frame lands where it was drawn.
+    public static func placed(_ layer: Layer, into parentID: UUID?, parentWorld: Affine?) -> Layer {
+        guard parentID != nil, let inverse = parentWorld?.inverted else { return layer }
+        return carried(layer, by: inverse)
+    }
+
     /// A layer's place, turn and scale carried by a transform between two
     /// parents' spaces.
     private static func carried(_ layer: Layer, by m: Affine) -> Layer {

@@ -1048,7 +1048,14 @@ final class TimelineTracksView: NSView {
         case 123 where flags.isEmpty: controller.nudgeActions(frames: -step)
         case 124 where flags.isEmpty: controller.nudgeActions(frames: step)
         default:
-            if !EditorKeys.handle(event, controller) { super.keyDown(with: event) }
+            if EditorKeys.handle(event, controller) { return }
+            // The tools' keys, as on the canvas: Animate has no tool bar.
+            if flags.isEmpty, let key = event.charactersIgnoringModifiers, let tool = Tool.forKey(key) {
+                controller.editor.tool = tool
+                if tool.isShape { controller.editor.lastShape = tool }
+                return
+            }
+            super.keyDown(with: event)
         }
     }
 }

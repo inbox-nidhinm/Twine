@@ -30,9 +30,13 @@ enum CanvasDrag {
     }
 
     struct Resize {
+        /// The layer as it shows: in Animate, as it is at the playhead.
         let layer: Layer
         let handle: Int
         let start: Vec2
+        /// In Animate, its design, which the resize changes
+        /// (`AnimateEditing.designed`); nil in Design.
+        var design: Layer? = nil
     }
 
     struct Edit {

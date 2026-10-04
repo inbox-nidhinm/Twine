@@ -143,6 +143,7 @@ final class CanvasNSView: NSView {
     /// changes; it only renders and never writes to the model.
     func show(_ project: Project, time: Double, selection: [UUID], tool: Tool, playing: Bool, animating: Bool) {
         setClockRunning(playing)
+        let modeChanged = self.animating != animating
         self.animating = animating
         self.project = project
         self.selection = selection
@@ -161,7 +162,7 @@ final class CanvasNSView: NSView {
         renderer.render(scene)
         checker.isHidden = scene.background != nil
         // Typing stops when its layer goes, is deselected, or the mode changes.
-        if let id = textSession?.layerID, animating || !selection.contains(id) || scene.layer(id) == nil {
+        if let id = textSession?.layerID, modeChanged || playing || !selection.contains(id) || scene.layer(id) == nil {
             endTextEditing()
         }
         validatePathSession()
@@ -361,11 +362,13 @@ final class CanvasNSView: NSView {
         var handles: [CGPoint] = []
         var anchor: CGPoint?
         var union: [CGPoint]?
-        // In Animate only a selected Resize or Scale brings the handles back,
-        // to set its end.
+        // A selected Resize or Scale shows its handles at its end, to set it;
+        // otherwise the layer's own, in Animate too (5 October 2026), where
+        // they change its design and its animation follows.
         if let endBox, actionKindOnCanvas != .rotate {
             handles = CanvasHandles.positions(for: endBox.box, isLine: endBox.isLine)
-        } else if selection.count == 1, let id = selection.first, id != editingPoints, !controller.isLocked(id), !animating,
+        } else if endBox == nil, selection.count == 1, let id = selection.first, id != editingPoints, !controller.isLocked(id),
+                  !(animating && controller.editor.isPlaying),
            let corners = scene.worldCorners(of: id), let layer = scene.layer(id),
            let world = scene.worldProjection(of: id) {
             let view = corners.map(compositionToView)
@@ -626,7 +629,9 @@ final class CanvasNSView: NSView {
             return
         }
 
-        if tool.draws, !animating {
+        // The drawing tools work in Animate too (5 October 2026), drawing
+        // into frames as they are at the playhead.
+        if tool.draws {
             snapTargets = targets(excluding: [])
             drag = .create(CanvasDrag.Create(tool: tool, start: snapped(point, event), layerID: nil,
                                              parentID: frame(under: point)))
@@ -635,29 +640,29 @@ final class CanvasNSView: NSView {
 
         // The Text tool places a text layer where it is clicked and puts the
         // keyboard in its text box, then hands back the arrow.
-        if tool == .text, !animating {
+        if tool == .text {
             controller.editor.tool = .select
-            if let id = controller.addText(at: point, in: frame(under: point)) { beginTextEditing(id, selectAll: true) }
-            return
-        }
-
-        // The selected action's own handles come first in Animate.
-        if animating, let action = controller.canvasAction,
-           beginActionEdit(action, at: point, viewPoint: viewPoint, commandHeld: event.modifierFlags.contains(.command)) {
-            redrawOverlay()
+            let parent = frame(under: point)
+            if let id = controller.addText(at: point, in: parent, parentWorld: animating ? parentWorld(parent) : nil) {
+                beginTextEditing(id, selectAll: true)
+            }
             return
         }
 
         // A handle of the one selected layer comes first, before the layers
-        // under it, so a handle over another shape still resizes.
-        if selection.count == 1, let id = selection.first, !controller.isLocked(id), !animating, !isTilted(id, in: scene),
+        // under it, so a handle over another shape still resizes, and in
+        // Animate before a selected Move, whose layer it sits on. A selected
+        // Resize, Scale or Rotate has its own handles instead.
+        if selection.count == 1, let id = selection.first, !controller.isLocked(id), !isTilted(id, in: scene),
+           actionEndBox() == nil, !(animating && controller.editor.isPlaying),
            let layer = controller.project.layer(withID: id), let resolved = scene.layer(id),
            let corners = scene.worldCorners(of: id), let world = scene.worldTransform(of: id) {
             let view = corners.map(compositionToView)
             let anchorView = compositionToView(world.apply(resolved.anchor))
             // The anchor sits in the middle of the layer, which is exactly
             // where a move usually starts, so moving it takes Command.
-            if event.modifierFlags.contains(.command),
+            // The anchor is Design's.
+            if !animating, event.modifierFlags.contains(.command),
                hypot(viewPoint.x - anchorView.x, viewPoint.y - anchorView.y) <= CanvasHandles.hitRadius {
                 drag = .anchor(CanvasDrag.Edit(layer: layer, start: point))
                 controller.begin("Move Anchor")
@@ -665,7 +670,11 @@ final class CanvasNSView: NSView {
             }
             if let handle = CanvasHandles.handle(at: viewPoint, box: view, isLine: isLine(resolved)) {
                 snapTargets = targets(excluding: [id])
-                drag = .resize(CanvasDrag.Resize(layer: layer, handle: handle, start: point))
+                // In Animate, worked out on the layer as it shows, and
+                // carried back into its design.
+                drag = .resize(animating ? CanvasDrag.Resize(layer: AnimateEditing.shown(layer, as: resolved), handle: handle,
+                                                             start: point, design: layer)
+                                         : CanvasDrag.Resize(layer: layer, handle: handle, start: point))
                 controller.begin(layer.isGroup && !layer.isFrame ? "Scale" : "Resize")
                 return
             }
@@ -674,6 +683,13 @@ final class CanvasNSView: NSView {
                 controller.begin("Rotate")
                 return
             }
+        }
+
+        // Then the selected action's own handles and path, in Animate.
+        if animating, let action = controller.canvasAction,
+           beginActionEdit(action, at: point, viewPoint: viewPoint, commandHeld: event.modifierFlags.contains(.command)) {
+            redrawOverlay()
+            return
         }
 
         let deep = event.modifierFlags.contains(.command)
@@ -697,7 +713,7 @@ final class CanvasNSView: NSView {
                 let chain = controller.project.ancestors(of: deepest) + [deepest]
                 let inner = chain.firstIndex(of: hit).map { chain[$0 + 1] } ?? deepest
                 controller.select([inner])
-            } else if event.clickCount == 2, !animating, controller.project.layer(withID: hit)?.isText == true,
+            } else if event.clickCount == 2, controller.project.layer(withID: hit)?.isText == true,
                       !controller.isLocked(hit) {
                 // And on text, it starts typing where it was clicked.
                 return beginTextEditing(hit, selectAll: false, at: point)
@@ -715,9 +731,10 @@ final class CanvasNSView: NSView {
             let sources = Set(moving.map(\.id))
             let boxes = moving.compactMap { scene.bounds(of: $0.id) }
             snapBox = boxes.dropFirst().reduce(boxes.first) { $0?.union($1) }
-            // Option-drag in Design leaves the originals behind and drags
-            // copies of them, as in Figma. The originals stay snap targets.
-            let duplicating = event.modifierFlags.contains(.option) && !animating && !moving.isEmpty
+            // Option-drag leaves the originals behind and drags copies of
+            // them, actions and all, as in Figma. The originals stay snap
+            // targets.
+            let duplicating = event.modifierFlags.contains(.option) && !moving.isEmpty
             if duplicating {
                 controller.begin(moving.count == 1 ? "Duplicate Layer" : "Duplicate Layers")
                 moving = controller.duplicateForDrag(moving)
@@ -753,7 +770,7 @@ final class CanvasNSView: NSView {
             let end = CanvasGeometry.constrainedEnd(create.start, reach, tool: create.tool, square: shift)
             let from = option && create.tool != .line ? Vec2(2 * create.start.x - end.x, 2 * create.start.y - end.y) : create.start
             guard let made = controller.makeShape(create.tool, from: from, to: end) else { return }
-            var layer = Arrangement.placed(made, into: create.parentID, in: controller.project)
+            var layer = placed(made, into: create.parentID)
             if let id = create.layerID, let existing = controller.project.layer(withID: id) {
                 // Keep the first frame's id and name, so the shape is one
                 // layer being drawn rather than a new one every step.
@@ -809,7 +826,11 @@ final class CanvasNSView: NSView {
                 t.sizing = .fixedWidth
                 edited.content = .text(t)
             }
-            controller.update([edited])
+            if let design = resize.design {
+                controller.update(controller.animatedUpdate([AnimateEditing.designed(design, shown: resize.layer, edited: edited)]))
+            } else {
+                controller.update([edited])
+            }
 
         case .rotate(let rotate):
             guard let scene, let world = scene.worldTransform(of: rotate.layer.id),
@@ -829,7 +850,7 @@ final class CanvasNSView: NSView {
             if shift { angle = (angle / 15).rounded() * 15 }
             var layer = rotate.layer
             layer.transform.rotation = angle
-            controller.update([layer])
+            if animating { controller.update(controller.animatedUpdate([layer])) } else { controller.update([layer]) }
 
         case .anchor(let edit):
             guard let parentInverse = parentInverse(of: edit.layer.id) else { return }
@@ -872,7 +893,7 @@ final class CanvasNSView: NSView {
                 let end = create.tool == .line ? Vec2(create.start.x + size / 2, create.start.y) :
                     Vec2(create.start.x + size / 2, create.start.y + size / 2)
                 if let made = controller.makeShape(create.tool, from: start, to: end) {
-                    let layer = Arrangement.placed(made, into: create.parentID, in: controller.project)
+                    let layer = placed(made, into: create.parentID)
                     let insert = EditorCommand.insertLayers([layer], parentID: create.parentID, index: nil)
                     // A frame takes in the layers it lands around, as in Figma.
                     let taking = layer.isFrame ? controller.enclosing(layer.id, after: insert) : nil
@@ -1146,6 +1167,20 @@ final class CanvasNSView: NSView {
         return Vec2(layer.scale.x * rx, layer.scale.y * ry)
     }
 
+    /// A layer made in composition space, carried into `parentID`'s space
+    /// where it shows: in Animate, the parent as it is at the playhead.
+    func placed(_ layer: Layer, into parentID: UUID?) -> Layer {
+        guard let controller else { return layer }
+        if animating { return Arrangement.placed(layer, into: parentID, parentWorld: parentWorld(parentID)) }
+        return Arrangement.placed(layer, into: parentID, in: controller.project)
+    }
+
+    /// A group's or frame's own space into the composition's, as it shows.
+    func parentWorld(_ parentID: UUID?) -> Affine? {
+        guard let parentID else { return nil }
+        return scene?.worldTransform(of: parentID)
+    }
+
     func parentInverse(of id: UUID) -> Affine? {
         guard let scene, let project else { return nil }
         guard let parent = project.location(of: id)?.parentID else { return .identity }
@@ -1177,7 +1212,7 @@ final class CanvasNSView: NSView {
     override func resetCursorRects() {
         discardCursorRects()
         addCursorRect(bounds, cursor: spaceHeld ? Cursors.hand : tool == .text ? .iBeam : tool.draws ? Cursors.crosshair
-                                      : tool == .pen && !animating ? Cursors.pen : Cursors.arrow)
+                                      : tool == .pen ? Cursors.pen : Cursors.arrow)
         // While typing, the text being edited takes the I-beam.
         if let id = textSession?.layerID, let corners = scene?.worldCorners(of: id) {
             let points = corners.map(compositionToView)
@@ -1227,8 +1262,7 @@ final class CanvasNSView: NSView {
         }
         let view: [CGPoint]
         let line: Bool
-        if animating {
-            guard let end = actionEndBox() else { return Cursors.arrow.set() }
+        if let end = actionEndBox() {
             view = end.box
             line = end.isLine
         } else {
@@ -1248,7 +1282,7 @@ final class CanvasNSView: NSView {
            let point = CanvasHandles.handles(for: view, isLine: line).first(where: { $0.0 == handle })?.1 {
             return Cursors.resize(toward: away(point))
         }
-        if !animating || actionKindOnCanvas == .rotate, CanvasHandles.isRotateZone(viewPoint, box: view),
+        if actionKindOnCanvas == .rotate || actionEndBox() == nil, CanvasHandles.isRotateZone(viewPoint, box: view),
            let corner = view.min(by: { hypot($0.x - viewPoint.x, $0.y - viewPoint.y) < hypot($1.x - viewPoint.x, $1.y - viewPoint.y) }) {
             return Cursors.rotate(toward: away(corner))
         }
@@ -1352,7 +1386,7 @@ final class CanvasNSView: NSView {
         if cropKeyDown(event) { return }
         if gradientKeyDown(event) { return }
         // Return on one selected text layer starts typing into it.
-        if event.keyCode == 36, !animating, selection.count == 1, let id = selection.first,
+        if event.keyCode == 36, selection.count == 1, let id = selection.first,
            controller.project.layer(withID: id)?.isText == true, !controller.isLocked(id) {
             return beginTextEditing(id, selectAll: true)
         }
@@ -1378,6 +1412,9 @@ final class CanvasNSView: NSView {
         case 53:                                                     // escape
             if dismissTransients() {
                 // An open menu closes first.
+            } else if controller.editor.tool != .select, drag == nil {
+                // A tool in hand goes back to the arrow, as in Figma.
+                controller.editor.tool = .select
             } else if controller.editor.showShortcuts {
                 controller.editor.showShortcuts = false
             } else if drag != nil {
@@ -1394,7 +1431,8 @@ final class CanvasNSView: NSView {
         case 126: controller.nudge(by: Vec2(0, -step))
         default:
             let flags = event.modifierFlags.intersection([.command, .control, .option])
-            if flags.isEmpty, !animating, let key = event.charactersIgnoringModifiers, let tool = Tool.forKey(key) {
+            // The tools' keys work in Animate too, where there is no bar.
+            if flags.isEmpty, let key = event.charactersIgnoringModifiers, let tool = Tool.forKey(key) {
                 controller.editor.tool = tool
                 if tool.isShape { controller.editor.lastShape = tool }
             } else {

@@ -75,9 +75,10 @@ final class EditorController {
     // MARK: Modes
 
     /// Design builds the layout and shows it with no animation; Animate adds
-    /// actions and shows the playhead's moment. Nothing carries across:
-    /// playback stops on the way into Design, and the drawing tools put
-    /// themselves away on the way into Animate.
+    /// actions and shows the playhead's moment. Playback stops on the way
+    /// into Design, and the tool goes back to the arrow on the way into
+    /// Animate, where no bar shows which is in hand (the tools work there
+    /// from their keys).
     func setMode(_ mode: EditorModel.Mode) {
         guard editor.mode != mode else { return }
         if mode == .design {
@@ -183,6 +184,21 @@ final class EditorController {
                 .map { $0.remapped(point: { $0 + delta }, vector: { $0 }) }
         }
         return carried.isEmpty ? .updateLayers(layers) : .batch([.updateLayers(layers), .updateActions(carried)], name: "Edit Layer")
+    }
+
+    /// A canvas resize or turn in Animate: the layers' design changes and
+    /// their animation follows (the user's choice, 5 October 2026): their
+    /// Move actions as `layerUpdate` carries them, and their Rotate, Resize
+    /// and Scale actions' absolute values turned or grown by as much
+    /// (`AnimateEditing.following`).
+    func animatedUpdate(_ layers: [Layer]) -> EditorCommand {
+        var carried: [Action] = []
+        for layer in layers {
+            guard let old = project.layer(withID: layer.id) else { continue }
+            carried += AnimateEditing.following(project.actions(on: layer.id), from: old, to: layer)
+        }
+        let moved = layerUpdate(layers)
+        return carried.isEmpty ? moved : .batch([moved, .updateActions(carried)], name: "Edit Layer")
     }
 
     /// Changes every selected layer the same way, as one undo step.
@@ -1095,7 +1111,10 @@ final class EditorController {
     /// light background, light on dark.
     @discardableResult
     /// A text layer at a composition point, inside `parentID` when given.
-    func addText(at point: Vec2, in parentID: UUID? = nil) -> UUID? {
+    /// `parentWorld` is the frame as it shows, in Animate (see
+    /// `Arrangement.placed(_:into:parentWorld:)`); nil places it in the
+    /// frame as designed.
+    func addText(at point: Vec2, in parentID: UUID? = nil, parentWorld: Affine? = nil) -> UUID? {
         // Dark on a light ground, light on a dark one: the frame it goes in,
         // when that has a colour, or the composition's background.
         let background = project.composition.background
@@ -1104,7 +1123,8 @@ final class EditorController {
         let light = ground.map { ($0.r + $0.g + $0.b) / 3 > 0.5 } ?? true
         let made = LayerFactory.text(at: point, name: LayerFactory.nextName("Text", in: project),
                                      color: light ? LayerFactory.defaultStroke : .white)
-        let layer = Arrangement.placed(made, into: parentID, in: project)
+        let layer = parentWorld != nil ? Arrangement.placed(made, into: parentID, parentWorld: parentWorld)
+                                       : Arrangement.placed(made, into: parentID, in: project)
         guard perform(.insertLayers([layer], parentID: parentID, index: nil)) else { return nil }
         select([layer.id])
         return layer.id

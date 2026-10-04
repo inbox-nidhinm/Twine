@@ -82,6 +82,7 @@ struct ShortcutsCard: View {
                     s("Polygon, star", "Y", "S"),
                     s("Pen", "P"),
                     s("Text", "T"),
+                    s("Put the tool away", "Esc"),
                     s("Type into a text layer", "Return"),
                 ]),
                 Group(title: "Points", items: [
