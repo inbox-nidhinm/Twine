@@ -97,7 +97,7 @@ public func volumeEnvelope(of layer: Layer, _ actions: [Action]) -> [VolumePoint
         times.insert(max(action.start - 1e-4, 0))
         times.insert(action.start)
         guard !action.isInstant else { continue }
-        let steps = min(max(Int((action.duration * 30).rounded(.up)), 2), 600)
+        let steps = min(max(Int(saturating: (action.duration * 30).rounded(.up)), 2), 600)
         for k in 1...steps { times.insert(action.start + action.duration * Double(k) / Double(steps)) }
     }
     let tracks = ActionTracks(actions)

@@ -45,6 +45,14 @@ final class ProjectDocument: NSDocument {
         // in the timeline, and an older Typewriter types rather than fades;
         // the file changes only when next saved.
         let project = Presets.withTypewriters(MediaPlays.withPlayBars(try ProjectFormat.decode(data)))
+        // Anything in the media folder that is not an ordinary file with a
+        // plain name (a link could lead anywhere on the Mac) is let go, so
+        // no save carries it on.
+        if let media = fileWrapper.fileWrappers?[ProjectFormat.mediaFolderName], media.isDirectory {
+            for (name, file) in media.fileWrappers ?? [:] where !file.isRegularFile || !FileSafety.isPlainName(name) {
+                media.removeFileWrapper(file)
+            }
+        }
         package = fileWrapper
         MainActor.assumeIsolated {
             if let store {
@@ -92,8 +100,7 @@ final class ProjectDocument: NSDocument {
         if let folder = root.fileWrappers?[ProjectFormat.mediaFolderName],
            let savedFolder = fileURL?.appendingPathComponent(ProjectFormat.mediaFolderName) {
             for name in saved where folder.fileWrappers?[name] == nil {
-                let file = savedFolder.appendingPathComponent(name)
-                guard FileManager.default.fileExists(atPath: file.path),
+                guard let file = Self.packageFile(name, in: savedFolder),
                       let wrapper = try? FileWrapper(url: file, options: []) else { continue }
                 wrapper.preferredFilename = name
                 folder.addFileWrapper(wrapper)
@@ -119,10 +126,10 @@ final class ProjectDocument: NSDocument {
         try fm.createDirectory(at: folder, withIntermediateDirectories: true)
         let before = originalContentsURL?.appendingPathComponent(ProjectFormat.mediaFolderName)
         var lost: [String] = []
-        for (name, staged, shown) in wanted {
+        for (name, staged, shown) in wanted where FileSafety.isPlainName(name) {
             let target = folder.appendingPathComponent(name)
             guard !fm.fileExists(atPath: target.path) else { continue }
-            let sources = [staged, before?.appendingPathComponent(name)].compactMap { $0 }
+            let sources = [staged, before.flatMap { Self.packageFile(name, in: $0) }].compactMap { $0 }
             guard let source = sources.first(where: { fm.fileExists(atPath: $0.path) }) else {
                 if staged != nil { lost.append(shown) }
                 continue
@@ -152,8 +159,19 @@ final class ProjectDocument: NSDocument {
         guard let asset = store?.project.media.first(where: { $0.id == id }) else { return nil }
         if let staged = stagedMedia[asset.fileName] { return staged }
         guard let fileURL else { return nil }
-        let saved = fileURL.appendingPathComponent(ProjectFormat.mediaFolderName).appendingPathComponent(asset.fileName)
-        return FileManager.default.fileExists(atPath: saved.path) ? saved : nil
+        return Self.packageFile(asset.fileName, in: fileURL.appendingPathComponent(ProjectFormat.mediaFolderName))
+    }
+
+    /// The file `name` in a package's media `folder`, or nil when the name
+    /// is not a plain file name (`FileSafety.isPlainName`: a name with a
+    /// path in it reached outside the package) or what is there is not an
+    /// ordinary file, such as a link, which could lead anywhere on the Mac.
+    nonisolated static func packageFile(_ name: String, in folder: URL) -> URL? {
+        guard FileSafety.isPlainName(name) else { return nil }
+        let url = folder.appendingPathComponent(name)
+        guard let kind = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+              kind.isRegularFile == true, kind.isSymbolicLink != true else { return nil }
+        return url
     }
 
     /// Every file the project uses, for an export to read on its own thread.

@@ -110,7 +110,7 @@ public enum PageCurlFilter {
         let extent = CGRect(origin: .zero, size: size)
         let tint = CIColor(red: color.r, green: color.g, blue: color.b)
         guard let outline else { return CIImage(color: tint).cropped(to: extent) }
-        let w = max(Int((size.width * scale).rounded(.up)), 1), h = max(Int((size.height * scale).rounded(.up)), 1)
+        let w = max(Int(saturating: (size.width * scale).rounded(.up)), 1), h = max(Int(saturating: (size.height * scale).rounded(.up)), 1)
         guard let context = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {

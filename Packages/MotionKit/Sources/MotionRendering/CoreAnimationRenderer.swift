@@ -1180,7 +1180,7 @@ extension PaintLayers {
         guard let across, let down, frame.width > 0, frame.height > 0 else { return }
         across.frame = bounds
         down.frame = bounds
-        func count(_ length: Double, _ tile: Double) -> Int { min(max(Int((length / tile).rounded(.up)), 1), Self.maxTiles) }
+        func count(_ length: Double, _ tile: Double) -> Int { min(max(Int(saturating: (length / tile).rounded(.up)), 1), Self.maxTiles) }
         across.instanceCount = count(bounds.width, frame.width)
         down.instanceCount = count(bounds.height, frame.height)
         across.instanceTransform = CATransform3DMakeTranslation(frame.width, 0, 0)

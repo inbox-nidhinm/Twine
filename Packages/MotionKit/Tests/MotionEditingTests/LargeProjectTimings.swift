@@ -38,6 +38,18 @@ struct LargeProjectTimings {
 
     private func ms(_ seconds: Double, _ n: Int) -> String { String(format: "%.3f ms", seconds / Double(n) * 1000) }
 
+    /// Reading the file, and what holding it in range (`FileSafety`) adds.
+    @Test func opening() throws {
+        let data = try ProjectFormat.encode(Self.project())
+        var start = CACurrentMediaTime()
+        for _ in 0..<5 { _ = try ProjectFormat.decode(data) }
+        print("BENCH opening decode, \(data.count / 1_000_000) MB: \(ms(CACurrentMediaTime() - start, 5))")
+        let project = try ProjectFormat.decode(data)
+        start = CACurrentMediaTime()
+        for _ in 0..<5 { _ = project.heldInRange() }
+        print("BENCH opening heldInRange: \(ms(CACurrentMediaTime() - start, 5))")
+    }
+
     @MainActor @Test func editing() throws {
         let project = Self.project()
         print("BENCH editing: \(project.allLayers.count) layers")

@@ -60,7 +60,7 @@ struct TextImage {
             top = -margin
         }
         origin = CGPoint(x: left, y: top)
-        let w = max(Int((total.width * key.scale).rounded(.up)), 1), h = max(Int((total.height * key.scale).rounded(.up)), 1)
+        let w = max(Int(saturating: (total.width * key.scale).rounded(.up)), 1), h = max(Int(saturating: (total.height * key.scale).rounded(.up)), 1)
         guard let context = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                       bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue

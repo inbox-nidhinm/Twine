@@ -13,7 +13,8 @@ struct ProjectDetails: Sendable {
 
     /// `open` is an open project as it stands; otherwise the file is read.
     nonisolated init(url: URL, open: Project?) {
-        let project = open ?? (try? Data(contentsOf: url.appendingPathComponent(ProjectFormat.documentFileName)))
+        let project = open ?? ProjectDocument.packageFile(ProjectFormat.documentFileName, in: url)
+            .flatMap { try? Data(contentsOf: $0) }
             .flatMap { try? ProjectFormat.decode($0) }
         created = (try? url.resourceValues(forKeys: [.creationDateKey]))?.creationDate
         let files = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.totalFileAllocatedSizeKey])

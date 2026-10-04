@@ -55,12 +55,15 @@ public enum ProjectFormat {
             throw ProjectFileError.olderVersion(probe.formatVersion)
         }
 
-        var body = data
+        // Numbers past what Twine can draw are brought back before anything
+        // reads them, migrations included, and the rest is held in range
+        // after (`FileSafety`), since a file can come from anyone.
+        var body = FileSafety.numbersHeld(data)
         if probe.formatVersion < currentVersion {
-            body = try migrator.migrate(data, from: probe.formatVersion, to: currentVersion)
+            body = try migrator.migrate(body, from: probe.formatVersion, to: currentVersion)
         }
         do {
-            return try JSONDecoder().decode(Envelope.self, from: body).project
+            return try JSONDecoder().decode(Envelope.self, from: body).project.heldInRange()
         } catch {
             throw ProjectFileError.unreadable(error.localizedDescription)
         }

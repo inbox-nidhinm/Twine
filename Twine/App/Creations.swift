@@ -93,7 +93,10 @@ enum Creations {
     }
 
     static func read(_ url: URL) throws -> Project {
-        let data = try Data(contentsOf: url.appendingPathComponent(ProjectFormat.documentFileName))
-        return try ProjectFormat.decode(data)
+        // Only an ordinary file is read: a link could lead anywhere, and
+        // a pipe would hold the home screen waiting.
+        guard let file = ProjectDocument.packageFile(ProjectFormat.documentFileName, in: url)
+        else { throw ProjectFileError.missingDocument }
+        return try ProjectFormat.decode(try Data(contentsOf: file))
     }
 }

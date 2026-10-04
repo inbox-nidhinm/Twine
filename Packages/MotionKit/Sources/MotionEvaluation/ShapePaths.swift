@@ -106,12 +106,12 @@ enum ShapePaths {
 
     /// Corners evenly round the box's inscribed ellipse, the first straight up.
     static func polygon(_ size: Size2, sides: Int) -> BezierPath {
-        let n = max(sides, 3)
+        let n = FileSafety.corners(sides)
         return closed(size, count: n) { _ in 1 }
     }
 
     static func star(_ size: Size2, points: Int, innerRadius: Double, cornerRadius: Double = 0) -> BezierPath {
-        let n = max(points, 3)
+        let n = FileSafety.corners(points)
         let sharp = closed(size, count: n * 2) { $0.isMultiple(of: 2) ? 1 : max(innerRadius, 0) }
         return cornerRadius > 0 ? rounded(sharp, radius: cornerRadius) : sharp
     }

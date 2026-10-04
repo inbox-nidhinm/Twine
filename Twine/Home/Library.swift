@@ -86,7 +86,7 @@ final class Library {
             if let known = read[url], known.modified == modified {
                 return Item(url: url, modified: modified, composition: known.composition, thumbnail: known.thumbnail, folder: folder)
             }
-            let thumb = NSImage(contentsOf: url.appendingPathComponent(ProjectFormat.thumbnailFileName))
+            let thumb = ProjectDocument.packageFile(ProjectFormat.thumbnailFileName, in: url).flatMap(NSImage.init(contentsOf:))
             let composition = (try? Creations.read(url))?.composition
             read[url] = (modified, composition, thumb)
             return Item(url: url, modified: modified, composition: composition, thumbnail: thumb, folder: folder)
