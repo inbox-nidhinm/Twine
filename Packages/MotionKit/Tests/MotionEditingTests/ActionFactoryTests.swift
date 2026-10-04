@@ -72,7 +72,7 @@ import MotionEvaluation
         let audio = Layer(name: "A", content: .audio(AudioContent(mediaID: UUID())), size: Size2(0, 0), position: .zero)
         // A filled rectangle with no stroke: everything but Stroke and Trim.
         #expect(ActionFactory.kinds(for: square) == [.move, .scale, .rotate, .skew, .tilt, .opacity, .resize, .visibility,
-                                                     .color, .cornerRadius, .shadow, .layerBlur, .backgroundBlur])
+                                                     .color, .cornerRadius, .shadow, .innerShadow, .layerBlur, .backgroundBlur])
         #expect(!ActionFactory.kinds(for: group).contains(.resize))
         #expect(ActionFactory.kinds(for: audio) == [.play, .volume])
         let project = Project(layers: [square, group])

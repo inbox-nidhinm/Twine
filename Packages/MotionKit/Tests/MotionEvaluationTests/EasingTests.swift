@@ -17,6 +17,24 @@ import MotionModel
         }
     }
 
+    @Test func theBackEasingsAreTheUsersCurvesAndGrowWithIntensity() {
+        let outBack = CubicBezier(0.45, 1.45, 0.8, 1), inBack = CubicBezier(0.3, -0.05, 0.7, -0.5)
+        for u in stride(from: 0.05, through: 0.95, by: 0.05) {
+            #expect(abs(EasingPreset.easeOutBack.progress(u, intensity: 0.5) - outBack.value(at: u)) < 1e-9)
+            #expect(abs(EasingPreset.easeInBack.progress(u, intensity: 0.5) - inBack.value(at: u)) < 1e-9)
+        }
+        let samples = stride(from: 0.0, through: 1, by: 0.01)
+        func peak(_ i: Double) -> Double { samples.map { EasingPreset.easeOutBack.progress($0, intensity: i) }.max()! }
+        func dip(_ i: Double) -> Double { samples.map { EasingPreset.easeInBack.progress($0, intensity: i) }.min()! }
+        // Out back passes the end, in back goes below the start, more so as intensity rises.
+        #expect(peak(0.5) > 1.05)
+        #expect(peak(1) > peak(0.5))
+        #expect(abs(peak(0) - 1) < 1e-9)
+        #expect(dip(0.5) < -0.05)
+        #expect(dip(1) < dip(0.5))
+        #expect(abs(dip(0)) < 1e-9)
+    }
+
     @Test func linearIsTheIdentity() {
         for u in stride(from: 0.0, through: 1, by: 0.1) {
             #expect(abs(Easing.linear.progress(u) - u) < 1e-12)

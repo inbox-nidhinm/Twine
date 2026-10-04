@@ -266,6 +266,7 @@ extension Layer {
         switch slot {
         case .fill(let i): return look.fills.indices.contains(i) ? look.fills[i].paint : nil
         case .stroke(let i): return look.strokes.indices.contains(i) ? look.strokes[i].paint : nil
+        case .action: return nil
         }
     }
 
@@ -280,5 +281,32 @@ extension Layer {
         var l = self
         l.look = look
         return l
+    }
+}
+
+extension Action {
+    /// A Colour or Stroke action's paint: its end's, or its starting
+    /// value's when `initial` (nil when it inherits one).
+    func paint(initial: Bool) -> Paint? {
+        switch spec {
+        case .color(let c): return initial ? c.initial : c.end
+        case .stroke(let s): return initial ? s.initial?.paint : s.end.paint
+        default: return nil
+        }
+    }
+
+    /// The action with `paint` as its end's, or its starting value's.
+    func with(_ paint: Paint, initial: Bool) -> Action {
+        var a = self
+        switch spec {
+        case .color(var c):
+            if initial { c.initial = paint } else { c.end = paint }
+            a.spec = .color(c)
+        case .stroke(var s):
+            if initial { s.initial?.paint = paint } else { s.end.paint = paint }
+            a.spec = .stroke(s)
+        default: break
+        }
+        return a
     }
 }

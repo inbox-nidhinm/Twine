@@ -178,6 +178,9 @@ public enum ActionGeometry {
         case .shadow(var s):
             (s.initial, s.end) = (s.end, s.initial ?? state.shadow)
             a.spec = .shadow(s)
+        case .innerShadow(var s):
+            (s.initial, s.end) = (s.end, s.initial ?? state.innerShadow.shadow)
+            a.spec = .innerShadow(s)
         case .layerBlur(var b):
             (b.initial, b.end) = (b.end, b.initial ?? state.layerBlur)
             a.spec = .layerBlur(b)

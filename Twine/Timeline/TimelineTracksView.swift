@@ -1068,6 +1068,7 @@ extension ActionKind {
         case .dash: return .dash
         case .cornerRadius: return .corners
         case .shadow: return .shadow
+        case .innerShadow: return .innerShadow
         case .layerBlur: return .layerBlur
         case .backgroundBlur: return .backgroundBlur
         case .letterSpacing: return .letterSpacing

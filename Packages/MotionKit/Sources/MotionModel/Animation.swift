@@ -74,6 +74,12 @@ public enum EasingPreset: String, Codable, Sendable, CaseIterable {
     case impulse
     /// Pulls back first, then passes the end value and settles onto it.
     case swing
+    /// Passes the end value and comes back onto it, a bezier (the user's,
+    /// 4 October 2026: 0.45, 1.45, 0.8, 1).
+    case easeOutBack
+    /// Dips back below the start, then goes, a bezier (the user's,
+    /// 4 October 2026: 0.3, -0.05, 0.7, -0.5).
+    case easeInBack
 }
 
 /// A CSS-style timing curve from (0, 0) to (1, 1) through two control points.

@@ -157,7 +157,14 @@ final class EditorModel {
     /// actions after a click in the timeline and on layers otherwise.
     var focus: Focus = .canvas
     /// Actions picked in the timeline. Their layers are selected with them.
-    var selectedActions: Set<UUID> = []
+    var selectedActions: Set<UUID> = [] {
+        didSet {
+            if selectedActions != oldValue {
+                if case .action = gradient?.slot { gradient = nil }
+                hidesGradient = false
+            }
+        }
+    }
     /// Actions the timeline should scroll to, such as ones just added. The
     /// count changes with every request, so the same actions can be asked
     /// for twice and the timeline never has to clear it.
@@ -303,6 +310,9 @@ struct Notice: Equatable {
 enum PaintSlot: Equatable {
     case fill(Int)
     case stroke(Int)
+    /// A Colour or Stroke action's end paint, or its starting value's, in
+    /// Animate.
+    case action(UUID, initial: Bool)
 }
 
 /// A gradient being edited: whose, which paint, and the stop picked.

@@ -92,6 +92,7 @@ func kitchenSinkProject() -> Project {
         Action(target: rect.id, start: 1, duration: 1, spec: .cornerRadius(CornerRadiusAction(
             end: CornerRadii(topLeft: 1, topRight: 2, bottomRight: 3, bottomLeft: 4), isLinked: false))),
         Action(target: rect.id, start: 1, duration: 1, spec: .shadow(ShadowAction(initial: .noShadow, end: DropShadow(spread: -2)))),
+        Action(target: rect.id, start: 1, duration: 1, spec: .innerShadow(ShadowAction(end: DropShadow(color: .white, blur: 3)))),
         Action(target: group.id, start: 1, duration: 1, spec: .layerBlur(LayerBlurAction(initial: 2, end: 10))),
         Action(target: text.id, start: 1, duration: 1, spec: .letterSpacing(LetterSpacingAction(initial: 0, end: 4))),
         Action(target: text.id, start: 1, duration: 1, spec: .lineHeight(LineHeightAction(end: 90))),

@@ -412,14 +412,16 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
         textAnchor = TextLayout.anchor(layer.transform.anchor, from: layer.size, to: size, alignment: text.alignment)
         var drawn = resolved
         drawn.showsFill = text.showsFill
-        if let stroke = text.stroke, stroke.isEnabled, stroke.width > 0 {
+        // A Stroke action drives the width and colour, as on a shape.
+        if let stroke = text.stroke, stroke.isEnabled, (state.stroke?.width ?? stroke.width) > 0 {
+            let look = state.stroke ?? StrokeLook(stroke)
             let color: RGBA
-            switch stroke.paint {
+            switch look.paint {
             case .solid(let c): color = c
             case .linearGradient(let g), .radialGradient(let g), .angularGradient(let g): color = g.stops.first?.color ?? .black
             case .image: color = .black
             }
-            drawn.stroke = ResolvedTextStroke(color: color, width: stroke.width, alignment: stroke.alignment, join: stroke.join)
+            drawn.stroke = ResolvedTextStroke(color: color, width: look.width, alignment: stroke.alignment, join: stroke.join)
         }
         if let animation {
             drawn.units = units(of: shown.text, style: resolved.style, width: width, animation, at: time, blur: blur)
@@ -438,7 +440,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
     // Every drop shadow switched on, in order; the first carries the
     // Shadow action, which on a layer designed without one is the only one.
     // Inner shadows fall inside an outline, so only shapes and frames have
-    // them. The first background blur counts, as in Figma; layer blurs add
+    // them; the first carries the Inner Shadow action the same way. The first background blur counts, as in Figma; layer blurs add
     // up, the first carrying its action.
     func shown(_ s: DropShadow) -> ResolvedShadow? {
         guard s.opacity > 0, s.color.a > 0 else { return nil }
@@ -448,18 +450,21 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
     var shadows: [ResolvedShadow] = []
     var innerShadows: [ResolvedShadow] = []
     var drivenShadow = false
+    var drivenInner = false
     for effect in layer.effects where effect.isEnabled {
         switch effect.kind {
         case .dropShadow(let s):
             if drivenShadow { shown(s).map { shadows.append($0) } } else { shown(state.shadow).map { shadows.append($0) } }
             drivenShadow = true
         case .innerShadow(let s):
-            if layer.look != nil { shown(s).map { innerShadows.append($0) } }
+            if layer.look != nil { shown(drivenInner ? s : state.innerShadow.shadow).map { innerShadows.append($0) } }
+            drivenInner = true
         case .layerBlur, .backgroundBlur:
             break
         }
     }
     if !drivenShadow { shown(state.shadow).map { shadows.append($0) } }
+    if !drivenInner, layer.look != nil { shown(state.innerShadow.shadow).map { innerShadows.append($0) } }
     var blur = max(state.layerBlur, 0)
     let blurs = layer.effects.filter(\.isEnabled).compactMap { effect -> Double? in
         if case .layerBlur(let b) = effect.kind { return b.radius }

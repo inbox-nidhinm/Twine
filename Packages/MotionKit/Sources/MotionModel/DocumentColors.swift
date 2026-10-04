@@ -56,7 +56,7 @@ extension Project {
             case .stroke(let s):
                 if let initial = s.initial { add(initial.paint) }
                 add(s.end.paint)
-            case .shadow(let s):
+            case .shadow(let s), .innerShadow(let s):
                 if let initial = s.initial { add(initial.color) }
                 add(s.end.color)
             default: break

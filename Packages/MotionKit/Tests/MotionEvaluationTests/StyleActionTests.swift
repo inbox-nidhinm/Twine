@@ -153,6 +153,36 @@ private func gradient(_ colors: [RGBA], radial: Bool = false) -> Paint {
         #expect(mid?.offset == Vec2(0, 8) && mid?.spread == 2)
     }
 
+    @Test func anInnerShadowAnimatesInFromNothing() {
+        let layer = card()
+        let end = DropShadow(color: red, offset: Vec2(0, 8), blur: 16, opacity: 0.5)
+        let a = action(layer, .innerShadow(ShadowAction(end: end)))
+        #expect(resolved(layer, [a], at: 0).innerShadows.isEmpty)
+        let mid = resolved(layer, [a], at: 2).innerShadows
+        #expect(mid.count == 1 && mid.first?.color == red)
+        #expect(mid.first?.opacity == 0.25 && mid.first?.offset == Vec2(0, 4) && mid.first?.blur == 8)
+        #expect(resolved(layer, [a], at: 3).innerShadows.first?.opacity == 0.5)
+        // The drop shadow is left alone.
+        #expect(resolved(layer, [a], at: 3).shadows.isEmpty)
+    }
+
+    @Test func anInnerShadowActionDrivesTheFirstAndLeavesTheRest() {
+        let first = DropShadow(color: .black, offset: Vec2(0, 2), blur: 4, opacity: 1)
+        let second = DropShadow(color: blue, offset: Vec2(3, 3), blur: 0, opacity: 1)
+        let layer = card(effects: [Effect(kind: .innerShadow(first)), Effect(kind: .innerShadow(second))])
+        #expect(LayerState(design: layer).innerShadow.shadow == first)
+        let a = action(layer, .innerShadow(ShadowAction(end: DropShadow(color: .black, offset: Vec2(0, 10), blur: 4, opacity: 1))))
+        let mid = resolved(layer, [a], at: 2).innerShadows
+        #expect(mid.count == 2)
+        #expect(mid.first?.offset == Vec2(0, 6))
+        #expect(mid.last?.color == blue && mid.last?.offset == Vec2(3, 3))
+    }
+
+    @Test func aLayerWithNoneHoldsNoInnerShadowState() {
+        // Kept out of line: a layer without one carries nothing.
+        #expect(LayerState(design: card()).innerShadow == .none)
+    }
+
     @Test func aSwitchedOffShadowCountsAsNone() {
         let layer = card(effects: [Effect(isEnabled: false, kind: .dropShadow(DropShadow(opacity: 1)))])
         #expect(LayerState(design: layer).shadow == .noShadow)
@@ -306,5 +336,33 @@ private func gradient(_ colors: [RGBA], radial: Bool = false) -> Paint {
         var layer = square([])
         layer.blendMode = .screen
         #expect(evaluateDesign(Project(layers: [layer])).layers[0].blendMode == .screen)
+    }
+}
+
+@Suite struct TextStrokeActionTests {
+    private func text(stroke: Stroke?) -> Layer {
+        var content = TextContent(text: "Hi")
+        content.stroke = stroke
+        return Layer(name: "T", content: .text(content), size: Size2(10, 10), position: .zero)
+    }
+
+    private func textStroke(_ layer: ResolvedLayer) -> ResolvedTextStroke? {
+        if case .text(let t) = layer.content { return t.stroke }
+        return nil
+    }
+
+    @Test func aStrokeActionThickensAndRecoloursATextsStroke() {
+        let layer = text(stroke: Stroke(paint: .solid(.black), width: 2))
+        let a = action(layer, .stroke(StrokeAction(end: StrokeLook(width: 10, paint: .solid(red)))))
+        #expect(textStroke(resolved(layer, [a], at: 0))?.width == 2)
+        #expect(textStroke(resolved(layer, [a], at: 2))?.width == 6)
+        let end = textStroke(resolved(layer, [a], at: 3))
+        #expect(end?.width == 10 && end?.color == red)
+    }
+
+    @Test func aTextWithNoStrokeIgnoresIt() {
+        let layer = text(stroke: nil)
+        let a = action(layer, .stroke(StrokeAction(end: StrokeLook(width: 10, paint: .solid(red)))))
+        #expect(textStroke(resolved(layer, [a], at: 3)) == nil)
     }
 }

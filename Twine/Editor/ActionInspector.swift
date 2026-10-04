@@ -521,6 +521,8 @@ extension EasingPreset {
         case .bounce: return "Bounce"
         case .impulse: return "Impulse"
         case .swing: return "Swing"
+        case .easeOutBack: return "Ease out back"
+        case .easeInBack: return "Ease in back"
         }
     }
 }

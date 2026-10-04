@@ -19,7 +19,8 @@ struct StyleValueFields: View {
         case .trim(let t): trim(t)
         case .dash(let d): dash(d)
         case .cornerRadius(let r): corners(r)
-        case .shadow(let s): shadow(s)
+        case .shadow(let s): shadow(s, inner: false)
+        case .innerShadow(let s): shadow(s, inner: true)
         case .layerBlur(let b): layerBlur(b)
         case .backgroundBlur(let b): backgroundBlur(b)
         case .letterSpacing(let v): letterSpacing(v)
@@ -68,7 +69,7 @@ struct StyleValueFields: View {
         }
         .help("The width it starts at. Empty starts from the layer's stroke when the action begins.")
         if let initial = s.initial {
-            PaintControls(paint: initial.paint, title: "Stroke",
+            PaintControls(paint: initial.paint, title: "Stroke", allowsGradients: !isText,
                           edit: callbacks("Starting Stroke", Self.stroke) { a, p in a.initial?.paint = p })
         }
         StackedRow(label: "To", swap: swap) {
@@ -76,7 +77,7 @@ struct StyleValueFields: View {
                 editing("Stroke", Self.stroke { a, _ in a.end.width = v })
             }
         }
-        PaintControls(paint: s.end.paint, title: "Stroke", edit: callbacks("Stroke", Self.stroke) { $0.end.paint = $1 })
+        PaintControls(paint: s.end.paint, title: "Stroke", allowsGradients: !isText, edit: callbacks("Stroke", Self.stroke) { $0.end.paint = $1 })
     }
 
     // MARK: Trim
@@ -209,23 +210,28 @@ struct StyleValueFields: View {
 
     // MARK: Shadow
 
-    @ViewBuilder private func shadow(_ s: ShadowAction) -> some View {
-        let from = inherited?.shadow ?? DropShadow.noShadow
+    /// A Shadow or an Inner Shadow action: the same values, on the layer's
+    /// first drop shadow or its first inner shadow.
+    @ViewBuilder private func shadow(_ s: ShadowAction, inner: Bool) -> some View {
+        let name = inner ? "Inner Shadow" : "Shadow"
+        let designed: (LayerState?) -> DropShadow = { inner ? $0?.innerShadow.shadow ?? .noShadow : $0?.shadow ?? .noShadow }
+        let from = designed(inherited)
         optionalStart(isSet: s.initial != nil, preview: PaintSwatch(paint: .solid(Self.seen(from))),
-                      set: { editing("Starting Shadow", Self.shadow { a, st in
+                      set: { editing("Starting \(name)", Self.shadow { a, st in
                           // From no shadow, it starts in the end's colour at 0%,
                           // so only the opacity needs raising.
-                          let from = st?.shadow ?? DropShadow.noShadow
+                          let from = designed(st)
                           a.initial = from.opacity > 0 ? from : DropShadow(color: a.end.color, offset: .zero, blur: 0, opacity: 0)
                       }) },
-                      clear: { editing("Starting Shadow", Self.shadow { a, _ in a.initial = nil }) }) {
+                      clear: { editing("Starting \(name)", Self.shadow { a, _ in a.initial = nil }) }) {
             if let initial = s.initial {
-                ShadowControls(shadow: initial, edit: callbacks("Starting Shadow", Self.shadow) { $0.initial = $1 })
+                ShadowControls(shadow: initial, edit: callbacks("Starting \(name)", Self.shadow) { $0.initial = $1 })
             }
         }
-        .help("The shadow it starts from. Empty starts from the layer's shadow when the action begins, or from none.")
+        .help(inner ? "The inner shadow it starts from. Empty starts from the layer's inner shadow when the action begins, or from none."
+                    : "The shadow it starts from. Empty starts from the layer's shadow when the action begins, or from none.")
         sectionLabel("To", swap: swap)
-        ShadowControls(shadow: s.end, edit: callbacks("Shadow", Self.shadow) { $0.end = $1 })
+        ShadowControls(shadow: s.end, edit: callbacks(name, Self.shadow) { $0.end = $1 })
     }
 
     /// The shadow's colour as it shows, with its opacity folded in.
@@ -540,7 +546,13 @@ struct StyleValueFields: View {
         { a, st in if case .cornerRadius(var v) = a.spec { change(&v, st); a.spec = .cornerRadius(v) } }
     }
     private static func shadow(_ change: @escaping Change<ShadowAction>) -> (inout Action, LayerState?) -> Void {
-        { a, st in if case .shadow(var v) = a.spec { change(&v, st); a.spec = .shadow(v) } }
+        { a, st in
+            switch a.spec {
+            case .shadow(var v): change(&v, st); a.spec = .shadow(v)
+            case .innerShadow(var v): change(&v, st); a.spec = .innerShadow(v)
+            default: break
+            }
+        }
     }
     private static func layerBlur(_ change: @escaping Change<LayerBlurAction>) -> (inout Action, LayerState?) -> Void {
         { a, st in if case .layerBlur(var v) = a.spec { change(&v, st); a.spec = .layerBlur(v) } }

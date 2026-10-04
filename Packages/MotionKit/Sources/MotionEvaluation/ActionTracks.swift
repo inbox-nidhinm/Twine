@@ -6,7 +6,7 @@ import MotionModel
 /// the same channel of the same layer interact (see `walk`).
 public enum Channel: String, Hashable, Sendable, CaseIterable {
     case position, scale, rotation, opacity, size, visibility
-    case fill, stroke, trim, cornerRadius, shadow, layerBlur, backgroundBlur
+    case fill, stroke, trim, cornerRadius, shadow, innerShadow, layerBlur, backgroundBlur
     case letterSpacing, lineHeight, text, arc, star, path
     case media, volume
     case skew, tilt
@@ -33,6 +33,7 @@ extension ActionKind {
         case .dash: return .dash
         case .cornerRadius: return .cornerRadius
         case .shadow: return .shadow
+        case .innerShadow: return .innerShadow
         case .layerBlur: return .layerBlur
         case .backgroundBlur: return .backgroundBlur
         case .letterSpacing: return .letterSpacing
@@ -128,6 +129,8 @@ public struct LayerState: Sendable, Equatable {
     public var cornerRadii: CornerRadii?
     /// The first shadow that is switched on, or `.noShadow`.
     public var shadow: DropShadow
+    /// The first inner shadow that is switched on, boxed (see `InnerShadow`).
+    public var innerShadow: InnerShadow = .none
     /// The first layer blur that is switched on, or 0.
     public var layerBlur: Double
     /// The first background blur that is switched on, or `.noBlur`.
@@ -165,7 +168,7 @@ public struct LayerState: Sendable, Equatable {
         isShown = true
         if let shape = layer.look {
             fill = shape.fills.last?.paint
-            stroke = shape.strokes.first.map { StrokeLook(width: $0.width, paint: $0.paint) }
+            stroke = shape.strokes.first.map(StrokeLook.init)
             trim = shape.strokes.first?.trim
             switch shape.geometry {
             case .rectangle(let radii): cornerRadii = radii
@@ -183,8 +186,10 @@ public struct LayerState: Sendable, Equatable {
         default: break
         }
         if case .text(let t) = layer.content {
-            // A text's colour is its fill, so Colour acts on it too.
+            // A text's colour is its fill, so Colour acts on it too, and
+            // its stroke takes Stroke as a shape's does.
             fill = .solid(t.color)
+            stroke = t.stroke.map(StrokeLook.init)
             letterSpacing = t.letterSpacing
             lineHeight = t.lineHeight ?? TextLayout.naturalLineHeight(TextStyle(t))
             text = ShownText(text: t.text)
@@ -195,12 +200,29 @@ public struct LayerState: Sendable, Equatable {
         for effect in layer.effects.reversed() where effect.isEnabled {
             switch effect.kind {
             case .dropShadow(let s): shadow = s
-            // Inner shadows are drawn as designed; no action changes them.
-            case .innerShadow: break
+            case .innerShadow(let s): innerShadow = InnerShadow(s)
             case .layerBlur(let b): layerBlur = b.radius
             case .backgroundBlur(let b): backgroundBlur = b
             }
         }
+    }
+}
+
+/// A layer's first inner shadow, kept out of line as `Warp` is: most layers
+/// have none, and every layer's state is copied many times a frame.
+/// `.none` is no inner shadow, which an Inner Shadow action animates in
+/// from as `DropShadow.noShadow`.
+public enum InnerShadow: Sendable, Equatable {
+    case none
+    indirect case shadow(DropShadow)
+
+    public init(_ shadow: DropShadow) {
+        self = shadow == .noShadow ? .none : .shadow(shadow)
+    }
+
+    public var shadow: DropShadow {
+        if case .shadow(let s) = self { return s }
+        return .noShadow
     }
 }
 
@@ -445,6 +467,8 @@ public struct ActionTracks: Sendable {
             case .cornerRadius:
                 if let radii = state.cornerRadii { state.cornerRadii = walk(radii, list.compactMap(Self.cornerStep), at: time) }
             case .shadow: state.shadow = walk(state.shadow, list.compactMap(Self.shadowStep), at: time)
+            case .innerShadow:
+                state.innerShadow = InnerShadow(walk(state.innerShadow.shadow, list.compactMap(Self.innerShadowStep), at: time))
             case .layerBlur: state.layerBlur = walk(state.layerBlur, steps(list, Self.layerBlurStep, Self.layerBlurPart), at: time)
             case .backgroundBlur:
                 state.backgroundBlur = walk(state.backgroundBlur, list.compactMap(Self.backgroundBlurStep), at: time)
@@ -697,6 +721,11 @@ public struct ActionTracks: Sendable {
 
     private static func shadowStep(_ a: Action) -> Step<DropShadow>? {
         guard case .shadow(let sh) = a.spec else { return nil }
+        return Step(a, initial: sh.initial, target: { _ in sh.end })
+    }
+
+    private static func innerShadowStep(_ a: Action) -> Step<DropShadow>? {
+        guard case .innerShadow(let sh) = a.spec else { return nil }
         return Step(a, initial: sh.initial, target: { _ in sh.end })
     }
 

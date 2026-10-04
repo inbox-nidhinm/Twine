@@ -68,9 +68,22 @@ import MotionEvaluation
     @Test func aFrameOffersWhatARectangleDoes() {
         let frame = LayerFactory.frame(in: Box(origin: .zero, size: Size2(10, 10)), name: "F")
         let kinds = ActionFactory.kinds(for: frame, hasSound: false)
-        for kind: ActionKind in [.resize, .color, .cornerRadius, .shadow, .backgroundBlur] { #expect(kinds.contains(kind)) }
+        for kind: ActionKind in [.resize, .color, .cornerRadius, .shadow, .innerShadow, .backgroundBlur] { #expect(kinds.contains(kind)) }
         let group = LayerFactory.group(in: Box(origin: .zero, size: Size2(10, 10)), children: [], name: "G")
         #expect(!ActionFactory.kinds(for: group, hasSound: false).contains(.resize))
+        // A plain group has no outline for an inner shadow to fall inside.
+        #expect(!ActionFactory.kinds(for: group, hasSound: false).contains(.innerShadow))
+    }
+
+    @Test func aTextOffersStrokeOnlyWhenItHasOne() {
+        var content = TextContent(text: "Hi")
+        var text = Layer(name: "T", content: .text(content), size: Size2(10, 10), position: .zero)
+        #expect(!ActionFactory.kinds(for: text).contains(.stroke))
+        #expect(!ActionFactory.kinds(for: text).contains(.innerShadow))
+        content.stroke = Stroke(paint: .solid(.black), width: 2)
+        text.content = .text(content)
+        #expect(ActionFactory.kinds(for: text).contains(.stroke))
+        #expect(!ActionFactory.kinds(for: text).contains(.trim))
     }
 
     @Test func aFramesColourAndCornersAnimateAndItsBoxIsItsOwn() {

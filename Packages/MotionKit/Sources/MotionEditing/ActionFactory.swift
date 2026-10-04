@@ -22,7 +22,8 @@ public enum ActionFactory {
     /// nothing to move or fade; a group's size is its children's, so it
     /// scales rather than resizes. Style acts on what a shape has: Colour
     /// on its first fill, Stroke and Trim on its first stroke, Corner Radius
-    /// on a rectangle. Background blur follows a shape's outline. Volume is
+    /// on a rectangle. Background blur and inner shadows follow a shape's
+    /// outline, and a text with a stroke takes Stroke too. Volume is
     /// for layers with sound: always a sound, and a video when `hasSound`
     /// says its file has a sound track (see `kinds(for:in:)`).
     public static func kinds(for layer: Layer, hasSound: Bool = false) -> [ActionKind] {
@@ -37,7 +38,7 @@ public enum ActionFactory {
             var kinds = transform
             if let top = frame.fills.last, !top.paint.isImage { kinds.append(.color) }
             if !frame.strokes.isEmpty { kinds.append(.stroke) }
-            return kinds + [.cornerRadius, .shadow, .layerBlur, .backgroundBlur]
+            return kinds + [.cornerRadius, .shadow, .innerShadow, .layerBlur, .backgroundBlur]
         case .shape(let shape):
             var kinds = transform
             // A picture has no colour to change.
@@ -48,16 +49,16 @@ public enum ActionFactory {
                 if first.dotted || first.dashPattern.contains(where: { $0 > 0 }) { kinds.append(.dash) }
             }
             if case .rectangle = shape.geometry { kinds.append(.cornerRadius) }
-            kinds += [.shadow, .layerBlur, .backgroundBlur]
+            kinds += [.shadow, .innerShadow, .layerBlur, .backgroundBlur]
             if case .ellipse = shape.geometry { kinds.append(.arc) }
             if case .star = shape.geometry { kinds.append(.star) }
             if case .path = shape.geometry { kinds.append(.path) }
             return kinds
-        case .text:
+        case .text(let text):
             // A text box is always the size of its words, so it has nothing
             // to resize.
-            return transform.filter { $0 != .resize } + [.color, .shadow, .layerBlur,
-                                                        .letterSpacing, .lineHeight, .counter, .changeText]
+            return transform.filter { $0 != .resize } + [.color] + (text.stroke == nil ? [] : [.stroke])
+                + [.shadow, .layerBlur, .letterSpacing, .lineHeight, .counter, .changeText]
         case .video:
             return transform + [.shadow, .layerBlur, .play] + (hasSound ? [.volume] : [])
         }
@@ -143,6 +144,16 @@ public enum ActionFactory {
                 shadow.blur = max(shadow.blur * 2, 16)
             }
             spec = .shadow(ShadowAction(end: shadow))
+        case .innerShadow:
+            // A soft one in from nothing, or the designed one deepened.
+            var shadow = state.innerShadow.shadow
+            if shadow.opacity <= 0 || shadow.color.a <= 0 {
+                shadow = DropShadow(color: .black, offset: Vec2(0, 4), blur: 16, opacity: 0.35)
+            } else {
+                shadow.offset = shadow.offset == .zero ? Vec2(0, 4) : Vec2(shadow.offset.x * 2, shadow.offset.y * 2)
+                shadow.blur = max(shadow.blur * 2, 16)
+            }
+            spec = .innerShadow(ShadowAction(end: shadow))
         case .layerBlur:
             spec = .layerBlur(LayerBlurAction(end: state.layerBlur > 0 ? 0 : 12))
         case .backgroundBlur:

@@ -70,6 +70,8 @@ public enum ActionSpec: Sendable, Equatable {
     case trim(TrimAction)
     case cornerRadius(CornerRadiusAction)
     case shadow(ShadowAction)
+    /// The first inner shadow, shapes and frames only.
+    case innerShadow(ShadowAction)
     case layerBlur(LayerBlurAction)
     case backgroundBlur(BackgroundBlurAction)
     case letterSpacing(LetterSpacingAction)
@@ -101,6 +103,7 @@ public enum ActionSpec: Sendable, Equatable {
         case .trim: return .trim
         case .cornerRadius: return .cornerRadius
         case .shadow: return .shadow
+        case .innerShadow: return .innerShadow
         case .layerBlur: return .layerBlur
         case .backgroundBlur: return .backgroundBlur
         case .letterSpacing: return .letterSpacing
@@ -122,7 +125,7 @@ public enum ActionSpec: Sendable, Equatable {
 
 public enum ActionKind: String, Codable, Sendable, CaseIterable {
     case move, scale, rotate, opacity, resize, visibility
-    case color, stroke, trim, dash, cornerRadius, shadow
+    case color, stroke, trim, dash, cornerRadius, shadow, innerShadow
     case layerBlur, backgroundBlur
     case letterSpacing, lineHeight, counter, changeText
     case arc, star, path
@@ -145,6 +148,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .dash: return "Dashes"
         case .cornerRadius: return "Corner Radius"
         case .shadow: return "Shadow"
+        case .innerShadow: return "Inner Shadow"
         case .layerBlur: return "Layer Blur"
         case .backgroundBlur: return "Background Blur"
         case .letterSpacing: return "Letter Spacing"
@@ -166,7 +170,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     public var category: ActionCategory {
         switch self {
         case .move, .scale, .rotate, .opacity, .resize, .visibility, .skew, .tilt: return .transform
-        case .color, .stroke, .trim, .dash, .cornerRadius, .shadow: return .style
+        case .color, .stroke, .trim, .dash, .cornerRadius, .shadow, .innerShadow: return .style
         case .layerBlur, .backgroundBlur: return .blur
         case .letterSpacing, .lineHeight, .counter, .changeText: return .text
         case .arc, .star, .path: return .shape
@@ -344,6 +348,11 @@ public struct StrokeLook: AnimatableValue {
     public init(width: Double, paint: Paint) {
         self.width = width
         self.paint = paint
+    }
+
+    /// A stroke's own width and paint.
+    public init(_ stroke: Stroke) {
+        self.init(width: stroke.width, paint: stroke.paint)
     }
 }
 
@@ -836,7 +845,7 @@ public enum PresetCorner: String, Codable, Sendable, CaseIterable {
 extension ActionSpec: Codable {
     private enum CodingKeys: String, CodingKey {
         case type, move, scale, rotate, opacity, resize, visibility
-        case color, stroke, trim, dash, cornerRadius, shadow, layerBlur, backgroundBlur
+        case color, stroke, trim, dash, cornerRadius, shadow, innerShadow, layerBlur, backgroundBlur
         case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume, skew, tilt, preset
     }
 
@@ -855,6 +864,7 @@ extension ActionSpec: Codable {
         case .dash: self = .dash(try c.decode(DashAction.self, forKey: .dash))
         case .cornerRadius: self = .cornerRadius(try c.decode(CornerRadiusAction.self, forKey: .cornerRadius))
         case .shadow: self = .shadow(try c.decode(ShadowAction.self, forKey: .shadow))
+        case .innerShadow: self = .innerShadow(try c.decode(ShadowAction.self, forKey: .innerShadow))
         case .layerBlur: self = .layerBlur(try c.decode(LayerBlurAction.self, forKey: .layerBlur))
         case .backgroundBlur: self = .backgroundBlur(try c.decode(BackgroundBlurAction.self, forKey: .backgroundBlur))
         case .letterSpacing: self = .letterSpacing(try c.decode(LetterSpacingAction.self, forKey: .letterSpacing))
@@ -888,6 +898,7 @@ extension ActionSpec: Codable {
         case .dash(let v): try c.encode(v, forKey: .dash)
         case .cornerRadius(let v): try c.encode(v, forKey: .cornerRadius)
         case .shadow(let v): try c.encode(v, forKey: .shadow)
+        case .innerShadow(let v): try c.encode(v, forKey: .innerShadow)
         case .layerBlur(let v): try c.encode(v, forKey: .layerBlur)
         case .backgroundBlur(let v): try c.encode(v, forKey: .backgroundBlur)
         case .letterSpacing(let v): try c.encode(v, forKey: .letterSpacing)

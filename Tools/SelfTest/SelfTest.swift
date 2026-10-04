@@ -555,6 +555,27 @@ enum SelfTest {
                     }.joined(separator: " ")
                 }
                 log(line)
+            case "actiongradient":
+                // Makes the selected Colour or Stroke actions end on a linear
+                // gradient from red to blue, left to right, as picking Linear
+                // in the inspector does with stops of the kit's choosing.
+                let g = MotionModel.Gradient(stops: [GradientStop(position: 0, color: RGBA(1, 0, 0)),
+                                                     GradientStop(position: 1, color: RGBA(0, 0, 1))])
+                controller.editActions("Gradient") { a in a = a.with(.linearGradient(g), initial: false) }
+            case "gradient":
+                // The gradient line the canvas shows: whose, which paint, its
+                // stops, and its ends and stops in the window, to drag.
+                guard let c = controller.canvas, let place = c.gradientPlace() else { log("GRADIENT none"); break }
+                let h = window.contentView!.bounds.height
+                func xy(_ p: CGPoint) -> String {
+                    let v = c.convert(p, to: nil)
+                    return "\(Int(v.x.rounded())),\(Int((h - v.y).rounded()))"
+                }
+                func f(_ v: Double) -> String { String(format: "%.3f", v) }
+                let g = place.gradient
+                log("GRADIENT \(place.layer.name) slot=\(place.edit.slot) action=\(place.action?.name ?? "-") start=\(f(g.start.x)),\(f(g.start.y)) end=\(f(g.end.x)),\(f(g.end.y))"
+                    + " stops=\(g.stops.map { f($0.position) }) startxy=\(xy(place.start)) endxy=\(xy(place.end))"
+                    + " time=\(String(format: "%.3f", controller.editor.time)) undo=\(controller.store.undoManager.undoActionName)")
             case "library":
                 // The home screen's folders and projects, each with its folder.
                 let lib = HomeWindowController.shared.library

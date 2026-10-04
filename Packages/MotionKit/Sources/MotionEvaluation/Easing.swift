@@ -32,6 +32,12 @@ extension EasingPreset {
             guard i > 0.5, let own = designCurve else { return curve(intensity: i).value(at: u) }
             let once = own.value(at: u)
             return once + (own.value(at: once) - once) * (i - 0.5) * 2
+        case .easeOutBack, .easeInBack:
+            // Up to the standard as the other beziers. Past it, applying the
+            // curve twice would clip its overshoot, so it strays from the
+            // line further instead, as the lists do: twice the standard's at 1.
+            guard i > 0.5, let own = designCurve else { return curve(intensity: i).value(at: u) }
+            return u + (own.value(at: u) - u) * i * 2
         case .bounce:
             // It falls as it does at the standard; intensity sets how deep
             // it bounces off the end, none at 0 and twice as deep at 1.
@@ -57,6 +63,8 @@ extension EasingPreset {
         case .natural: return CubicBezier(0.8, 0, 0.2, 1)
         case .slowDown: return CubicBezier(0, 0, 0, 1)
         case .accelerate: return CubicBezier(1, 0, 1, 1)
+        case .easeOutBack: return CubicBezier(0.45, 1.45, 0.8, 1)
+        case .easeInBack: return CubicBezier(0.3, -0.05, 0.7, -0.5)
         default: return nil
         }
     }

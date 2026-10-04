@@ -16,7 +16,7 @@ struct EasingCard: View {
 
     /// The easings in the order the tiles show them, Custom first.
     static let order: [EasingPreset] = [.smooth, .natural, .slowDown, .accelerate, .spring, .bounce,
-                                        .overshoot, .impulse, .swing, .none]
+                                        .overshoot, .impulse, .swing, .easeOutBack, .easeInBack, .none]
 
     private var shared: Easing? {
         let actions = controller.selectedActions

@@ -15,6 +15,12 @@ import MotionEvaluation
 /// the selection changes, giving back the handles under it; with Command
 /// the anchor moves as usual. A radial or angular gradient's line runs
 /// from its centre to its edge, its circle drawn.
+///
+/// In Animate the line is a Colour or Stroke action's (4 October 2026):
+/// with one such action selected whose end is a gradient, the line edits
+/// that end, placed on the layer as it is when the action ends, and a
+/// press takes the playhead there. When only its starting value is a
+/// gradient, or that is the one picked, it edits that, at the action's start.
 extension CanvasNSView {
     /// The gradient being edited and where it is, when it can be shown.
     struct GradientPlace {
@@ -22,6 +28,8 @@ extension CanvasNSView {
         let layer: Layer
         let paint: Paint
         let gradient: MotionModel.Gradient
+        /// The action whose gradient this is, in Animate; nil for the layer's own.
+        let action: Action?
         /// The layer's own size: a gradient's points are fractions of it.
         let size: Size2
         /// From the layer's own pixels into the composition, and back.
@@ -34,11 +42,36 @@ extension CanvasNSView {
 
         func local(_ unit: Vec2) -> Vec2 { Vec2(unit.x * size.width, unit.y * size.height) }
         func unit(_ local: Vec2) -> Vec2 { Vec2(local.x / size.width, local.y / size.height) }
+
+        /// The change that puts `g` in this gradient's place.
+        func command(_ g: MotionModel.Gradient) -> EditorCommand {
+            if let action, case .action(_, let initial) = edit.slot {
+                return .updateActions([action.with(paint.withGradient(g), initial: initial)])
+            }
+            return .updateLayers([layer.with(paint.withGradient(g), at: edit.slot)])
+        }
+
+        /// When the layer is as the line shows it: the action's end, or its
+        /// start for its starting value. Nil for the layer's own gradient.
+        var time: Double? {
+            guard let action, case .action(_, let initial) = edit.slot else { return nil }
+            return initial ? action.start : action.end
+        }
     }
 
     /// The selected layer's gradient: the paint named in `EditorModel.gradient`,
     /// else its top fill's, else its first stroke's.
     private func gradientEdit() -> GradientEdit? {
+        if animating {
+            guard let action = controller?.canvasAction else { return nil }
+            let id = action.targetLayerID
+            if let edit = controller?.editor.gradient, edit.layerID == id, case .action(action.id, let initial) = edit.slot,
+               action.paint(initial: initial)?.gradient != nil { return edit }
+            for initial in [false, true] where action.paint(initial: initial)?.gradient != nil {
+                return GradientEdit(layerID: id, slot: .action(action.id, initial: initial))
+            }
+            return nil
+        }
         guard let controller, selection.count == 1, let id = selection.first,
               let layer = controller.project.layer(withID: id), let look = layer.look else { return nil }
         if let edit = controller.editor.gradient, edit.layerID == id, layer.paint(at: edit.slot)?.gradient != nil { return edit }
@@ -48,11 +81,22 @@ extension CanvasNSView {
     }
 
     func gradientPlace() -> GradientPlace? {
-        guard let controller, let scene, !controller.editor.hidesGradient, let edit = gradientEdit(), !animating,
-              tool == .select, textSession == nil, pathSession == nil, cropSession == nil,
-              !controller.isLocked(edit.layerID), !isTilted(edit.layerID, in: scene),
-              let layer = controller.project.layer(withID: edit.layerID), let paint = layer.paint(at: edit.slot),
-              let gradient = paint.gradient, let resolved = scene.layer(edit.layerID),
+        guard let controller, var scene, !controller.editor.hidesGradient, !controller.editor.isPlaying,
+              let edit = gradientEdit(), tool == .select, textSession == nil, pathSession == nil, cropSession == nil,
+              !controller.isLocked(edit.layerID), let layer = controller.project.layer(withID: edit.layerID) else { return nil }
+        let paint: Paint?
+        var action: Action?
+        if case .action(let actionID, let initial) = edit.slot {
+            guard let a = controller.project.actions.first(where: { $0.id == actionID }) else { return nil }
+            action = a
+            paint = a.paint(initial: initial)
+            // The layer as it is when the action ends (or starts), as a
+            // Resize's handles are, so the line stays put whatever the playhead.
+            scene = evaluate(controller.project, at: initial ? a.start : a.end)
+        } else {
+            paint = layer.paint(at: edit.slot)
+        }
+        guard let paint, let gradient = paint.gradient, !isTilted(edit.layerID, in: scene), let resolved = scene.layer(edit.layerID),
               resolved.size.width > 0, resolved.size.height > 0,
               let world = scene.worldTransform(of: edit.layerID), let toLocal = world.inverted else { return nil }
         let size = resolved.size
@@ -61,7 +105,7 @@ extension CanvasNSView {
         let stops = gradient.stops.map { stop in
             CGPoint(x: start.x + (end.x - start.x) * stop.position, y: start.y + (end.y - start.y) * stop.position)
         }
-        return GradientPlace(edit: edit, layer: layer, paint: paint, gradient: gradient, size: size, world: world,
+        return GradientPlace(edit: edit, layer: layer, paint: paint, gradient: gradient, action: action, size: size, world: world,
                              toLocal: toLocal, start: start, end: end, stops: stops)
     }
 
@@ -113,6 +157,10 @@ extension CanvasNSView {
             return false
         }
         if case .stop(let i) = part { controller.editor.gradient = GradientEdit(layerID: place.edit.layerID, slot: place.edit.slot, stop: i) }
+        if let time = place.time {
+            controller.stop()
+            controller.seek(to: time)
+        }
         drag = .gradient(CanvasDrag.GradientDrag(part: part, place: place, start: point, startView: viewPoint))
         return true
     }
@@ -145,7 +193,11 @@ extension CanvasNSView {
             let along = GradientEditing.position(of: point, from: composition(g.start), to: composition(g.end))
             g = GradientEditing.moving(i, in: g, to: along)
         }
-        controller.update([place.layer.with(place.paint.withGradient(g), at: place.edit.slot)])
+        if place.action != nil {
+            controller.update(place.command(g))
+        } else {
+            controller.update([place.layer.with(place.paint.withGradient(g), at: place.edit.slot)])
+        }
     }
 
     func gradientMouseUp(_ edit: CanvasDrag.GradientDrag, point: Vec2) {
@@ -157,8 +209,7 @@ extension CanvasNSView {
         func composition(_ unit: Vec2) -> Vec2 { place.world.apply(place.local(unit)) }
         let along = GradientEditing.position(of: point, from: composition(place.gradient.start), to: composition(place.gradient.end))
         let added = GradientEditing.adding(to: place.gradient, at: along)
-        controller.perform(.batch([.updateLayers([place.layer.with(place.paint.withGradient(added.gradient), at: place.edit.slot)])],
-                                  name: "Add Stop"))
+        controller.perform(.batch([place.command(added.gradient)], name: "Add Stop"))
         controller.editor.gradient = GradientEdit(layerID: place.edit.layerID, slot: place.edit.slot, stop: added.index)
     }
 
@@ -178,8 +229,7 @@ extension CanvasNSView {
                 NSSound.beep()
                 return true
             }
-            controller.perform(.batch([.updateLayers([place.layer.with(place.paint.withGradient(fewer), at: place.edit.slot)])],
-                                      name: "Remove Stop"))
+            controller.perform(.batch([place.command(fewer)], name: "Remove Stop"))
             controller.editor.gradient?.stop = nil
             return true
         default:
