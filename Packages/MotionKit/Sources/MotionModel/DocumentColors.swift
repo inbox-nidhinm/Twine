@@ -21,7 +21,7 @@ extension Project {
         func add(_ paint: Paint) {
             switch paint {
             case .solid(let c): add(c)
-            case .linearGradient(let g), .radialGradient(let g): g.stops.forEach { add($0.color) }
+            case .linearGradient(let g), .radialGradient(let g), .angularGradient(let g): g.stops.forEach { add($0.color) }
             case .image: break
             }
         }

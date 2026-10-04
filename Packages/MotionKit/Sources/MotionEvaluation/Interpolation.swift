@@ -119,23 +119,23 @@ extension Paint: Interpolatable {
         if a.isImage || b.isImage { return a }
         if case .solid(let ca) = a, case .solid(let cb) = b { return .solid(.interpolate(ca, cb, t)) }
         let g = MotionModel.Gradient.interpolate(a.gradient(shapedLike: b), b.gradient(shapedLike: a), t)
-        let radial: Bool
+        let kind: GradientKind?
         switch (a, b) {
-        case (.solid, _): radial = b.isRadialGradient
-        case (_, .solid): radial = a.isRadialGradient
-        default: radial = t < 0.5 ? a.isRadialGradient : b.isRadialGradient
+        case (.solid, _): kind = b.gradientKind
+        case (_, .solid): kind = a.gradientKind
+        default: kind = t < 0.5 ? a.gradientKind : b.gradientKind
         }
-        return radial ? .radialGradient(g) : .linearGradient(g)
+        return .gradient(g, kind ?? .linear)
     }
 
     /// The paint's own gradient, or for a colour, `other`'s gradient with
     /// every stop in this colour.
     func gradient(shapedLike other: Paint) -> MotionModel.Gradient {
         switch self {
-        case .linearGradient(let g), .radialGradient(let g): return g
+        case .linearGradient(let g), .radialGradient(let g), .angularGradient(let g): return g
         case .solid(let color):
             switch other {
-            case .linearGradient(var g), .radialGradient(var g):
+            case .linearGradient(var g), .radialGradient(var g), .angularGradient(var g):
                 g.stops = g.stops.map { GradientStop(position: $0.position, color: color) }
                 return g
             case .solid, .image:

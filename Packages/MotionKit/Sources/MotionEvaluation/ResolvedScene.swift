@@ -215,6 +215,9 @@ public enum ResolvedPaint: Sendable, Equatable {
     /// `center` and `radius` in pixels. The radius is the distance from the
     /// centre to the model's edge point.
     case radial(stops: [GradientStop], center: Vec2, radius: Double)
+    /// `center` and the point `toward` which the first stop lies, in
+    /// pixels; the stops go a whole turn clockwise from there.
+    case angular(stops: [GradientStop], center: Vec2, toward: Vec2)
     /// Held by reference, so the other paints stay small to copy.
     indirect case image(ResolvedImage)
 }

@@ -31,6 +31,7 @@ struct CanvasView: NSViewRepresentable {
         _ = editor.hoveredLayer
         // And so the gradient being edited shows its line and handles.
         _ = editor.gradient
+        _ = editor.hidesGradient
         view.show(controller.project, time: editor.time, selection: controller.selection, tool: editor.tool,
                   playing: editor.isPlaying, animating: editor.mode == .animate)
     }

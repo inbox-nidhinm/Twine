@@ -398,12 +398,8 @@ final class CanvasNSView: NSView {
         // While cropping, the handles crop, and the layer is not turned or
         // moved about its anchor.
         if isCropping { anchor = nil }
-        // While a gradient's line shows, its ends are the handles.
+        // A gradient's line shows over the layer's handles.
         let gradient = gradientMarks()
-        if gradient != nil {
-            handles = []
-            anchor = nil
-        }
         overlay.update(outlines: outlines, union: union, handles: handles, anchor: anchor,
                        hover: textSession == nil ? hover : nil,
                        marquee: drag?.marqueeRect, motion: motionOverlay())

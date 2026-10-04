@@ -205,10 +205,10 @@ public enum ActionFactory {
             var end = options.max { distance($0) < distance($1) } ?? options[0]
             end.a = color.a
             return .solid(end)
-        case .linearGradient(var g), .radialGradient(var g):
+        case .linearGradient(var g), .radialGradient(var g), .angularGradient(var g):
             let colors = g.stops.map(\.color).reversed()
             g.stops = zip(g.stops, colors).map { GradientStop(position: $0.position, color: $1) }
-            return paint.isRadialGradient ? .radialGradient(g) : .linearGradient(g)
+            return paint.withGradient(g)
         case .image:
             return .solid(RGBA(hex: "4C9FEF")!)
         }

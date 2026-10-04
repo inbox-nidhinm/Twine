@@ -26,7 +26,12 @@ final class EditorModel {
     }
 
     var mode: Mode = .animate {
-        didSet { if mode != oldValue { gradient = nil } }
+        didSet {
+            if mode != oldValue {
+                gradient = nil
+                hidesGradient = false
+            }
+        }
     }
     var showLayers = true
     var showInspector = true
@@ -34,12 +39,19 @@ final class EditorModel {
     /// The shape that the shape slot shows, which is the one used last.
     var lastShape: Tool = .rectangle
     var selection: Set<UUID> = [] {
-        didSet { if let g = gradient, selection != [g.layerID] { gradient = nil } }
+        didSet {
+            if let g = gradient, selection != [g.layerID] { gradient = nil }
+            if selection != oldValue { hidesGradient = false }
+        }
     }
-    /// The gradient being edited, whose line and handles the canvas shows,
-    /// with the stop last picked on the inspector's bar or the canvas. Let
-    /// go when the selection or the mode changes.
+    /// The gradient picked into, which paint and which stop, from the
+    /// inspector's bar or the canvas: the canvas shows the selected layer's
+    /// gradient's line whether or not one is picked. Let go when the
+    /// selection or the mode changes.
     var gradient: GradientEdit?
+    /// Escape on the canvas hides the gradient's line, until the selection
+    /// or the mode changes.
+    var hidesGradient = false
     /// The layer under the pointer, on the canvas or in the layers panel,
     /// which both light up.
     var hoveredLayer: UUID?
@@ -297,5 +309,5 @@ enum PaintSlot: Equatable {
 struct GradientEdit: Equatable {
     var layerID: UUID
     var slot: PaintSlot
-    var stop: Int?
+    var stop: Int? = nil
 }

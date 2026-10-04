@@ -19,6 +19,9 @@ public enum Paint: AnimatableValue {
     case solid(RGBA)
     case linearGradient(Gradient)
     case radialGradient(Gradient)
+    /// Round its start (the centre), from the direction of its end, a whole
+    /// turn clockwise, as Figma's angular gradient (4 October 2026).
+    case angularGradient(Gradient)
     /// A picture, as Figma paints one: every picture is a fill on a shape.
     /// Held by reference, so every paint stays as small to copy as a
     /// gradient: paints are copied in every layer's state on every frame.
@@ -30,6 +33,37 @@ public enum Paint: AnimatableValue {
         if case .radialGradient = self { return true }
         return false
     }
+
+    /// The gradient a linear, radial or angular paint draws.
+    public var gradient: Gradient? {
+        switch self {
+        case .linearGradient(let g), .radialGradient(let g), .angularGradient(let g): g
+        case .solid, .image: nil
+        }
+    }
+
+    /// Which kind of gradient the paint is, nil for a colour or a picture.
+    public var gradientKind: GradientKind? {
+        switch self {
+        case .linearGradient: .linear
+        case .radialGradient: .radial
+        case .angularGradient: .angular
+        case .solid, .image: nil
+        }
+    }
+
+    /// `gradient` drawn as `kind`.
+    public static func gradient(_ gradient: Gradient, _ kind: GradientKind) -> Paint {
+        switch kind {
+        case .linear: .linearGradient(gradient)
+        case .radial: .radialGradient(gradient)
+        case .angular: .angularGradient(gradient)
+        }
+    }
+
+    /// The same kind of gradient with `gradient` in place; a colour or a
+    /// picture becomes a linear one.
+    public func withGradient(_ gradient: Gradient) -> Paint { .gradient(gradient, gradientKind ?? .linear) }
 
     public var isImage: Bool {
         if case .image = self { return true }
@@ -43,7 +77,7 @@ public enum Paint: AnimatableValue {
 }
 
 extension Paint: Codable {
-    private enum Kind: String, Codable { case solid, linearGradient, radialGradient, image }
+    private enum Kind: String, Codable { case solid, linearGradient, radialGradient, angularGradient, image }
     private enum CodingKeys: String, CodingKey { case type, color, gradient, image }
 
     public init(from decoder: Decoder) throws {
@@ -52,6 +86,7 @@ extension Paint: Codable {
         case .solid: self = .solid(try c.decode(RGBA.self, forKey: .color))
         case .linearGradient: self = .linearGradient(try c.decode(Gradient.self, forKey: .gradient))
         case .radialGradient: self = .radialGradient(try c.decode(Gradient.self, forKey: .gradient))
+        case .angularGradient: self = .angularGradient(try c.decode(Gradient.self, forKey: .gradient))
         case .image: self = .image(try c.decode(ImagePaint.self, forKey: .image))
         }
     }
@@ -67,6 +102,9 @@ extension Paint: Codable {
             try c.encode(gradient, forKey: .gradient)
         case .radialGradient(let gradient):
             try c.encode(Kind.radialGradient, forKey: .type)
+            try c.encode(gradient, forKey: .gradient)
+        case .angularGradient(let gradient):
+            try c.encode(Kind.angularGradient, forKey: .type)
             try c.encode(gradient, forKey: .gradient)
         case .image(let image):
             try c.encode(Kind.image, forKey: .type)
@@ -159,6 +197,12 @@ public struct Gradient: AnimatableValue {
         self.start = start
         self.end = end
     }
+}
+
+/// The three ways a gradient is drawn: along its line, out from its start
+/// to the circle through its end, or round its start.
+public enum GradientKind: String, CaseIterable, Sendable {
+    case linear, radial, angular
 }
 
 public struct GradientStop: AnimatableValue, Hashable {

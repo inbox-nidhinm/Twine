@@ -46,11 +46,11 @@ public enum Icon: String, CaseIterable, Sendable {
     case corners
     case distributeH
     case distributeV
+    case fillAngular
     case fillImage
     case fillLinear
     case fillRadial
     case fillSolid
-    case gradientHandles
     case link
     case preset
     case presets
@@ -301,6 +301,11 @@ public enum Icon: String, CaseIterable, Sendable {
             "M21 18.5H3",
             "M21 5.5H3"
         ]
+        case .fillAngular: return [   // Inspector/fill-angular.svg
+            "M22 12 C22 17.52 17.52 22 12 22 C6.48 22 2 17.52 2 12 C2 6.48 6.48 2 12 2 C17.52 2 22 6.48 22 12 Z",
+            "M12 12 L12 2",
+            "M12 7 C14.76 7 17 9.24 17 12"
+        ]
         case .fillImage: return [   // Inspector/fill-image.svg
             "M7.5 9C8.32843 9 9 8.32843 9 7.5C9 6.67157 8.32843 6 7.5 6C6.67157 6 6 6.67157 6 7.5C6 8.32843 6.67157 9 7.5 9Z",
             "M2.5 12C2.5 7.52166 2.5 5.28249 3.89124 3.89124C5.28249 2.5 7.52166 2.5 12 2.5C16.4783 2.5 18.7175 2.5 20.1088 3.89124C21.5 5.28249 21.5 7.52166 21.5 12C21.5 16.4783 21.5 18.7175 20.1088 20.1088C18.7175 21.5 16.4783 21.5 12 21.5C7.52166 21.5 5.28249 21.5 3.89124 20.1088C2.5 18.7175 2.5 16.4783 2.5 12Z",
@@ -326,11 +331,6 @@ public enum Icon: String, CaseIterable, Sendable {
         case .fillSolid: return [   // Inspector/fill-solid.svg
             "M2.5 12C2.5 7.52166 2.5 5.28249 3.89124 3.89124C5.28249 2.5 7.52166 2.5 12 2.5C16.4783 2.5 18.7175 2.5 20.1088 3.89124C21.5 5.28249 21.5 7.52166 21.5 12C21.5 16.4783 21.5 18.7175 20.1088 20.1088C18.7175 21.5 16.4783 21.5 12 21.5C7.52166 21.5 5.28249 21.5 3.89124 20.1088C2.5 18.7175 2.5 16.4783 2.5 12Z",
             "M6 12C6 9.17157 6 7.75736 6.87868 6.87868C7.75736 6 9.17157 6 12 6C14.8284 6 16.2426 6 17.1213 6.87868C18 7.75736 18 9.17157 18 12C18 14.8284 18 16.2426 17.1213 17.1213C16.2426 18 14.8284 18 12 18C9.17157 18 7.75736 18 6.87868 17.1213C6 16.2426 6 14.8284 6 12Z"
-        ]
-        case .gradientHandles: return [   // Inspector/gradient-handles.svg
-            "M8.5 18 C8.5 19.38 7.38 20.5 6 20.5 C4.62 20.5 3.5 19.38 3.5 18 C3.5 16.62 4.62 15.5 6 15.5 C7.38 15.5 8.5 16.62 8.5 18 Z",
-            "M20.5 6 C20.5 7.38 19.38 8.5 18 8.5 C16.62 8.5 15.5 7.38 15.5 6 C15.5 4.62 16.62 3.5 18 3.5 C19.38 3.5 20.5 4.62 20.5 6 Z",
-            "M7.77 16.23 L16.23 7.77"
         ]
         case .link: return [   // Inspector/link.svg
             "M9.521 14.4356L14.434 9.52258",

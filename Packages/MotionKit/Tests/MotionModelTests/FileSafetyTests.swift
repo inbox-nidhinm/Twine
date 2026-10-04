@@ -84,3 +84,18 @@ import Testing
         #expect(Int(saturating: 41.0) == 41)
     }
 }
+
+@Suite struct AngularGradientTests {
+    @Test func anAngularGradientRoundTrips() throws {
+        let g = Gradient(stops: [GradientStop(position: 0, color: .black), GradientStop(position: 1, color: .white)],
+                         start: Vec2(0.5, 0.5), end: Vec2(1, 0.25))
+        let layer = Layer(name: "A", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
+                                                                 fills: [Fill(paint: .angularGradient(g))])),
+                          size: Size2(10, 10), position: .zero)
+        let project = Project(layers: [layer])
+        #expect(try ProjectFormat.decode(try ProjectFormat.encode(project)) == project)
+        #expect(Paint.angularGradient(g).gradientKind == .angular && Paint.angularGradient(g).gradient == g)
+        #expect(Paint.solid(.black).withGradient(g) == .linearGradient(g))
+        #expect(Paint.angularGradient(g).withGradient(g) == .angularGradient(g))
+    }
+}

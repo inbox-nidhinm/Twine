@@ -4,14 +4,17 @@ import MotionEditing
 import MotionEvaluation
 
 /// A gradient's line on the canvas, as Figma shows it (4 October 2026):
-/// shown while `EditorModel.gradient` names one of the selected layer's
-/// paints (the switch beside the inspector's gradient bar, or picking a
-/// stop there). Drag either end to turn and stretch it (Shift keeps the
-/// angle to steps of 15°), the line to move it, a stop's dot to slide the
-/// stop along; a click on the line adds a stop there. Delete removes the
-/// picked stop; Escape, Return or a click away finishes. A radial
-/// gradient's line runs from its centre to its edge, its circle drawn.
-/// Design only; the layer's own handles hide meanwhile.
+/// shown whenever the one layer selected in Design has a gradient, its top
+/// fill's or else its stroke's (or the paint `EditorModel.gradient` names),
+/// over the layer's own handles, which it wins where they meet (the
+/// user's choice, a switch for it at first). Drag either end to turn and
+/// stretch it (Shift keeps the angle to steps of 15°), the line to move
+/// it, a stop's dot to slide the stop along; a click on the line adds a
+/// stop there. Delete removes the picked stop (a press anywhere else lets
+/// it go, so Delete deletes the layer again). Escape hides the line until
+/// the selection changes, giving back the handles under it; with Command
+/// the anchor moves as usual. A radial or angular gradient's line runs
+/// from its centre to its edge, its circle drawn.
 extension CanvasNSView {
     /// The gradient being edited and where it is, when it can be shown.
     struct GradientPlace {
@@ -33,11 +36,20 @@ extension CanvasNSView {
         func unit(_ local: Vec2) -> Vec2 { Vec2(local.x / size.width, local.y / size.height) }
     }
 
-    var isEditingGradient: Bool { gradientPlace() != nil }
+    /// The selected layer's gradient: the paint named in `EditorModel.gradient`,
+    /// else its top fill's, else its first stroke's.
+    private func gradientEdit() -> GradientEdit? {
+        guard let controller, selection.count == 1, let id = selection.first,
+              let layer = controller.project.layer(withID: id), let look = layer.look else { return nil }
+        if let edit = controller.editor.gradient, edit.layerID == id, layer.paint(at: edit.slot)?.gradient != nil { return edit }
+        if let top = look.topFillIndex, look.fills[top].paint.gradient != nil { return GradientEdit(layerID: id, slot: .fill(top)) }
+        if look.strokes.first?.paint.gradient != nil { return GradientEdit(layerID: id, slot: .stroke(0)) }
+        return nil
+    }
 
     func gradientPlace() -> GradientPlace? {
-        guard let controller, let scene, let edit = controller.editor.gradient, !animating, tool == .select,
-              textSession == nil, pathSession == nil, cropSession == nil, selection == [edit.layerID],
+        guard let controller, let scene, !controller.editor.hidesGradient, let edit = gradientEdit(), !animating,
+              tool == .select, textSession == nil, pathSession == nil, cropSession == nil,
               !controller.isLocked(edit.layerID), !isTilted(edit.layerID, in: scene),
               let layer = controller.project.layer(withID: edit.layerID), let paint = layer.paint(at: edit.slot),
               let gradient = paint.gradient, let resolved = scene.layer(edit.layerID),
@@ -56,7 +68,7 @@ extension CanvasNSView {
     func gradientMarks() -> CanvasOverlay.GradientMarks? {
         guard let place = gradientPlace() else { return nil }
         var circle: CGPath?
-        if place.paint.isRadial {
+        if place.paint.isCentred {
             // The circle in the layer's own pixels, drawn through its
             // transform, so a scaled or turned layer's is too.
             let c = place.local(place.gradient.start), e = place.local(place.gradient.end)
@@ -76,9 +88,14 @@ extension CanvasNSView {
     // MARK: Pointer
 
     /// A press while a gradient's line shows: on an end, a stop, or the
-    /// line. Anywhere else the editing finishes and the press carries on.
+    /// line. Anywhere else, or with Command (the anchor), the picked stop
+    /// is let go and the press carries on.
     func gradientMouseDown(_ event: NSEvent, at point: Vec2, viewPoint: CGPoint) -> Bool {
         guard let place = gradientPlace(), let controller else { return false }
+        guard !event.modifierFlags.contains(.command) else {
+            controller.editor.gradient?.stop = nil
+            return false
+        }
         func distance(_ p: CGPoint) -> CGFloat { hypot(p.x - viewPoint.x, p.y - viewPoint.y) }
         let part: CanvasDrag.GradientDrag.Part
         if distance(place.end) <= CanvasHandles.hitRadius {
@@ -92,10 +109,10 @@ extension CanvasNSView {
         } else if Self.distance(from: viewPoint, toSegment: place.start, place.end) <= CanvasHandles.hitRadius {
             part = .line
         } else {
-            controller.editor.gradient = nil
+            controller.editor.gradient?.stop = nil
             return false
         }
-        if case .stop(let i) = part { controller.editor.gradient?.stop = i }
+        if case .stop(let i) = part { controller.editor.gradient = GradientEdit(layerID: place.edit.layerID, slot: place.edit.slot, stop: i) }
         drag = .gradient(CanvasDrag.GradientDrag(part: part, place: place, start: point, startView: viewPoint))
         return true
     }
@@ -142,20 +159,22 @@ extension CanvasNSView {
         let added = GradientEditing.adding(to: place.gradient, at: along)
         controller.perform(.batch([.updateLayers([place.layer.with(place.paint.withGradient(added.gradient), at: place.edit.slot)])],
                                   name: "Add Stop"))
-        controller.editor.gradient?.stop = added.index
+        controller.editor.gradient = GradientEdit(layerID: place.edit.layerID, slot: place.edit.slot, stop: added.index)
     }
 
-    /// Escape and Return finish; Delete removes the picked stop, and
-    /// beeps when only the two ends' stops are left, rather than deleting
-    /// the layer.
+    /// Escape hides the line until the selection changes. Delete removes
+    /// the picked stop, and beeps when only the two ends' stops are left,
+    /// rather than deleting the layer; with no stop picked it deletes the
+    /// layer as usual.
     func gradientKeyDown(_ event: NSEvent) -> Bool {
         guard let place = gradientPlace(), let controller else { return false }
         switch event.keyCode {
-        case 53, 36, 76:
-            controller.editor.gradient = nil
+        case 53:
+            controller.editor.hidesGradient = true
             return true
         case 51, 117:
-            guard let stop = place.edit.stop, let fewer = GradientEditing.removing(stop, from: place.gradient) else {
+            guard let stop = place.edit.stop else { return false }
+            guard let fewer = GradientEditing.removing(stop, from: place.gradient) else {
                 NSSound.beep()
                 return true
             }

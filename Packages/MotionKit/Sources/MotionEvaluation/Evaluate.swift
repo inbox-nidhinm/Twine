@@ -393,7 +393,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
         var color = text.color
         switch state.fill {
         case .solid(let c): color = c
-        case .linearGradient(let g), .radialGradient(let g): color = g.stops.first?.color ?? color
+        case .linearGradient(let g), .radialGradient(let g), .angularGradient(let g): color = g.stops.first?.color ?? color
         case .image, nil: break
         }
         let resolved = ResolvedText(text: shown.text, swap: shown.swap, fontFamily: text.fontFamily,
@@ -410,7 +410,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
             let color: RGBA
             switch stroke.paint {
             case .solid(let c): color = c
-            case .linearGradient(let g), .radialGradient(let g): color = g.stops.first?.color ?? .black
+            case .linearGradient(let g), .radialGradient(let g), .angularGradient(let g): color = g.stops.first?.color ?? .black
             case .image: color = .black
             }
             drawn.stroke = ResolvedTextStroke(color: color, width: stroke.width, alignment: stroke.alignment, join: stroke.join)
@@ -604,6 +604,8 @@ private func resolve(_ paint: Paint, size: Size2, pictures: [UUID: Size2]) -> Re
         let center = px(g.start), edge = px(g.end)
         return .radial(stops: g.stops.sorted { $0.position < $1.position },
                        center: center, radius: hypot(edge.x - center.x, edge.y - center.y))
+    case .angularGradient(let g):
+        return .angular(stops: g.stops.sorted { $0.position < $1.position }, center: px(g.start), toward: px(g.end))
     case .image(let p):
         return .image(ResolvedImage(mediaID: p.mediaID,
                                     frame: ImagePlacement.frame(of: p, box: size, picture: pictures[p.mediaID]),

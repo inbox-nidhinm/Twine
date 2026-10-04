@@ -242,17 +242,20 @@ private final class GradientBarView: NSView {
 }
 
 extension Paint {
-    /// The gradient a linear or radial paint draws.
-    var gradient: MotionModel.Gradient? {
-        switch self {
-        case .linearGradient(let g), .radialGradient(let g): g
-        default: nil
-        }
-    }
+    /// A radial or angular gradient: one drawn round its start, whose
+    /// canvas handles are a centre and a point on its circle.
+    var isCentred: Bool { gradientKind == .radial || gradientKind == .angular }
+}
 
-    var isRadial: Bool {
-        if case .radialGradient = self { return true }
-        return false
+extension GradientKind {
+    /// The kind a fill kind's name in the inspector stands for.
+    nonisolated init?(kindName: String) {
+        switch kindName {
+        case "Linear": self = .linear
+        case "Radial": self = .radial
+        case "Angular": self = .angular
+        default: return nil
+        }
     }
 }
 

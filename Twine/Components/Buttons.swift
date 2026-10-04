@@ -137,8 +137,6 @@ struct IconButton: View {
     var help: String
     var size: CGFloat = Theme.control
     var iconBox: CGFloat = 15
-    /// A switch that is on: drawn in the chosen grey, as chosen segments are.
-    var isOn = false
     let action: () -> Void
 
     @State private var hovering = false
@@ -147,11 +145,11 @@ struct IconButton: View {
     var body: some View {
         Button(action: action) {
             IconView(icon, size: iconBox)
-                .foregroundStyle((hovering || isOn) && isEnabled ? Theme.textPrimary : Theme.textTertiary)
+                .foregroundStyle(hovering && isEnabled ? Theme.textPrimary : Theme.textTertiary)
                 .opacity(isEnabled ? 1 : 0.4)
                 .frame(width: size, height: size)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
-                    .fill(isOn ? (hovering ? Theme.chosenHover : Theme.chosen) : hovering && isEnabled ? Theme.panelRaised : .clear))
+                    .fill(hovering && isEnabled ? Theme.panelRaised : .clear))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

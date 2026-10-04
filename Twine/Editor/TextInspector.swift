@@ -344,7 +344,7 @@ struct TextStrokeSection: View {
     static func color(of stroke: Stroke) -> RGBA {
         switch stroke.paint {
         case .solid(let c): return c
-        case .linearGradient(let g), .radialGradient(let g): return g.stops.first?.color ?? .black
+        case .linearGradient(let g), .radialGradient(let g), .angularGradient(let g): return g.stops.first?.color ?? .black
         case .image: return .black
         }
     }

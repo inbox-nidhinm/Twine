@@ -549,7 +549,7 @@ final class Node {
         return paints.map { paint -> Double in
             switch paint {
             case .solid(let c): return c.a
-            case .linear(let stops, _, _), .radial(let stops, _, _): return stops.map(\.color.a).max() ?? 0
+            case .linear(let stops, _, _), .radial(let stops, _, _), .angular(let stops, _, _): return stops.map(\.color.a).max() ?? 0
             case .image(let image): return image.opacity
             }
         }.max() ?? 1
@@ -1148,6 +1148,12 @@ private final class PaintLayers {
             gradient.locations = stops.map { NSNumber(value: $0.position) }
             gradient.startPoint = unit(center)
             gradient.endPoint = unit(Vec2(center.x + radius, center.y + radius))
+        case .angular(let stops, let center, let toward):
+            gradient.type = .conic
+            gradient.colors = stops.map(\.color.cgColor)
+            gradient.locations = stops.map { NSNumber(value: $0.position) }
+            gradient.startPoint = unit(center)
+            gradient.endPoint = unit(toward)
         case .solid, .image:
             break
         }
@@ -1376,6 +1382,7 @@ extension ResolvedPaint {
         case .solid: return "solid"
         case .linear: return "linear"
         case .radial: return "radial"
+        case .angular: return "angular"
         case .image(let image): return image.tiles ? "tiles" : "image"
         }
     }

@@ -12,6 +12,11 @@ enum SVGPictures {
     /// PNG, and the box it covers in the SVG's own units. Nil when it draws
     /// nothing.
     static func draw(_ svg: String, size: Size2, scale: Double) -> (png: Data, box: Box)? {
+        // One drawing at a time: the system's SVG drawing asks the font
+        // service for every text's font, and many threads asking at once
+        // (the tests, in parallel) left them all waiting on it for good.
+        drawing.lock()
+        defer { drawing.unlock() }
         guard size.width.isFinite, size.height.isFinite, scale.isFinite, let image = NSImage(data: Data(svg.utf8)) else { return nil }
         let s = drawingScale(size: size, scale: scale)
         let w = Int((size.width * s).rounded(.up)), h = Int((size.height * s).rounded(.up))
@@ -54,6 +59,8 @@ enum SVGPictures {
         let s = drawingScale(size: size, scale: scale)
         return (size.width * s).rounded(.up) * (size.height * s).rounded(.up)
     }
+
+    private static let drawing = NSLock()
 
     /// A picture file's size in pixels, the way round it shows.
     static func pixelSize(of data: Data) -> Size2? {

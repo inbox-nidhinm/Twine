@@ -12,7 +12,7 @@ struct EditCallbacks<Value> {
     var end: () -> Void
 }
 
-/// A paint's kind (Solid, Linear, Radial) and its colours: a solid's well,
+/// A paint's kind (Solid, Linear, Radial, Angular) and its colours: a solid's well,
 /// hex and opacity, or a gradient's stops (`GradientStopsEditor`).
 struct PaintControls: View {
     let paint: Paint
@@ -26,7 +26,7 @@ struct PaintControls: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if allowsGradients {
-                SegmentRow(selection: paint.kindName, options: ["Solid", "Linear", "Radial"], title: { $0 },
+                SegmentRow(selection: paint.kindName, options: ["Solid", "Linear", "Radial", "Angular"], title: { $0 },
                            icon: Icon.fillKind) { kind in
                     edit.commit(paint.converted(to: kind))
                 }
@@ -34,7 +34,7 @@ struct PaintControls: View {
             switch paint {
             case .solid(let color):
                 colorRow(color) { .solid($0) }
-            case .linearGradient(let g), .radialGradient(let g):
+            case .linearGradient(let g), .radialGradient(let g), .angularGradient(let g):
                 GradientStopsEditor(gradient: g, title: title, picked: picked, pick: { picked = $0 },
                                     edit: GradientCallbacks(commit: { edit.commit(paint.withGradient($0)) },
                                                             live: { edit.live(paint.withGradient($0)) },
@@ -131,6 +131,9 @@ struct PaintSwatch: View {
             case .radialGradient(let g):
                 RadialGradient(stops: g.swiftUIStops, center: UnitPoint(x: g.start.x, y: g.start.y),
                                startRadius: 0, endRadius: size * hypot(g.end.x - g.start.x, g.end.y - g.start.y))
+            case .angularGradient(let g):
+                AngularGradient(stops: g.swiftUIStops, center: UnitPoint(x: g.start.x, y: g.start.y),
+                                angle: .radians(atan2(g.end.y - g.start.y, g.end.x - g.start.x)))
             case .image:
                 Theme.panelRaised
                 IconView(.image, size: size * 0.6)
@@ -150,12 +153,13 @@ extension MotionModel.Gradient {
 }
 
 extension Icon {
-    /// The icon for a kind of fill in the Solid, Linear, Radial and Image
+    /// The icon for a kind of fill in the Solid, Linear, Radial, Angular and Image
     /// segments, whose names become their tooltips.
     static func fillKind(_ kind: String) -> Icon {
         switch kind {
         case "Linear": .fillLinear
         case "Radial": .fillRadial
+        case "Angular": .fillAngular
         case "Image": .fillImage
         default: .fillSolid
         }

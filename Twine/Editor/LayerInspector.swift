@@ -546,12 +546,14 @@ private struct FillSection: View {
             if let top = shape.topFillIndex {
                 let fill = shape.fills[top]
                 VStack(alignment: .leading, spacing: 8) {
-                    SegmentRow(selection: fill.paint.kindName, options: ["Solid", "Linear", "Radial", "Image"], title: { $0 },
+                    SegmentRow(selection: fill.paint.kindName, options: ["Solid", "Linear", "Radial", "Angular", "Image"], title: { $0 },
                                icon: Icon.fillKind) { kind in
                         if kind == "Image" {
                             if !fill.paint.isImage { controller.fillWithPicture(layer.id) }
                         } else {
                             editShape { $0.fills[top].paint = fill.paint.converted(to: kind) }
+                            // Working on the gradient brings back its line.
+                            controller.editor.hidesGradient = false
                         }
                     }
                     .rowButton {
@@ -915,13 +917,15 @@ struct PaintEditor: View {
         switch paint {
         case .solid(let color):
             colorRow(color, first: true) { c in .solid(c) }
-        case .linearGradient(let g), .radialGradient(let g):
+        case .linearGradient(let g), .radialGradient(let g), .angularGradient(let g):
             let editing = controller.editor.gradient.flatMap { $0.layerID == layer.id && $0.slot == slot ? $0 : nil }
             GradientStopsEditor(
                 gradient: g, title: title, picked: editing?.stop,
                 pick: { stop in
-                    // Picking a stop shows the gradient's handles too.
-                    if let slot { controller.editor.gradient = GradientEdit(layerID: layer.id, slot: slot, stop: stop) }
+                    if let slot {
+                        controller.editor.gradient = GradientEdit(layerID: layer.id, slot: slot, stop: stop)
+                        controller.editor.hidesGradient = false
+                    }
                 },
                 edit: GradientCallbacks(
                     commit: { controller.perform(.updateLayers([change(paint.withGradient($0))])) },
@@ -929,15 +933,7 @@ struct PaintEditor: View {
                     begin: { controller.begin($0) },
                     end: { controller.end() }),
                 barButton: {
-                    if showsToggle {
-                        toggleButton
-                    } else if let slot {
-                        IconButton(icon: .gradientHandles,
-                                   help: editing == nil ? "Edit the gradient on the canvas" : "Done editing the gradient",
-                                   isOn: editing != nil) {
-                            controller.editor.gradient = editing == nil ? GradientEdit(layerID: layer.id, slot: slot, stop: nil) : nil
-                        }
-                    }
+                    if showsToggle { toggleButton }
                 },
                 firstRowButton: { EmptyView() })
         case .image:
@@ -988,46 +984,41 @@ extension Paint {
         case .solid: return "Solid"
         case .linearGradient: return "Linear"
         case .radialGradient: return "Radial"
+        case .angularGradient: return "Angular"
         case .image: return "Image"
         }
     }
 
     /// The same paint as another kind, carrying its colours across: a solid
     /// becomes a gradient from its colour to transparent, and a gradient
-    /// becomes a solid of its first colour.
+    /// becomes a solid of its first colour. A linear gradient runs across
+    /// the middle; a radial or angular one starts from the centre, and
+    /// keeps its centre and edge when it turns into the other.
     func converted(to kind: String) -> Paint {
-        switch (self, kind) {
-        case (.image, _):
+        if case .image = self {
             // A picture has no colour to carry over, so it starts from the
             // default grey.
             return Paint.color(LayerFactory.defaultFill).converted(to: kind)
-        case (.solid(let c), "Linear"), (.solid(let c), "Radial"):
+        }
+        guard let target = GradientKind(kindName: kind) else {
+            return gradient.map { .color($0.stops.first?.color ?? .white) } ?? self
+        }
+        var g: MotionModel.Gradient
+        if let current = gradient {
+            g = current
+        } else if case .solid(let c) = self {
             var clear = c
             clear.a = 0
-            let g = MotionModel.Gradient(stops: [GradientStop(position: 0, color: c), GradientStop(position: 1, color: clear)],
-                             start: kind == "Radial" ? Vec2(0.5, 0.5) : Vec2(0, 0.5),
-                             end: kind == "Radial" ? Vec2(1, 0.5) : Vec2(1, 0.5))
-            return kind == "Radial" ? .radialGradient(g) : .linearGradient(g)
-        case (.linearGradient(let g), "Solid"), (.radialGradient(let g), "Solid"):
-            return .color(g.stops.first?.color ?? .white)
-        case (.linearGradient(var g), "Radial"):
-            g.start = Vec2(0.5, 0.5)
-            g.end = Vec2(1, 0.5)
-            return .radialGradient(g)
-        case (.radialGradient(var g), "Linear"):
-            g.start = Vec2(0, 0.5)
-            g.end = Vec2(1, 0.5)
-            return .linearGradient(g)
-        default:
+            g = MotionModel.Gradient(stops: [GradientStop(position: 0, color: c), GradientStop(position: 1, color: clear)])
+        } else {
             return self
         }
-    }
-
-    func withGradient(_ g: MotionModel.Gradient) -> Paint {
-        switch self {
-        case .radialGradient: return .radialGradient(g)
-        default: return .linearGradient(g)
+        let centred = { (k: GradientKind?) in k == .radial || k == .angular }
+        if gradientKind != target, !(centred(gradientKind) && centred(target)) {
+            g.start = target == .linear ? Vec2(0, 0.5) : Vec2(0.5, 0.5)
+            g.end = Vec2(1, 0.5)
         }
+        return .gradient(g, target)
     }
 }
 
