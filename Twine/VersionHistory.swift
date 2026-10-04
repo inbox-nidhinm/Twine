@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 186
+    static let pushes = 187
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -65,6 +65,7 @@ enum VersionHistory {
             "Saving a very large project no longer pauses Twine for half a second after each edit. Its picture on the home screen is drawn as the project closes, rather than with every save.",
             "Projects with more than 512 texts no longer lay all their text out again on every edit and frame.",
             "Playback no longer stutters while a large group moves with motion blur. Each of the blur's eight copies drew every layer in the group again, so a group of 500 layers was 4,000 layers a frame and slowed the whole Mac; the group is now drawn once and its copies made from that picture. In a project whose screens slide in with motion blur, the slowest frames draw in about 50 ms, from 400.",
+            "Shift-dragging a selected layer moves it straight across or straight up and down, as in Figma. Shift took the layer out of the selection as soon as it was pressed, so there was nothing left to drag; now it leaves the selection only when Shift-clicked without dragging.",
             "A project from someone else can no longer reach files outside itself. A picture or video in a project is found by its file name, and a name with a path in it, or a file that was a link elsewhere on the Mac, made Twine show that outside file and copy it into the project when saving. Such a picture now shows grey, and nothing outside the project is read or copied.",
             "A damaged or hand-edited project no longer stops Twine as it opens. Numbers far past anything Twine makes, such as a Volume fade billions of years long, a star with a trillion points or an enormous type size, are brought back to the largest Twine allows as the file is read.",
             "SVG files and Figma pastes made to stall Twine are refused, rather than freezing it or filling the memory: an SVG saved in UTF-16 could hide entities that grow a few bytes into gigabytes, and a small one could make macOS's drawing of its text repeat its definitions for hours. Each picture drawn for an SVG now carries only the definitions it uses, and the drawing for one import or paste is held to a limit.",

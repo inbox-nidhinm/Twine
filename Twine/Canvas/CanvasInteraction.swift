@@ -24,6 +24,9 @@ enum CanvasDrag {
         /// and the originals are selected again.
         var duplicating = false
         var sources: Set<UUID> = []
+        /// A layer already selected that was Shift-pressed: it leaves the
+        /// selection if the press is let go as a click, and stays for a drag.
+        var deselectsOnClick: UUID?
     }
 
     struct Resize {
@@ -175,6 +178,8 @@ enum CanvasDrag {
 enum CanvasHandles {
     nonisolated static let size: CGFloat = 8
     static let hitRadius: CGFloat = 6
+    /// How far a press may wander, in screen points, and still be a click.
+    static let clickReach: CGFloat = 3
     /// How far past a corner still turns the layer rather than missing it.
     static let rotateReach: CGFloat = 18
 

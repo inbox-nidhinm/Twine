@@ -670,7 +670,14 @@ final class CanvasNSView: NSView {
 
         let deep = event.modifierFlags.contains(.command)
         if let hit = layer(at: point, deep: deep) {
-            if shift {
+            // Shift on a layer already selected takes it out only once the
+            // press turns out to be a click, as in Figma (4 October 2026):
+            // taken out at the press, a Shift-drag to keep a move level or
+            // upright had nothing left to move.
+            var deselectsOnClick: UUID?
+            if shift, selection.contains(hit) {
+                deselectsOnClick = hit
+            } else if shift {
                 controller.select([hit], extending: true)
             } else if !selection.contains(hit) {
                 controller.select([hit])
@@ -710,7 +717,8 @@ final class CanvasNSView: NSView {
                 controller.begin(moving.count == 1 ? "Move Layer" : "Move Layers")
             }
             snapTargets = targets(excluding: Set(moving.map(\.id)))
-            drag = .move(CanvasDrag.Move(originals: moving, start: point, duplicating: duplicating, sources: sources))
+            drag = .move(CanvasDrag.Move(originals: moving, start: point, duplicating: duplicating, sources: sources,
+                                         deselectsOnClick: deselectsOnClick))
         } else {
             if !shift { controller.deselectAll() }
             drag = .marquee(CanvasDrag.Marquee(start: viewPoint, current: viewPoint, additive: shift,
@@ -875,6 +883,11 @@ final class CanvasNSView: NSView {
             // Option-clicked without moving: no copies after all.
             controller.cancel()
             controller.editor.selection = move.sources
+        case .move(let move) where move.deselectsOnClick != nil && isClick(event, from: move.start):
+            // Shift-clicked a selected layer without dragging: it leaves the
+            // selection, and any wobble of the press is taken back.
+            controller.cancel()
+            if let id = move.deselectsOnClick { controller.select([id], extending: true) }
         case .move, .resize, .rotate, .anchor, .action:
             controller.end()
         case .marquee:
@@ -887,6 +900,12 @@ final class CanvasNSView: NSView {
             (spaceHeld ? Cursors.hand : Cursors.arrow).set()
         }
         redrawOverlay()
+    }
+
+    /// Whether `event` is let go within a click's reach of `start`.
+    private func isClick(_ event: NSEvent, from start: Vec2) -> Bool {
+        let here = convert(event.locationInWindow, from: nil), there = compositionToView(start)
+        return hypot(here.x - there.x, here.y - there.y) <= CanvasHandles.clickReach
     }
 
     // MARK: Snapping
