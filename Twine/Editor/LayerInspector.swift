@@ -535,47 +535,60 @@ private struct FillSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HeaderRow(title: "Fill") {
-                if shape.fills.isEmpty {
-                    IconButton(icon: .plus, help: "Add a fill") {
-                        editShape { $0.fills = [Fill(paint: .color(LayerFactory.defaultFill))] }
+                IconButton(icon: .plus, help: shape.fills.isEmpty ? "Add a fill" : "Add a fill on top") {
+                    editShape { s in
+                        // The first in the shape's own grey; another, a
+                        // see-through black over what is there.
+                        s.fills.append(Fill(paint: .color(s.fills.isEmpty ? LayerFactory.defaultFill : RGBA(0, 0, 0, 0.2))))
                     }
-                } else {
-                    IconButton(icon: .minus, help: "Remove the fill") { editShape { $0.fills.removeLast() } }
                 }
             }
-            // The fill on top, the one that shows; any under it stay as they are.
-            if let top = shape.topFillIndex {
-                let fill = shape.fills[top]
-                VStack(alignment: .leading, spacing: 8) {
-                    SegmentRow(selection: fill.paint.kindName, options: ["Solid", "Linear", "Radial", "Angular", "Image"], title: { $0 },
-                               icon: Icon.fillKind) { kind in
-                        if kind == "Image" {
-                            if !fill.paint.isImage { controller.fillWithPicture(layer.id) }
-                        } else {
-                            editShape { $0.fills[top].paint = fill.paint.converted(to: kind) }
-                            // Working on the gradient brings back its line.
-                            controller.editor.hidesGradient = false
-                        }
-                    }
-                    .rowButton {
-                        // Show and hide the fill, on its first row.
-                        IconButton(icon: fill.isEnabled ? .eye : .eyeSlash, help: fill.isEnabled ? "Hide the fill" : "Show the fill") {
-                            editShape { $0.fills[top].isEnabled.toggle() }
-                        }
-                    }
-                    if let picture = fill.paint.imagePaint {
-                        PictureFields(layer: layer, paint: picture, controller: controller)
-                    } else {
-                        PaintEditor(paint: fill.paint, isEnabled: fill.isEnabled, controller: controller, layer: layer,
-                                    title: "Fill", slot: .fill(top),
-                                    change: { paint in editedShape { $0.fills[top].paint = paint } },
-                                    toggle: { editShape { $0.fills[top].isEnabled.toggle() } })
-                    }
-                }
-                .gridBody()
+            // Every fill, the top one (the one a Colour action changes)
+            // first, as the layers panel lists layers (4 October 2026; only
+            // the top one showed before).
+            ForEach(Array(shape.fills.enumerated()).reversed(), id: \.element.id) { index, fill in
+                fillRows(fill, index: index)
+                    .gridBody()
             }
         }
         .sectionPadding(empty: shape.fills.isEmpty)
+    }
+
+    @ViewBuilder private func fillRows(_ fill: Fill, index i: Int) -> some View {
+        // One picture fill a layer: Image is offered where it is, or on any
+        // fill while there is none.
+        let picture = shape.pictureIndex
+        let kinds = picture == nil || picture == i ? ["Solid", "Linear", "Radial", "Angular", "Image"]
+                                                   : ["Solid", "Linear", "Radial", "Angular"]
+        VStack(alignment: .leading, spacing: 8) {
+            InspectorItemTitle(icon: Icon.fillKind(fill.paint.kindName), title: "Fill") {
+                editShape { s in if s.fills.indices.contains(i) { s.fills.remove(at: i) } }
+            }
+            SegmentRow(selection: fill.paint.kindName, options: kinds, title: { $0 }, icon: Icon.fillKind) { kind in
+                if kind == "Image" {
+                    if !fill.paint.isImage { controller.fillWithPicture(layer.id, at: i) }
+                } else {
+                    editShape { s in if s.fills.indices.contains(i) { s.fills[i].paint = fill.paint.converted(to: kind) } }
+                    // Working on the gradient brings back its line, on this fill.
+                    controller.editor.hidesGradient = false
+                    if kind != "Solid" { controller.editor.gradient = GradientEdit(layerID: layer.id, slot: .fill(i)) }
+                }
+            }
+            .rowButton {
+                // Show and hide the fill, on its first row.
+                IconButton(icon: fill.isEnabled ? .eye : .eyeSlash, help: fill.isEnabled ? "Hide the fill" : "Show the fill") {
+                    editShape { s in if s.fills.indices.contains(i) { s.fills[i].isEnabled.toggle() } }
+                }
+            }
+            if let picture = fill.paint.imagePaint {
+                PictureFields(layer: layer, paint: picture, controller: controller)
+            } else {
+                PaintEditor(paint: fill.paint, isEnabled: fill.isEnabled, controller: controller, layer: layer,
+                            title: "Fill", slot: .fill(i),
+                            change: { paint in editedShape { s in if s.fills.indices.contains(i) { s.fills[i].paint = paint } } },
+                            toggle: { editShape { s in if s.fills.indices.contains(i) { s.fills[i].isEnabled.toggle() } } })
+            }
+        }
     }
 
     private func editShape(_ change: (inout ShapeContent) -> Void) {
@@ -707,31 +720,48 @@ private struct StrokeSection: View {
     let controller: EditorController
 
     @Environment(MenuHost.self) private var menus
-    @State private var settingsFrame: CGRect = .zero
+    /// Each stroke's settings button, to raise its card beside.
+    @State private var settingsFrames: [UUID: CGRect] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HeaderRow(title: "Stroke") {
-                if shape.strokes.isEmpty {
-                    IconButton(icon: .plus, help: "Add a stroke") {
-                        editShape { $0.strokes = [Stroke(paint: .color(LayerFactory.defaultStroke), width: 2)] }
+                IconButton(icon: .plus, help: shape.strokes.isEmpty ? "Add a stroke" : "Add a stroke on top") {
+                    editShape { s in
+                        // Another sits as the top one does, in the stroke colour.
+                        var stroke = s.strokes.last?.withNewID() ?? Stroke(paint: .color(LayerFactory.defaultStroke), width: 2)
+                        stroke.paint = .color(LayerFactory.defaultStroke)
+                        stroke.isEnabled = true
+                        s.strokes.append(stroke)
                     }
-                } else {
-                    IconButton(icon: .minus, help: "Remove the stroke") { editShape { $0.strokes.removeFirst() } }
                 }
             }
-            if let stroke = shape.strokes.first {
+            // Every stroke, the one drawn on top first (4 October 2026; only
+            // the first showed before). Stroke and Trim actions drive the
+            // bottom one, the first in the list kept.
+            ForEach(Array(shape.strokes.enumerated()).reversed(), id: \.element.id) { index, stroke in
+                strokeRows(stroke, index: index)
+                    .gridBody()
+            }
+        }
+        .sectionPadding(empty: shape.strokes.isEmpty)
+    }
+
+    @ViewBuilder private func strokeRows(_ stroke: Stroke, index i: Int) -> some View {
                 VStack(alignment: .leading, spacing: 8) {
+                    InspectorItemTitle(icon: .stroke, title: "Stroke") {
+                        editShape { s in if s.strokes.indices.contains(i) { s.strokes.remove(at: i) } }
+                    }
                     PaintEditor(paint: stroke.paint, isEnabled: stroke.isEnabled, controller: controller, layer: layer,
-                                title: "Stroke", slot: .stroke(0),
+                                title: "Stroke", slot: .stroke(i),
                                 change: { paint in
                                     var l = layer
                                     var s = shape
-                                    s.strokes[0].paint = paint
+                                    if s.strokes.indices.contains(i) { s.strokes[i].paint = paint }
                                     l.look = s
                                     return l
                                 },
-                                toggle: { editShape { $0.strokes[0].isEnabled.toggle() } },
+                                toggle: { editShape { s in if s.strokes.indices.contains(i) { s.strokes[i].isEnabled.toggle() } } },
                                 showsToggle: true)
                     HStack(spacing: 8) {
                         // An open line has no inside or outside.
@@ -739,14 +769,14 @@ private struct StrokeSection: View {
                             MenuField(value: stroke.alignment.rawValue.capitalized, entries: {
                                 StrokeAlignment.allCases.map { a in
                                     .item(a.rawValue.capitalized, checked: a == stroke.alignment) {
-                                        editShape { $0.strokes[0].alignment = a }
+                                        editShape { s in if s.strokes.indices.contains(i) { s.strokes[i].alignment = a } }
                                     }
                                 }
                             }, height: Theme.control)
                             .help("Whether the stroke sits centred on the edge, inside it, or outside it")
                         }
                         UnitField(value: stroke.width, decimals: 1, suffix: "px", accepts: { $0 >= 0 }) { v in
-                            editShape { $0.strokes[0].width = v }
+                            editShape { s in if s.strokes.indices.contains(i) { s.strokes[i].width = v } }
                         }
                         .help("Stroke width")
                     }
@@ -754,21 +784,18 @@ private struct StrokeSection: View {
                         IconButton(icon: .settings, help: layer.isFrame ? "More stroke settings: ends, corners and dashes"
                                                                         : "More stroke settings: trim, ends, corners and dashes") {
                             // Beside the inspector, towards the canvas, level with the button.
+                            let settingsFrame = settingsFrames[stroke.id] ?? .zero
                             let inspectorLeft = settingsFrame.maxX + Theme.panelPad - Theme.panelWidth
                             menus.showPopup(at: CGPoint(x: inspectorLeft - Theme.floatGap - Theme.cardWidth,
                                                         y: settingsFrame.minY - 40)) {
                                 PopupCard(title: "Stroke", width: Theme.cardWidth) {
-                                    StrokeSettings(layerID: layer.id, controller: controller)
+                                    StrokeSettings(layerID: layer.id, strokeID: stroke.id, controller: controller)
                                 }
                             }
                         }
-                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { settingsFrame = $0 }
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { settingsFrames[stroke.id] = $0 }
                     }
                 }
-                .gridBody()
-            }
-        }
-        .sectionPadding(empty: shape.strokes.isEmpty)
     }
 
     private func editShape(_ change: (inout ShapeContent) -> Void) {
@@ -817,10 +844,13 @@ enum StrokeLine: CaseIterable {
 /// layer afresh each time, so it follows every edit while it is up.
 private struct StrokeSettings: View {
     let layerID: UUID
+    /// Which of the layer's strokes, by id, so it stays the same one as
+    /// others are added or removed.
+    let strokeID: UUID
     let controller: EditorController
 
     var body: some View {
-        if let layer = controller.project.layer(withID: layerID), let stroke = layer.look?.strokes.first {
+        if let layer = controller.project.layer(withID: layerID), let stroke = layer.look?.strokes.first(where: { $0.id == strokeID }) {
             // A frame's stroke has no ends to trim.
             if !layer.isFrame {
                 MenuRow(label: "Trim", value: stroke.trim.direction.title, entries: {
@@ -888,8 +918,8 @@ private struct StrokeSettings: View {
 
     private func edit(_ change: @escaping (inout Stroke) -> Void) {
         controller.edit(layerID) { l in
-            guard var s = l.look, !s.strokes.isEmpty else { return }
-            change(&s.strokes[0])
+            guard var s = l.look, let i = s.strokes.firstIndex(where: { $0.id == strokeID }) else { return }
+            change(&s.strokes[i])
             l.look = s
         }
     }
@@ -1023,6 +1053,28 @@ extension Paint {
     }
 }
 
+// MARK: - Items
+
+/// The name row over one fill, stroke or effect in a list of them: its
+/// icon and name, with its remove button in the button column.
+struct InspectorItemTitle: View {
+    let icon: Icon
+    let title: String
+    let remove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            IconView(icon, size: 15)
+                .foregroundStyle(Theme.textTertiary)
+            Text(title)
+                .font(ThemeFont.label)
+                .foregroundStyle(Theme.textSecondary)
+            Spacer(minLength: 0)
+        }
+        .rowButton { IconButton(icon: .minus, help: "Remove", action: remove) }
+    }
+}
+
 // MARK: - Effects
 
 /// A mask: the layers in front of it in its group or frame show only
@@ -1095,17 +1147,8 @@ private struct EffectsSection: View {
         .sectionPadding(empty: layer.effects.isEmpty && !showsSkew && !showsTilt)
     }
 
-    /// An effect's icon and name, with its remove button in the column.
     private func titleRow(_ icon: Icon, _ title: String, remove: @escaping () -> Void) -> some View {
-        HStack(spacing: 6) {
-            IconView(icon, size: 15)
-                .foregroundStyle(Theme.textTertiary)
-            Text(title)
-                .font(ThemeFont.label)
-                .foregroundStyle(Theme.textSecondary)
-            Spacer(minLength: 0)
-        }
-        .rowButton { IconButton(icon: .minus, help: "Remove", action: remove) }
+        InspectorItemTitle(icon: icon, title: title, remove: remove)
     }
 
     /// Show and hide, on an effect's first row of values.

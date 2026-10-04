@@ -533,16 +533,26 @@ final class EditorController {
     }
 
     /// Fills a shape's first fill with a picture chosen in a panel.
-    func fillWithPicture(_ id: UUID) {
-        chooseFile([.image]) { [weak self] url in self?.fillWithPicture(id, from: url) }
+    /// The fill at `index` (the top one when nil) becomes a picture chosen
+    /// in a panel.
+    func fillWithPicture(_ id: UUID, at index: Int? = nil) {
+        let fill = index.flatMap { i in project.layer(withID: id)?.look?.fills.indices.contains(i) == true
+            ? project.layer(withID: id)?.look?.fills[i].id : nil }
+        chooseFile([.image]) { [weak self] url in self?.fillWithPicture(id, from: url, fill: fill) }
     }
 
-    func fillWithPicture(_ id: UUID, from url: URL) {
+    /// The fill with id `fill` (the top one when nil or gone) becomes the
+    /// picture at `url`.
+    func fillWithPicture(_ id: UUID, from url: URL, fill: UUID? = nil) {
         Task { @MainActor in
             guard let (asset, isNew) = await bringIn(url, as: .image),
                   var layer = project.layer(withID: id), var shape = layer.look else { return }
             let paint = Paint.image(ImagePaint(mediaID: asset.id))
-            if let top = shape.topFillIndex { shape.fills[top].paint = paint } else { shape.fills = [Fill(paint: paint)] }
+            if let i = shape.fills.firstIndex(where: { $0.id == fill }) ?? shape.topFillIndex {
+                shape.fills[i].paint = paint
+            } else {
+                shape.fills = [Fill(paint: paint)]
+            }
             layer.look = shape
             perform(.batch((isNew ? [.addMedia(asset)] : []) + [.updateLayers([layer])], name: "Image Fill"))
         }
