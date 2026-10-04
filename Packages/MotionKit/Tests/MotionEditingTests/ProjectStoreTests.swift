@@ -128,16 +128,6 @@ import MotionModel
         #expect(!store.undoManager.canUndo)
     }
 
-    @Test func deletingAMaskClearsReferencesToIt() throws {
-        let mask = shape("Mask")
-        var masked = shape("Masked")
-        masked.mask = MaskReference(layerID: mask.id)
-        let store = makeStore(Project(layers: [mask, masked]))
-        try store.perform(.deleteLayers([mask.id]))
-        #expect(store.project.layers.count == 1)
-        #expect(store.project.layers[0].mask == nil)
-    }
-
     @Test func movingKeepsRelativeOrderAndRefusesCycles() throws {
         let a = shape("A"), b = shape("B"), c = shape("C")
         let group = Layer(name: "G", content: .group(GroupContent()), size: Size2(1, 1), position: .zero)

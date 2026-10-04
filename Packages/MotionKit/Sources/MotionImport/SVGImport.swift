@@ -389,19 +389,17 @@ private struct Reader {
         let needsOne = opacity < 1 || blend != nil || !effects.isEmpty || clip != nil || mask != nil
         guard needsOne else { return layers }
         var target: Layer
-        if layers.count == 1, layers[0].mask == nil { target = layers[0] } else {
+        if layers.count == 1, !layers[0].isMask { target = layers[0] } else {
             target = group(layers, named: element, fallback: "Group", always: true)[0]
         }
         target.opacity *= opacity
         if let blend { target.blendMode = blend }
         target.effects += effects.map { Effect(kind: $0) }
-        var out: [Layer] = []
-        if let source = clip ?? mask {
-            out.append(source)
-            target.mask = MaskReference(layerID: source.id)
-        }
-        out.append(target)
-        return out
+        guard var source = clip ?? mask else { return [target] }
+        // A mask masks everything in front of it in its group, so the
+        // element and its mask go in a group of their own.
+        source.isMask = true
+        return group([source, target], named: element, fallback: "Mask group", always: true)
     }
 
     private static func blendMode(_ css: String) -> BlendMode? {

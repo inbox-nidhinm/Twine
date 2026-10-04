@@ -124,6 +124,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     @objc func groupLayers(_ sender: Any?) { controller.groupSelection() }
     @objc func ungroupLayers(_ sender: Any?) { controller.ungroupSelection() }
     @objc func frameLayers(_ sender: Any?) { controller.frameSelection() }
+    @objc func useAsMask(_ sender: Any?) { controller.useSelectionAsMask() }
     @objc func bringForward(_ sender: Any?) { controller.restack(.forward) }
     @objc func sendBackward(_ sender: Any?) { controller.restack(.backward) }
     @objc func bringToFront(_ sender: Any?) { controller.restack(.front) }
@@ -175,7 +176,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         case #selector(exportFile(_:)), #selector(exportFrame(_:)):
             return !editor.exports.isExporting
         case #selector(delete(_:)), #selector(copy(_:)), #selector(cut(_:)), #selector(duplicateLayers(_:)),
-             #selector(groupLayers(_:)), #selector(frameLayers(_:)), #selector(bringForward(_:)), #selector(sendBackward(_:)),
+             #selector(groupLayers(_:)), #selector(frameLayers(_:)), #selector(useAsMask(_:)), #selector(bringForward(_:)), #selector(sendBackward(_:)),
              #selector(bringToFront(_:)), #selector(sendToBack(_:)):
             return hasSelection
         case #selector(renameLayer(_:)):

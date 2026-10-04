@@ -34,7 +34,7 @@ func kitchenSinkProject() -> Project {
         fills: [Fill(paint: .radialGradient(Gradient(stops: [GradientStop(position: 0.5, color: .clear)],
                                                     start: Vec2(0.5, 0.5), end: Vec2(1, 0.5))))])),
         size: Size2(80, 80), position: Vec2(0, 0))
-    star.mask = MaskReference(layerID: ellipse.id, isInverted: true)
+    star.isMask = true
 
     let polygon = Layer(name: "Poly", content: .shape(ShapeContent(geometry: .polygon(sides: 6))),
                         size: Size2(10, 10), position: .zero)
@@ -239,7 +239,7 @@ func kitchenSinkProject() -> Project {
         // 100 by 100 is not the picture's shape, so its stretch is kept.
         #expect(project.layer(withID: stretched)?.picture?.paint.mode == .crop)
         #expect(project.layer(withID: stretched)?.picture?.paint.crop == .whole)
-        #expect(project.layer(withID: masked)?.mask?.layerID == fitting)
+        #expect(project.layer(withID: masked)?.legacyMask?.layerID == fitting)
         #expect(project.actions == [action])
     }
 

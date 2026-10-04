@@ -48,16 +48,6 @@ import MotionEvaluation
         #expect(project.layers.map(\.id) == [frameID])
     }
 
-    @Test func groupingKeepsAMaskThatPointsInside() throws {
-        let source = square("mask", at: 0, 0), other = square("other", at: 30, 0)
-        var masked = square("masked", at: 60, 0)
-        masked.mask = MaskReference(layerID: source.id)
-        var project = Project(layers: [source, other, masked])
-        let (command, _) = try Arrangement.group([source.id, other.id], in: project, name: "Group 1")
-        try command.apply(to: &project)
-        #expect(project.layer(withID: masked.id)?.mask?.layerID == source.id)
-    }
-
     @Test func aFrameDrawnAroundLayersTakesInTheWholeOnesBehindIt() throws {
         let inside = square("in", at: 20, 20), across = square("across", at: 100, 20), locked = { () -> Layer in
             var l = square("locked", at: 30, 30)

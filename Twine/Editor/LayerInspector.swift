@@ -59,8 +59,9 @@ struct LayerInspector: View {
             }
             PanelDivider()
             EffectsSection(layer: layer, controller: controller)
-            // A mask draws alone, so a mask of its own would do nothing.
-            if case .audio = layer.content {} else if layer.mask != nil || !controller.project.maskSourceIDs.contains(layer.id) {
+            // Masks are made from the layers' right-click menu, as in Figma;
+            // a mask says so here, where it can stop being one.
+            if layer.isMask {
                 PanelDivider()
                 MaskSection(layer: layer, controller: controller)
             }
@@ -1024,57 +1025,20 @@ extension Paint {
 
 // MARK: - Effects
 
-/// Another layer that shows this one only where it draws, or with Invert,
-/// only where it does not. The mask stops drawing by itself.
+/// A mask: the layers in front of it in its group or frame show only
+/// where it draws (4 October 2026, as in Figma). Its one control stops it
+/// being a mask; Use as Mask is on the layers' right-click menu.
 private struct MaskSection: View {
     let layer: Layer
     let controller: EditorController
 
-    @Environment(MenuHost.self) private var menus
-    @State private var addFrame: CGRect = .zero
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HeaderRow(title: "Mask") {
-                if layer.mask == nil {
-                    IconButton(icon: .plus, help: "Show this layer only where another layer draws") {
-                        menus.show(entries(), at: CGPoint(x: addFrame.maxX - Theme.menuMinWidth, y: addFrame.maxY + 4))
-                    }
-                    .disabled(!controller.project.hasMaskCandidates(for: layer.id))
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { addFrame = $0 }
-                } else {
-                    IconButton(icon: .minus, help: "Remove the mask") { set(nil) }
-                }
-            }
-            if let mask = layer.mask {
-                VStack(alignment: .leading, spacing: 8) {
-                    MenuRow(label: "Layer", value: controller.project.layer(withID: mask.layerID)?.name ?? "None",
-                            entries: entries)
-                        .help("The layer whose shape shows this one. It stops drawing by itself.")
-                    ToggleRow(label: "Invert", isOn: mask.isInverted) {
-                        set(MaskReference(layerID: mask.layerID, isInverted: !mask.isInverted))
-                    }
-                    .help("Show this layer where the mask does not draw, rather than where it does")
-                }
-                .gridBody()
+        HeaderRow(title: "Mask") {
+            IconButton(icon: .minus, help: "Remove the mask: this layer draws again, and the layers in front of it show whole") {
+                controller.removeMask(layer.id)
             }
         }
-        .sectionPadding(empty: layer.mask == nil)
-    }
-
-    /// Front first, as the layers panel lists them.
-    private var candidates: [Layer] { controller.project.maskCandidates(for: layer.id).reversed() }
-
-    private func entries() -> [MenuEntry] {
-        candidates.map { candidate in
-            .item(candidate.name, checked: layer.mask?.layerID == candidate.id) {
-                set(MaskReference(layerID: candidate.id, isInverted: layer.mask?.isInverted ?? false))
-            }
-        }
-    }
-
-    private func set(_ mask: MaskReference?) {
-        controller.edit(layer.id) { l in l.mask = mask }
+        .sectionPadding(empty: true)
     }
 }
 

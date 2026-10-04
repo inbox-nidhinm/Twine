@@ -376,6 +376,64 @@
      ]
     },
     {
+     "name": "Dial",
+     "visible": true,
+     "locked": false,
+     "opacity": 1,
+     "blend": "PASS_THROUGH",
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      240,
+      160
+     ],
+     "width": 30,
+     "height": 30,
+     "kind": "ellipse",
+     "arc": {
+      "start": 0,
+      "end": 6.283185307179586,
+      "inner": 0
+     },
+     "fills": [
+      {
+       "type": "GRADIENT_ANGULAR",
+       "visible": true,
+       "opacity": 1,
+       "stops": [
+        {
+         "position": 0,
+         "color": {
+          "r": 1,
+          "g": 0,
+          "b": 0,
+          "a": 1
+         }
+        },
+        {
+         "position": 1,
+         "color": {
+          "r": 0,
+          "g": 0,
+          "b": 1,
+          "a": 1
+         }
+        }
+       ],
+       "transform": [
+        0,
+        -1,
+        1,
+        0,
+        0,
+        1
+       ]
+      }
+     ]
+    },
+    {
      "name": "Rule",
      "visible": true,
      "locked": false,

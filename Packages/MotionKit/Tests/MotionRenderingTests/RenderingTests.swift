@@ -396,12 +396,12 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
     // MARK: Masks
 
     /// A red square filling the frame, masked by a white circle 32 across in
-    /// the middle.
-    private func masked(inverted: Bool = false, change: (inout Layer) -> Void = { _ in }) -> Project {
+    /// the middle, behind it.
+    private func masked(change: (inout Layer) -> Void = { _ in }) -> Project {
         var circle = shape(.ellipse(arc: .full), fill: RGBA(1, 1, 1), at: Vec2(16, 16), size: Size2(32, 32))
+        circle.isMask = true
         change(&circle)
-        var square = shape(at: .zero, size: Size2(64, 64))
-        square.mask = MaskReference(layerID: circle.id, isInverted: inverted)
+        let square = shape(at: .zero, size: Size2(64, 64))
         return Project(composition: transparentComposition(), layers: [circle, square])
     }
 
@@ -414,11 +414,11 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
         #expect(pixel(image, 60, 60).a == 0)
     }
 
-    @Test func invertedMasksShowTheLayerEverywhereElse() throws {
-        let image = try render(masked(inverted: true))
-        #expect(pixel(image, 32, 32).a == 0)
-        let corner = pixel(image, 4, 4)
-        #expect(corner.r > 250 && corner.g < 5 && corner.a > 250)
+    @Test func aMaskLeavesWhatIsBehindItAlone() throws {
+        var project = masked()
+        project.layers.insert(shape(fill: RGBA(0, 0, 1), at: .zero, size: Size2(64, 64)), at: 0)
+        let corner = pixel(try render(project), 4, 4)
+        #expect(corner.b > 250 && corner.r < 5 && corner.a > 250, "the blue square behind the mask shows whole")
     }
 
     @Test func aMasksOpacityIsHowMuchItShows() throws {
@@ -434,18 +434,15 @@ private func transparentComposition(_ size: Int = 64) -> Composition {
 
     @Test func masksSitWhereTheirGroupsPutThem() throws {
         // The circle is 16 across at the group's origin, and the group sits
-        // at (24, 24): the mask covers 24 to 40. The square is in a group of
-        // its own, moved 8 left, so its own space is shifted too.
-        let circle = shape(.ellipse(arc: .full), fill: RGBA(1, 1, 1), at: .zero, size: Size2(16, 16))
-        var holder = Layer(name: "G", content: .group(GroupContent(children: [circle])), size: Size2(16, 16),
+        // at (24, 24): the mask covers 24 to 40. The square, in front of it
+        // in the group, fills the frame.
+        var circle = shape(.ellipse(arc: .full), fill: RGBA(1, 1, 1), at: .zero, size: Size2(16, 16))
+        circle.isMask = true
+        let square = shape(at: Vec2(-24, -24), size: Size2(64, 64))
+        var holder = Layer(name: "G", content: .group(GroupContent(children: [circle, square])), size: Size2(16, 16),
                            position: Vec2(24, 24))
         holder.transform.anchor = .zero
-        var square = shape(at: Vec2(8, 0), size: Size2(64, 64))
-        square.mask = MaskReference(layerID: circle.id)
-        var outer = Layer(name: "H", content: .group(GroupContent(children: [square])), size: Size2(64, 64),
-                          position: Vec2(-8, 0))
-        outer.transform.anchor = .zero
-        let image = try render(Project(composition: transparentComposition(), layers: [holder, outer]))
+        let image = try render(Project(composition: transparentComposition(), layers: [holder]))
         #expect(pixel(image, 32, 32).a > 250)
         #expect(pixel(image, 20, 32).a == 0)
         #expect(pixel(image, 44, 32).a == 0)

@@ -2,8 +2,8 @@ import Foundation
 
 extension Layer {
     /// A copy with fresh ids for the layer, everything inside it, and its
-    /// fills, strokes and effects. A mask that pointed at a layer inside the
-    /// copy points at that layer's copy; one that pointed outside is kept.
+    /// fills, strokes and effects. A mask copies as a mask, masking what
+    /// comes in front of its copy.
     ///
     /// This is the only way a layer gets a new id: a layer's own id never
     /// changes, so copying is always making a new layer.
@@ -16,8 +16,7 @@ extension Layer {
     /// refers to the originals (their actions) can be copied across too.
     public func duplicated(recordingIDs map: inout [UUID: UUID]) -> Layer {
         var local: [UUID: UUID] = [:]
-        var copy = copied(into: &local)
-        copy.remapMasks(local)
+        let copy = copied(into: &local)
         map.merge(local) { $1 }
         return copy
     }
@@ -47,24 +46,6 @@ extension Layer {
             break
         }
         return copy
-    }
-
-    /// The layer with every mask inside it that names a layer in `map`
-    /// pointing at that layer's copy instead: for layers copied one by one
-    /// together, such as a picture and its mask selected side by side, so
-    /// each copy is masked by the other's copy, not the original.
-    public func remappingMasks(_ map: [UUID: UUID]) -> Layer {
-        var copy = self
-        copy.remapMasks(map)
-        return copy
-    }
-
-    private mutating func remapMasks(_ map: [UUID: UUID]) {
-        if let m = mask, let moved = map[m.layerID] { mask?.layerID = moved }
-        if case .group(var group) = content {
-            for i in group.children.indices { group.children[i].remapMasks(map) }
-            content = .group(group)
-        }
     }
 }
 

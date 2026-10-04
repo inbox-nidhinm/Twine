@@ -21,8 +21,11 @@ public enum ProjectFormat {
     /// 2 replaced keyframes with actions (September 2026). 3 made pictures
     /// fills on rectangles, as Figma has them, rather than layers of their
     /// own (September 2026). 4 added angular gradients (October 2026),
-    /// which an older Twine cannot read; nothing older needs changing.
-    public static let currentVersion = 4
+    /// which an older Twine cannot read; nothing older needs changing. 5
+    /// made masks Figma's (a layer marked as a mask masks those in front of
+    /// it), which an older Twine would read as no masks at all; older masks
+    /// are read as they were and converted once the project opens.
+    public static let currentVersion = 5
     /// Files older than this are refused with a plain message rather than
     /// migrated: nothing made before actions carries over meaningfully.
     public static let oldestReadableVersion = 2
@@ -120,7 +123,7 @@ public struct FormatMigrator: Sendable {
     }
 
     /// Version 2 is the oldest format still read.
-    public static let standard = FormatMigrator(steps: [2: PictureMigration.step, 3: { _ in }])
+    public static let standard = FormatMigrator(steps: [2: PictureMigration.step, 3: { _ in }, 4: { _ in }])
 
     public func migrate(_ data: Data, from old: Int, to new: Int) throws -> Data {
         guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {

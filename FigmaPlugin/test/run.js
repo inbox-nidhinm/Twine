@@ -59,7 +59,7 @@ function textNode(props, segments) {
 const card = node("FRAME", {
   name: "Card", absoluteTransform: translate(100, 50), width: 320, height: 200, clipsContent: true,
   topLeftRadius: 16, topRightRadius: 16, bottomRightRadius: 16, bottomLeftRadius: 16, cornerRadius: 16,
-  fills: [solid(1, 1, 1), { type: "GRADIENT_ANGULAR", visible: true, gradientStops: [], gradientTransform: translate(0, 0) }],
+  fills: [solid(1, 1, 1), { type: "GRADIENT_DIAMOND", visible: true, gradientStops: [], gradientTransform: translate(0, 0) }],
   strokes: [solid(0, 0, 0, 0.1)],
   effects: [
     { type: "DROP_SHADOW", visible: true, color: { r: 0, g: 0, b: 0, a: 0.2 }, offset: { x: 0, y: 8 }, radius: 24, spread: 0 },
@@ -97,6 +97,12 @@ const card = node("FRAME", {
           cornerRadius: 2, fills: [solid(1, 0.8, 0)] }),
       ],
     }),
+    // An angular gradient turned a quarter: it starts pointing down.
+    node("ELLIPSE", { name: "Dial", absoluteTransform: translate(240, 160), width: 30, height: 30,
+      arcData: { startingAngle: 0, endingAngle: 2 * Math.PI, innerRadius: 0 },
+      fills: [{ type: "GRADIENT_ANGULAR", visible: true, opacity: 1,
+        gradientStops: [{ position: 0, color: { r: 1, g: 0, b: 0, a: 1 } }, { position: 1, color: { r: 0, g: 0, b: 1, a: 1 } }],
+        gradientTransform: [[0, 1, 0], [-1, 0, 1]] }] }),
     node("LINE", { name: "Rule", absoluteTransform: translate(116, 190), width: 288, height: 0, strokes: [solid(0, 0, 0)], strokeWeight: 2, strokeCap: "ROUND" }),
     node("STICKY", { name: "Note", absoluteTransform: translate(300, 180), width: 20, height: 20 }),
     // A background of pictures stacked on a colour: only the top one is kept.
@@ -149,8 +155,12 @@ vm.runInNewContext(code, { figma: figma, __html__: "", console: console, Math: M
   const frame = payload.nodes[0];
   const kinds = frame.children.map(function (c) { return c.name + ":" + c.kind; });
   assert.deepStrictEqual(kinds, ["Photo:rectangle", "Title:text", "Mixed:picture", "Leaning:picture", "Slanted:rectangle", "Sheared:text", "Icon:vector",
-    "Painted Regions:svg", "Masked:group", "Rule:line", "Note:picture", "Stacked:frame"]);
-  assert.deepStrictEqual(frame.fills.map(function (f) { return f.type; }).join(), "SOLID", "the angular gradient is left out");
+    "Painted Regions:svg", "Masked:group", "Dial:ellipse", "Rule:line", "Note:picture", "Stacked:frame"]);
+  assert.deepStrictEqual(frame.fills.map(function (f) { return f.type; }).join(), "SOLID", "the diamond gradient is left out");
+  const dial = frame.children[9].fills[0];
+  assert.strictEqual(dial.type, "GRADIENT_ANGULAR", "an angular gradient travels as a gradient");
+  assert.deepStrictEqual(dial.transform, [0, -1, 1, 0, 0, 1]);
+  assert.strictEqual(dial.stops.length, 2);
   assert.deepStrictEqual(frame.effects.map(function (e) { return e.type; }).join(), "DROP_SHADOW", "noise is left out");
   assert(payload.warnings.some(function (w) { return w.indexOf("Card") === 0; }), "the left-out gradient is said");
   assert.ok(payload.images["photo-hash"], "the photo travels with the copy");

@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 189
+    static let pushes = 190
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -44,6 +44,8 @@ enum VersionHistory {
             "Gradients take as many colour stops as you like, as in Figma. The Fill section shows the gradient as a bar with a marker for each stop: click the bar to add a stop in the colour already there, drag a marker to move it, and type its place beside the bar. Each stop has its own row with its colour, hex and opacity, and a button to remove it. Colour and Stroke actions edit their gradients the same way.",
             "Gradient handles on the canvas. Select a layer with a gradient in Design and its line shows on the layer, over its own handles: drag its ends to turn and stretch it (Shift keeps it to steps of 15°), drag the line to move it, drag a stop's dot to slide the stop, and click the line to add a stop there. Delete removes the picked stop; Escape hides the line until you select again. A radial or angular gradient shows its circle, with a handle at its centre and one on its edge.",
             "Angular gradients, as in Figma: a fill or a Colour action can be Angular, its colours going a whole turn clockwise round its centre, starting where its edge handle points.",
+            "Masks work as in Figma. Select layers and choose Use as Mask from the right-click menu (or ⌃⌘M): they go into a Mask group, the one at the back becoming the mask, and the layers in front of it show only where it draws. With one layer, it becomes a mask where it is. A mask's inspector has a Mask section whose button removes it. Masks in projects made before this become mask groups when the project opens; an inverted mask is no longer inverted, as Figma has no such mask.",
+            "Angular gradients copied from Figma with the Twine plugin come in as Twine's own angular gradients, which you can edit, rather than as pictures.",
             "Moving dashes: a Dashes action sets a dashed or dotted stroke's dashes travelling along the line, at a speed you set and either way, from the playhead to the end of the scene unless you shorten its bar (Linear keeps the flow steady). Follow trim makes them travel the way the trim draws the line, each part towards its growing end.",
             "Trim works by direction now: Start to End, End to Start, Both Ends to Middle or Middle to Both Ends, and how much of the line is drawn, in the stroke's settings and in the Trim action (From and To amounts), in place of the start and end numbers. Older projects keep their trims, read as the nearest of these.",
             "Dotted lines: a stroke's Style is Solid, Dashed or Dotted. Dots are round, the Gap the clear space between them.",

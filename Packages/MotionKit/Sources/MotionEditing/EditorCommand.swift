@@ -81,27 +81,15 @@ public enum EditorCommand: Sendable {
                 return kept.actionIDs.isEmpty ? nil : kept
             }
         }
-        // Likewise a mask naming a layer that is not there. Checked once
-        // the whole command is done, so a batch that takes a layer out and
-        // puts it back, as ungrouping does, keeps the masks that name it,
-        // and layers pasted from another project drop masks they left behind.
-        var unmasked: [UUID] = []
         // A text box is always the size of its words, whatever changed them.
         var refitted: [Layer] = []
         draft.forEachLayer { layer in
-            if let mask = layer.mask, !remaining.contains(mask.layerID) { unmasked.append(layer.id) }
             if layer.isText {
                 let fitted = layer.fittedText()
                 if fitted != layer { refitted.append(fitted) }
             }
         }
-        for id in unmasked { draft.updateLayer(id) { $0.mask = nil } }
-        for fitted in refitted {
-            _ = draft.updateLayer(fitted.id) { layer in
-                // Fitted again, as it may have just lost its mask.
-                layer = layer.fittedText()
-            }
-        }
+        for fitted in refitted { _ = draft.updateLayer(fitted.id) { $0 = fitted } }
         project = draft
     }
 

@@ -25,7 +25,16 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
     /// Drop shadows and blurs, in the order they apply. A list, like fills, so
     /// that Figma's effect stack can be carried over whole.
     public var effects: [Effect]
-    public var mask: MaskReference?
+    /// The layer masks the layers in front of it in the same group or frame,
+    /// up to the next mask, as Figma's Use as Mask does: they show only
+    /// where it draws, and it does not draw itself (4 October 2026). Left
+    /// out of files when off.
+    public var isMask: Bool
+    /// A mask as projects kept one until 4 October 2026: the layer it names
+    /// masks this one. Read from older files only and never written:
+    /// `Masks.convertingLegacy` turns these into mask groups as a project
+    /// opens.
+    public var legacyMask: MaskReference?
     /// How the layer mixes with what is behind it. A group or frame left
     /// at Normal lets its children blend with what is behind it too, as
     /// Figma's Pass Through does.
@@ -46,7 +55,8 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
         self.size = size
         self.opacity = 1
         self.effects = []
-        self.mask = nil
+        self.isMask = false
+        self.legacyMask = nil
         self.blendMode = .normal
         self.keepsProportions = false
         self.content = content
@@ -61,7 +71,7 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, isVisible, isLocked, isSoloed, transform, size, opacity, effects, mask, blendMode, keepsProportions, content
+        case id, name, isVisible, isLocked, isSoloed, transform, size, opacity, effects, isMask, mask, blendMode, keepsProportions, content
     }
 
     public init(from decoder: Decoder) throws {
@@ -75,7 +85,8 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
         size = try c.decode(Size2.self, forKey: .size)
         opacity = try c.decode(Double.self, forKey: .opacity)
         effects = try c.decode([Effect].self, forKey: .effects)
-        mask = try c.decodeIfPresent(MaskReference.self, forKey: .mask)
+        isMask = try c.decodeIfPresent(Bool.self, forKey: .isMask) ?? false
+        legacyMask = try c.decodeIfPresent(MaskReference.self, forKey: .mask)
         // Blend modes arrived after the first files.
         blendMode = try c.decodeIfPresent(BlendMode.self, forKey: .blendMode) ?? .normal
         keepsProportions = try c.decodeIfPresent(Bool.self, forKey: .keepsProportions) ?? false
@@ -93,7 +104,7 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
         try c.encode(size, forKey: .size)
         try c.encode(opacity, forKey: .opacity)
         try c.encode(effects, forKey: .effects)
-        try c.encodeIfPresent(mask, forKey: .mask)
+        if isMask { try c.encode(isMask, forKey: .isMask) }
         // Left out at Normal, so files without blending read as before.
         if blendMode != .normal { try c.encode(blendMode, forKey: .blendMode) }
         // Left out when off, as it is for nearly every layer.
@@ -426,8 +437,9 @@ public struct FrameStyle: Codable, Sendable, Equatable {
     }
 }
 
-/// A shape layer used as this layer's alpha mask. The mask layer stops drawing
-/// on its own while it is used as one.
+/// How projects before 4 October 2026 kept a mask: on the masked layer, the
+/// layer masking it, which stopped drawing on its own. Read only, for
+/// `Layer.legacyMask`; its inversion is dropped as the mask converts.
 public struct MaskReference: Codable, Sendable, Equatable {
     public var layerID: UUID
     public var isInverted: Bool

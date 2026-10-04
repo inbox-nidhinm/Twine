@@ -31,7 +31,7 @@ struct LayersPanel: View {
             SectionHeader(title: "Layers")
             ScrollView {
                 // Worked out once, not by every row scanning every layer.
-                let masks = controller.project.maskSourceIDs
+                let masks = controller.project.maskIDs
                 LazyVStack(spacing: 0) {
                     ForEach(rows) { row in
                         LayerRow(row: row, editor: editor, controller: controller, isMask: masks.contains(row.id),
@@ -203,7 +203,7 @@ private struct LayerRow: View {
             }
             IconView(isMask ? .mask : layer.icon, size: 15)
                 .foregroundStyle(selected ? Theme.textPrimary : Theme.textTertiary)
-                .help(isMask ? "Masking another layer: it shows only through that layer" : "")
+                .help(isMask ? "A mask: the layers in front of it in its group show only where it draws" : "")
             name
             Spacer(minLength: 0)
             if layer.isSoloed || lit {
@@ -341,6 +341,8 @@ extension EditorController {
             .item("Frame Selection") { self.frameSelection() },
         ]
         if layer.isGroup { entries.append(.item("Ungroup") { self.ungroupSelection() }) }
+        entries.append(layer.isMask ? .item("Remove Mask") { self.removeMask(layer.id) }
+                                    : .item("Use as Mask") { self.useSelectionAsMask() })
         // Copied actions go onto this layer, or every selected one it is among.
         if editor.mode == .animate, canPasteActions {
             let onto = editor.selection.contains(layer.id) ? selectedLayers : [layer]

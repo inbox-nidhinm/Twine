@@ -439,15 +439,12 @@ public struct ResolvedShadow: Sendable, Equatable {
 public struct ResolvedMask: Sendable, Equatable {
     /// The mask, in `ResolvedScene.masks`.
     public var layerID: UUID
-    /// Shows the layer where the mask is empty rather than where it draws.
-    public var isInverted: Bool
     /// From the mask's own space into the masked layer's, through whatever
     /// groups either sits in, tilts and all.
     public var transform: Projective
 
-    public init(layerID: UUID, isInverted: Bool, transform: Projective) {
+    public init(layerID: UUID, transform: Projective) {
         self.layerID = layerID
-        self.isInverted = isInverted
         self.transform = transform
     }
 }

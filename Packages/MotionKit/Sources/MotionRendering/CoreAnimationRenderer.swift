@@ -197,13 +197,10 @@ public final class CoreAnimationRenderer: SceneRenderer {
 
 /// The layer a mask is set to: the mask layer, drawn as it would be on its
 /// own and moved into the masked layer's space. Core Animation keeps the
-/// masked layer where this is opaque. Inverted, it is an opaque sheet with
-/// the mask layer punched out of it, so the masked layer shows everywhere
-/// the mask does not draw.
+/// masked layer where this is opaque.
 private final class MaskNode {
     let root = CALayer()
     let node: Node
-    private var sheet: CALayer?
 
     init(scale: CGFloat) {
         node = Node(scale: scale)
@@ -217,22 +214,6 @@ private final class MaskNode {
         root.frame = bounds
         node.update(source, media: media)
         node.container.transform = mask.transform.caTransform
-        if mask.isInverted, let punch = Compositing.destinationOut() {
-            if sheet == nil {
-                let made = CALayer()
-                made.actions = Node.noActions
-                made.backgroundColor = CGColor(gray: 0, alpha: 1)
-                root.insertSublayer(made, at: 0)
-                sheet = made
-                node.container.compositingFilter = punch
-            }
-            // Wide enough to cover a shadow or a blur spilling past the box.
-            sheet?.frame = bounds.insetBy(dx: -4096, dy: -4096)
-        } else if let sheet {
-            sheet.removeFromSuperlayer()
-            self.sheet = nil
-            node.container.compositingFilter = nil
-        }
     }
 }
 

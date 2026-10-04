@@ -113,9 +113,9 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
     }
 
     @Test func maskLayersDoNotDrawOnTheirOwn() {
-        let mask = rect("Mask")
-        var masked = rect("Masked")
-        masked.mask = MaskReference(layerID: mask.id)
+        var mask = rect("Mask")
+        mask.isMask = true
+        let masked = rect("Masked")
         let scene = evaluate(Project(layers: [mask, masked]), at: 0)
         #expect(scene.layers.map(\.id) == [masked.id])
         #expect(scene.layers[0].mask?.layerID == mask.id)
@@ -126,9 +126,9 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
     }
 
     @Test func aMaskFollowsItsOwnActions() {
-        let mask = rect("Mask")
-        var masked = rect("Masked")
-        masked.mask = MaskReference(layerID: mask.id, isInverted: true)
+        var mask = rect("Mask")
+        mask.isMask = true
+        let masked = rect("Masked")
         let slide = Action(target: mask.id, start: 0, duration: 1, easing: .linear,
                            spec: .move(MoveAction(mode: .by, end: Vec2(30, 0))))
         let project = Project(layers: [mask, masked], actions: [slide])
@@ -136,14 +136,13 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
         #expect(evaluate(project, at: 0).layers[0].mask?.transform == .identity)
         let later = evaluate(project, at: 1).layers[0].mask
         #expect(later?.transform.tx == 30 && later?.transform.ty == 0)
-        #expect(later?.isInverted == true)
     }
 
     @Test func aHiddenMaskLeavesTheLayerUnmasked() {
         var mask = rect("Mask")
         mask.isVisible = false
-        var masked = rect("Masked")
-        masked.mask = MaskReference(layerID: mask.id)
+        mask.isMask = true
+        let masked = rect("Masked")
         let scene = evaluate(Project(layers: [mask, masked]), at: 0)
         #expect(scene.layers.map(\.id) == [masked.id])
         #expect(scene.layers[0].mask == nil)
@@ -151,9 +150,9 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
     }
 
     @Test func masksKeepWorkingWhileSoloed() {
-        let mask = rect("Mask")
+        var mask = rect("Mask")
+        mask.isMask = true
         var masked = rect("Masked")
-        masked.mask = MaskReference(layerID: mask.id)
         masked.isSoloed = true
         let scene = evaluate(Project(layers: [mask, masked, rect("Other")]), at: 0)
         #expect(scene.layers.map(\.id) == [masked.id])
@@ -240,26 +239,37 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
 }
 
 @Suite struct MaskPlacingTests {
-    @Test func eachMaskedLayerGetsItsOwnMaskThroughItsGroups() {
-        let first = rect("First mask", at: Vec2(10, 10)), second = rect("Second mask", at: Vec2(300, 300))
-        var a = rect("A"), b = rect("B"), plain = rect("Plain")
-        a.mask = MaskReference(layerID: first.id)
-        b.mask = MaskReference(layerID: second.id, isInverted: true)
-        var group = Layer(name: "G", content: .group(GroupContent(children: [b, plain])), size: Size2(400, 400),
+    @Test func aMaskMasksWhatIsInFrontOfItUpToTheNextAndNoFurther() {
+        var first = rect("First mask"), second = rect("Second mask")
+        first.isMask = true
+        second.isMask = true
+        let behind = rect("Behind"), a = rect("A"), b = rect("B"), inner = rect("Inner")
+        var group = Layer(name: "G", content: .group(GroupContent(children: [inner])), size: Size2(400, 400),
                           position: Vec2(200, 200))
         group.transform.rotation = 30
-        let scene = evaluate(Project(layers: [first, a, group, second]), at: 0)
+        let scene = evaluate(Project(layers: [behind, first, a, second, b, group]), at: 0)
+        #expect(scene.layer(behind.id)?.mask == nil)
         #expect(scene.layer(a.id)?.mask?.layerID == first.id)
-        #expect(scene.layer(b.id)?.mask?.layerID == second.id && scene.layer(b.id)?.mask?.isInverted == true)
-        #expect(scene.layer(plain.id)?.mask == nil && scene.layer(group.id)?.mask == nil)
-        // The mask in the composition, carried into the turned group's child.
-        #expect(scene.layer(b.id)?.mask?.transform != .identity)
+        #expect(scene.layer(b.id)?.mask?.layerID == second.id && scene.layer(group.id)?.mask?.layerID == second.id)
+        // The group is masked as a whole; what is inside it is not again.
+        #expect(scene.layer(inner.id)?.mask == nil)
+        #expect(scene.masks.map(\.id) == [first.id, second.id])
+    }
+
+    @Test func aMaskStopsAtTheEndOfItsGroup() {
+        var mask = rect("Mask")
+        mask.isMask = true
+        let inside = rect("Inside"), outside = rect("Outside")
+        let group = Layer(name: "G", content: .group(GroupContent(children: [mask, inside])), size: Size2(10, 10), position: .zero)
+        let scene = evaluate(Project(layers: [group, outside]), at: 0)
+        #expect(scene.layer(inside.id)?.mask?.layerID == mask.id)
+        #expect(scene.layer(outside.id)?.mask == nil && scene.layer(group.id)?.mask == nil)
     }
 
     @Test func aRepeatedIDDoesNotCrash() {
-        let mask = rect("Mask")
-        var masked = rect("Masked")
-        masked.mask = MaskReference(layerID: mask.id)
+        var mask = rect("Mask")
+        mask.isMask = true
+        let masked = rect("Masked")
         // A damaged file with the same layer twice.
         _ = evaluate(Project(layers: [mask, masked, masked]), at: 0)
     }

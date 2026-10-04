@@ -28,34 +28,21 @@ private func close(_ a: [Vec2], _ b: [Vec2]) -> Bool {
         #expect(copy.look?.fills.first?.id != layer.look?.fills.first?.id)
     }
 
-    @Test func aLayerAndItsMaskCopiedTogetherPairUp() {
-        let m = box("M", 0, 0)
-        var a = box("A", 0, 0)
-        a.mask = MaskReference(layerID: m.id)
-        // Copied one by one, as Duplicate and Paste do with a selection.
-        var map: [UUID: UUID] = [:]
-        let copies = [a, m].map { $0.duplicated(recordingIDs: &map) }.map { $0.remappingMasks(map) }
-        #expect(copies[0].mask?.layerID == copies[1].id)
+    @Test func aMaskCopiesAsAMask() {
+        var m = box("M", 0, 0)
+        m.isMask = true
+        #expect(m.duplicated().isMask)
     }
 
-    @Test func aMaskNamingALayerThatIsNotThereGoes() throws {
-        var a = box("A", 0, 0)
-        a.mask = MaskReference(layerID: UUID())
-        var project = Project()
-        try EditorCommand.insertLayers([a], parentID: nil, index: nil).apply(to: &project)
-        #expect(project.layers[0].mask == nil)
-    }
-
-    @Test func ungroupingKeepsMasksThatNameAChild() throws {
-        let child = box("Child", 0, 0)
-        var outside = box("Outside", 50, 50)
-        outside.mask = MaskReference(layerID: child.id)
-        var project = Project(layers: [outside, child])
-        let (grouping, groupID) = try Arrangement.group([child.id], in: project, name: "G")
+    @Test func ungroupingAMaskGroupKeepsItsMask() throws {
+        var mask = box("Mask", 0, 0)
+        mask.isMask = true
+        let shown = box("Shown", 0, 0)
+        var project = Project(layers: [mask, shown])
+        let (grouping, groupID) = try Arrangement.group([mask.id, shown.id], in: project, name: "G")
         try grouping.apply(to: &project)
-        #expect(project.layer(withID: outside.id)?.mask?.layerID == child.id)
         try Arrangement.ungroup(groupID, in: project).0.apply(to: &project)
-        #expect(project.layer(withID: outside.id)?.mask?.layerID == child.id)
+        #expect(project.layers.map(\.id) == [mask.id, shown.id] && project.layers[0].isMask)
     }
 
     /// A turned and slanted layer, with a Rotate, in a flipped group that is

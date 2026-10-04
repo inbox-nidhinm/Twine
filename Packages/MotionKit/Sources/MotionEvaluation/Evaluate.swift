@@ -177,9 +177,9 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
                    cache: EvaluationCache?) -> ResolvedScene {
     // Only worked out when some action has it, so a scene without costs one check.
     let blur = blur.flatMap { $0.samples > 1 && tracks.hasMotionBlur ? $0 : nil }
-    // Whether anything is soloed, and the layers used as another's mask,
-    // which stop drawing on their own and draw only through the layers
-    // they mask. Found in one pass that copies no layers.
+    // Whether anything is soloed, and the layers that are masks, which do
+    // not draw on their own but only through the layers in front of them
+    // that they mask. Found in one pass that copies no layers.
     var soloing = false
     var maskSources = Set<UUID>()
     var count = 0
@@ -187,7 +187,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
         // By place rather than `for in`, which copies every layer.
         for i in layers.indices {
             if layers[i].isSoloed { soloing = true }
-            if let mask = layers[i].mask { maskSources.insert(mask.layerID) }
+            if layers[i].isMask { maskSources.insert(layers[i].id) }
             if layers[i].isGroup { note(layers[i].children) }
         }
         count += layers.count
@@ -201,7 +201,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
     /// The masks of the layers in `out`, by their place there, noted on the
     /// way rather than looked up afterwards: that searched the whole
     /// project for every layer, every frame, once any mask existed.
-    var masked: [(index: Int, mask: MaskReference)] = []
+    var masked: [(index: Int, mask: UUID)] = []
 
     func hasSoloedDescendant(_ layer: Layer) -> Bool {
         layer.children.contains { $0.isSoloed || hasSoloedDescendant($0) }
@@ -214,8 +214,11 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
         @discardableResult
         func still(_ layers: [Layer]) -> Bool {
             var all = true
+            // Everything in front of a mask is masked by it.
+            var behindAMask = false
             for i in layers.indices {
-                var mine = tracks.isStill(layers[i].id) && layers[i].mask == nil && !maskSources.contains(layers[i].id)
+                if layers[i].isMask { behindAMask = true }
+                var mine = tracks.isStill(layers[i].id) && !behindAMask
                 if layers[i].isGroup {
                     mine = still(layers[i].children) && mine
                     if mine { stillGroups.insert(layers[i].id) }
@@ -228,7 +231,12 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
     }
 
     func walk(_ layers: [Layer], parent: UUID?, soloedAbove: Bool) {
+        // The mask behind the layers so far in this list: each masks the
+        // ones in front of it up to the next, as in Figma. A hidden mask
+        // still ends the one before; it masks nothing (see below).
+        var mask: UUID?
         for layer in layers {
+            if layer.isMask { mask = layer.id }
             guard layer.isVisible, !maskSources.contains(layer.id) else { continue }
             let soloed = soloedAbove || layer.isSoloed
             if soloing && !soloed && !(layer.isGroup && hasSoloedDescendant(layer)) { continue }
@@ -256,7 +264,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
             }
             guard var resolved = made else { continue }
             if let blur { resolved.motion = motion(of: layer, resolved, tracks: tracks, at: time, blur) }
-            if let mask = layer.mask { masked.append((out.count, mask)) }
+            if let mask { masked.append((out.count, mask)) }
             out.append(resolved)
             if layer.isGroup { walk(layer.children, parent: layer.id, soloedAbove: soloed) }
         }
@@ -275,11 +283,9 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
             masks.append(source)
         }
         let shown = Set(masks.map(\.id))
-        for (i, reference) in masked {
-            if shown.contains(reference.layerID), let from = world.transform(of: reference.layerID),
-               let into = world.transform(of: out[i].id)?.inverted {
-                out[i].mask = ResolvedMask(layerID: reference.layerID, isInverted: reference.isInverted,
-                                           transform: from.then(into))
+        for (i, mask) in masked {
+            if shown.contains(mask), let from = world.transform(of: mask), let into = world.transform(of: out[i].id)?.inverted {
+                out[i].mask = ResolvedMask(layerID: mask, transform: from.then(into))
             } else {
                 out[i].mask = nil
             }

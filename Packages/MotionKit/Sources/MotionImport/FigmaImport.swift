@@ -197,22 +197,20 @@ private struct FigmaBuilder {
         self.budget = budget
     }
 
-    /// Siblings, back to front. A mask masks every sibling in front of it,
-    /// as in Figma, until the next mask.
+    /// Siblings, back to front. A mask masks every sibling in front of it
+    /// until the next mask, in Figma and Twine alike, so it comes in as it
+    /// is. A group or frame Twine cannot draw as a mask comes in as itself.
     mutating func layers(_ nodes: [FigmaPayload.Node], parent: Affine) -> [Layer] {
         var out: [Layer] = []
-        var mask: UUID?
         for node in nodes {
             guard var layer = self.layer(node, parent: parent) else { continue }
-            if node.isMask == true {
+            if node.isMask == true, layer.canMask {
                 if node.maskType == "VECTOR", var look = layer.look {
                     // An outline mask ignores how see-through its fill is.
                     look.fills = [Fill(paint: .color(.black))]
                     layer.look = look
                 }
-                mask = layer.id
-            } else if let mask, layer.mask == nil {
-                layer.mask = MaskReference(layerID: mask)
+                layer.isMask = true
             }
             out.append(layer)
         }
@@ -390,7 +388,7 @@ private struct FigmaBuilder {
         switch paint.type {
         case "SOLID":
             return .solid(Self.rgba(paint.color, opacity: opacity))
-        case "GRADIENT_LINEAR", "GRADIENT_RADIAL":
+        case "GRADIENT_LINEAR", "GRADIENT_RADIAL", "GRADIENT_ANGULAR":
             let stops = (paint.stops ?? []).map { GradientStop(position: $0.position, color: Self.rgba($0.color, opacity: opacity)) }
             guard !stops.isEmpty else { return nil }
             // Figma's transform takes the box into the gradient's space; its
@@ -399,7 +397,17 @@ private struct FigmaBuilder {
             if paint.type == "GRADIENT_LINEAR" {
                 return .linearGradient(Gradient(stops: stops, start: t.apply(Vec2(0, 0.5)), end: t.apply(Vec2(1, 0.5))))
             }
-            return .radialGradient(Gradient(stops: stops, start: t.apply(Vec2(0.5, 0.5)), end: t.apply(Vec2(1, 0.5))))
+            let center = t.apply(Vec2(0.5, 0.5)), edge = t.apply(Vec2(1, 0.5))
+            if paint.type == "GRADIENT_ANGULAR" {
+                // Clockwise from the edge point, as Twine's are, unless the
+                // transform mirrors it: then it goes the other way round,
+                // which is the stops turned end for end. An uneven stretch
+                // (Figma's oval) is kept only as the angle of its start.
+                let mirrored = t.a * t.d - t.b * t.c < 0
+                let turned = mirrored ? stops.map { GradientStop(position: 1 - $0.position, color: $0.color) } : stops
+                return .angularGradient(Gradient(stops: turned, start: center, end: edge))
+            }
+            return .radialGradient(Gradient(stops: stops, start: center, end: edge))
         case "IMAGE":
             guard let hash = paint.image, let id = image(hash) else { return nil }
             var p = ImagePaint(mediaID: id, opacity: opacity)

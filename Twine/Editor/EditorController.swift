@@ -1146,9 +1146,7 @@ final class EditorController {
             copy.name = layer.name
             placed.append((copy, location.parentID, location.index))
         }
-        // Copied side by side, a layer and its mask each point at the
-        // other's copy only once every copy has its id.
-        let copies = placed.map { $0.copy.remappingMasks(map) }
+        let copies = placed.map(\.copy)
         var commands: [EditorCommand] = zip(copies, placed).map { copy, p in
             .insertLayers([copy], parentID: p.parentID, index: p.index + 1)
         }
@@ -1171,6 +1169,31 @@ final class EditorController {
         } catch {
             NSSound.beep()
         }
+    }
+
+    /// Figma's Use as Mask: one layer becomes a mask where it is; several
+    /// go into a Mask group, the one at the back the mask, which is then
+    /// selected. Refusals say why.
+    func useSelectionAsMask() {
+        let ids = topmost(selectedLayers).map(\.id)
+        guard !ids.isEmpty else { return }
+        do {
+            let back = ids.min { (project.location(of: $0)?.index ?? 0) < (project.location(of: $1)?.index ?? 0) }
+            guard perform(try Masking.useAsMask(ids, in: project)) else { return }
+            if ids.count > 1, let back, let group = project.location(of: back)?.parentID { editor.selection = [group] }
+        } catch Masking.Refusal.cannotMask {
+            editor.showNotice("A group can't be a mask. Put a shape, text, picture or video at the back.")
+        } catch Masking.Refusal.apart {
+            editor.showNotice("Layers in different groups can't be masked together.")
+        } catch {
+            NSSound.beep()
+        }
+    }
+
+    /// The layer stops being a mask; its group stays.
+    func removeMask(_ id: UUID) {
+        guard let command = try? Masking.removeMask(id, in: project) else { return NSSound.beep() }
+        perform(command)
     }
 
     func ungroupSelection() {
@@ -1351,7 +1374,7 @@ final class EditorController {
         guard let data = NSPasteboard.general.data(forType: Self.pasteboardType),
               let clipboard = LayerClipboard.read(data) else { return }
         var map: [UUID: UUID] = [:]
-        let copies = clipboard.layers.map { $0.duplicated(recordingIDs: &map) }.map { $0.remappingMasks(map) }
+        let copies = clipboard.layers.map { $0.duplicated(recordingIDs: &map) }
         let pairs = Project(actions: clipboard.actions).actionCopyPairs(for: map)
         let actions = pairs.map(\.copy)
         let scenes = Scenes.copying(pairs.map { ($0.original, $0.copy.id, nil) }, whole: clipboard.scenes ?? [],

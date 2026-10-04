@@ -535,8 +535,7 @@ final class CanvasNSView: NSView {
         while let current = layer {
             if let mask = current.mask, let source = scene.mask(mask.layerID), let inverse = mask.transform.inverted,
                let inMask = inverse.apply(point) {
-                let inside = hits(source, at: inMask.cg, tolerance: 0)
-                if inside == mask.isInverted { return false }
+                if !hits(source, at: inMask.cg, tolerance: 0) { return false }
             }
             guard let up = current.projection.apply(point) else { return false }
             point = up

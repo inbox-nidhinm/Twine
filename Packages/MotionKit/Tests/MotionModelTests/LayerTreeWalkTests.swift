@@ -37,14 +37,10 @@ struct LayerTreeWalkTests {
         #expect(visited == [a, outer, b, inner, c, d, e].map(\.id))
     }
 
-    @Test func aLayerHasMaskCandidatesExactlyWhenTheyAreListed() {
-        let a = shape("a"), b = shape("b")
-        let only = group("only", [a])
-        let alone = Project(composition: Composition(width: 100, height: 100), layers: [only])
-        #expect(alone.maskCandidates(for: a.id).isEmpty)
-        #expect(!alone.hasMaskCandidates(for: a.id))
-        let two = Project(composition: Composition(width: 100, height: 100), layers: [only, b])
-        #expect(two.maskCandidates(for: a.id).map(\.id) == [b.id])
-        #expect(two.hasMaskCandidates(for: a.id))
+    @Test func masksAreFoundThroughGroups() {
+        var a = shape("a")
+        a.isMask = true
+        let project = Project(composition: Composition(width: 100, height: 100), layers: [group("g", [a, shape("b")])])
+        #expect(project.maskIDs == [a.id])
     }
 }

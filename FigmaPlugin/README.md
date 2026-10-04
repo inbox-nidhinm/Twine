@@ -23,7 +23,8 @@ Select a frame or some layers, run the plugin, and press **Copy**. In Twine, pre
 - It comes in centred, at its exact size. The composition keeps its own size, empty or not: change it yourself if you want it to match.
 - Text in one style comes in as Twine text. If its font is not on the Mac, a stand-in shows until it is installed, and Twine says which fonts are missing.
 - Skewed layers, frames and text come in as themselves, slanted as in Figma.
-- What Twine cannot hold comes in as a sharp picture Figma drew: text with mixed styles, italics, underlines or lists; angular and diamond gradients; picture filters; luminance masks; skewed layers; FigJam items. Vectors painted region by region come in through Figma's own SVG.
+- Linear, radial and angular gradients come in as Twine gradients, with their handles where Figma had them.
+- What Twine cannot hold comes in as a sharp picture Figma drew: text with mixed styles, italics, underlines or lists; diamond gradients; picture filters; luminance masks; skewed layers; FigJam items. Vectors painted region by region come in through Figma's own SVG.
 - Figma's newer effects (noise, texture, glass) and frames' uneven borders are left out, and Twine says so.
 
 ## Files

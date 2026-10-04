@@ -20,7 +20,7 @@ import MotionEditing
         #expect(card.isFrame && card.name == "Card" && card.size == Size2(320, 200))
         #expect(r.bounds == Box(minX: 100, minY: 50, maxX: 420, maxY: 250))
         let names = card.children.map(\.name)
-        #expect(names == ["Photo", "Title", "Mixed", "Leaning", "Slanted", "Sheared", "Icon", "Painted Regions", "Masked", "Rule", "Note", "Stacked"])
+        #expect(names == ["Photo", "Title", "Mixed", "Leaning", "Slanted", "Sheared", "Icon", "Painted Regions", "Masked", "Dial", "Rule", "Note", "Stacked"])
         let photo = card.children[0]
         #expect(photo.picture?.paint.mode == .fill && photo.transform.position == Vec2(76, 56))
         guard case .text(let title) = card.children[1].content else { Issue.record("title is not text"); return }
@@ -34,10 +34,15 @@ import MotionEditing
         #expect(card.children[6].look?.fillRule == .evenOdd)
         #expect(card.children[7].isGroup, "Figma's SVG, read into a group")
         let masked = card.children[8]
-        #expect(masked.children[1].mask?.layerID == masked.children[0].id)
+        #expect(masked.children[0].isMask && !masked.children[1].isMask, "Figma's mask comes in as a mask")
+        // Turned a quarter in Figma: it starts pointing down.
+        guard case .angularGradient(let dial)? = card.children[9].look?.fills.first?.paint else { Issue.record("no angular gradient"); return }
+        #expect(close(dial.start, Vec2(0.5, 0.5)) && close(dial.end, Vec2(0.5, 1)) && dial.stops.map(\.position) == [0, 1])
         #expect(card.effects.count == 1 && r.warnings.count == 1)
         // The stand-in gives the photo and every drawing the same bytes,
         // which are kept once.
         #expect(r.media.count == 1)
     }
+
+    private func close(_ a: Vec2, _ b: Vec2) -> Bool { abs(a.x - b.x) < 1e-9 && abs(a.y - b.y) < 1e-9 }
 }

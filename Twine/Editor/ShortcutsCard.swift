@@ -122,6 +122,7 @@ struct ShortcutsCard: View {
                     s("Group", "⌘G"),
                     s("Ungroup groups and frames", "⇧⌘G", "⌘⌫"),
                     s("Frame selection", "⌥⌘G"),
+                    s("Use as mask", "⌃⌘M"),
                     s("Forward, backward", "⌘]", "⌘["),
                     s("To front, to back", "⌥⌘]", "⌥⌘["),
                 ]),

@@ -4,7 +4,7 @@
 // vectors, text), with its absolute transform, so Twine can place it in
 // whatever holds it. What Twine cannot hold is flattened here, while Figma
 // can still draw it: as a picture Figma renders (mixed text styles, italics,
-// angular gradients, picture filters and the like), or as Figma's own SVG
+// diamond gradients, picture filters and the like), or as Figma's own SVG
 // (vectors whose regions are painted differently). Skewed layers travel as
 // they are: Twine holds skew. Picture
 // fills travel with the copy, once each. The whole copy is one line of JSON
@@ -250,10 +250,10 @@ async function container(node, base, kind, context) {
     // A frame is not flattened, or what it holds would be too; a paint
     // Twine lacks is left out instead, and said so.
     const lacking = (node.fills === figma.mixed ? [] : node.fills).concat(node.strokes).filter(function (p) {
-      return p.visible !== false && ["SOLID", "GRADIENT_LINEAR", "GRADIENT_RADIAL", "IMAGE"].indexOf(p.type) < 0;
+      return p.visible !== false && DRAWN_PAINTS.indexOf(p.type) < 0;
     });
     if (lacking.length) {
-      const drawn = function (p) { return ["SOLID", "GRADIENT_LINEAR", "GRADIENT_RADIAL", "IMAGE"].indexOf(p.type) >= 0; };
+      const drawn = function (p) { return DRAWN_PAINTS.indexOf(p.type) >= 0; };
       if (out.fills) out.fills = out.fills.filter(drawn);
       if (out.strokes) out.strokes = out.strokes.filter(drawn);
       context.warnings.push(node.name + " is painted with a gradient Twine lacks, which was left out.");
@@ -267,6 +267,10 @@ async function container(node, base, kind, context) {
 }
 
 // MARK: What Twine cannot hold
+
+/// The paints Twine draws as they are: everything else (diamond gradients,
+/// video) makes a layer a picture, or is left out of a frame.
+const DRAWN_PAINTS = ["SOLID", "GRADIENT_LINEAR", "GRADIENT_RADIAL", "GRADIENT_ANGULAR", "IMAGE"];
 
 /// "picture" for what Figma must draw, "svg" for vectors Figma writes out,
 /// "skip" for what draws nothing, or nothing for a layer Twine can build.
@@ -296,7 +300,7 @@ function isFlattened(node) {
   return as === "picture" || as === "svg";
 }
 
-/// Paints Twine draws: solid colours, linear and radial gradients, and
+/// Paints Twine draws: solid colours, linear, radial and angular gradients, and
 /// pictures without filters, turned in quarters, blended normally.
 function paintsNeedPicture(node) {
   const lists = [];
@@ -305,7 +309,7 @@ function paintsNeedPicture(node) {
   for (const list of lists) {
     for (const p of list) {
       if (p.visible === false) continue;
-      if (["SOLID", "GRADIENT_LINEAR", "GRADIENT_RADIAL", "IMAGE"].indexOf(p.type) < 0) return true;
+      if (DRAWN_PAINTS.indexOf(p.type) < 0) return true;
       if (p.blendMode && p.blendMode !== "NORMAL" && p.blendMode !== "PASS_THROUGH") return true;
       if (p.type === "IMAGE") {
         const f = p.filters || {};
@@ -428,7 +432,7 @@ function paints(list, context) {
   return keptPaints(list).map(function (p) {
     const out = { type: p.type, visible: p.visible !== false, opacity: p.opacity === undefined ? 1 : p.opacity };
     if (p.type === "SOLID") out.color = { r: p.color.r, g: p.color.g, b: p.color.b, a: 1 };
-    if (p.type === "GRADIENT_LINEAR" || p.type === "GRADIENT_RADIAL") {
+    if (p.type === "GRADIENT_LINEAR" || p.type === "GRADIENT_RADIAL" || p.type === "GRADIENT_ANGULAR") {
       out.stops = p.gradientStops.map(function (s) {
         return { position: s.position, color: { r: s.color.r, g: s.color.g, b: s.color.b, a: s.color.a } };
       });

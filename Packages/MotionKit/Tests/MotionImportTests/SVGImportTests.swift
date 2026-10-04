@@ -111,9 +111,11 @@ private func near(_ a: Double, _ b: Double, _ e: Double = 1e-6) -> Bool { abs(a 
 
     @Test func aClipPathBecomesAMask() throws {
         let r = try read(##"<defs><clipPath id="c"><rect x="10" y="10" width="50" height="50" rx="8"/></clipPath></defs><g clip-path="url(#c)"><rect width="100" height="100" fill="red"/></g>"##)
-        #expect(r.layer.children.count == 2)
-        let (clip, target) = (r.layer.children[0], r.layer.children[1])
-        #expect(target.mask?.layerID == clip.id)
+        // In a mask group of its own, so it masks only what it clipped.
+        let group = try #require(r.layer.children.first)
+        #expect(r.layer.children.count == 1 && group.children.count == 2)
+        let (clip, target) = (group.children[0], group.children[1])
+        #expect(clip.isMask && !target.isMask)
         #expect(Arrangement.box(of: clip) == Box(minX: 10, minY: 10, maxX: 60, maxY: 60))
     }
 
@@ -172,7 +174,8 @@ private func near(_ a: Double, _ b: Double, _ e: Double = 1e-6) -> Bool { abs(a 
         // Figma writes each line as a positioned tspan; the system draws
         // those wrongly unless they are made texts of their own.
         let r = try read(##"<g clip-path="url(#c)"><text fill="#1E1E1E" style="white-space: pre" font-family="Helvetica" font-size="20"><tspan x="10" y="40">One</tspan><tspan x="10" y="70">Two</tspan></text></g><defs><clipPath id="c"><rect width="100" height="100"/></clipPath></defs>"##, extra: #"fill="none""#)
-        let text = try #require(r.layer.children.last)
+        // Clipped, so in a mask group with its clip, which starts at 0, 0.
+        let text = try #require(r.layer.children.last?.children.last)
         let box = try #require(Arrangement.box(of: text))
         #expect(box.minX > 8 && box.minX < 14, "\(box)")
         #expect(box.minY > 20 && box.minY < 30 && box.maxY > 66 && box.maxY < 76, "both lines, top to bottom")

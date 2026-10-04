@@ -94,10 +94,6 @@ struct LargeProjectTimings {
         print("BENCH editing layer(withID:): \(ms(CACurrentMediaTime() - start, 50))")
 
         start = CACurrentMediaTime()
-        for _ in 0..<20 { _ = p.maskCandidates(for: target.id) }
-        print("BENCH editing maskCandidates: \(ms(CACurrentMediaTime() - start, 20))")
-
-        start = CACurrentMediaTime()
         for _ in 0..<20 { _ = p.documentColors(limit: 16) }
         print("BENCH editing documentColors: \(ms(CACurrentMediaTime() - start, 20))")
 

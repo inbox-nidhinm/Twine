@@ -98,22 +98,11 @@ import Testing
 }
 
 @Suite struct MaskCandidateTests {
-    @Test func anythingThatDrawsCanMaskButNotItsOwnGroups() {
-        func shape(_ name: String) -> Layer {
-            Layer(name: name, content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero))), size: Size2(10, 10), position: .zero)
-        }
-        var target = shape("Target")
-        let sibling = shape("Sibling")
+    @Test func anythingThatDrawsByItselfCanMask() {
+        let shape = Layer(name: "S", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero))), size: Size2(10, 10), position: .zero)
         let sound = Layer(name: "Sound", content: .audio(AudioContent(mediaID: UUID())), size: Size2(0, 0), position: .zero)
-        var masksTarget = shape("Masked by target")
-        masksTarget.mask = MaskReference(layerID: target.id)
-        target.mask = nil
-        let inner = Layer(name: "Inner", content: .group(GroupContent(children: [target, sibling])), size: Size2(10, 10), position: .zero)
-        let outer = Layer(name: "Outer", content: .group(GroupContent(children: [inner])), size: Size2(10, 10), position: .zero)
-        let project = Project(layers: [outer, sound, masksTarget])
-        #expect(project.maskCandidates(for: target.id).map(\.name) == ["Sibling"])
-        // A group can be masked by a layer inside it.
-        #expect(project.maskCandidates(for: inner.id).map(\.name) == ["Target", "Sibling", "Masked by target"])
+        let group = Layer(name: "G", content: .group(GroupContent(children: [shape])), size: Size2(10, 10), position: .zero)
+        #expect(shape.canMask && !sound.canMask && !group.canMask)
     }
 }
 

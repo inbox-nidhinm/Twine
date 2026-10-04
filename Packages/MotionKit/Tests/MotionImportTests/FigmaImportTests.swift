@@ -123,7 +123,8 @@ private func near(_ a: Double, _ b: Double, _ e: Double = 1e-6) -> Bool { abs(a 
         """##)
         let group = try #require(try FigmaImport.read(json).layers.first)
         let kids = group.children
-        #expect(kids[0].mask == nil && kids[2].mask?.layerID == kids[1].id && kids[3].mask?.layerID == kids[1].id)
+        // Figma and Twine mask alike: the mask comes in as one, in its place.
+        #expect(kids.map(\.isMask) == [false, true, false, false])
     }
 
     @Test func gradientsAndPicturesKeepTheirPlaces() throws {
@@ -151,6 +152,24 @@ private func near(_ a: Double, _ b: Double, _ e: Double = 1e-6) -> Bool { abs(a 
         #expect(crop.mode == .crop && crop.crop == ImageCrop(x: 0, y: 0, width: 2, height: 1) && crop.opacity == 0.5)
         #expect(fit.mode == .fit && fit.quarterTurns == 1 && fit.mediaID == crop.mediaID)
         #expect(r.media.count == 1)
+    }
+
+    @Test func angularGradientsComeInTurningTheSameWay() throws {
+        let stops = ##""stops": [{"position": 0.25, "color": {"r": 1, "g": 0, "b": 0, "a": 1}}, {"position": 1, "color": {"r": 0, "g": 0, "b": 1, "a": 1}}]"##
+        let json = payload(##"""
+        {"kind": "rectangle", "name": "A", "transform": [1, 0, 0, 1, 0, 0], "width": 100, "height": 50, "fills": [
+          {"type": "GRADIENT_ANGULAR", "transform": [1, 0, 0, 1, 0, 0], \##(stops)}]},
+        {"kind": "rectangle", "name": "M", "transform": [1, 0, 0, 1, 0, 0], "width": 100, "height": 50, "fills": [
+          {"type": "GRADIENT_ANGULAR", "transform": [-1, 0, 0, 1, 1, 0], \##(stops)}]}
+        """##)
+        let r = try FigmaImport.read(json)
+        guard case .angularGradient(let a)? = r.layers.first?.look?.fills.first?.paint,
+              case .angularGradient(let m)? = r.layers.last?.look?.fills.first?.paint else { Issue.record("not angular"); return }
+        // Figma's identity starts at the right and turns clockwise, as Twine's do.
+        #expect(a.start == Vec2(0.5, 0.5) && a.end == Vec2(1, 0.5) && a.stops.map(\.position) == [0.25, 1])
+        // Mirrored, it starts at the left and turns the other way: the stops
+        // come in turned end for end.
+        #expect(m.start == Vec2(0.5, 0.5) && m.end == Vec2(0, 0.5) && m.stops.map(\.position) == [0.75, 0])
     }
 
     @Test func vectorsBecomePathsInTheirOwnBox() throws {

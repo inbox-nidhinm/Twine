@@ -129,17 +129,17 @@ private func close(_ a: [[Vec2]], _ b: [[Vec2]]) -> Bool {
     }
 
     @Test func duplicatesGetNewIdentitiesAllTheWayDown() {
-        let child = box("Child", 0, 0)
-        var masked = box("Masked", 0, 0)
-        masked.mask = MaskReference(layerID: child.id)
+        var child = box("Child", 0, 0)
+        child.isMask = true
+        let masked = box("Masked", 0, 0)
         let group = Layer(name: "G", content: .group(GroupContent(children: [child, masked])), size: Size2(1, 1),
                           position: .zero)
         let copy = group.duplicated()
         #expect(copy.id != group.id)
         #expect(copy.children.map(\.name) == ["Child", "Masked"])
         #expect(copy.children[0].id != child.id)
-        // The mask follows the copy of the layer it pointed at.
-        #expect(copy.children[1].mask?.layerID == copy.children[0].id)
+        // The mask is a mask in the copy too.
+        #expect(copy.children[0].isMask && !copy.children[1].isMask)
         if case .shape(let a) = child.content, case .shape(let b) = copy.children[0].content {
             #expect(a.fills[0].id != b.fills[0].id)
         }

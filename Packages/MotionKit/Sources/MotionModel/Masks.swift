@@ -1,45 +1,33 @@
 import Foundation
 
-/// Which layers mask which.
+/// Masks as Figma has them (4 October 2026): a layer marked `isMask` masks
+/// the layers in front of it in the same group or frame, up to the next
+/// mask.
 extension Project {
-    /// Every layer used as another layer's mask.
-    public var maskSourceIDs: Set<UUID> {
+    /// Every layer that is a mask.
+    public var maskIDs: Set<UUID> {
         var out = Set<UUID>()
-        forEachLayer { if let mask = $0.mask { out.insert(mask.layerID) } }
+        forEachLayer { if $0.isMask { out.insert($0.id) } }
         return out
     }
 
-    /// The layers `id` can be masked by, back to front: anything that draws
-    /// by itself (not a group, not a sound), other than the layer itself,
-    /// the groups it sits in (a mask stops drawing, and would take the layer
-    /// with it), and a layer it already masks. A layer inside a masked group
-    /// is fine: that is how Figma masks a group.
-    public func maskCandidates(for id: UUID) -> [Layer] {
-        let blocked = Set(ancestors(of: id) + [id])
-        var out: [Layer] = []
-        forEachLayer { if Self.canMask($0, id, blocked: blocked) { out.append($0) } }
-        return out
+    /// Whether any layer still carries a mask the way older projects kept
+    /// them, for `Masks.convertingLegacy`.
+    public var hasLegacyMasks: Bool {
+        var found = false
+        forEachLayer { if $0.legacyMask != nil { found = true } }
+        return found
     }
+}
 
-    /// Whether `maskCandidates(for:)` has any, found without listing them,
-    /// for a button shown on every redraw.
-    public func hasMaskCandidates(for id: UUID) -> Bool {
-        let blocked = Set(ancestors(of: id) + [id])
-        func look(in list: [Layer]) -> Bool {
-            for i in list.indices {
-                if Self.canMask(list[i], id, blocked: blocked) { return true }
-                if list[i].isGroup, look(in: list[i].children) { return true }
-            }
-            return false
-        }
-        return look(in: layers)
-    }
-
-    private static func canMask(_ layer: Layer, _ id: UUID, blocked: Set<UUID>) -> Bool {
-        guard !blocked.contains(layer.id), layer.mask?.layerID != id else { return false }
-        switch layer.content {
-        case .group, .audio: return false
-        case .shape, .text, .video: return true
+extension Layer {
+    /// Whether the layer can be a mask: it draws by itself. A group draws
+    /// only through its children, which a mask cannot, and a sound draws
+    /// nothing.
+    public var canMask: Bool {
+        switch content {
+        case .shape, .text, .video: true
+        case .group, .audio: false
         }
     }
 }
