@@ -37,7 +37,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `spacedown`, `spaceup` | Holds and releases Space |
 | `menukey C` | ⌘C through the main menu |
 | `hover X Y`, `rhover X Y`, `chover X Y` | Pointer moves handed straight to the timeline tracks, the ruler or the canvas (`chover` logs `HOVER`) |
-| `call NAME` | `duplicate`, `shortcuts`, `copy`, `paste`, `undo`, `focuscanvas`, `copyeasing`, `pasteeasing`, `exportmovie` (opens the export panel; again, exports), `exportframe`, `staggermenu`, `group`, `frameselection` |
+| `call NAME` | `duplicate`, `shortcuts`, `copy`, `paste`, `undo`, `focuscanvas`, `copyeasing`, `pasteeasing`, `copystyle`, `pastestyle`, `exportmovie` (opens the export panel; again, exports), `exportframe`, `staggermenu`, `group`, `frameselection` |
 | `savepanel PATH`, `waitexport` | Fills and closes a save panel, waits for an export |
 | `import PATH`, `save` | Imports media (an `.svg` comes in as layers), saves (logging `SAVE` with how long the save held the main thread) |
 | `selectlayer NAME`, `layeractions` | Selects a layer by name; picks every action of the selected layers |

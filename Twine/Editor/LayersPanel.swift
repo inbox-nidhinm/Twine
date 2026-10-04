@@ -343,6 +343,11 @@ extension EditorController {
         if layer.isGroup { entries.append(.item("Ungroup") { self.ungroupSelection() }) }
         entries.append(layer.isMask ? .item("Remove Mask") { self.removeMask(layer.id) }
                                     : .item("Use as Mask") { self.useSelectionAsMask() })
+        // Style is the design's, so it is copied and pasted in Design.
+        if editor.mode == .design, LayerStyle.takes(layer) {
+            entries += [.separator, .item("Copy Style") { self.copyStyle(of: layer) }]
+            if canPasteStyle { entries.append(.item("Paste Style") { self.pasteStyle() }) }
+        }
         // Copied actions go onto this layer, or every selected one it is among.
         if editor.mode == .animate, canPasteActions {
             let onto = editor.selection.contains(layer.id) ? selectedLayers : [layer]

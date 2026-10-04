@@ -932,6 +932,44 @@ final class EditorController {
         !easedSelection.isEmpty && NSPasteboard.general.data(forType: Self.easingPasteboardType) != nil
     }
 
+    static let stylePasteboardType = NSPasteboard.PasteboardType("com.nidhin.twine.style")
+
+    /// Whether a selected layer has a style to copy (a sound has none).
+    var canCopyStyle: Bool { selectedLayers.contains(where: LayerStyle.takes) }
+
+    /// Whether a style is copied and a selected layer can take it, in Design:
+    /// a style is the design, which Animate leaves alone.
+    var canPasteStyle: Bool {
+        editor.mode == .design && NSPasteboard.general.data(forType: Self.stylePasteboardType) != nil
+            && selectedLayers.contains { LayerStyle.takes($0) && !isLocked($0.id) }
+    }
+
+    /// Copies `layer`'s style (Copy Style, ⌥⌘C), or the first selected
+    /// layer's, from the top of the layers panel: its opacity, blend mode,
+    /// effects, fills and strokes, and a text's type (see `LayerStyle`).
+    func copyStyle(of layer: Layer? = nil) {
+        let source = layer ?? topmost(selectedLayers).last(where: LayerStyle.takes)
+        guard let source, LayerStyle.takes(source), let data = try? JSONEncoder().encode(LayerStyle(of: source)) else {
+            return NSSound.beep()
+        }
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.setData(data, forType: Self.stylePasteboardType)
+    }
+
+    /// Paints the copied style onto every selected layer that can take it
+    /// (Paste Style, ⌥⌘V), in Design, as one undo step.
+    func pasteStyle() {
+        guard editor.mode == .design, let data = NSPasteboard.general.data(forType: Self.stylePasteboardType),
+              let style = try? JSONDecoder().decode(LayerStyle.self, from: FileSafety.numbersHeld(data)) else { return NSSound.beep() }
+        let media = Set(project.media.map(\.id))
+        let targets = selectedLayers.filter { LayerStyle.takes($0) && !isLocked($0.id) }
+        // Held in range as a pasted layer is: the clipboard is anyone's.
+        let painted = FileSafety.held(targets.map { style.applied(to: $0, media: media) })
+        guard !painted.isEmpty else { return NSSound.beep() }
+        perform(.batch([.updateLayers(painted)], name: "Paste Style"))
+    }
+
     /// Copies the easing of the first selected action, down the timeline.
     func copyEasing() {
         guard let first = TimelineRow.order(of: easedSelection, in: project).first,

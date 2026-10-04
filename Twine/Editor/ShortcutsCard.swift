@@ -123,6 +123,7 @@ struct ShortcutsCard: View {
                     s("Ungroup groups and frames", "⇧⌘G", "⌘⌫"),
                     s("Frame selection", "⌥⌘G"),
                     s("Use as mask", "⌃⌘M"),
+                    s("Copy, paste style", "⌥⌘C", "⌥⌘V"),
                     s("Forward, backward", "⌘]", "⌘["),
                     s("To front, to back", "⌥⌘]", "⌥⌘["),
                 ]),
@@ -148,7 +149,7 @@ struct ShortcutsCard: View {
                     s("Trim both ends", "⌥", "drag end"),
                     s("Pan", "⌥", "drag"),
                     s("Zoom", "⌘", "scroll"),
-                    s("Copy, paste easing", "⌥⌘C", "⌥⌘V"),
+                    s("Copy, paste easing", "⇧⌘C", "⇧⌘V"),
                 ]),
                 Group(title: "Project", items: [
                     s("Import", "⌘I"),

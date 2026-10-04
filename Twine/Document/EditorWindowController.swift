@@ -119,6 +119,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         editor.showLayers = true
         editor.renaming = controller.selection.first
     }
+    @objc func copyStyle(_ sender: Any?) { controller.copyStyle() }
+    @objc func pasteStyle(_ sender: Any?) { controller.pasteStyle() }
     @objc func copyEasing(_ sender: Any?) { controller.copyEasing() }
     @objc func pasteEasing(_ sender: Any?) { controller.pasteEasing() }
     @objc func groupLayers(_ sender: Any?) { controller.groupSelection() }
@@ -191,6 +193,10 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         case #selector(previousFrame(_:)), #selector(nextFrame(_:)), #selector(goToStart(_:)), #selector(goToEnd(_:)),
              #selector(previousEdge(_:)), #selector(nextEdge(_:)):
             return editor.mode == .animate
+        case #selector(copyStyle(_:)):
+            return controller.canCopyStyle
+        case #selector(pasteStyle(_:)):
+            return controller.canPasteStyle
         case #selector(copyEasing(_:)):
             return controller.canCopyEasing
         case #selector(pasteEasing(_:)):

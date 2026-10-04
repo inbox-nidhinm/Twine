@@ -467,6 +467,8 @@ enum SelfTest {
                 case "focuscanvas": controller.editor.focus = .canvas
                 case "copyeasing": controller.copyEasing()
                 case "pasteeasing": controller.pasteEasing()
+                case "copystyle": controller.copyStyle()
+                case "pastestyle": controller.pasteStyle()
                 case "exportmovie": (window.windowController as? EditorWindowController)?.exportFile(nil)
                 case "exportframe": (window.windowController as? EditorWindowController)?.exportFrame(nil)
                 case "staggermenu": (window.windowController as? EditorWindowController)?.staggerActions(nil)
