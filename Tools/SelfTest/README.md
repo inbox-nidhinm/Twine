@@ -53,6 +53,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `replace PATH`, `fillpicture PATH` | Replace in the inspector, or Image as the fill, with the file handed in rather than chosen in the panel |
 | `mode M`, `turn` | The selected picture's mode (`fill`, `fit`, `crop`, which starts cropping, `tile`) and a quarter turn |
 | `blend M`, `effect inner\|drop DX DY BLUR HEX` | Sets the selection's blend mode (`multiply`, `screen`...); adds a shadow, as the Effects menu does |
+| `audio` | Logs the preview's sound: the renderer's status, the synchronizer's place and rate against the playhead, the pieces handed over and how early the first one was ready |
 | `pastefigma PATH`, `composition` | Pastes a copy from the Figma plugin read from a file (such as `FigmaPlugin/test/sample-payload.json`), leaving the clipboard alone; logs the composition's size and any notice |
 | `pasteimage PATH [png\|tiff\|jpeg]`, `pastefile PATH` | Paste with the picture file's bytes copied as that type, or with the file copied as the Finder does, on a pasteboard of the kit's own |
 | `tree` | Logs every layer under its parent: kind (frame, group, picture...), place, size, scale, clipping, fills and strokes, then the selection and the last undo |

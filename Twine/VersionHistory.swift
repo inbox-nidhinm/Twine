@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 194
+    static let pushes = 195
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -60,6 +60,7 @@ enum VersionHistory {
             "Animate is Twine's main mode: a project opens in it, and it is now the left of the switch at the top of the inspector, with Design on the right. The View menu lists them in the same order.",
             "Every row of tabs glides as the tool bar does: the mode switch, a fill's Solid, Linear, Radial and Image, a stroke's Style, Caps and Joins, a preset's direction, corner and In or Out, and the rest. A highlight slides from option to option under the pointer, and the chosen grey slides across to the one you pick.",
             "Paste pictures straight from the clipboard. A screenshot copied with ⌃⇧⌘4, a picture copied in a browser, or a layer copied as PNG in Figma comes in with ⌘V as a picture layer, as if it were imported; the same picture pasted twice is stored once. Files copied in the Finder paste too: pictures, video, sound and SVG drawings come in as they would from File > Import.",
+            "The sound while you play is kept under full scale as an export's is, so loud overlapping clips no longer crackle or distort in the editor or the export panel's preview. What you hear while editing is now exactly what an export writes: the same mix, the same fades, the same limiter.",
             "Copy Style and Paste Style, as Figma's Copy and Paste Properties (⌥⌘C and ⌥⌘V, in the Edit menu and a layer's right-click menu in Design). Copy a layer's style and paste it onto any number of selected layers: its opacity, blend mode, shadows and blurs, fills and strokes, and for text its font, weight, size, alignment, spacing, colour and stroke, never its words. A shape's colour and stroke paste onto text, and a text's onto a shape.",
             "Radial gradients can be ovals, as in Figma. A radial gradient's line on the canvas has a third handle, across from the end: drag it in or out to squash or stretch the circle into an oval, and turn the line to turn the oval with it. It works for a layer's fill or stroke in Design and for a Colour or Stroke action's gradient in Animate, where an oval blends into another as the action plays. Oval radial gradients copied from Figma, and radial gradients in SVG files that are wider than they are tall, now come in as ovals rather than circles.",
             "Copy Easing and Paste Easing are now ⇧⌘C and ⇧⌘V, so ⌥⌘C and ⌥⌘V can copy and paste style as in Figma.",

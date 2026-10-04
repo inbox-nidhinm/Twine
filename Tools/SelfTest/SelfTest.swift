@@ -656,6 +656,10 @@ enum SelfTest {
                     board.setData(data, forType: kind == "tiff" ? .tiff : kind == "jpeg" ? NSPasteboard.PasteboardType("public.jpeg") : .png)
                 }
                 controller.paste(from: board)
+            case "audio":
+                // The preview's sound: whether its renderer is playing, its
+                // clock against the playhead, and its reading.
+                log("AUDIO time=\(String(format: "%.3f", controller.editor.time)) \(controller.audioState)")
             case "composition":
                 let c = controller.project.composition
                 log("COMPOSITION \(c.width)x\(c.height) notice=\(controller.editor.notice?.text ?? "-")")

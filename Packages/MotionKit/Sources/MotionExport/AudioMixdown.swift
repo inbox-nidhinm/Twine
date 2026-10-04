@@ -67,7 +67,7 @@ final class AudioMixdown: @unchecked Sendable {
 
     /// Stereo 32-bit float at 48 kHz, interleaved: room above full scale, so
     /// loud overlaps reach the limiter whole instead of already clipped.
-    private static var floatSettings: [String: Any] { [
+    static var floatSettings: [String: Any] { [
         AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 48000, AVNumberOfChannelsKey: 2,
         AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true, AVLinearPCMIsBigEndianKey: false,
         AVLinearPCMIsNonInterleaved: false,
@@ -151,7 +151,7 @@ final class AudioMixdown: @unchecked Sendable {
     }
 
     /// The interleaved samples a reader handed over.
-    private static func floats(in sample: CMSampleBuffer) -> [Float] {
+    static func floats(in sample: CMSampleBuffer) -> [Float] {
         guard let block = CMSampleBufferGetDataBuffer(sample) else { return [] }
         let length = CMBlockBufferGetDataLength(block)
         var out = [Float](repeating: 0, count: length / MemoryLayout<Float>.size)
@@ -164,7 +164,7 @@ final class AudioMixdown: @unchecked Sendable {
     /// Interleaved stereo floats as a sample buffer starting `start` frames
     /// into the movie. Times are counted from zero, so a movie of part of
     /// the composition hears the sound from its own start.
-    private static func sample(_ frames: [Float], at start: Int64) -> CMSampleBuffer? {
+    static func sample(_ frames: [Float], at start: Int64) -> CMSampleBuffer? {
         var description = AudioStreamBasicDescription(
             mSampleRate: rate, mFormatID: kAudioFormatLinearPCM,
             mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked,

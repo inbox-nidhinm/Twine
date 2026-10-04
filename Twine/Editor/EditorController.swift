@@ -35,6 +35,10 @@ final class EditorController {
     /// The sound while playing.
     private lazy var audio = AudioPreview { [weak self] id in self?.document?.mediaURL(for: id) }
 
+    #if SELFTEST
+    var audioState: String { audio.state }
+    #endif
+
     private func followAudio() {
         audio.follow(project, time: editor.time, playing: editor.isPlaying)
     }
