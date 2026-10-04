@@ -120,6 +120,26 @@ enum CanvasDrag {
     /// Cropping a picture: moving it inside its shape, scaling it by a
     /// corner, or resizing the shape around it. Every step works from the
     /// layer as it was when the press began.
+    /// A press on a gradient's line while it is being edited.
+    struct GradientDrag {
+        enum Part: Equatable {
+            case start, end, line
+            case stop(Int)
+
+            var isStop: Bool {
+                if case .stop = self { return true }
+                return false
+            }
+        }
+
+        let part: Part
+        /// The gradient and its layer as they were at the press.
+        let place: CanvasNSView.GradientPlace
+        let start: Vec2
+        let startView: CGPoint
+        var began = false
+    }
+
     struct CropEdit {
         enum Part {
             case move
@@ -157,6 +177,7 @@ enum CanvasDrag {
     case action(ActionEdit)
     case path(PathEdit)
     case crop(CropEdit)
+    case gradient(GradientDrag)
 
     var marqueeRect: CGRect? {
         switch self {

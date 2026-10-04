@@ -12,14 +12,16 @@ struct EditCallbacks<Value> {
     var end: () -> Void
 }
 
-/// A paint's kind (Solid, Linear, Radial) and its colours, each as a well,
-/// its hex and its opacity.
+/// A paint's kind (Solid, Linear, Radial) and its colours: a solid's well,
+/// hex and opacity, or a gradient's stops (`GradientStopsEditor`).
 struct PaintControls: View {
     let paint: Paint
     var title = "Colour"
     /// Off for text, which is one colour.
     var allowsGradients = true
     let edit: EditCallbacks<Paint>
+
+    @State private var picked: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -33,13 +35,11 @@ struct PaintControls: View {
             case .solid(let color):
                 colorRow(color) { .solid($0) }
             case .linearGradient(let g), .radialGradient(let g):
-                ForEach(Array(g.stops.enumerated()), id: \.offset) { index, stop in
-                    colorRow(stop.color) { c in
-                        var gradient = g
-                        gradient.stops[index].color = c
-                        return paint.withGradient(gradient)
-                    }
-                }
+                GradientStopsEditor(gradient: g, title: title, picked: picked, pick: { picked = $0 },
+                                    edit: GradientCallbacks(commit: { edit.commit(paint.withGradient($0)) },
+                                                            live: { edit.live(paint.withGradient($0)) },
+                                                            begin: { _ in edit.begin() }, end: edit.end),
+                                    barButton: { EmptyView() })
             case .image:
                 // Pictures are chosen in Design, not blended to.
                 EmptyView()

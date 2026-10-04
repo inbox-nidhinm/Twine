@@ -29,6 +29,8 @@ struct CanvasView: NSViewRepresentable {
         // canvas alone instead of the whole window's views.
         // Read so a row hovered in the layers panel lights up its layer here.
         _ = editor.hoveredLayer
+        // And so the gradient being edited shows its line and handles.
+        _ = editor.gradient
         view.show(controller.project, time: editor.time, selection: controller.selection, tool: editor.tool,
                   playing: editor.isPlaying, animating: editor.mode == .animate)
     }

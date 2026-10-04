@@ -179,6 +179,13 @@ public enum Theme {
     /// controls with the gap between them.
     public static let pictureWell: CGFloat = panelRow + 4 + 6 + button
 
+    /// A gradient stop's marker on the inspector's gradient bar, and the
+    /// picked one's, taller so it reads as picked without colour.
+    public static let gradientMarker: CGFloat = 10
+    public static let gradientMarkerPicked: CGFloat = 16
+    /// The picked gradient stop's place, beside the gradient bar.
+    public static let stopField: CGFloat = 52
+
     // MARK: Radii (radius/*)
 
     public static let radiusPanel: CGFloat = 10

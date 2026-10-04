@@ -125,6 +125,12 @@ struct ShortcutsCard: View {
                     s("Forward, backward", "⌘]", "⌘["),
                     s("To front, to back", "⌥⌘]", "⌥⌘["),
                 ]),
+                Group(title: "Gradients", items: [
+                    s("Turn in 15° steps", "⇧", "drag"),
+                    s("Add a stop on the line", "click"),
+                    s("Remove the picked stop", "⌫"),
+                    s("Finish editing the gradient", "Esc"),
+                ]),
             ],
             [
                 Group(title: "Playback", items: [

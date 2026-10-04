@@ -48,6 +48,11 @@ nonisolated final class CanvasOverlay: CALayer {
     /// Cropping a picture: the whole picture, faint, in a holder of its own
     /// (the overlay sizes its sublayers to itself, and the picture has a
     /// shape of its own), its outline, and the corners that scale it.
+    private let gradientShade = CAShapeLayer()
+    private let gradientLine = CAShapeLayer()
+    private let gradientEnds = CAShapeLayer()
+    /// One dot per stop, each in its own colour.
+    private let gradientStops = CALayer()
     private let cropHolder = CALayer()
     private let cropPicture = CALayer()
     private let cropLine = CAShapeLayer()
@@ -73,7 +78,8 @@ nonisolated final class CanvasOverlay: CALayer {
         actions = Self.none
         for l in [cropHolder, textSelection, hover, cropLine, shapes, outlines, union, marquee, motion, motionArms, anchor, handles,
                   cropHandles, motionStart, motionEnd, motionHandles, textMarked, caret, guides, gapLines,
-                  pathLine, pathRubber, pathArms, pathHandles, pathPoints, pathSelected] {
+                  pathLine, pathRubber, pathArms, pathHandles, pathPoints, pathSelected,
+                  gradientShade, gradientLine, gradientEnds, gradientStops] {
             l.anchorPoint = .zero
             l.actions = Self.none
             l.contentsScale = 2
@@ -148,6 +154,17 @@ nonisolated final class CanvasOverlay: CALayer {
             l.strokeColor = Self.guide
             l.lineWidth = 1
         }
+        // The gradient's line is white over a soft dark one, so it reads on
+        // any colours under it.
+        gradientShade.fillColor = nil
+        gradientShade.strokeColor = CGColor(gray: 0, alpha: 0.35)
+        gradientShade.lineWidth = 3
+        gradientLine.fillColor = nil
+        gradientLine.strokeColor = Self.handle
+        gradientLine.lineWidth = 1.5
+        gradientEnds.fillColor = Self.handle
+        gradientEnds.strokeColor = Self.accent
+        gradientEnds.lineWidth = 1.5
     }
 
     private static let guide = NSColor(Theme.guide).cgColor
@@ -275,6 +292,63 @@ nonisolated final class CanvasOverlay: CALayer {
         }
         pathPoints.path = dots(marks.points)
         pathSelected.path = dots(marks.selected)
+    }
+
+    /// A gradient being edited, in view points: its ends, a radial one's
+    /// circle, and each stop with its colour and whether it is picked.
+    struct GradientMarks {
+        var start: CGPoint
+        var end: CGPoint
+        var circle: CGPath?
+        var stops: [(point: CGPoint, color: CGColor, picked: Bool)]
+    }
+
+    static let gradientEndRadius: CGFloat = 5
+    static let gradientStopRadius: CGFloat = 4.5
+
+    func updateGradient(_ marks: GradientMarks?) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        guard let marks else {
+            for l in [gradientShade, gradientLine, gradientEnds] { l.path = nil }
+            gradientStops.sublayers = nil
+            return
+        }
+        let line = CGMutablePath()
+        line.move(to: marks.start)
+        line.addLine(to: marks.end)
+        if let circle = marks.circle { line.addPath(circle) }
+        gradientShade.path = line
+        gradientLine.path = line
+        let ends = CGMutablePath()
+        let r = Self.gradientEndRadius
+        for p in [marks.start, marks.end] { ends.addEllipse(in: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)) }
+        gradientEnds.path = ends
+        // A dot per stop, kept and recoloured while their count holds.
+        var dots = (gradientStops.sublayers as? [CAShapeLayer]) ?? []
+        if dots.count != marks.stops.count {
+            dots = marks.stops.map { _ in
+                let dot = CAShapeLayer()
+                dot.actions = Self.none
+                dot.contentsScale = 2
+                dot.shadowColor = CGColor(gray: 0, alpha: 1)
+                dot.shadowOpacity = 0.4
+                dot.shadowRadius = 1.5
+                dot.shadowOffset = .zero
+                return dot
+            }
+            gradientStops.sublayers = dots
+        }
+        // The picked stop over the others.
+        for (dot, stop) in zip(dots, marks.stops) {
+            let s = Self.gradientStopRadius + (stop.picked ? 1 : 0)
+            dot.path = CGPath(ellipseIn: CGRect(x: stop.point.x - s, y: stop.point.y - s, width: s * 2, height: s * 2), transform: nil)
+            dot.fillColor = stop.color
+            dot.strokeColor = stop.picked ? Self.accent : Self.handle
+            dot.lineWidth = stop.picked ? 2 : 1.5
+            dot.zPosition = stop.picked ? 1 : 0
+        }
     }
 
     /// A picture being cropped, in view points.

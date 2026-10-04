@@ -398,6 +398,12 @@ final class CanvasNSView: NSView {
         // While cropping, the handles crop, and the layer is not turned or
         // moved about its anchor.
         if isCropping { anchor = nil }
+        // While a gradient's line shows, its ends are the handles.
+        let gradient = gradientMarks()
+        if gradient != nil {
+            handles = []
+            anchor = nil
+        }
         overlay.update(outlines: outlines, union: union, handles: handles, anchor: anchor,
                        hover: textSession == nil ? hover : nil,
                        marquee: drag?.marqueeRect, motion: motionOverlay())
@@ -407,6 +413,7 @@ final class CanvasNSView: NSView {
         updateTextOverlay()
         overlay.updatePath(pathSession == nil ? nil : pathMarks())
         overlay.updateCrop(isCropping ? cropMarks() : nil)
+        overlay.updateGradient(gradient)
     }
 
     /// The kind of the action the canvas is editing, in Animate.
@@ -614,6 +621,12 @@ final class CanvasNSView: NSView {
 
         // So does a picture being cropped.
         if cropMouseDown(event, at: point, viewPoint: viewPoint) {
+            redrawOverlay()
+            return
+        }
+
+        // And a gradient's line while it is being edited.
+        if gradientMouseDown(event, at: point, viewPoint: viewPoint) {
             redrawOverlay()
             return
         }
@@ -842,6 +855,8 @@ final class CanvasNSView: NSView {
 
         case .crop(let edit):
             cropMouseDragged(edit, point: point, event: event)
+        case .gradient(let edit):
+            gradientMouseDragged(edit, point: point, viewPoint: viewPoint, event: event)
         }
         redrawOverlay()
     }
@@ -896,6 +911,8 @@ final class CanvasNSView: NSView {
             pathMouseUp(edit, event: event)
         case .crop(let edit):
             cropMouseUp(edit)
+        case .gradient(let edit):
+            gradientMouseUp(edit, point: viewToComposition(convert(event.locationInWindow, from: nil)))
         case .pan:
             (spaceHeld ? Cursors.hand : Cursors.arrow).set()
         }
@@ -1338,6 +1355,7 @@ final class CanvasNSView: NSView {
         if textKeyDown(event) { return }
         if pathKeyDown(event) { return }
         if cropKeyDown(event) { return }
+        if gradientKeyDown(event) { return }
         // Return on one selected text layer starts typing into it.
         if event.keyCode == 36, !animating, selection.count == 1, let id = selection.first,
            controller.project.layer(withID: id)?.isText == true, !controller.isLocked(id) {

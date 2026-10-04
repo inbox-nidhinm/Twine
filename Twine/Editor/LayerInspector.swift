@@ -564,7 +564,7 @@ private struct FillSection: View {
                         PictureFields(layer: layer, paint: picture, controller: controller)
                     } else {
                         PaintEditor(paint: fill.paint, isEnabled: fill.isEnabled, controller: controller, layer: layer,
-                                    title: "Fill",
+                                    title: "Fill", slot: .fill(top),
                                     change: { paint in editedShape { $0.fills[top].paint = paint } },
                                     toggle: { editShape { $0.fills[top].isEnabled.toggle() } })
                     }
@@ -720,7 +720,7 @@ private struct StrokeSection: View {
             if let stroke = shape.strokes.first {
                 VStack(alignment: .leading, spacing: 8) {
                     PaintEditor(paint: stroke.paint, isEnabled: stroke.isEnabled, controller: controller, layer: layer,
-                                title: "Stroke",
+                                title: "Stroke", slot: .stroke(0),
                                 change: { paint in
                                     var l = layer
                                     var s = shape
@@ -894,14 +894,17 @@ private struct StrokeSettings: View {
 
 // MARK: - Paint
 
-/// A paint's colours: one well for a solid colour, a well per end for a
-/// gradient, each with its hex and its opacity.
+/// A paint's colours: one well for a solid colour, its hex and its
+/// opacity; for a gradient, its stops (`GradientStopsEditor`) and the
+/// switch for its handles on the canvas.
 struct PaintEditor: View {
     let paint: Paint
     let isEnabled: Bool
     let controller: EditorController
     let layer: Layer
     let title: String
+    /// Which of the layer's paints this is, for its gradient's handles.
+    var slot: PaintSlot? = nil
     /// Builds the whole edited layer for a new paint.
     let change: (Paint) -> Layer
     let toggle: () -> Void
@@ -913,18 +916,30 @@ struct PaintEditor: View {
         case .solid(let color):
             colorRow(color, first: true) { c in .solid(c) }
         case .linearGradient(let g), .radialGradient(let g):
-            let stops = g.stops
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(Array(stops.enumerated()), id: \.offset) { index, stop in
-                    colorRow(stop.color, first: index == 0) { c in
-                        var s = stops
-                        s[index].color = c
-                        var gradient = g
-                        gradient.stops = s
-                        return paint.withGradient(gradient)
+            let editing = controller.editor.gradient.flatMap { $0.layerID == layer.id && $0.slot == slot ? $0 : nil }
+            GradientStopsEditor(
+                gradient: g, title: title, picked: editing?.stop,
+                pick: { stop in
+                    // Picking a stop shows the gradient's handles too.
+                    if let slot { controller.editor.gradient = GradientEdit(layerID: layer.id, slot: slot, stop: stop) }
+                },
+                edit: GradientCallbacks(
+                    commit: { controller.perform(.updateLayers([change(paint.withGradient($0))])) },
+                    live: { controller.update([change(paint.withGradient($0))]) },
+                    begin: { controller.begin($0) },
+                    end: { controller.end() }),
+                barButton: {
+                    if showsToggle {
+                        toggleButton
+                    } else if let slot {
+                        IconButton(icon: .gradientHandles,
+                                   help: editing == nil ? "Edit the gradient on the canvas" : "Done editing the gradient",
+                                   isOn: editing != nil) {
+                            controller.editor.gradient = editing == nil ? GradientEdit(layerID: layer.id, slot: slot, stop: nil) : nil
+                        }
                     }
-                }
-            }
+                },
+                firstRowButton: { EmptyView() })
         case .image:
             // Pictures have their own fields.
             EmptyView()
@@ -933,13 +948,15 @@ struct PaintEditor: View {
 
     @ViewBuilder private func colorRow(_ color: RGBA, first: Bool, _ make: @escaping (RGBA) -> Paint) -> some View {
         if first && showsToggle {
-            colorFields(color, make).rowButton {
-                IconButton(icon: isEnabled ? .eye : .eyeSlash, help: isEnabled ? "Hide the \(title.lowercased())" : "Show the \(title.lowercased())",
-                           action: toggle)
-            }
+            colorFields(color, make).rowButton { toggleButton }
         } else {
             colorFields(color, make)
         }
+    }
+
+    private var toggleButton: some View {
+        IconButton(icon: isEnabled ? .eye : .eyeSlash, help: isEnabled ? "Hide the \(title.lowercased())" : "Show the \(title.lowercased())",
+                   action: toggle)
     }
 
     private func colorFields(_ color: RGBA, _ make: @escaping (RGBA) -> Paint) -> some View {
