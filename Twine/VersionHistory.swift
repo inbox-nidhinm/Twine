@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 196
+    static let pushes = 197
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -60,6 +60,7 @@ enum VersionHistory {
             "Animate is Twine's main mode: a project opens in it, and it is now the left of the switch at the top of the inspector, with Design on the right. The View menu lists them in the same order.",
             "Every row of tabs glides as the tool bar does: the mode switch, a fill's Solid, Linear, Radial and Image, a stroke's Style, Caps and Joins, a preset's direction, corner and In or Out, and the rest. A highlight slides from option to option under the pointer, and the chosen grey slides across to the one you pick.",
             "Paste pictures straight from the clipboard. A screenshot copied with ⌃⇧⌘4, a picture copied in a browser, or a layer copied as PNG in Figma comes in with ⌘V as a picture layer, as if it were imported; the same picture pasted twice is stored once. Files copied in the Finder paste too: pictures, video, sound and SVG drawings come in as they would from File > Import.",
+            "Dragging a number no longer stops at the edge of the screen. While you drag, the pointer goes on past the edge and comes back in from the other side, as in Figma, so one drag can change a number by as much as you like; let go and the pointer is where you left it.",
             "Every fill and every stroke in the inspector, as effects already were. The Fill and Stroke sections list each one, the one on top first, each under its own name row with a button to remove it; + in the section's header adds another on top. Each has its own colour or gradient, show and hide, and for strokes alignment, width and settings. Layers copied from Figma with several fills or strokes can now be edited whole.",
             "The sound while you play is kept under full scale as an export's is, so loud overlapping clips no longer crackle or distort in the editor or the export panel's preview. What you hear while editing is now exactly what an export writes: the same mix, the same fades, the same limiter.",
             "Copy Style and Paste Style, as Figma's Copy and Paste Properties (⌥⌘C and ⌥⌘V, in the Edit menu and a layer's right-click menu in Design). Copy a layer's style and paste it onto any number of selected layers: its opacity, blend mode, shadows and blurs, fills and strokes, and for text its font, weight, size, alignment, spacing, colour and stroke, never its words. A shape's colour and stroke paste onto text, and a text's onto a shape.",

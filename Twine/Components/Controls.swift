@@ -941,7 +941,8 @@ extension EnvironmentValues {
 /// it changes the number, as in Figma, and a click without a drag starts
 /// typing with the number selected. Shift moves ten times as fast, Option a
 /// tenth as fast. An AppKit view rather than a SwiftUI gesture, so every
-/// press lands and the pointer stays the resize arrows throughout.
+/// press lands and the pointer stays the resize arrows throughout. The
+/// pointer never meets the screen's edge while dragging (`ScrubPointer`).
 struct ScrubSurface: NSViewRepresentable {
     let start: () -> Double
     let step: Double
@@ -1010,6 +1011,9 @@ final class ScrubView: NSView {
     private var committed: Double = 0
     /// A press that moves less than this is a click.
     private let deadZone: CGFloat = 3
+    /// The stand-in pointer while the real one is held still, nil when it
+    /// is not (a posted drag, or the test copy).
+    private var pointer: ScrubPointer?
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
@@ -1034,6 +1038,9 @@ final class ScrubView: NSView {
     override func mouseDragged(with event: NSEvent) {
         guard let surface else { return }
         let x = event.locationInWindow.x
+        // The drag's first step: the stand-in starts where the pointer
+        // already is, so this step's movement is not counted again.
+        let starting = raw == nil
         if raw == nil {
             guard abs(x - pressX) > deadZone else { return }
             let start = surface.start()
@@ -1041,13 +1048,25 @@ final class ScrubView: NSView {
             committed = start
             lastX = x
             surface.scrubbing?.begin("Change Value")
+            // Only a real mouse moves the real pointer: posted drags carry
+            // no movement of their own, and must never hold it still.
+            #if !SELFTEST
+            if event.deltaX != 0 || event.deltaY != 0 { pointer = ScrubPointer(at: NSEvent.mouseLocation, on: window?.screen) }
+            #endif
         }
         Cursors.resizeHorizontal.set()
+        // Held still, the pointer's place never changes: the mouse's own
+        // movement drives the number, and the stand-in shows where it goes.
+        var moved = x - lastX
+        if let pointer, !starting {
+            moved = event.deltaX
+            pointer.move(by: event.deltaX, event.deltaY)
+        }
         let flags = event.modifierFlags
         let fine = flags.contains(.option)
         let speed = flags.contains(.shift) ? 10 : fine ? 0.1 : 1
         let quantum = surface.step * (fine ? 0.1 : 1)
-        var value = ((raw ?? committed) + Double(x - lastX) * surface.step * speed)
+        var value = ((raw ?? committed) + Double(moved) * surface.step * speed)
         lastX = x
         value = (value / quantum).rounded() * quantum
         // Past a limit, it rests on the last value the field takes, so
@@ -1074,5 +1093,99 @@ final class ScrubView: NSView {
             surface?.scrubbing?.end()
         }
         raw = nil
+        releasePointer()
+    }
+
+    // Taken away mid-drag (the inspector rebuilt), the pointer is let go
+    // all the same: it must never stay hidden and held.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { releasePointer() }
+    }
+
+    private func releasePointer() {
+        pointer?.release()
+        pointer = nil
+    }
+}
+
+/// While a number is dragged, the real pointer is hidden and held where
+/// it is, so it never meets the edge of the screen and a drag can go on as
+/// far as the number needs, as in Figma (5 October 2026). A stand-in, the
+/// same resize arrows in a small window of its own, follows the mouse's
+/// movement and comes back in from the opposite edge when it leaves one;
+/// letting go puts the real pointer where the stand-in is. A local monitor
+/// also lets go at any mouse up, wherever it lands, so the pointer is never
+/// left held.
+@MainActor
+final class ScrubPointer {
+    private var place: CGPoint
+    private let bounds: CGRect
+    private let window: NSWindow
+    private let hotSpot: CGPoint
+    private var monitor: Any?
+    private var released = false
+
+    /// Holds the pointer at `start` (screen points, y up), on `screen`.
+    init(at start: CGPoint, on screen: NSScreen?) {
+        place = start
+        bounds = (screen ?? NSScreen.screens.first { $0.frame.contains(start) } ?? NSScreen.main)?.frame
+            ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let cursor = Cursors.resizeHorizontal
+        hotSpot = cursor.hotSpot
+        let size = cursor.image.size
+        window = NSWindow(contentRect: CGRect(origin: .zero, size: size), styleMask: .borderless, backing: .buffered, defer: false)
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = false
+        window.ignoresMouseEvents = true
+        window.isReleasedWhenClosed = false
+        window.level = .screenSaver
+        window.collectionBehavior = [.canJoinAllSpaces, .transient, .ignoresCycle]
+        let image = NSImageView(frame: CGRect(origin: .zero, size: size))
+        image.image = cursor.image
+        window.contentView = image
+        CGAssociateMouseAndMouseCursorPosition(0)
+        NSCursor.hide()
+        place(window)
+        window.orderFrontRegardless()
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] event in
+            self?.release()
+            return event
+        }
+    }
+
+    /// Follows the mouse's movement (AppKit's deltas, y down), coming back
+    /// in from the far side past an edge.
+    func move(by dx: CGFloat, _ dy: CGFloat) {
+        place.x += dx
+        place.y -= dy
+        if place.x >= bounds.maxX { place.x -= bounds.width }
+        if place.x < bounds.minX { place.x += bounds.width }
+        if place.y >= bounds.maxY { place.y -= bounds.height }
+        if place.y < bounds.minY { place.y += bounds.height }
+        place(window)
+    }
+
+    /// Puts the real pointer where the stand-in is and shows it again.
+    func release() {
+        guard !released else { return }
+        released = true
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        window.orderOut(nil)
+        // The display's own coordinates run down from the top of the main screen.
+        let top = NSScreen.screens.first?.frame.maxY ?? bounds.maxY
+        CGWarpMouseCursorPosition(CGPoint(x: place.x, y: top - place.y))
+        // Associating again also ends the moment the system ignores the
+        // mouse after a warp.
+        CGAssociateMouseAndMouseCursorPosition(1)
+        NSCursor.unhide()
+    }
+
+    private func place(_ window: NSWindow) {
+        // The image's hot spot, counted from its top-left, on the place.
+        let size = window.frame.size
+        window.setFrameOrigin(CGPoint(x: place.x - hotSpot.x, y: place.y - (size.height - hotSpot.y)))
     }
 }
