@@ -103,28 +103,34 @@ struct HomeView: View {
                 .padding(.horizontal, Theme.panelPad)
                 .padding(.bottom, Theme.rowGap)
 
-            sidebarRow("All Projects", on: !library.showsSettings && library.selectedFolder == nil) { library.selectedFolder = nil }
-                .background(dropHighlight(Creations.folder.standardizedFileURL))
-                .dropDestination(for: URL.self) { urls, _ in drop(urls, into: nil) } isTargeted: {
-                    target(Creations.folder.standardizedFileURL, $0)
-                }
-            ForEach(library.folders) { folder in folderRow(folder) }
+            // The folders scroll when there are more than fit (5 October
+            // 2026): before, every one made the sidebar taller and the window
+            // grew to hold it. Settings stays at the foot, outside.
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    sidebarRow("All Projects", on: !library.showsSettings && library.selectedFolder == nil) { library.selectedFolder = nil }
+                        .background(dropHighlight(Creations.folder.standardizedFileURL))
+                        .dropDestination(for: URL.self) { urls, _ in drop(urls, into: nil) } isTargeted: {
+                            target(Creations.folder.standardizedFileURL, $0)
+                        }
+                    ForEach(library.folders) { folder in folderRow(folder) }
 
-            // Under the folders: a dim row that turns into the new one's name.
-            if addingFolder {
-                nameField(placeholder: "Folder name", onSubmit: endNewFolder, onCancel: {
-                    folderDraft = ""
-                    addingFolder = false
-                })
-            } else {
-                sidebarRow("New Folder", dim: true) {
-                    folderDraft = ""
-                    renamingFolder = nil
-                    addingFolder = true
+                    // Under the folders: a dim row that turns into the new one's name.
+                    if addingFolder {
+                        nameField(placeholder: "Folder name", onSubmit: endNewFolder, onCancel: {
+                            folderDraft = ""
+                            addingFolder = false
+                        })
+                    } else {
+                        sidebarRow("New Folder", dim: true) {
+                            folderDraft = ""
+                            renamingFolder = nil
+                            addingFolder = true
+                        }
+                    }
                 }
             }
-
-            Spacer(minLength: 0)
+            .frame(maxHeight: .infinity)
 
             // Opens Settings; picking a folder is what comes back.
             sidebarRow("Settings", icon: .settings, on: library.showsSettings) {

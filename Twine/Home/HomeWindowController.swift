@@ -26,7 +26,12 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
             window.windowController = self
             window.delegate = self
             window.title = "Twine"
-            MainWindow.present(NSHostingView(rootView: HomeView(library: library).environment(menus)), in: window)
+            // The window keeps its own size (and its minimum, 980 by 660):
+            // the home screen never asks it to grow to fit, as it did with
+            // every folder added.
+            let host = NSHostingView(rootView: HomeView(library: library).environment(menus))
+            host.sizingOptions = []
+            MainWindow.present(host, in: window)
         }
         library.refresh()
         super.showWindow(sender)
