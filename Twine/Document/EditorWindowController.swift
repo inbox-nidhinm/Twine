@@ -155,6 +155,22 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     @objc func toggleSnapping(_ sender: Any?) { editor.snaps.toggle() }
     @objc func toggleShortcuts(_ sender: Any?) { editor.showShortcuts.toggle() }
 
+    /// Raises the ⌘K search card, or with it up, puts it away. What it
+    /// offers is gathered first, while the canvas has the keyboard, so the
+    /// menu commands are judged as the menus would judge them.
+    @objc func showSearch(_ sender: Any?) {
+        guard editor.search == nil else {
+            editor.search = nil
+            window?.makeFirstResponder((window as? ChromelessWindow)?.preferredResponder)
+            return
+        }
+        guard !OnboardingState.shared.isShowing, !editor.showExport else { return }
+        menus.dismiss()
+        controller.finishEditing()
+        editor.showShortcuts = false
+        editor.search = controller.searchSource()
+    }
+
     // MARK: Arrange
 
     /// The menu item's tag is the edge's place in `Alignment.Edge.allCases`.

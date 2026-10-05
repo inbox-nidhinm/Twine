@@ -111,7 +111,7 @@ final class ExportSession {
         completed = nil
         progress = 0
         let ffmpeg = WebMConversion.tool("ffmpeg")
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             // Progress crosses to the main thread at most a hundred times.
             var shown = 0
             let result = Result {

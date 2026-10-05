@@ -233,7 +233,7 @@ private struct EasingPreview: View {
 
 /// An easing's progress over time as a line: across is time, up is how far
 /// along, from `low` at the bottom to `high` at the top.
-struct EasingPath: Shape {
+nonisolated struct EasingPath: Shape {
     let easing: Easing
     var low = -0.3
     var high = 1.3

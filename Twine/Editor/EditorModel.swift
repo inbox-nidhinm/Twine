@@ -57,6 +57,8 @@ final class EditorModel {
     var hoveredLayer: UUID?
     /// The keyboard shortcuts card is up (⌘/).
     var showShortcuts = false
+    /// The ⌘K search card is up, with what it offers.
+    var search: SearchSource?
     /// A short note over the canvas, such as fonts a paste could not find,
     /// or an import under way. A note goes by itself after a few seconds;
     /// work stays up until it is done, then shows it is for three.

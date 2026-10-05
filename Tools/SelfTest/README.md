@@ -32,12 +32,12 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `scroll X Y DY` | Scrolls the scroll view under the point DY points further down its content (negative goes back up), as a wheel would |
 | `down X Y`, `to X Y`, `up X Y` | A held drag, a step at a time, for screenshots mid-drag |
 | `open X Y`, `pick X Y` | Clicks until the app's menu opens, or closes |
-| `key K` | `space`, `enter`, `del`, `left`, `right`, `up`, `down`, `comma`, `stop`, `esc`, or a letter |
+| `key K` | `space`, `enter`, `del`, `left`, `right`, `up`, `down`, `comma`, `stop`, `esc`, `tab`, or a letter |
 | `keycode N`, `type TEXT`, `clear` | A key by code (Option changes characters), typing, deleting a field |
 | `spacedown`, `spaceup` | Holds and releases Space |
 | `menukey C` | ⌘C through the main menu |
 | `hover X Y`, `rhover X Y`, `chover X Y` | Pointer moves handed straight to the timeline tracks, the ruler or the canvas (`chover` logs `HOVER`) |
-| `call NAME` | `duplicate`, `shortcuts`, `copy`, `paste`, `undo`, `focuscanvas`, `copyeasing`, `pasteeasing`, `copystyle`, `pastestyle`, `exportmovie` (opens the export panel; again, exports), `exportframe`, `staggermenu`, `group`, `frameselection` |
+| `call NAME` | `search` (the ⌘K card, in the editor or on the home screen; `type` takes one word, so put `key space` between words), `duplicate`, `shortcuts`, `copy`, `paste`, `undo`, `focuscanvas`, `copyeasing`, `pasteeasing`, `copystyle`, `pastestyle`, `exportmovie` (opens the export panel; again, exports), `exportframe`, `staggermenu`, `group`, `frameselection` |
 | `savepanel PATH`, `waitexport` | Fills and closes a save panel, waits for an export |
 | `import PATH`, `save` | Imports media (an `.svg` comes in as layers), saves (logging `SAVE` with how long the save held the main thread) |
 | `selectlayer NAME`, `layeractions` | Selects a layer by name; picks every action of the selected layers |

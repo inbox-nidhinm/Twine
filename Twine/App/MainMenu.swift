@@ -55,6 +55,8 @@ enum MainMenu {
 
     private static func fileMenu() -> NSMenu {
         let menu = NSMenu(title: "File")
+        menu.addItem(item("Search…", #selector(EditorWindowController.showSearch(_:)), "k"))
+        menu.addItem(.separator())
         menu.addItem(item("New Project", #selector(NSDocumentController.newDocument(_:)), "n"))
         menu.addItem(item("Open…", #selector(NSDocumentController.openDocument(_:)), "o"))
         menu.addItem(item("Home", #selector(AppDelegate.showHome(_:)), "h", [.command, .shift]))

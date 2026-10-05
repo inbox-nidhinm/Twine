@@ -121,6 +121,7 @@ enum SelfTest {
                 case "comma": key(",", 43)
                 case "stop": key(".", 47)
                 case "esc": key("\u{1b}", 53)
+                case "tab": key("\t", 48)
                 default: key(parts[1], 0)
                 }
             case "type": for c in parts[1] { key(String(c), 0) }
@@ -462,6 +463,10 @@ enum SelfTest {
                 switch parts[1] {
                 case "duplicate": controller.duplicateSelection()
                 case "shortcuts": (window.windowController as? EditorWindowController)?.toggleShortcuts(nil)
+                // ⌘K, in the editor or on the home screen, whichever has the window.
+                case "search":
+                    if let editor = window.windowController as? EditorWindowController { editor.showSearch(nil) }
+                    else { HomeWindowController.shared.showSearch(nil) }
                 case "copy": controller.copySelection()
                 case "paste": controller.paste()
                 case "undo": controller.store.undoManager.undo()

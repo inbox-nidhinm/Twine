@@ -98,6 +98,7 @@ struct ShortcutsCard: View {
                     s("Finish cropping", "Esc"),
                 ]),
                 Group(title: "View", items: [
+                    s("Search", "⌘K"),
                     s("Pan", "Space", "drag"),
                     s("Zoom to fit, actual size", "⌘0", "⌥⌘0"),
                     s("Zoom in, out", "⌘=", "⌘-"),

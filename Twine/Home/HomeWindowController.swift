@@ -33,6 +33,20 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
         super.showWindow(sender)
     }
 
+    /// Raises the ⌘K search card, or with it up, puts it away.
+    @objc func showSearch(_ sender: Any?) {
+        guard library.search == nil else {
+            library.search = nil
+            window?.makeFirstResponder(nil)
+            return
+        }
+        guard !OnboardingState.shared.isShowing else { return }
+        menus.dismiss()
+        library.info = nil
+        library.showVersionHistory = false
+        library.search = library.searchSource()
+    }
+
     func windowDidBecomeKey(_ notification: Notification) {
         // Renames and new files from the Finder show up when you come back.
         library.refresh()
@@ -42,5 +56,6 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
         guard window?.windowController === self else { return }
         menus.dismiss()
         library.showVersionHistory = false
+        library.search = nil
     }
 }

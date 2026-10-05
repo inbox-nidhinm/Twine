@@ -355,7 +355,7 @@ private struct EasingTile: View {
 }
 
 /// A level line across its frame, for dashing.
-private struct Line: Shape {
+private nonisolated struct Line: Shape {
     func path(in rect: CGRect) -> Path {
         Path { p in
             p.move(to: CGPoint(x: rect.minX, y: rect.midY))

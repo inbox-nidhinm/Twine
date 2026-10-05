@@ -249,6 +249,16 @@ public enum Theme {
     public static let easingGridHeight: CGFloat = 468
     public static let menuMinWidth: CGFloat = 168
 
+    /// The ⌘K search card: its width, how far down the window it sits, its
+    /// search row, a result's row, the tallest its list grows before it
+    /// scrolls, and a project's picture in a row.
+    public static let searchWidth: CGFloat = 560
+    public static let searchTop: CGFloat = 96
+    public static let searchField: CGFloat = 46
+    public static let searchRow: CGFloat = 34
+    public static let searchList: CGFloat = 392
+    public static let searchThumb = CGSize(width: 36, height: 24)
+
     /// The bottom bar's full height: one bar row inside its padding.
     public static let barHeight: CGFloat = barRow + barPad * 2
 
@@ -328,6 +338,9 @@ public enum ThemeFont {
     public static let caption = Font.system(size: 10)
     /// The unit letter inside a unit field.
     public static let unit = Font.system(size: 10, weight: .medium)
+    /// What is typed into the ⌘K search card, and its results.
+    public static let search = Font.system(size: 14)
+    public static let searchResult = Font.system(size: 12)
     /// The document name.
     public static let title = Font.system(size: 13, weight: .semibold)
     /// Tiny numbers on tiles and markers.

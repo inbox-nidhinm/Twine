@@ -269,17 +269,20 @@ struct SegmentRow<Value: Hashable>: View {
     var icon: ((Value) -> Icon)? = nil
     let select: (Value) -> Void
 
-    @State private var glide = GlideHover<Value>()
-    /// Each option's box in the row.
-    @State private var frames: [Value: CGRect] = [:]
+    @State private var glide = GlideHover<Int>()
+    /// Each option's box in the row. The hover and the boxes go by each
+    /// option's place in `options`: keyed by the option itself, the compiler
+    /// cannot vouch its hashing runs safely where SwiftUI keeps state.
+    @State private var frames: [Int: CGRect] = [:]
 
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(options, id: \.self) { option in
+            ForEach(options.indices, id: \.self) { i in
+                let option = options[i]
                 Segment(title: title(option), icon: icon?(option), isOn: option == selection,
-                        isHovered: glide.hovered == option) { select(option) }
-                    .onHover { $glide.hover(option, $0) }
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(segmentSpace)) } action: { frames[option] = $0 }
+                        isHovered: glide.hovered == i) { select(option) }
+                    .onHover { $glide.hover(i, $0) }
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(segmentSpace)) } action: { frames[i] = $0 }
             }
         }
         .coordinateSpace(.named(segmentSpace))
@@ -289,7 +292,7 @@ struct SegmentRow<Value: Hashable>: View {
                     highlight(Theme.rowHover, box)
                         .opacity(glide.hovered == nil ? 0 : 1)
                 }
-                if let box = frames[selection] {
+                if let i = options.firstIndex(of: selection), let box = frames[i] {
                     highlight(Theme.chosen, box)
                 }
             }
@@ -934,7 +937,20 @@ struct Scrubbing {
 extension EnvironmentValues {
     @Entry var scrubbing: Scrubbing? = nil
     /// The colours the open project uses, for the colour picker's swatches.
-    @Entry var documentColors: @MainActor () -> [RGBA] = { [] }
+    @Entry var documentColors = DocumentColors { [] }
+}
+
+/// Reads the open project's colours when a colour picker opens. It reads the
+/// project as it is then, so one reader is as good as another, and views
+/// reading it never need redrawing when the window hands it a new one.
+struct DocumentColors: Equatable {
+    let read: @MainActor () -> [RGBA]
+
+    init(_ read: @escaping @MainActor () -> [RGBA]) { self.read = read }
+
+    @MainActor func callAsFunction() -> [RGBA] { read() }
+
+    static func == (_: DocumentColors, _: DocumentColors) -> Bool { true }
 }
 
 /// Laid over a number field while it is not being typed in: a drag across

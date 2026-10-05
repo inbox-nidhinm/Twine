@@ -42,6 +42,8 @@ final class Library {
     var showVersionHistory = false
     /// The project whose Info card is up.
     var info: Item?
+    /// The ⌘K search card is up, with what it offers.
+    var search: SearchSource?
 
     /// What the shelf shows: everything, or one folder's projects.
     var shownItems: [Item] {

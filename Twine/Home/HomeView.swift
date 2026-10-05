@@ -67,6 +67,15 @@ struct HomeView: View {
                     .transition(.opacity)
             }
         }
+        .overlay {
+            if let search = library.search {
+                SearchCard(source: search) { [library] in
+                    library.search = nil
+                    MainWindow.window.makeFirstResponder(nil)
+                }
+                .transition(.opacity)
+            }
+        }
         .overlay { MenuLayer() }
         // Over everything: on a first launch it is the whole of what shows.
         .overlay {
@@ -80,6 +89,7 @@ struct HomeView: View {
         }
         .animation(.easeOut(duration: 0.14), value: library.showVersionHistory)
         .animation(.easeOut(duration: 0.14), value: library.info?.url)
+        .animation(.easeOut(duration: 0.12), value: library.search != nil)
         .animation(.easeOut(duration: 0.2), value: OnboardingState.shared.isShowing)
         .ignoresSafeArea()
         .preferredColorScheme(.dark)

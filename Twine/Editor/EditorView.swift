@@ -70,6 +70,14 @@ struct EditorView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
             }
 
+            if let search = editor.search {
+                SearchCard(source: search) { [editor] in
+                    editor.search = nil
+                    MainWindow.window.makeFirstResponder(MainWindow.window.preferredResponder)
+                }
+                .transition(.opacity)
+            }
+
             MenuLayer()
 
             if OnboardingState.shared.isShowing {
@@ -82,6 +90,7 @@ struct EditorView: View {
         .animation(.easeOut(duration: 0.18), value: editor.showInspector)
         .animation(.easeOut(duration: 0.18), value: editor.mode)
         .animation(.easeOut(duration: 0.15), value: editor.showShortcuts)
+        .animation(.easeOut(duration: 0.12), value: editor.search != nil)
         .animation(.easeOut(duration: 0.18), value: editor.notice)
         .animation(Theme.exportFade, value: editor.showExport)
         .animation(.easeOut(duration: 0.18), value: editor.exports.isExporting || editor.exports.finished != nil)
@@ -91,7 +100,7 @@ struct EditorView: View {
         // Every number field in the window, its cards and menus included,
         // undoes a drag as one step.
         .environment(\.scrubbing, controller.scrubbing)
-        .environment(\.documentColors, { [weak controller] in controller?.project.documentColors() ?? [] })
+        .environment(\.documentColors, DocumentColors { [weak controller] in controller?.project.documentColors() ?? [] })
     }
 
     /// Design mode floats the tools in a bar centred under the canvas,

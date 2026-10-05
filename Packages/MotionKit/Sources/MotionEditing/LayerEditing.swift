@@ -19,6 +19,46 @@ extension Layer {
         copy.transform.position = transform.position + delta
         return copy
     }
+
+    /// The layer given a new width or height as the inspector gives one: its
+    /// top-left stays where it is and the anchor keeps its place in the box,
+    /// as dragging the bottom-right handle would. A text box given a width
+    /// keeps it, and wraps inside it.
+    public func resized(width: Double? = nil, height: Double? = nil) -> Layer {
+        var l = self
+        let target = Size2(width ?? size.width, height ?? size.height)
+        let anchor = transform.anchor
+        let newAnchor = Vec2(size.width > 0 ? anchor.x / size.width * target.width : anchor.x,
+                             size.height > 0 ? anchor.y / size.height * target.height : anchor.y)
+        let old = Affine.layer(position: transform.position, anchor: anchor,
+                               scale: transform.scale, rotation: transform.rotation, skew: transform.skew)
+        let topLeft = old.apply(.zero)
+        let offset = old.applyToVector(Vec2(-newAnchor.x, -newAnchor.y))
+        l.size = target
+        l.transform.anchor = newAnchor
+        l.transform.position = Vec2(topLeft.x - offset.x, topLeft.y - offset.y)
+        if width != nil, case .text(var t) = l.content {
+            t.sizing = .fixedWidth
+            l.content = .text(t)
+        }
+        return l
+    }
+
+    /// Whether width and height change together: the link in the inspector.
+    /// Text sets its own height, so never for text.
+    public var keepsProportionsWhenSized: Bool { !isText && keepsProportions }
+
+    /// The layer given a new width, its height following when it keeps
+    /// proportions.
+    public func resized(toWidth w: Double) -> Layer {
+        keepsProportionsWhenSized && size.width > 0 ? resized(width: w, height: size.height * w / size.width) : resized(width: w)
+    }
+
+    /// The layer given a new height, its width following when it keeps
+    /// proportions.
+    public func resized(toHeight h: Double) -> Layer {
+        keepsProportionsWhenSized && size.height > 0 ? resized(width: size.width * h / size.height, height: h) : resized(height: h)
+    }
 }
 
 extension Layer {

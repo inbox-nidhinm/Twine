@@ -89,6 +89,7 @@ public enum Icon: String, CaseIterable, Sendable {
     case folder
     case minus
     case plus
+    case search
     case speakerOff
     case speaker
     case trash
@@ -495,6 +496,10 @@ public enum Icon: String, CaseIterable, Sendable {
         ]
         case .plus: return [   // Shared/plus.svg
             "M11.9922 4.00012V20.0001M19.9922 12.0001H3.99222"
+        ]
+        case .search: return [   // Shared/search.svg
+            "M18 11C18 14.866 14.866 18 11 18C7.13401 18 4 14.866 4 11C4 7.13401 7.13401 4 11 4C14.866 4 18 7.13401 18 11Z",
+            "M16.0001 16L20 20"
         ]
         case .speakerOff: return [   // Shared/speaker-off.svg
             "M14 14.8135V9.18646C14 6.04126 14 4.46866 13.0747 4.0773C12.1494 3.68593 11.0603 4.79793 8.88232 7.02192C7.75439 8.17365 7.11085 8.42869 5.50604 8.42869C4.10257 8.42869 3.40084 8.42869 2.89675 8.77262C1.85035 9.48655 2.00852 10.882 2.00852 12C2.00852 13.118 1.85035 14.5134 2.89675 15.2274C3.40084 15.5713 4.10257 15.5713 5.50604 15.5713C7.11085 15.5713 7.75439 15.8264 8.88232 16.9781C11.0603 19.2021 12.1494 20.3141 13.0747 19.9227C14 19.5313 14 17.9587 14 14.8135Z",

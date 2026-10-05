@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 201
+    static let pushes = 202
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -77,6 +77,7 @@ enum VersionHistory {
             "The Stroke action works on text with a stroke: its width and colour animate as a shape's do.",
             "Gradients in Animate have their handles on the canvas. Select a Colour or Stroke action that ends on a gradient and its line shows on the layer as it is when the action ends: drag the ends to turn and stretch the gradient it ends on, drag the line to move it, slide or add stops, as in Design. Grabbing it takes the playhead to the action's end, so you see what you set. When only the starting value is a gradient, the line sets that, at the action's start.",
             "Copy a scene onto another layer. Click a scene's row, copy, select another layer and paste: the scene's actions go onto that layer at the same times, each making its motion from where the new layer stands, as a scene of their own called \"Scene 1 copy\". Pasted onto several layers, each gets its own. Duplicating a whole scene, or a layer whose actions make a whole scene, also makes a new scene; copies of only some of a scene's actions still join it.",
+            "Search with ⌘K, on the home screen and in a project. On the home screen it finds projects by name (Return opens one; Tab shows Rename, Duplicate, Info, Show in Finder, Move to a folder and Move to Trash), folders, New Folder and Settings. In a project it finds the actions and presets the selection can take (Fade In and Fade Out each by name), the tools, the timeline's own commands, every menu command that can be used at that moment with its shortcut, and layers and scenes by name. Type a value to use it directly: `opacity 50`, `w 400`, `x 120`, `rotate 45`, `scale 150`, `radius 8` or `length 6s` set the selected layers or the scene, and `2.5s` or `f120` move the playhead. What you chose lately comes first.",
         ], fixes: [
             "A menu opened from inside a card, such as the Trim menu in the stroke's settings, opens over the card and leaves it up, rather than closing it.",
             "The playhead's time and the ruler's numbers no longer spill over the play controls when the timeline is scrolled or the playhead is near the start: the ruler keeps to its own area, and the time stays whole at either end while the playhead is in view.",
@@ -100,6 +101,7 @@ enum VersionHistory {
             "The picture at the top of a project's Info card fills the card's width at its own shape, rather than shrinking to a fixed height with space at its sides; a tall one is cut to a square, as on the home screen's cards.",
             "Settings' cards lie flat on the page, with no shadow under them.",
             "Cancel in the export window is a plain grey button while an export runs, rather than blue: it is not the thing the window is for.",
+            "Twine builds with Xcode 27, whose stricter checks needed a few small changes inside; nothing you use changed.",
         ]),
         .init(date: "30 September 2026", title: "Scenes and GIFs", features: [
             "Scenes on the timeline. Pick actions from any layers and choose Group into Scene (in the inspector, or the timeline's right-click menu): they gather under a row with the scene's name, how long it runs and a deep blue bar across its whole span. Drag that bar to move everything in the scene together, or drag its ends to stretch or squeeze it all in proportion. A scene folds with its chevron; double-click its name to rename it there, or use Rename Scene… on the right-click menu, beside Ungroup Scene. Duplicating or pasting an action in a scene, or a layer with actions in one, puts the copies in the same scene. Scenes are saved with the project.",

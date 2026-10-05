@@ -130,20 +130,8 @@ struct LayerInspector: View {
                 // A group's size is only where it was made; a frame's is its own.
                 if !layer.isGroup || layer.isFrame {
                     HStack(spacing: 8) {
-                        number("W", layer.size.width, accepts: { $0 >= 0 }) { l, v in
-                            if keepsProportions(l), l.size.width > 0 {
-                                resize(&l, width: v, height: l.size.height * v / l.size.width)
-                            } else {
-                                resize(&l, width: v)
-                            }
-                        }
-                        number("H", layer.size.height, accepts: { $0 >= 0 }) { l, v in
-                            if keepsProportions(l), l.size.height > 0 {
-                                resize(&l, width: l.size.width * v / l.size.height, height: v)
-                            } else {
-                                resize(&l, height: v)
-                            }
-                        }
+                        number("W", layer.size.width, accepts: { $0 >= 0 }) { l, v in l = l.resized(toWidth: v) }
+                        number("H", layer.size.height, accepts: { $0 >= 0 }) { l, v in l = l.resized(toHeight: v) }
                     }
                     .rowButton { widthHeightLink }
                 }
@@ -192,11 +180,6 @@ struct LayerInspector: View {
         return (x, y)
     }
 
-    private func keepsProportions(_ l: Layer) -> Bool {
-        if case .text = l.content { return false }
-        return l.keepsProportions
-    }
-
     /// Both ways always, with their own link in the column.
     private var scaleRow: some View {
         let scale = t.scale
@@ -240,29 +223,6 @@ struct LayerInspector: View {
         .padding(.bottom, Theme.panelPad)
     }
 
-
-    /// Resizing from the inspector keeps the layer's top-left where it is and
-    /// the anchor in the same place relative to the box, as dragging the
-    /// bottom-right handle would.
-    private func resize(_ l: inout Layer, width: Double? = nil, height: Double? = nil) {
-        let size = l.size
-        let target = Size2(width ?? size.width, height ?? size.height)
-        let anchor = l.transform.anchor
-        let newAnchor = Vec2(size.width > 0 ? anchor.x / size.width * target.width : anchor.x,
-                             size.height > 0 ? anchor.y / size.height * target.height : anchor.y)
-        let old = Affine.layer(position: l.transform.position, anchor: anchor,
-                               scale: l.transform.scale, rotation: l.transform.rotation, skew: l.transform.skew)
-        let topLeft = old.apply(.zero)
-        let offset = old.applyToVector(Vec2(-newAnchor.x, -newAnchor.y))
-        l.size = target
-        l.transform.anchor = newAnchor
-        l.transform.position = Vec2(topLeft.x - offset.x, topLeft.y - offset.y)
-        // A text box given a width keeps it, and wraps inside it.
-        if width != nil, case .text(var t) = l.content {
-            t.sizing = .fixedWidth
-            l.content = .text(t)
-        }
-    }
 
     /// Typing an anchor moves the anchor, not the layer.
     private func moveAnchor(_ l: inout Layer, x: Double? = nil, y: Double? = nil) {

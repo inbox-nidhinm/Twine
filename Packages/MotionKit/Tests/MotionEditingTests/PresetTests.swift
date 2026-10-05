@@ -49,6 +49,16 @@ private func edgeOn(_ state: LayerState) -> Bool {
         }
     }
 
+    @Test func theOtherWayOfAPairSuitsWhatThePairSuits() {
+        let project = Project(composition: Composition(), layers: [square()])
+        let layers = project.layers
+        #expect(Presets.suits(Presets.preset(.fadeOut), layers, in: project))
+        #expect(Presets.suits(Presets.library[0], layers, in: project))
+        // A text preset's Out never suits a shape, nor a sound preset.
+        #expect(!Presets.suits(Presets.preset(.typewriterOut), layers, in: project))
+        #expect(!Presets.suits(Presets.preset(.fadeSoundOut), layers, in: project))
+    }
+
     @Test func aPresetIsOneBar() throws {
         let layer = square()
         let action = bar(Presets.preset(.slideIn), on: layer)

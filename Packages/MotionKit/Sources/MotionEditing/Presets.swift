@@ -214,6 +214,15 @@ public enum Presets {
         return library.filter { preset in (!preset.isText || allText) && needs(preset.kind).isSubset(of: kinds) }
     }
 
+    /// Whether `preset` suits every one of `layers`: one `available` offers,
+    /// or the other way of a pair it offers (Fade Out, from `preset(_:)`,
+    /// where the picker shows Fade).
+    public static func suits(_ preset: Preset, _ layers: [Layer], in project: Project) -> Bool {
+        available(for: layers, in: project).contains { offered in
+            offered == preset || (!preset.isText && !offered.isText && offered.kind.reversed == preset.kind)
+        }
+    }
+
     /// The actions a layer must be able to take for the preset to suit it.
     static func needs(_ kind: PresetKind) -> Set<ActionKind> {
         Set(PresetRecipe.channels(PresetRecipe.defaults(kind)).map { channel -> ActionKind in

@@ -499,7 +499,7 @@ final class EditorController {
         let text = "Converting \(url.lastPathComponent)"
         editor.updateWork(work, text: text, fraction: 0)
         do {
-            let movie = try await WebMConversion.convert(url) { fraction in
+            let movie = try await WebMConversion.convert(url) { [weak self] fraction in
                 Task { @MainActor [weak self] in self?.editor.updateWork(work, text: text, fraction: fraction) }
             }
             defer { try? FileManager.default.removeItem(at: movie) }
@@ -712,7 +712,7 @@ final class EditorController {
     /// playhead: one bar each, on new rows at the bottom, selected and
     /// played, as Add Action's are. Its settings are in the inspector.
     func addPreset(_ preset: Preset) {
-        let layers = selectedLayers.filter { Presets.available(for: [$0], in: project).contains(preset) }
+        let layers = selectedLayers.filter { Presets.suits(preset, [$0], in: project) }
         let made = layers.map { Presets.action(preset, for: $0, at: editor.time, frameRate: frameRate) }
         insertAndShow(made, name: preset.name)
     }
