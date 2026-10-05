@@ -657,6 +657,9 @@ enum SelfTest {
                     board.setData(data, forType: kind == "tiff" ? .tiff : kind == "jpeg" ? NSPasteboard.PasteboardType("public.jpeg") : .png)
                 }
                 controller.paste(from: board)
+            case "window":
+                // The window's size and the smallest it may be made.
+                log("WINDOW frame=\(window.frame.size) min=\(window.minSize) contentMin=\(window.contentMinSize)")
             case "audio":
                 // The preview's sound: whether its renderer is playing, its
                 // clock against the playhead, and its reading.

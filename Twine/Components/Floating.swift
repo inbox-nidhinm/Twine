@@ -176,6 +176,29 @@ final class ChromelessWindow: NSWindow {
     /// on a panel button.
     weak var preferredResponder: NSResponder?
 
+    /// The smallest the window may be, which nothing can lower: SwiftUI's
+    /// hosting views set the window's smallest to zero whenever their
+    /// content goes in, sizing options or not (5 October 2026, when windows
+    /// could be dragged to half the width), so every setter keeps to this.
+    var sizeFloor = NSSize.zero {
+        didSet {
+            minSize = minSize
+            contentMinSize = contentMinSize
+        }
+    }
+
+    override var minSize: NSSize {
+        get { super.minSize }
+        set { super.minSize = NSSize(width: max(newValue.width, sizeFloor.width), height: max(newValue.height, sizeFloor.height)) }
+    }
+
+    override var contentMinSize: NSSize {
+        get { super.contentMinSize }
+        set {
+            super.contentMinSize = NSSize(width: max(newValue.width, sizeFloor.width), height: max(newValue.height, sizeFloor.height))
+        }
+    }
+
     override func sendEvent(_ event: NSEvent) {
         if event.type == .leftMouseDown || event.type == .rightMouseDown,
            let fieldEditor = firstResponder as? NSText,
@@ -216,7 +239,7 @@ func makeChromelessWindow(size: NSSize, minSize: NSSize) -> ChromelessWindow {
     window.titleVisibility = .hidden
     window.appearance = NSAppearance(named: .darkAqua)
     window.backgroundColor = NSColor(Theme.canvas)
-    window.minSize = minSize
+    window.sizeFloor = minSize
     window.isRestorable = false
     window.center()
     TrafficLights.keepPlaced(in: window)

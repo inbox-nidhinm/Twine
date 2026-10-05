@@ -132,6 +132,13 @@ struct HomeView: View {
             }
             .frame(maxHeight: .infinity)
 
+            // Parts the list from Settings, as the title is parted from it.
+            Rectangle().fill(Theme.border)
+                .frame(height: Theme.hairline)
+                .padding(.horizontal, Theme.panelPad)
+                .padding(.top, Theme.rowGap)
+                .padding(.bottom, Theme.rowGap)
+
             // Opens Settings; picking a folder is what comes back.
             sidebarRow("Settings", icon: .settings, on: library.showsSettings) {
                 endNewFolder()
