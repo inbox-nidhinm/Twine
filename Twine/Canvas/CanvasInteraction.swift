@@ -233,8 +233,45 @@ enum CanvasHandles {
         }.map { ($0.offset, $0.element) }
     }
 
+    /// The handle under `point`, or else the side it is on: anywhere along
+    /// a side resizes that way, as in Figma (5 October 2026), not only its
+    /// middle handle. A side counts only while the layer is thick enough
+    /// across it to be grabbed inside too (`sideDepth`), so a thin layer
+    /// still moves; a line has only its ends.
     static func handle(at point: CGPoint, box: [CGPoint], isLine: Bool) -> Int? {
-        handles(for: box, isLine: isLine).first { hypot($0.1.x - point.x, $0.1.y - point.y) <= hitRadius }?.0
+        if let hit = handles(for: box, isLine: isLine).first(where: { hypot($0.1.x - point.x, $0.1.y - point.y) <= hitRadius })?.0 {
+            return hit
+        }
+        guard !isLine, box.count == 4 else { return nil }
+        let width = hypot(box[1].x - box[0].x, box[1].y - box[0].y)
+        let height = hypot(box[3].x - box[0].x, box[3].y - box[0].y)
+        // Top, right, bottom and left, as their middle handles are numbered.
+        let sides: [(index: Int, from: CGPoint, to: CGPoint, depth: CGFloat)] = [
+            (1, box[0], box[1], height), (3, box[1], box[2], width), (5, box[2], box[3], height), (7, box[3], box[0], width),
+        ]
+        return sides.filter { $0.depth > sideDepth }
+            .map { ($0.index, distance(from: point, toSegment: $0.from, $0.to)) }
+            .filter { $0.1 <= hitRadius }
+            .min { $0.1 < $1.1 }?.0
+    }
+
+    /// How thick a layer must be across a side, in screen points, for the
+    /// side to resize: thinner, and the reach of both sides would cover it.
+    static let sideDepth: CGFloat = hitRadius * 4
+
+    /// Where handle `index` sits on `box`, shown or not.
+    static func point(_ index: Int, in box: [CGPoint]) -> CGPoint? {
+        guard box.count == 4, (0..<8).contains(index) else { return nil }
+        func mid(_ a: CGPoint, _ b: CGPoint) -> CGPoint { CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2) }
+        return [box[0], mid(box[0], box[1]), box[1], mid(box[1], box[2]),
+                box[2], mid(box[2], box[3]), box[3], mid(box[3], box[0])][index]
+    }
+
+    private static func distance(from p: CGPoint, toSegment a: CGPoint, _ b: CGPoint) -> CGFloat {
+        let dx = b.x - a.x, dy = b.y - a.y
+        let length = dx * dx + dy * dy
+        let t = length > 0 ? min(max(((p.x - a.x) * dx + (p.y - a.y) * dy) / length, 0), 1) : 0
+        return hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t))
     }
 
     /// Just outside a corner.

@@ -34,6 +34,9 @@ enum Cursors {
     static let resizeVertical = make("cursor-resize-vertical", fallback: .resizeUpDown)
     static let resizeNWSE = make("cursor-resize-nwse", fallback: .frameResize(position: .topLeft, directions: .all))
     static let resizeNESW = make("cursor-resize-nesw", fallback: .frameResize(position: .topRight, directions: .all))
+    /// Arrows every way: over a gradient's handles, its stops and its line,
+    /// and while they are dragged (the designer's, 5 October 2026).
+    static let moveAll = make("cursor-move-all", fallback: .openHand)
     static let rotateTopLeft = make("cursor-rotate-top-left", fallback: .crosshair)
     static let rotateTopRight = make("cursor-rotate-top-right", fallback: .crosshair)
     static let rotateBottomLeft = make("cursor-rotate-bottom-left", fallback: .crosshair)

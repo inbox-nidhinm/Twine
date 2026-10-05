@@ -442,7 +442,8 @@ enum SelfTest {
                     ("grabbed", Cursors.handGrabbed), ("h", Cursors.resizeHorizontal), ("v", Cursors.resizeVertical),
                     ("nwse", Cursors.resizeNWSE), ("nesw", Cursors.resizeNESW), ("rTL", Cursors.rotateTopLeft),
                     ("rTR", Cursors.rotateTopRight), ("rBL", Cursors.rotateBottomLeft), ("rBR", Cursors.rotateBottomRight),
-                    ("pen", Cursors.pen), ("penAdd", Cursors.penAdd), ("penMove", Cursors.penMove), ("penConnect", Cursors.penConnect)]
+                    ("pen", Cursors.pen), ("penAdd", Cursors.penAdd), ("penMove", Cursors.penMove), ("penConnect", Cursors.penConnect),
+                    ("moveAll", Cursors.moveAll)]
                 log("CURSOR " + (names.first { $0.1 === NSCursor.current }?.0 ?? "other") + " size=\(Cursors.arrow.image.size)")
             case "spacedown":
                 let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,

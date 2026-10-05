@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 198
+    static let pushes = 199
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -60,6 +60,9 @@ enum VersionHistory {
             "Animate is Twine's main mode: a project opens in it, and it is now the left of the switch at the top of the inspector, with Design on the right. The View menu lists them in the same order.",
             "Every row of tabs glides as the tool bar does: the mode switch, a fill's Solid, Linear, Radial and Image, a stroke's Style, Caps and Joins, a preset's direction, corner and In or Out, and the rest. A highlight slides from option to option under the pointer, and the chosen grey slides across to the one you pick.",
             "Paste pictures straight from the clipboard. A screenshot copied with ⌃⇧⌘4, a picture copied in a browser, or a layer copied as PNG in Figma comes in with ⌘V as a picture layer, as if it were imported; the same picture pasted twice is stored once. Files copied in the Finder paste too: pictures, video, sound and SVG drawings come in as they would from File > Import.",
+            "Resize from anywhere along a side, as in Figma: press on a selected layer's edge, not only its middle handle, and drag it out or in. The pointer shows which way it goes. A layer too thin to grab inside still moves when dragged.",
+            "Gradient handles take the designer's all-direction pointer: over a gradient's ends, its oval handle, its stops and its line, and while dragging them.",
+            "A new app icon, the designer's.",
             "Draw and shape things in Animate too. The tool keys work there (R, O, L, Y, S for shapes, F for a frame, P for the pen, T for text; there is no tool bar in Animate, so Escape puts a tool away), drawing where you click, into frames as they are at the playhead. A selected layer shows its handles in Animate as well: resize and turn it where it is at the playhead, and its animation follows, so a Rotate or Resize action's end turns or grows with it. Double-click a text to retype it, and Option-drag to copy layers with their actions. Editing a shape's points, cropping pictures and moving the anchor stay in Design.",
             "Dragging a number no longer stops at the edge of the screen. While you drag, the pointer goes on past the edge and comes back in from the other side, as in Figma, so one drag can change a number by as much as you like; let go and the pointer is where you left it.",
             "Every fill and every stroke in the inspector, as effects already were. The Fill and Stroke sections list each one, the one on top first, each under its own name row with a button to remove it; + in the section's header adds another on top. Each has its own colour or gradient, show and hide, and for strokes alignment, width and settings. Layers copied from Figma with several fills or strokes can now be edited whole.",

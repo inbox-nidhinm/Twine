@@ -1234,6 +1234,10 @@ final class CanvasNSView: NSView {
         guard !spaceHeld else { return }
         if pathMouseMoved(viewPoint, event: event) { return }
         guard !tool.draws, tool != .text else { return }
+        if tool == .select, gradientMouseMoved(viewPoint, event: event) {
+            setHover(nil)
+            return
+        }
         setHover(layer(at: viewToComposition(viewPoint), deep: event.modifierFlags.contains(.command)))
         updateCursor(at: viewPoint)
     }
@@ -1279,7 +1283,7 @@ final class CanvasNSView: NSView {
         let center = CGPoint(x: view.map(\.x).reduce(0, +) / 4, y: view.map(\.y).reduce(0, +) / 4)
         func away(_ p: CGPoint) -> CGVector { CGVector(dx: p.x - center.x, dy: p.y - center.y) }
         if actionKindOnCanvas != .rotate, let handle = CanvasHandles.handle(at: viewPoint, box: view, isLine: line),
-           let point = CanvasHandles.handles(for: view, isLine: line).first(where: { $0.0 == handle })?.1 {
+           let point = CanvasHandles.point(handle, in: view) {
             return Cursors.resize(toward: away(point))
         }
         if actionKindOnCanvas == .rotate || actionEndBox() == nil, CanvasHandles.isRotateZone(viewPoint, box: view),

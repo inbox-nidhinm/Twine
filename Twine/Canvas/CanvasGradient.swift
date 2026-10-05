@@ -144,30 +144,42 @@ extension CanvasNSView {
     /// A press while a gradient's line shows: on an end, a stop, or the
     /// line. Anywhere else, or with Command (the anchor), the picked stop
     /// is let go and the press carries on.
+    /// The part of the gradient's line under `viewPoint`: an end, the third
+    /// handle, a stop, or the line itself.
+    func gradientPart(at viewPoint: CGPoint, in place: GradientPlace) -> CanvasDrag.GradientDrag.Part? {
+        func distance(_ p: CGPoint) -> CGFloat { hypot(p.x - viewPoint.x, p.y - viewPoint.y) }
+        if distance(place.end) <= CanvasHandles.hitRadius { return .end }
+        if distance(place.start) <= CanvasHandles.hitRadius { return .start }
+        if let across = place.across, distance(across) <= CanvasHandles.hitRadius { return .across }
+        if let stop = place.stops.indices
+            .filter({ distance(place.stops[$0]) <= CanvasHandles.hitRadius })
+            .min(by: { distance(place.stops[$0]) < distance(place.stops[$1]) }) {
+            return .stop(stop)
+        }
+        if Self.distance(from: viewPoint, toSegment: place.start, place.end) <= CanvasHandles.hitRadius { return .line }
+        return nil
+    }
+
+    /// The pointer over the gradient's line: arrows every way. Returns
+    /// false when the pointer is not over it.
+    func gradientMouseMoved(_ viewPoint: CGPoint, event: NSEvent) -> Bool {
+        guard !event.modifierFlags.contains(.command), let place = gradientPlace(),
+              gradientPart(at: viewPoint, in: place) != nil else { return false }
+        Cursors.moveAll.set()
+        return true
+    }
+
     func gradientMouseDown(_ event: NSEvent, at point: Vec2, viewPoint: CGPoint) -> Bool {
         guard let place = gradientPlace(), let controller else { return false }
         guard !event.modifierFlags.contains(.command) else {
             controller.editor.gradient?.stop = nil
             return false
         }
-        func distance(_ p: CGPoint) -> CGFloat { hypot(p.x - viewPoint.x, p.y - viewPoint.y) }
-        let part: CanvasDrag.GradientDrag.Part
-        if distance(place.end) <= CanvasHandles.hitRadius {
-            part = .end
-        } else if distance(place.start) <= CanvasHandles.hitRadius {
-            part = .start
-        } else if let across = place.across, distance(across) <= CanvasHandles.hitRadius {
-            part = .across
-        } else if let stop = place.stops.indices
-            .filter({ distance(place.stops[$0]) <= CanvasHandles.hitRadius })
-            .min(by: { distance(place.stops[$0]) < distance(place.stops[$1]) }) {
-            part = .stop(stop)
-        } else if Self.distance(from: viewPoint, toSegment: place.start, place.end) <= CanvasHandles.hitRadius {
-            part = .line
-        } else {
+        guard let part = gradientPart(at: viewPoint, in: place) else {
             controller.editor.gradient?.stop = nil
             return false
         }
+        Cursors.moveAll.set()
         if case .stop(let i) = part { controller.editor.gradient = GradientEdit(layerID: place.edit.layerID, slot: place.edit.slot, stop: i) }
         if let time = place.time {
             controller.stop()
@@ -187,6 +199,7 @@ extension CanvasNSView {
             edit.began = true
             drag = .gradient(edit)
         }
+        Cursors.moveAll.set()
         let place = edit.place
         var g = place.gradient
         let shift = event.modifierFlags.contains(.shift)
