@@ -39,7 +39,7 @@ import Testing
                          size: Size2(10, 10), position: Vec2(123.25, 0))
         let star = Layer(name: "Star", content: .shape(ShapeContent(geometry: .star(points: 7, innerRadius: 0.4, cornerRadius: 0))),
                          size: Size2(10, 10), position: .zero)
-        let poly = Layer(name: "Poly", content: .shape(ShapeContent(geometry: .polygon(sides: 9))),
+        let poly = Layer(name: "Poly", content: .shape(ShapeContent(geometry: .polygon(sides: 9, cornerRadius: 0))),
                          size: Size2(10, 10), position: .zero)
         let fade = Action(target: audio.id, start: 1.375, duration: 2.875, spec: .volume(VolumeAction(end: 0)))
         let project = Project(composition: Composition(width: 1234, height: 567, duration: 6.625),
@@ -62,7 +62,7 @@ import Testing
         #expect(t.text == "1e400 stays words")
         #expect(read.layers[1].transform.position.x == -FileSafety.limit)
         #expect(read.layers[2].look?.geometry == .star(points: FileSafety.maxCorners, innerRadius: 0.4, cornerRadius: 0))
-        #expect(read.layers[3].look?.geometry == .polygon(sides: FileSafety.maxCorners))
+        #expect(read.layers[3].look?.geometry == .polygon(sides: FileSafety.maxCorners, cornerRadius: 0))
     }
 
     @Test func numbersInRangeAreNotCopied() throws {

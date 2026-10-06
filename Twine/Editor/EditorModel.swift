@@ -52,6 +52,10 @@ final class EditorModel {
     /// Escape on the canvas hides the gradient's line, until the selection
     /// or the mode changes.
     var hidesGradient = false
+    /// The points picked while a layer's points are edited in Design, for
+    /// the inspector's corner radius to change only those. Set by the
+    /// canvas; nil while none are picked.
+    var pickedPoints: PickedPoints?
     /// The layer under the pointer, on the canvas or in the layers panel,
     /// which both light up.
     var hoveredLayer: UUID?
@@ -322,4 +326,10 @@ struct GradientEdit: Equatable {
     var layerID: UUID
     var slot: PaintSlot
     var stop: Int? = nil
+}
+
+/// Points picked on one layer, as `EditorModel.pickedPoints` holds them.
+struct PickedPoints: Equatable {
+    let layerID: UUID
+    let refs: Set<PointRef>
 }

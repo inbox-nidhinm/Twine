@@ -48,7 +48,10 @@ public enum ActionFactory {
                 // Only dashes or dots have anything to move.
                 if first.dotted || first.dashPattern.contains(where: { $0 > 0 }) { kinds.append(.dash) }
             }
-            if case .rectangle = shape.geometry { kinds.append(.cornerRadius) }
+            switch shape.geometry {
+            case .rectangle, .polygon: kinds.append(.cornerRadius)
+            default: break
+            }
             kinds += [.shadow, .innerShadow, .layerBlur, .backgroundBlur]
             if case .ellipse = shape.geometry { kinds.append(.arc) }
             if case .star = shape.geometry { kinds.append(.star) }

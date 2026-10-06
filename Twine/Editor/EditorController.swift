@@ -171,6 +171,16 @@ final class EditorController {
         perform(layerUpdate([layer]))
     }
 
+    /// Rounds a shape's corners: the points `refs`, or every corner when
+    /// nil, as one undo step, its Path actions following
+    /// (`CornerEditing.setting`).
+    func setCornerRadius(_ radius: Double, of id: UUID, at refs: Set<PointRef>?) {
+        guard let layer = project.layer(withID: id) else { return }
+        let (edited, moved) = CornerEditing.setting(radius, at: refs, of: layer, actions: project.actions)
+        let update = layerUpdate([edited])
+        perform(moved.isEmpty ? .batch([update], name: "Corner Radius") : .batch([update, .updateActions(moved)], name: "Corner Radius"))
+    }
+
     /// Layer edits as one command. A layer whose design position moved
     /// takes its Move actions' absolute positions (To ends, initial values)
     /// with it, so its whole animation travels with it in either mode.

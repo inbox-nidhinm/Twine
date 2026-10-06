@@ -22,7 +22,7 @@ func stressProject(layers count: Int = 160) -> Project {
         case 0: geometry = .rectangle(cornerRadii: CornerRadii(all: 12))
         case 1: geometry = .ellipse(arc: .full)
         case 2: geometry = .star(points: 5, innerRadius: 0.5, cornerRadius: 4)
-        default: geometry = .polygon(sides: 6)
+        default: geometry = .polygon(sides: 6, cornerRadius: 0)
         }
         let color = RGBA(rng.next(), rng.next(), rng.next())
         let paint: Paint = i % 5 == 0

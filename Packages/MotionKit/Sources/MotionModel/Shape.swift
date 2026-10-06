@@ -64,7 +64,8 @@ public enum ShapeGeometry: Sendable, Equatable {
     /// A straight line across the middle of the box, left to right. Rotation
     /// points it anywhere, which is how Figma represents lines too.
     case line
-    case polygon(sides: Int)
+    /// `cornerRadius` rounds every corner, in pixels.
+    case polygon(sides: Int, cornerRadius: Double)
     /// `innerRadius` is the inner points' distance from the centre as a fraction
     /// of the outer radius. `cornerRadius` rounds every point, in pixels.
     case star(points: Int, innerRadius: Double, cornerRadius: Double)
@@ -97,7 +98,9 @@ extension ShapeGeometry: Codable {
         // Arcs and star corners arrived after the first files were written.
         case .ellipse: self = .ellipse(arc: try c.decodeIfPresent(EllipseArc.self, forKey: .arc) ?? .full)
         case .line: self = .line
-        case .polygon: self = .polygon(sides: try c.decode(Int.self, forKey: .sides))
+        case .polygon:
+            self = .polygon(sides: try c.decode(Int.self, forKey: .sides),
+                            cornerRadius: try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? 0)
         case .star:
             self = .star(points: try c.decode(Int.self, forKey: .points),
                          innerRadius: try c.decode(Double.self, forKey: .innerRadius),
@@ -116,9 +119,10 @@ extension ShapeGeometry: Codable {
             try c.encode(Kind.ellipse, forKey: .type)
             if arc != .full { try c.encode(arc, forKey: .arc) }
         case .line: try c.encode(Kind.line, forKey: .type)
-        case .polygon(let sides):
+        case .polygon(let sides, let corner):
             try c.encode(Kind.polygon, forKey: .type)
             try c.encode(sides, forKey: .sides)
+            if corner != 0 { try c.encode(corner, forKey: .cornerRadius) }
         case .star(let points, let inner, let corner):
             try c.encode(Kind.star, forKey: .type)
             try c.encode(points, forKey: .points)
@@ -188,15 +192,43 @@ public struct Subpath: Codable, Sendable, Hashable {
 }
 
 /// An anchor point with its two handles, stored as offsets from the anchor.
-/// A zero handle is a sharp corner on that side.
+/// A zero handle is a sharp corner on that side. `cornerRadius` rounds the
+/// point where the path turns there, in pixels, as Figma's vector points
+/// have; a smooth point has nothing to round.
 public struct PathPoint: Codable, Sendable, Hashable {
     public var position: Vec2
     public var inHandle: Vec2
     public var outHandle: Vec2
+    public var cornerRadius: Double
 
-    public init(_ position: Vec2, inHandle: Vec2 = .zero, outHandle: Vec2 = .zero) {
+    public init(_ position: Vec2, inHandle: Vec2 = .zero, outHandle: Vec2 = .zero, cornerRadius: Double = 0) {
         self.position = position
         self.inHandle = inHandle
         self.outHandle = outHandle
+        self.cornerRadius = cornerRadius
+    }
+
+    /// The same point for the path run the other way.
+    public var reversed: PathPoint {
+        PathPoint(position, inHandle: outHandle, outHandle: inHandle, cornerRadius: cornerRadius)
+    }
+
+    private enum CodingKeys: String, CodingKey { case position, inHandle, outHandle, cornerRadius }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        position = try c.decode(Vec2.self, forKey: .position)
+        inHandle = try c.decode(Vec2.self, forKey: .inHandle)
+        outHandle = try c.decode(Vec2.self, forKey: .outHandle)
+        // Arrived with rounded path corners; left out of files when sharp.
+        cornerRadius = try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? 0
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(position, forKey: .position)
+        try c.encode(inHandle, forKey: .inHandle)
+        try c.encode(outHandle, forKey: .outHandle)
+        if cornerRadius != 0 { try c.encode(cornerRadius, forKey: .cornerRadius) }
     }
 }

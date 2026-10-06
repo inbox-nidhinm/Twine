@@ -225,7 +225,8 @@ extension BezierPath: Interpolatable {
             Subpath(points: zip(sa.points, sb.points).map { pa, pb in
                 PathPoint(.interpolate(pa.position, pb.position, t),
                           inHandle: .interpolate(pa.inHandle, pb.inHandle, t),
-                          outHandle: .interpolate(pa.outHandle, pb.outHandle, t))
+                          outHandle: .interpolate(pa.outHandle, pb.outHandle, t),
+                          cornerRadius: max(0, lerp(pa.cornerRadius, pb.cornerRadius, t)))
             }, isClosed: sa.isClosed)
         })
     }

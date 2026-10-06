@@ -119,7 +119,7 @@ import MotionModel
         #expect(allFinite(r.layers))
         #expect(r.layers.map(\.name) == ["R", "S", "P"])
         guard case .star(let points, _, _)? = r.layers.first(where: { $0.name == "S" })?.look?.geometry,
-              case .polygon(let sides)? = r.layers.first(where: { $0.name == "P" })?.look?.geometry else {
+              case .polygon(let sides, _)? = r.layers.first(where: { $0.name == "P" })?.look?.geometry else {
             Issue.record("no star or polygon")
             return
         }

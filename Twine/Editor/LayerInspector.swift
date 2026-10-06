@@ -241,10 +241,7 @@ struct LayerInspector: View {
         case .rectangle(let radii):
             let r = radii
             VStack(alignment: .leading, spacing: 8) {
-                UnitField(unit: "Radius", value: r.topLeft, decimals: 1, accepts: { $0 >= 0 }) { v in
-                    setRadii(CornerRadii(all: v))
-                }
-                .help("Corner radius, in pixels")
+                cornerRadiusField
                 .rowButton {
                     IconButton(icon: .corners, help: perCorner ? "One radius for every corner" : "A radius for each corner") {
                         perCorner.toggle()
@@ -261,9 +258,12 @@ struct LayerInspector: View {
                     }
                 }
             }
-        case .polygon(let sides):
-            StepRow(label: "Sides", value: sides, range: 3...60) { n in
-                setGeometry(.polygon(sides: n))
+        case .polygon(let sides, let corner):
+            VStack(alignment: .leading, spacing: 8) {
+                StepRow(label: "Sides", value: sides, range: 3...60) { n in
+                    setGeometry(.polygon(sides: n, cornerRadius: corner))
+                }
+                cornerRadiusField
             }
         case .star(let points, let inner, let corner):
             VStack(alignment: .leading, spacing: 8) {
@@ -275,10 +275,7 @@ struct LayerInspector: View {
                         setGeometry(.star(points: points, innerRadius: v / 100, cornerRadius: corner))
                     }
                     .help("How far in the inner points sit, as a share of the outer ones")
-                    UnitField(unit: "Radius", value: corner, decimals: 1, accepts: { $0 >= 0 }) { v in
-                        setGeometry(.star(points: points, innerRadius: inner, cornerRadius: v))
-                    }
-                    .help("Rounds every point, in pixels")
+                    cornerRadiusField
                 }
             }
         case .ellipse(let arc):
@@ -301,9 +298,40 @@ struct LayerInspector: View {
                 .frame(width: 48)
                 .help("Ratio: the hole in the middle, as a share of the ellipse. 0% is solid, 80% a thin ring.")
             }
-        default:
+        case .path:
+            cornerRadiusField
+        case .line:
             EmptyView()
         }
+    }
+
+    /// The points picked on this layer's points, nil when none are.
+    private var pickedRefs: Set<PointRef>? {
+        guard let picked = controller.editor.pickedPoints, picked.layerID == layer.id else { return nil }
+        return picked.refs
+    }
+
+    /// One radius for the corners: the picked points' while some are
+    /// picked, else every corner's. Where they differ, the largest shows
+    /// dimmed, and typing sets them all.
+    private var cornerRadiusField: some View {
+        let refs = pickedRefs
+        var radii = CornerEditing.radii(of: layer, at: refs)
+        if radii.isEmpty, case .rectangle(let r)? = layer.look?.geometry {
+            // A frame's corners.
+            radii = [r.topLeft, r.topRight, r.bottomRight, r.bottomLeft]
+        }
+        let shared = radii.allSatisfy { $0 == radii.first } ? radii.first : nil
+        return OptionalField(unit: "Radius", value: shared, placeholder: radii.max() ?? 0, decimals: 1,
+                             accepts: { $0 >= 0 }) { v in
+            guard let v else { return }
+            if CornerEditing.hasCorners(layer) {
+                controller.setCornerRadius(v, of: layer.id, at: refs)
+            } else {
+                setRadii(CornerRadii(all: v))
+            }
+        }
+        .help(refs == nil ? "Corner radius, in pixels" : "Corner radius of the picked points, in pixels")
     }
 
     private func corner(_ icon: Icon, _ value: Double, _ set: @escaping (inout CornerRadii, Double) -> Void) -> some View {

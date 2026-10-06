@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 204
+    static let pushes = 205
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -78,6 +78,7 @@ enum VersionHistory {
             "Gradients in Animate have their handles on the canvas. Select a Colour or Stroke action that ends on a gradient and its line shows on the layer as it is when the action ends: drag the ends to turn and stretch the gradient it ends on, drag the line to move it, slide or add stops, as in Design. Grabbing it takes the playhead to the action's end, so you see what you set. When only the starting value is a gradient, the line sets that, at the action's start.",
             "Copy a scene onto another layer. Click a scene's row, copy, select another layer and paste: the scene's actions go onto that layer at the same times, each making its motion from where the new layer stands, as a scene of their own called \"Scene 1 copy\". Pasted onto several layers, each gets its own. Duplicating a whole scene, or a layer whose actions make a whole scene, also makes a new scene; copies of only some of a scene's actions still join it.",
             "Search with ⌘K, on the home screen and in a project. On the home screen it finds projects by name (Return opens one; Tab shows Rename, Duplicate, Info, Show in Finder, Move to a folder and Move to Trash), folders, New Folder and Settings. In a project it finds the actions and presets the selection can take (Fade In and Fade Out each by name), the tools, the timeline's own commands, every menu command that can be used at that moment with its shortcut, and layers and scenes by name. Type a value to use it directly: `opacity 50`, `w 400`, `x 120`, `rotate 45`, `scale 150`, `radius 8` or `length 6s` set the selected layers or the scene, and `2.5s` or `f120` move the playhead. What you chose lately comes first.",
+            "Corner radius on every shape with corners, as in Figma: polygons have a Radius field beside their sides, and paths one too. Double-click a shape to edit its points, pick one or several, and the Radius field rounds just those corners, showing the largest dimmed when they differ. A rectangle keeps its four corners; a polygon or star becomes a path once its points differ. The outline you edit shows the rounding, with each point at the corner it rounds, and rounded shapes keep their corners when they turn into paths. The Corner Radius action works on polygons too, and a Path action carries each point's radius along, so corners can round and sharpen as it plays.",
         ], fixes: [
             "A menu opened from inside a card, such as the Trim menu in the stroke's settings, opens over the card and leaves it up, rather than closing it.",
             "The playhead's time and the ruler's numbers no longer spill over the play controls when the timeline is scrolled or the playhead is near the start: the ruler keeps to its own area, and the time stays whole at either end while the playhead is in view.",

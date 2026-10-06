@@ -254,7 +254,7 @@ private struct FigmaBuilder {
             let arc = node.arc.map { EllipseArc(start: $0.start * 180 / .pi, end: $0.end * 180 / .pi, innerRadius: $0.inner) } ?? .full
             layer = shape(.ellipse(arc: arc.isWhole && arc.innerRadius == 0 ? .full : arc), node, size: size, closed: true)
         case "polygon":
-            layer = shape(.polygon(sides: min(max(node.count ?? 3, 3), FigmaImport.maxPoints)), node, size: size, closed: true)
+            layer = shape(.polygon(sides: min(max(node.count ?? 3, 3), FigmaImport.maxPoints), cornerRadius: 0), node, size: size, closed: true)
         case "star":
             layer = shape(.star(points: min(max(node.count ?? 5, 3), FigmaImport.maxPoints), innerRadius: node.inner ?? 0.4,
                                 cornerRadius: node.radii?.first ?? 0), node, size: size, closed: true)

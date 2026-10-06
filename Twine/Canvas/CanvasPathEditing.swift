@@ -52,6 +52,19 @@ extension CanvasNSView {
         redrawOverlay()
     }
 
+    /// Tells the inspector which points are picked, a turn later, since
+    /// the session also changes while the canvas is being drawn.
+    func publishPickedPoints() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let editor = self.controller?.editor else { return }
+            var picked: PickedPoints?
+            if let s = self.pathSession, s.target == .layer, s.drawingFrom == nil, !s.selected.isEmpty {
+                picked = PickedPoints(layerID: s.layerID, refs: s.selected)
+            }
+            if editor.pickedPoints != picked { editor.pickedPoints = picked }
+        }
+    }
+
     func endPathEditing() {
         guard pathSession != nil else { return }
         if isDrawingPath { finishDrawing() }
@@ -205,7 +218,9 @@ extension CanvasNSView {
         func view(_ p: Vec2) -> CGPoint { compositionToView(t.apply(p)) }
         var marks = CanvasOverlay.PathMarks()
         var transform = viewTransform(t)
-        marks.outline = path.cgPath.copy(using: &transform)
+        // The outline as drawn, corners rounded, with each rounded
+        // corner's point at the corner it rounds, as Figma shows them.
+        marks.outline = path.roundingCorners().cgPath.copy(using: &transform)
         for ref in PathEditing.refs(in: path) {
             guard let p = PathEditing.point(ref, in: path) else { continue }
             if session.selected.contains(ref) || ref == session.drawingFrom {

@@ -49,7 +49,7 @@ public enum PathTrim {
     }
 
     private static func reversed(_ subpath: Subpath) -> Subpath {
-        Subpath(points: subpath.points.reversed().map { PathPoint($0.position, inHandle: $0.outHandle, outHandle: $0.inHandle) },
+        Subpath(points: subpath.points.reversed().map(\.reversed),
                 isClosed: subpath.isClosed)
     }
 

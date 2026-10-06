@@ -34,7 +34,7 @@ public enum LayerFactory {
         case .rectangle: geometry = .rectangle(cornerRadii: .zero)
         case .ellipse: geometry = .ellipse(arc: .full)
         case .line: geometry = .line
-        case .polygon: geometry = .polygon(sides: 6)
+        case .polygon: geometry = .polygon(sides: 6, cornerRadius: 0)
         case .star: geometry = .star(points: 5, innerRadius: 0.4, cornerRadius: 0)
         }
         let content: ShapeContent

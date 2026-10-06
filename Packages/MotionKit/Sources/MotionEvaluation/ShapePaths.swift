@@ -104,52 +104,44 @@ enum ShapePaths {
                                       isClosed: false)])
     }
 
-    /// Corners evenly round the box's inscribed ellipse, the first straight up.
-    static func polygon(_ size: Size2, sides: Int) -> BezierPath {
+    /// Corners evenly round the box's inscribed ellipse, the first straight
+    /// up, each to be rounded by `cornerRadius`.
+    static func polygonPoints(_ size: Size2, sides: Int, cornerRadius: Double = 0) -> BezierPath {
         let n = FileSafety.corners(sides)
-        return closed(size, count: n) { _ in 1 }
+        return closed(size, count: n, cornerRadius: cornerRadius) { _ in 1 }
+    }
+
+    static func polygon(_ size: Size2, sides: Int, cornerRadius: Double = 0) -> BezierPath {
+        polygonPoints(size, sides: sides, cornerRadius: cornerRadius).roundingCorners()
+    }
+
+    static func starPoints(_ size: Size2, points: Int, innerRadius: Double, cornerRadius: Double = 0) -> BezierPath {
+        let n = FileSafety.corners(points)
+        return closed(size, count: n * 2, cornerRadius: cornerRadius) { $0.isMultiple(of: 2) ? 1 : max(innerRadius, 0) }
     }
 
     static func star(_ size: Size2, points: Int, innerRadius: Double, cornerRadius: Double = 0) -> BezierPath {
-        let n = FileSafety.corners(points)
-        let sharp = closed(size, count: n * 2) { $0.isMultiple(of: 2) ? 1 : max(innerRadius, 0) }
-        return cornerRadius > 0 ? rounded(sharp, radius: cornerRadius) : sharp
+        starPoints(size, points: points, innerRadius: innerRadius, cornerRadius: cornerRadius).roundingCorners()
     }
 
-    /// Every corner of a straight-sided path rounded by `radius`, which
-    /// shrinks where two corners would otherwise overlap on a short side.
-    static func rounded(_ path: BezierPath, radius: Double) -> BezierPath {
-        BezierPath(subpaths: path.subpaths.map { sub in
-            let ps = sub.points.map(\.position)
-            guard ps.count >= 3 else { return sub }
-            var out: [PathPoint] = []
-            for (i, p) in ps.enumerated() {
-                let a = ps[(i + ps.count - 1) % ps.count], b = ps[(i + 1) % ps.count]
-                let la = hypot(a.x - p.x, a.y - p.y), lb = hypot(b.x - p.x, b.y - p.y)
-                guard la > 0, lb > 0 else { out.append(PathPoint(p)); continue }
-                let u = Vec2((a.x - p.x) / la, (a.y - p.y) / la), v = Vec2((b.x - p.x) / lb, (b.y - p.y) / lb)
-                let angle = acos(min(max(u.x * v.x + u.y * v.y, -1), 1))
-                guard angle > 1e-3, angle < .pi - 1e-3 else { out.append(PathPoint(p)); continue }
-                // How far from the corner the curve starts, kept to half of
-                // each side, and the radius that distance allows.
-                let distance = min(radius / tan(angle / 2), la / 2, lb / 2)
-                let r = distance * tan(angle / 2)
-                let handle = 4.0 / 3.0 * tan((.pi - angle) / 4) * r
-                let start = Vec2(p.x + u.x * distance, p.y + u.y * distance)
-                let end = Vec2(p.x + v.x * distance, p.y + v.y * distance)
-                out.append(PathPoint(start, outHandle: Vec2(-u.x * handle, -u.y * handle)))
-                out.append(PathPoint(end, inHandle: Vec2(-v.x * handle, -v.y * handle)))
-            }
-            return Subpath(points: out, isClosed: sub.isClosed)
-        })
+    /// A rectangle's four corners, sharp, each carrying its radius: the
+    /// points it is edited by.
+    static func rectanglePoints(_ size: Size2, radii: CornerRadii) -> BezierPath {
+        let w = max(size.width, 0), h = max(size.height, 0)
+        return BezierPath(subpaths: [Subpath(points: [
+            PathPoint(Vec2(0, 0), cornerRadius: radii.topLeft),
+            PathPoint(Vec2(w, 0), cornerRadius: radii.topRight),
+            PathPoint(Vec2(w, h), cornerRadius: radii.bottomRight),
+            PathPoint(Vec2(0, h), cornerRadius: radii.bottomLeft),
+        ], isClosed: true)])
     }
 
-    private static func closed(_ size: Size2, count: Int, radius: (Int) -> Double) -> BezierPath {
+    private static func closed(_ size: Size2, count: Int, cornerRadius: Double, radius: (Int) -> Double) -> BezierPath {
         let rx = size.width / 2, ry = size.height / 2
         let points = (0..<count).map { i -> PathPoint in
             let angle = -Double.pi / 2 + Double(i) * 2 * .pi / Double(count)
             let r = radius(i)
-            return PathPoint(Vec2(rx + cos(angle) * rx * r, ry + sin(angle) * ry * r))
+            return PathPoint(Vec2(rx + cos(angle) * rx * r, ry + sin(angle) * ry * r), cornerRadius: cornerRadius)
         }
         return BezierPath(subpaths: [Subpath(points: points, isClosed: true)])
     }

@@ -71,7 +71,9 @@ final class CanvasNSView: NSView {
     /// Blinks the caret while typing.
     var caretTimer: Timer?
     /// A shape's points shown for editing, or the pen drawing, when happening.
-    var pathSession: PathSession?
+    var pathSession: PathSession? {
+        didSet { if pathSession != oldValue { publishPickedPoints() } }
+    }
     /// A picture being cropped, when happening.
     var cropSession: CropSession?
 

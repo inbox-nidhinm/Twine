@@ -181,8 +181,8 @@ extension FileSafety {
                 l.content = .text(text)
             case .shape(var shape):
                 switch shape.geometry {
-                case .polygon(let sides) where corners(sides) != sides:
-                    shape.geometry = .polygon(sides: corners(sides))
+                case .polygon(let sides, let corner) where corners(sides) != sides:
+                    shape.geometry = .polygon(sides: corners(sides), cornerRadius: corner)
                 case .star(let points, let inner, let corner) where corners(points) != points:
                     shape.geometry = .star(points: corners(points), innerRadius: inner, cornerRadius: corner)
                 default:

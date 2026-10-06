@@ -30,12 +30,13 @@ public enum HandleSide: Sendable, Hashable {
 public enum PathEditing {
     // MARK: Reading
 
-    /// The points a shape is drawn with, in its own space: a pen path as it
-    /// is stored, any other shape as it is drawn at its size. Nil for layers
+    /// The points a shape is edited by, in its own space: a pen path as it
+    /// is stored, any other shape as it is drawn at its size, but with each
+    /// rounded corner one sharp point carrying its radius. Nil for layers
     /// that are not shapes.
     public static func path(of layer: Layer) -> BezierPath? {
         guard case .shape(let shape) = layer.content else { return nil }
-        return shape.geometry.bezierPath(size: layer.size)
+        return shape.geometry.points(size: layer.size)
     }
 
     /// Whether the layer's points can be edited: shapes, not groups, text or
@@ -297,7 +298,7 @@ public enum PathEditing {
         var edited = path
         var sub = edited.subpaths.remove(at: ref.subpath)
         if ref.index == 0 && sub.points.count > 1 {
-            sub.points = sub.points.reversed().map { PathPoint($0.position, inHandle: $0.outHandle, outHandle: $0.inHandle) }
+            sub.points = sub.points.reversed().map(\.reversed)
         }
         edited.subpaths.append(sub)
         return (edited, PointRef(edited.subpaths.count - 1, sub.points.count - 1))
@@ -317,7 +318,7 @@ public enum PathEditing {
         // end, turned so the end the pen reached comes first.
         var other = edited.subpaths[ref.subpath]
         if ref.index != 0 {
-            other.points = other.points.reversed().map { PathPoint($0.position, inHandle: $0.outHandle, outHandle: $0.inHandle) }
+            other.points = other.points.reversed().map(\.reversed)
         }
         edited.subpaths[last].points += other.points
         edited.subpaths.remove(at: ref.subpath)
@@ -410,7 +411,7 @@ public enum PathEditing {
     public static func translated(_ path: BezierPath, by delta: Vec2) -> BezierPath {
         guard delta != .zero else { return path }
         return BezierPath(subpaths: path.subpaths.map { sub in
-            Subpath(points: sub.points.map { PathPoint($0.position + delta, inHandle: $0.inHandle, outHandle: $0.outHandle) },
+            Subpath(points: sub.points.map { PathPoint($0.position + delta, inHandle: $0.inHandle, outHandle: $0.outHandle, cornerRadius: $0.cornerRadius) },
                     isClosed: sub.isClosed)
         })
     }

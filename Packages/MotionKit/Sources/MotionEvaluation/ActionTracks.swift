@@ -172,6 +172,7 @@ public struct LayerState: Sendable, Equatable {
             trim = shape.strokes.first?.trim
             switch shape.geometry {
             case .rectangle(let radii): cornerRadii = radii
+            case .polygon(_, let corner): cornerRadii = CornerRadii(all: corner)
             case .ellipse(let a): arc = a
             case .star(let points, let inner, let corner):
                 star = StarShape(points: points, innerRadius: inner, cornerRadius: corner)

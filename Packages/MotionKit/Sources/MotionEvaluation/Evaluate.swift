@@ -559,7 +559,14 @@ private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState, pict
         }
         if let trim = state.trim { shape.strokes[0].trim = trim }
     }
-    if let radii = state.cornerRadii, case .rectangle = shape.geometry { shape.geometry = .rectangle(cornerRadii: radii) }
+    if let radii = state.cornerRadii {
+        switch shape.geometry {
+        case .rectangle: shape.geometry = .rectangle(cornerRadii: radii)
+        // A polygon has one radius for every corner.
+        case .polygon(let sides, _): shape.geometry = .polygon(sides: sides, cornerRadius: radii.topLeft)
+        default: break
+        }
+    }
     if let arc = state.arc, case .ellipse = shape.geometry { shape.geometry = .ellipse(arc: arc) }
     if let star = state.star, case .star = shape.geometry {
         shape.geometry = .star(points: star.points, innerRadius: star.innerRadius, cornerRadius: star.cornerRadius)
@@ -568,7 +575,7 @@ private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState, pict
 
     let path: BezierPath
     if case .path(let p) = shape.geometry {
-        path = p.fitted(from: designBounds, to: size)
+        path = p.fitted(from: designBounds, to: size).roundingCorners()
     } else {
         path = shape.geometry.bezierPath(size: size)
     }
@@ -637,16 +644,28 @@ extension Project {
 
 extension ShapeGeometry {
     /// The shape as a bezier path filling a box of `size`, in the layer's own
-    /// pixel space. A pen path is its own points, whatever the size.
+    /// pixel space, as it is drawn: corners rounded. A pen path is its own
+    /// points, stretched onto the box.
     public func bezierPath(size: Size2) -> BezierPath {
         switch self {
         case .rectangle(let radii): return ShapePaths.rectangle(size, radii: radii)
+        case .polygon, .star, .path: return points(size: size).roundingCorners()
         case .ellipse(let arc): return ShapePaths.ellipse(size, arc: arc)
         case .line: return ShapePaths.line(size)
-        case .polygon(let sides): return ShapePaths.polygon(size, sides: sides)
+        }
+    }
+
+    /// The points the shape is edited by, in a box of `size`: as drawn,
+    /// except that a rounded corner is one sharp point carrying its radius,
+    /// as Figma shows a rounded rectangle's or polygon's points.
+    public func points(size: Size2) -> BezierPath {
+        switch self {
+        case .rectangle(let radii): return ShapePaths.rectanglePoints(size, radii: radii)
+        case .polygon(let sides, let corner): return ShapePaths.polygonPoints(size, sides: sides, cornerRadius: corner)
         case .star(let points, let inner, let corner):
-            return ShapePaths.star(size, points: points, innerRadius: inner, cornerRadius: corner)
+            return ShapePaths.starPoints(size, points: points, innerRadius: inner, cornerRadius: corner)
         case .path(let p): return p.fitted(from: p.bounds, to: size)
+        case .ellipse, .line: return bezierPath(size: size)
         }
     }
 }
@@ -665,7 +684,8 @@ extension BezierPath {
         func point(_ v: Vec2) -> Vec2 { Vec2((v.x - ox) * sx, (v.y - oy) * sy) }
         func vector(_ v: Vec2) -> Vec2 { Vec2(v.x * sx, v.y * sy) }
         return BezierPath(subpaths: subpaths.map { sub in
-            Subpath(points: sub.points.map { PathPoint(point($0.position), inHandle: vector($0.inHandle), outHandle: vector($0.outHandle)) },
+            Subpath(points: sub.points.map { PathPoint(point($0.position), inHandle: vector($0.inHandle), outHandle: vector($0.outHandle),
+                                                cornerRadius: $0.cornerRadius) },
                     isClosed: sub.isClosed)
         })
     }

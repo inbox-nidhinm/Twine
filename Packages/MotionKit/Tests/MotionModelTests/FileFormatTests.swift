@@ -36,7 +36,7 @@ func kitchenSinkProject() -> Project {
         size: Size2(80, 80), position: Vec2(0, 0))
     star.isMask = true
 
-    let polygon = Layer(name: "Poly", content: .shape(ShapeContent(geometry: .polygon(sides: 6))),
+    let polygon = Layer(name: "Poly", content: .shape(ShapeContent(geometry: .polygon(sides: 6, cornerRadius: 0))),
                         size: Size2(10, 10), position: .zero)
     let line = Layer(name: "Line", content: .shape(ShapeContent(geometry: .line)),
                      size: Size2(100, 0), position: .zero)
