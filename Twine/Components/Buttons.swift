@@ -131,7 +131,8 @@ struct PrimaryButton: View {
 }
 
 /// A small square glyph button for panel headers and rows, which lights its
-/// ground only under the pointer.
+/// ground only under the pointer. Its icon reads as the other controls' do
+/// while it can be used; only a button that cannot is dimmed.
 struct IconButton: View {
     let icon: Icon
     var help: String
@@ -145,7 +146,7 @@ struct IconButton: View {
     var body: some View {
         Button(action: action) {
             IconView(icon, size: iconBox)
-                .foregroundStyle(hovering && isEnabled ? Theme.textPrimary : Theme.textTertiary)
+                .foregroundStyle(!isEnabled ? Theme.textTertiary : hovering ? Theme.textPrimary : Theme.textSecondary)
                 .opacity(isEnabled ? 1 : 0.4)
                 .frame(width: size, height: size)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
