@@ -214,7 +214,7 @@ async function describe(node, context) {
         arc: { start: node.arcData.startingAngle, end: node.arcData.endingAngle, inner: node.arcData.innerRadius },
       }, look(node, context));
     case "POLYGON":
-      return Object.assign(base, { kind: "polygon", count: node.pointCount }, look(node, context));
+      return Object.assign(base, { kind: "polygon", count: node.pointCount, radii: [number(node.cornerRadius)] }, look(node, context));
     case "STAR":
       return Object.assign(base, {
         kind: "star", count: node.pointCount, inner: node.innerRadius, radii: [number(node.cornerRadius)],
@@ -225,6 +225,7 @@ async function describe(node, context) {
       return Object.assign(base, {
         kind: "vector",
         paths: node.vectorPaths.map(function (p) { return { rule: p.windingRule, d: p.data }; }),
+        corners: vectorCorners(node),
       }, look(node, context));
     case "BOOLEAN_OPERATION":
       return Object.assign(base, {
@@ -291,7 +292,6 @@ function flattenAs(node) {
     if (regions && regions.some(function (r) { return r.fills && r.fills.length; })) return "svg";
   }
   if (node.type === "RECTANGLE" && node.cornerSmoothing > 0) return "svg";
-  if (node.type === "POLYGON" && number(node.cornerRadius) > 0) return "svg";
   return null;
 }
 
@@ -391,6 +391,21 @@ function flat(t) {
 
 function number(v) {
   return typeof v === "number" ? v : 0;
+}
+
+/// A vector's rounded points as [x, y, radius] in its own space: Figma keeps
+/// the radius on the network's vertices (or one for the whole vector), not
+/// in `vectorPaths`, which are drawn sharp. Twine matches them by place.
+function vectorCorners(node) {
+  const vertices = node.vectorNetwork && node.vectorNetwork.vertices;
+  if (!vertices) return undefined;
+  const all = number(node.cornerRadius);
+  const corners = [];
+  for (const v of vertices) {
+    const r = typeof v.cornerRadius === "number" ? v.cornerRadius : all;
+    if (r > 0) corners.push([v.x, v.y, r]);
+  }
+  return corners.length ? corners : undefined;
 }
 
 function radii(node) {

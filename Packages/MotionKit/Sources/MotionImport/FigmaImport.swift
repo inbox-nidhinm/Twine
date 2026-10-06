@@ -58,6 +58,10 @@ public struct FigmaPayload: Codable, Sendable {
         public var inner: Double?
         /// Vectors: their outlines in their own space.
         public var paths: [PathData]?
+        /// Vectors: their rounded points as `x y radius`, in their own
+        /// space. Figma keeps these on its vector network; the outlines
+        /// are sharp.
+        public var corners: [[Double]]?
         public var text: Text?
         /// Pictures: Figma's drawing, and its box in the page.
         public var png: String?
@@ -254,7 +258,8 @@ private struct FigmaBuilder {
             let arc = node.arc.map { EllipseArc(start: $0.start * 180 / .pi, end: $0.end * 180 / .pi, innerRadius: $0.inner) } ?? .full
             layer = shape(.ellipse(arc: arc.isWhole && arc.innerRadius == 0 ? .full : arc), node, size: size, closed: true)
         case "polygon":
-            layer = shape(.polygon(sides: min(max(node.count ?? 3, 3), FigmaImport.maxPoints), cornerRadius: 0), node, size: size, closed: true)
+            layer = shape(.polygon(sides: min(max(node.count ?? 3, 3), FigmaImport.maxPoints), cornerRadius: max(node.radii?.first ?? 0, 0)),
+                          node, size: size, closed: true)
         case "star":
             layer = shape(.star(points: min(max(node.count ?? 5, 3), FigmaImport.maxPoints), innerRadius: node.inner ?? 0.4,
                                 cornerRadius: node.radii?.first ?? 0), node, size: size, closed: true)
@@ -320,7 +325,7 @@ private struct FigmaBuilder {
         let parts = node.paths ?? []
         var subpaths: [Subpath] = []
         for part in parts { subpaths += SVGPathData.parse(part.d).subpaths }
-        let path = BezierPath(subpaths: subpaths)
+        let path = Self.rounding(BezierPath(subpaths: subpaths), at: node.corners ?? [])
         guard let bounds = path.bounds else { return nil }
         let local = path.transformed(by: .translation(Vec2(-bounds.minX, -bounds.minY)))
         let closed = subpaths.allSatisfy(\.isClosed)
@@ -328,6 +333,22 @@ private struct FigmaBuilder {
         content.fillRule = !parts.isEmpty && parts.allSatisfy({ $0.rule == "EVENODD" }) ? .evenOdd : .nonZero
         let layer = Layer(name: node.name, content: .shape(content), size: Size2(bounds.width, bounds.height), position: .zero)
         return (layer, Vec2(bounds.minX, bounds.minY))
+    }
+
+    /// Each point of `path` at one of `corners`' places takes its radius.
+    static func rounding(_ path: BezierPath, at corners: [[Double]]) -> BezierPath {
+        let rounded = corners.filter { $0.count == 3 && $0[2] > 0 }
+        guard !rounded.isEmpty else { return path }
+        var path = path
+        for s in path.subpaths.indices {
+            for i in path.subpaths[s].points.indices {
+                let p = path.subpaths[s].points[i].position
+                if let corner = rounded.first(where: { abs($0[0] - p.x) < 0.01 && abs($0[1] - p.y) < 0.01 }) {
+                    path.subpaths[s].points[i].cornerRadius = corner[2]
+                }
+            }
+        }
+        return path
     }
 
     private func radii(_ node: FigmaPayload.Node) -> CornerRadii {

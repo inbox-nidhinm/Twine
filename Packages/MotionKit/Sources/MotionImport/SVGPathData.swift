@@ -264,7 +264,8 @@ extension BezierPath {
     func transformed(by t: Affine) -> BezierPath {
         BezierPath(subpaths: subpaths.map { sub in
             Subpath(points: sub.points.map {
-                PathPoint(t.apply($0.position), inHandle: t.applyToVector($0.inHandle), outHandle: t.applyToVector($0.outHandle))
+                PathPoint(t.apply($0.position), inHandle: t.applyToVector($0.inHandle), outHandle: t.applyToVector($0.outHandle),
+                          cornerRadius: $0.cornerRadius)
             }, isClosed: sub.isClosed)
         })
     }

@@ -81,7 +81,8 @@ const card = node("FRAME", {
     node("VECTOR", {
       name: "Icon", absoluteTransform: translate(130, 160), width: 24, height: 24, fills: [solid(0.3, 0.6, 0.9)],
       vectorPaths: [{ windingRule: "EVENODD", data: "M0 0 L24 0 L24 24 L0 24 Z M6 6 L18 6 L18 18 L6 18 Z" }],
-      vectorNetwork: { regions: [] },
+      // One rounded point: Figma keeps its radius on the vertex, not in the path.
+      vectorNetwork: { regions: [], vertices: [{ x: 0, y: 0 }, { x: 24, y: 0, cornerRadius: 4 }, { x: 24, y: 24 }, { x: 0, y: 24 }] },
     }),
     node("VECTOR", {
       name: "Painted Regions", absoluteTransform: translate(160, 160), width: 24, height: 24,
@@ -105,6 +106,8 @@ const card = node("FRAME", {
         gradientTransform: [[0, 1, 0], [-1, 0, 1]] }] }),
     node("LINE", { name: "Rule", absoluteTransform: translate(116, 190), width: 288, height: 0, strokes: [solid(0, 0, 0)], strokeWeight: 2, strokeCap: "ROUND" }),
     node("STICKY", { name: "Note", absoluteTransform: translate(300, 180), width: 20, height: 20 }),
+    node("POLYGON", { name: "Rounded Polygon", absoluteTransform: translate(330, 180), width: 30, height: 30, pointCount: 6,
+      cornerRadius: 5, fills: [solid(0.2, 0.8, 0.4)] }),
     // A background of pictures stacked on a colour: only the top one is kept.
     node("FRAME", { name: "Stacked", absoluteTransform: translate(340, 200), width: 60, height: 40, clipsContent: true,
       topLeftRadius: 6, topRightRadius: 6, bottomRightRadius: 6, bottomLeftRadius: 6, cornerRadius: 6, children: [],
@@ -155,7 +158,7 @@ vm.runInNewContext(code, { figma: figma, __html__: "", console: console, Math: M
   const frame = payload.nodes[0];
   const kinds = frame.children.map(function (c) { return c.name + ":" + c.kind; });
   assert.deepStrictEqual(kinds, ["Photo:rectangle", "Title:text", "Mixed:picture", "Leaning:picture", "Slanted:rectangle", "Sheared:text", "Icon:vector",
-    "Painted Regions:svg", "Masked:group", "Dial:ellipse", "Rule:line", "Note:picture", "Stacked:frame"]);
+    "Painted Regions:svg", "Masked:group", "Dial:ellipse", "Rule:line", "Note:picture", "Rounded Polygon:polygon", "Stacked:frame"]);
   assert.deepStrictEqual(frame.fills.map(function (f) { return f.type; }).join(), "SOLID", "the diamond gradient is left out");
   const dial = frame.children[9].fills[0];
   assert.strictEqual(dial.type, "GRADIENT_ANGULAR", "an angular gradient travels as a gradient");
@@ -169,6 +172,8 @@ vm.runInNewContext(code, { figma: figma, __html__: "", console: console, Math: M
   assert(!payload.images["under-1"] && !payload.images["under-2"] && payload.images["top"], "and only it is copied");
   assert.strictEqual(frame.children[1].text.letterSpacing, -0.48);
   assert.strictEqual(frame.children[8].children[0].isMask, true);
+  assert.deepStrictEqual(frame.children[6].corners, [[24, 0, 4]], "a vector's rounded point travels");
+  assert.deepStrictEqual(frame.children[12].radii, [5], "a rounded polygon stays a polygon");
   assert.deepStrictEqual(frame.children[4].transform, [1, 0, 0.4, 1, 300, 60], "the slant travels in the transform");
   const percents = messages.filter(function (m) { return m.type === "progress"; }).map(function (m) { return m.percent; });
   assert(percents.length > 1 && percents.every(function (p, i) { return i === 0 || p > percents[i - 1]; }), "progress only rises");

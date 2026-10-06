@@ -20,7 +20,7 @@ import MotionEditing
         #expect(card.isFrame && card.name == "Card" && card.size == Size2(320, 200))
         #expect(r.bounds == Box(minX: 100, minY: 50, maxX: 420, maxY: 250))
         let names = card.children.map(\.name)
-        #expect(names == ["Photo", "Title", "Mixed", "Leaning", "Slanted", "Sheared", "Icon", "Painted Regions", "Masked", "Dial", "Rule", "Note", "Stacked"])
+        #expect(names == ["Photo", "Title", "Mixed", "Leaning", "Slanted", "Sheared", "Icon", "Painted Regions", "Masked", "Dial", "Rule", "Note", "Rounded Polygon", "Stacked"])
         let photo = card.children[0]
         #expect(photo.picture?.paint.mode == .fill && photo.transform.position == Vec2(76, 56))
         guard case .text(let title) = card.children[1].content else { Issue.record("title is not text"); return }
@@ -32,6 +32,12 @@ import MotionEditing
         guard case .text = sheared.content else { Issue.record("sheared is not text"); return }
         #expect(abs(sheared.transform.skew.x - atan(0.3) * 180 / .pi) < 1e-9)
         #expect(card.children[6].look?.fillRule == .evenOdd)
+        // Figma keeps a vector's rounded points on its network: the one at
+        // the top right comes in carrying its radius, the rest sharp.
+        guard case .path(let icon)? = card.children[6].look?.geometry else { Issue.record("icon is not a path"); return }
+        #expect(icon.subpaths[0].points.map(\.cornerRadius) == [0, 4, 0, 0])
+        #expect(icon.subpaths[1].points.allSatisfy { $0.cornerRadius == 0 })
+        #expect(card.children[12].look?.geometry == .polygon(sides: 6, cornerRadius: 5), "a rounded polygon stays one")
         #expect(card.children[7].isGroup, "Figma's SVG, read into a group")
         let masked = card.children[8]
         #expect(masked.children[0].isMask && !masked.children[1].isMask, "Figma's mask comes in as a mask")

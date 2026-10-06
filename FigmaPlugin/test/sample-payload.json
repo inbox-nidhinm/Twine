@@ -242,6 +242,13 @@
        "d": "M0 0 L24 0 L24 24 L0 24 Z M6 6 L18 6 L18 18 L6 18 Z"
       }
      ],
+     "corners": [
+      [
+       24,
+       0,
+       4
+      ]
+     ],
      "fills": [
       {
        "type": "SOLID",
@@ -490,6 +497,41 @@
       180,
       20,
       20
+     ]
+    },
+    {
+     "name": "Rounded Polygon",
+     "visible": true,
+     "locked": false,
+     "opacity": 1,
+     "blend": "PASS_THROUGH",
+     "transform": [
+      1,
+      0,
+      0,
+      1,
+      330,
+      180
+     ],
+     "width": 30,
+     "height": 30,
+     "kind": "polygon",
+     "count": 6,
+     "radii": [
+      5
+     ],
+     "fills": [
+      {
+       "type": "SOLID",
+       "visible": true,
+       "opacity": 1,
+       "color": {
+        "r": 0.2,
+        "g": 0.8,
+        "b": 0.4,
+        "a": 1
+       }
+      }
      ]
     },
     {
