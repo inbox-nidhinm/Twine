@@ -59,9 +59,21 @@ public struct TemplateCard: Sendable, Equatable {
     public var curve: Vec2
     public var scale: Double
     public var opacity: Double
+    /// The slot whose picture it shows; nil goes round them by `index`.
+    public var slot: Int?
+    /// A piece of a bigger picture: where that picture's whole area lies,
+    /// in the card's own pixels from its top-left. The picture covers the
+    /// area, and the card shows its part of it; the card is its cell
+    /// exactly. Nil fits the whole picture to the card.
+    public var area: Box?
+    /// A plain colour in place of a picture, for a dimming veil or a glow.
+    public var color: RGBA?
+    /// Rounded as the template's cards are, or square, as a full frame is.
+    public var rounded: Bool
 
     init(_ index: Int, cell: Size2, position: Vec2, z: Double = 0, rotation: Double = 0, tilt: Vec2 = .zero,
-         curve: Vec2 = .zero, scale: Double = 1, opacity: Double = 1) {
+         curve: Vec2 = .zero, scale: Double = 1, opacity: Double = 1, slot: Int? = nil, area: Box? = nil,
+         color: RGBA? = nil, rounded: Bool = true) {
         self.index = index
         self.cell = cell
         self.position = position
@@ -71,6 +83,10 @@ public struct TemplateCard: Sendable, Equatable {
         self.curve = curve
         self.scale = scale
         self.opacity = opacity
+        self.slot = slot
+        self.area = area
+        self.color = color
+        self.rounded = rounded
     }
 }
 
@@ -90,6 +106,22 @@ public enum TemplateRecipes {
         case .isoSwing: 9
         case .quadOrbit: 4
         case .zoomOrbit: 20
+        default: flatSlotCount(kind)
+        }
+    }
+
+    /// Where a new template rests in its loop, for Design and the
+    /// picker's still: where it looks whole, past any building up.
+    public static func restingPose(_ kind: TemplateKind) -> Double {
+        switch kind {
+        case .gridBuild: 0.7
+        case .popTiles: 0.45
+        case .stage: 0.16
+        case .dropStack: 0.85
+        case .burst: 0.12
+        case .fannedDeck: 0.45
+        case .flipTiles: 0.05
+        default: 0
         }
     }
 
@@ -213,6 +245,8 @@ public enum TemplateRecipes {
              .choice("motion", "Motion", [("continuous", "Continuous"), ("step", "Stepped")], "Smoothly, or a tick at a time."),
              .choice("spin", "Cards", [("follow", "Follow the wheel"), ("upright", "Stay upright"), ("flip", "Flip in 3D")],
                      "How the cards turn as the wheel goes round.")]
+        default:
+            flatControls(kind)
         }
     }
 
@@ -273,6 +307,7 @@ public enum TemplateRecipes {
         case .zoomOrbit: return zoomOrbit(s, p, k)
         case .vortex: return vortex(s, p, k)
         case .wheel, .halfWheel: return wheel(s, p, k, half: setup.kind == .halfWheel)
+        default: return flatScene(setup.kind, s, p, k, slots: max(setup.slots.count, 1))
         }
     }
 

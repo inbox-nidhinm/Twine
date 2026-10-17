@@ -16,13 +16,27 @@ public enum TemplateCards {
         let scene = TemplateRecipes.scene(setup, phase: phase, size: size)
         let slots = setup.slots.isEmpty ? [nil] : Array(setup.slots.prefix(maxSlots))
         let cards = scene.cards.map { card -> Layer in
-            let media = slots[card.index % slots.count]
-            let aspect = setup.ratio.aspect
-                ?? media.flatMap { pictures[$0] }.map { $0.height > 0 ? $0.width / $0.height : 1 }
-                ?? (card.cell.height > 0 ? card.cell.width / card.cell.height : 1)
-            let box = fitted(aspect, in: card.cell)
-            let corner = min(max(setup.cornerRadius, 0), 0.5) * min(box.width, box.height)
-            let paint: Paint = media.map { .image(ImagePaint(mediaID: $0, mode: .fill)) } ?? .color(placeholder(card.index))
+            let slot = (card.slot ?? card.index) % slots.count
+            let media = card.color == nil ? slots[(slot + slots.count) % slots.count] : nil
+            let own = media.flatMap { pictures[$0] }.map { $0.height > 0 ? $0.width / $0.height : 1 }
+            let aspect = setup.ratio.aspect ?? own ?? (card.cell.height > 0 ? card.cell.width / card.cell.height : 1)
+            // A piece of a bigger picture, or a plain card, is its cell exactly.
+            let box = card.area != nil || card.color != nil ? card.cell : fitted(aspect, in: card.cell)
+            let corner = card.rounded ? min(max(setup.cornerRadius, 0), 0.5) * min(box.width, box.height) : 0
+            let paint: Paint
+            if let color = card.color {
+                paint = .color(color)
+            } else if let media, let area = card.area, box.width > 0, box.height > 0 {
+                // The picture covering its area, given as fractions of the card.
+                let cover = covering(own ?? 1, area)
+                paint = .image(ImagePaint(mediaID: media, mode: .crop,
+                                          crop: ImageCrop(x: cover.minX / box.width, y: cover.minY / box.height,
+                                                          width: cover.width / box.width, height: cover.height / box.height)))
+            } else if let media {
+                paint = .image(ImagePaint(mediaID: media, mode: .fill))
+            } else {
+                paint = .color(placeholder(card.area != nil ? slot : card.index))
+            }
             var layer = Layer(id: id(of: card.index, in: frame.id), name: "Card \(card.index + 1)",
                               content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: CornerRadii(all: corner)),
                                                            fills: [Fill(paint: paint)])),
@@ -50,6 +64,13 @@ public enum TemplateCards {
     static func bend(_ length: Double, _ radius: Double) -> Double {
         guard abs(radius) > 1e-6 else { return 0 }
         return length / radius * 180 / .pi
+    }
+
+    /// The smallest box of shape `aspect` covering `area`, centred on it.
+    static func covering(_ aspect: Double, _ area: Box) -> Box {
+        guard aspect > 0, area.width > 0, area.height > 0 else { return area }
+        let size = area.width / area.height > aspect ? Size2(area.width, area.width / aspect) : Size2(area.height * aspect, area.height)
+        return Box(origin: Vec2(area.center.x - size.width / 2, area.center.y - size.height / 2), size: size)
     }
 
     /// The largest box of shape `aspect` (width over height) in `cell`.

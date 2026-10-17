@@ -109,7 +109,27 @@ Each ends with the usual gate: a clean `./make-app.sh`, `./test.sh` passing, the
    | Depth Stack Scroll | Depth Stack | Wheel Spin | Wheel |
    | Cover Ring | Carousel Ring | Wheel Spin Bottom | Half Wheel |
    | Cover Ring Vertical | Vertical Ring | | |
-6. **Flat and nearly flat templates (33).** Carousel & Flow, Grid, Spotlight & Focus, Stack & Scatter, Reveal & Wipe. Many lean on things Twine has (masks, reveals, presets).
+6. **Flat and nearly flat templates (33).** Done (18 October 2026): Carousel & Flow, Grid, Spotlight & Focus, Reveal & Wipe and Stack & Scatter, built on cards that show a piece of a picture, a chosen picture or a plain colour. Our names, by Animos's:
+
+   | Animos | Twine | Animos | Twine |
+   |---|---|---|---|
+   | Card Totem | Curved Column | Center Stage | Stage |
+   | Film Strip | Film Roll | Focus Shift | Rail Focus |
+   | Wheel Carousel | Swing Wheel | Deck Peel | Peel Deck |
+   | Cover Flow | Flow | Zoom Parallax | Slow Zoom |
+   | Cover Flow Vertical | Vertical Flow | Diagonal Wipe | Angled Wipe |
+   | Carousel Flow | Slide Carousel | Stripe Reveal | Stripes |
+   | Diagonal Carousel | Diagonal Run | Split Reveal | Split |
+   | Focus Slider | Focus Slide | Mosaic Wipe | Tile Wipe |
+   | Mosaic Marquee | Brick Marquee | Stack Slide | Slide Stack |
+   | Hero Reel | Feature Reel | Cascade Drop | Drop Stack |
+   | Grid Reveal | Grid Build | Cascade Deck | Fanned Deck |
+   | Spotlight Zoom | Grid Zoom | Image Trail | Trail |
+   | Flip Grid | Flip Tiles | Poster Burst | Burst |
+   | Pop Grid | Pop Tiles | Card Toss | Toss |
+   | Ticker Loop | Ticker | Position Dance | Shuffle |
+   | Ticker Tilt | Tilted Ticker | Column Drift | Drift Columns |
+   | Feed Scroll | Feed | | |
 7. **Multiscene (13).** The hardest: each moves through several layouts with camera moves between them.
 8. **Keyframed settings and New from Template on Home.**
 

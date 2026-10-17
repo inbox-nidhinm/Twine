@@ -67,24 +67,24 @@ struct TemplatePicker: View {
     }
 }
 
-/// A template on a tile, its name under it.
+/// A template on a tile, its name under it. Its picture is drawn after the
+/// view is built, never while it is: drawing flushes Core Animation, which
+/// made SwiftUI build the tile again mid-way and stopped the app.
 private struct TemplateChoice: View {
     let info: TemplateInfo
     let action: () -> Void
 
     @State private var hovering = false
-    @State private var started = Date()
+    @State private var image: CGImage?
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 6) {
                 Group {
-                    if hovering {
-                        TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
-                            poster(TemplatePosters.image(info.kind, phase: context.date.timeIntervalSince(started) / TemplatePosters.period))
-                        }
+                    if let image {
+                        Image(decorative: image, scale: 2).resizable()
                     } else {
-                        poster(TemplatePosters.poster(info.kind))
+                        Theme.panelRaised
                     }
                 }
                 .aspectRatio(Double(TemplatePosters.width) / Double(TemplatePosters.height), contentMode: .fit)
@@ -98,19 +98,20 @@ private struct TemplateChoice: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { inside in
-            if inside { started = Date() }
-            hovering = inside
+        .onHover { hovering = $0 }
+        // The still, then, under the pointer, the loop playing until it leaves.
+        .task(id: hovering) {
+            guard hovering else {
+                image = TemplatePosters.poster(info.kind)
+                return
+            }
+            let started = Date()
+            while !Task.isCancelled {
+                image = TemplatePosters.image(info.kind, phase: Date().timeIntervalSince(started) / TemplatePosters.period)
+                try? await Task.sleep(for: .milliseconds(33))
+            }
         }
         .help("Adds \(info.name), filling the frame, with the selected pictures in its slots.")
-    }
-
-    @ViewBuilder private func poster(_ image: CGImage?) -> some View {
-        if let image {
-            Image(decorative: image, scale: 2).resizable()
-        } else {
-            Theme.panelRaised
-        }
     }
 }
 

@@ -11,7 +11,7 @@ struct TemplateSection: View {
     let setup: TemplateSetup
     let controller: EditorController
 
-    private let wells = [GridItem(.adaptive(minimum: Theme.pictureWell), spacing: 6)]
+    private let wells = [GridItem(.adaptive(minimum: SlotWell.side, maximum: SlotWell.side), spacing: 6)]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -137,18 +137,23 @@ private struct SlotWell: View {
 
     @State private var hovering = false
 
+    /// Small, so a dozen slots take a few rows rather than the panel.
+    static let side = Theme.control * 1.5
+
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Theme.radiusControl)
         Button(action: choose) {
             ZStack {
-                if filled {
-                    PictureWell(image: image)
+                shape.fill(hovering ? Theme.panelHover : Theme.panelRaised)
+                if filled, let image {
+                    Image(decorative: image, scale: 1).resizable().aspectRatio(contentMode: .fill)
                 } else {
-                    RoundedRectangle(cornerRadius: Theme.radiusControl)
-                        .fill(hovering ? Theme.panelHover : Theme.panelRaised)
-                        .frame(width: Theme.pictureWell, height: Theme.pictureWell)
-                        .overlay(Text("\(number)").font(ThemeFont.label).foregroundStyle(Theme.textTertiary))
+                    Text("\(number)").font(ThemeFont.label).foregroundStyle(Theme.textTertiary)
                 }
             }
+            .frame(width: Self.side, height: Self.side)
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(Theme.edge, lineWidth: 1))
         }
         .buttonStyle(.plain)
         .overlay(alignment: .topTrailing) {

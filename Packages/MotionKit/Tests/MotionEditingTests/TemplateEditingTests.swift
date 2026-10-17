@@ -18,12 +18,14 @@ import MotionEvaluation
               size: Size2(100, 100), position: Vec2(50, 50))
     }
 
-    @Test func theLibraryHasTheFirstTwentyThree() {
-        #expect(Templates.library.count == 23)
+    @Test func theLibraryHasEveryTemplate() {
+        #expect(Templates.library.count == 56)
         #expect(Set(Templates.library.map(\.kind)) == Set(TemplateKind.allCases))
-        #expect(Set(Templates.library.map(\.name)).count == 23)
+        #expect(Set(Templates.library.map(\.name)).count == 56)
         #expect(Templates.library.filter { $0.group == .isometric }.count == 3)
         #expect(Templates.library.filter { $0.group == .orbit }.count == 8)
+        let counts = Dictionary(grouping: Templates.library, by: \.group).mapValues(\.count)
+        #expect(counts[.flow] == 10 && counts[.grid] == 8 && counts[.spotlight] == 4 && counts[.reveal] == 4 && counts[.stack] == 7)
     }
 
     @Test func addingTakesTheSelectedPicturesIntoItsSlots() throws {

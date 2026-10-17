@@ -132,6 +132,19 @@ public enum TemplateKind: String, Codable, Sendable, CaseIterable {
     // Orbit
     case orbit, halo, quadOrbit = "quad-orbit", photoLoop = "photo-loop", zoomOrbit = "zoom-orbit"
     case vortex, wheel, halfWheel = "half-wheel"
+    // Carousel & Flow
+    case curvedColumn = "curved-column", filmRoll = "film-roll", swingWheel = "swing-wheel", flow
+    case verticalFlow = "vertical-flow", slideCarousel = "slide-carousel", diagonalRun = "diagonal-run"
+    case focusSlide = "focus-slide", brickMarquee = "brick-marquee", featureReel = "feature-reel"
+    // Grid
+    case gridBuild = "grid-build", gridZoom = "grid-zoom", flipTiles = "flip-tiles", popTiles = "pop-tiles"
+    case ticker, tiltedTicker = "tilted-ticker", driftColumns = "drift-columns", feed
+    // Spotlight & Focus
+    case stage, railFocus = "rail-focus", peelDeck = "peel-deck", slowZoom = "slow-zoom"
+    // Reveal & Wipe
+    case angledWipe = "angled-wipe", stripes, split, tileWipe = "tile-wipe"
+    // Stack & Scatter
+    case slideStack = "slide-stack", dropStack = "drop-stack", fannedDeck = "fanned-deck", trail, burst, toss, shuffle
 }
 
 /// When a template plays: its bar holds `loops` turns of the template's

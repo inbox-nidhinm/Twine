@@ -4,13 +4,18 @@ import MotionEvaluation
 
 /// The headed groups the template picker shows, in order.
 public enum TemplateGroup: String, Sendable, CaseIterable {
-    case perspective, isometric, orbit
+    case perspective, isometric, orbit, flow, grid, spotlight, reveal, stack
 
     public var title: String {
         switch self {
         case .perspective: "3D & Perspective"
         case .isometric: "Isometric"
         case .orbit: "Orbit"
+        case .flow: "Carousel & Flow"
+        case .grid: "Grid"
+        case .spotlight: "Spotlight & Focus"
+        case .reveal: "Reveal & Wipe"
+        case .stack: "Stack & Scatter"
         }
     }
 }
@@ -51,6 +56,39 @@ public enum Templates {
         TemplateInfo(kind: .vortex, name: "Vortex", group: .orbit),
         TemplateInfo(kind: .wheel, name: "Wheel", group: .orbit),
         TemplateInfo(kind: .halfWheel, name: "Half Wheel", group: .orbit),
+        TemplateInfo(kind: .curvedColumn, name: "Curved Column", group: .flow),
+        TemplateInfo(kind: .filmRoll, name: "Film Roll", group: .flow),
+        TemplateInfo(kind: .swingWheel, name: "Swing Wheel", group: .flow),
+        TemplateInfo(kind: .flow, name: "Flow", group: .flow),
+        TemplateInfo(kind: .verticalFlow, name: "Vertical Flow", group: .flow),
+        TemplateInfo(kind: .slideCarousel, name: "Slide Carousel", group: .flow),
+        TemplateInfo(kind: .diagonalRun, name: "Diagonal Run", group: .flow),
+        TemplateInfo(kind: .focusSlide, name: "Focus Slide", group: .flow),
+        TemplateInfo(kind: .brickMarquee, name: "Brick Marquee", group: .flow),
+        TemplateInfo(kind: .featureReel, name: "Feature Reel", group: .flow),
+        TemplateInfo(kind: .gridBuild, name: "Grid Build", group: .grid),
+        TemplateInfo(kind: .gridZoom, name: "Grid Zoom", group: .grid),
+        TemplateInfo(kind: .flipTiles, name: "Flip Tiles", group: .grid),
+        TemplateInfo(kind: .popTiles, name: "Pop Tiles", group: .grid),
+        TemplateInfo(kind: .ticker, name: "Ticker", group: .grid),
+        TemplateInfo(kind: .tiltedTicker, name: "Tilted Ticker", group: .grid),
+        TemplateInfo(kind: .driftColumns, name: "Drift Columns", group: .grid),
+        TemplateInfo(kind: .feed, name: "Feed", group: .grid),
+        TemplateInfo(kind: .stage, name: "Stage", group: .spotlight),
+        TemplateInfo(kind: .railFocus, name: "Rail Focus", group: .spotlight),
+        TemplateInfo(kind: .peelDeck, name: "Peel Deck", group: .spotlight),
+        TemplateInfo(kind: .slowZoom, name: "Slow Zoom", group: .spotlight),
+        TemplateInfo(kind: .angledWipe, name: "Angled Wipe", group: .reveal),
+        TemplateInfo(kind: .stripes, name: "Stripes", group: .reveal),
+        TemplateInfo(kind: .split, name: "Split", group: .reveal),
+        TemplateInfo(kind: .tileWipe, name: "Tile Wipe", group: .reveal),
+        TemplateInfo(kind: .slideStack, name: "Slide Stack", group: .stack),
+        TemplateInfo(kind: .dropStack, name: "Drop Stack", group: .stack),
+        TemplateInfo(kind: .fannedDeck, name: "Fanned Deck", group: .stack),
+        TemplateInfo(kind: .trail, name: "Trail", group: .stack),
+        TemplateInfo(kind: .burst, name: "Burst", group: .stack),
+        TemplateInfo(kind: .toss, name: "Toss", group: .stack),
+        TemplateInfo(kind: .shuffle, name: "Shuffle", group: .stack),
     ]
 
     public static func name(of kind: TemplateKind) -> String {
@@ -71,7 +109,8 @@ public enum Templates {
         let slots: [UUID?] = pictures + Array(repeating: nil, count: count - pictures.count)
         let size = Size2(Double(composition.width), Double(composition.height))
         return Layer(name: name(of: kind), content: .group(GroupContent(clipsContent: true, frame: FrameStyle(),
-                                                                       template: TemplateSetup(kind: kind, slots: slots))),
+                                                                       template: TemplateSetup(kind: kind, slots: slots,
+                                                                                               pose: TemplateRecipes.restingPose(kind)))),
                      size: size, position: Vec2(size.width / 2, size.height / 2))
     }
 
