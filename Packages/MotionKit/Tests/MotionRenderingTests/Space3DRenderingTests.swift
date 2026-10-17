@@ -205,6 +205,36 @@ import MotionModel
         #expect(Self.pixel(bytes, width: width, 250, 200).near(Self.hue(11, of: 12)))
     }
 
+    @Test func aBentFrameCurvesEverythingInIt() throws {
+        // A frame of eight upright bands, bent a quarter turn across: each
+        // band lands where the curve says, through the renderer exports use.
+        let size = Self.bendSize
+        let bands = Self.bands.enumerated().map { i, c -> Layer in
+            let w = size.width / Double(Self.bands.count)
+            return Layer(name: "B\(i)", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
+                                                                     fills: [Fill(paint: .color(c))])),
+                         size: Size2(w, size.height), position: Vec2((Double(i) + 0.5) * w, size.height / 2))
+        }
+        var frame = Layer(name: "F", content: .group(GroupContent(children: bands, clipsContent: true,
+                                                                  frame: FrameStyle(cornerRadii: CornerRadii(all: 24)))),
+                          size: size, position: Vec2(300, 300))
+        frame.transform.bend = Vec2(90, 0)
+        frame.transform.tilt = Tilt(x: 0, y: 30, depth: 800)
+        let project = Project(composition: Composition(width: 600, height: 600, background: Background(isTransparent: true)),
+                              layers: [frame])
+        let renderer = try #require(OffscreenRenderer(pixelWidth: 600, pixelHeight: 600))
+        let bytes = Self.pixels(try #require(renderer.image(of: evaluate(project, at: 0))), width: 600, height: 600)
+        Self.save(bytes, width: 600, height: 600, "bent-frame")
+        // The same curve and camera the spike's own check uses.
+        let bend = Bend(size: size, radius: size.width / (.pi / 2),
+                        pose: .turnY(degrees: 30).then(.translation(Vec3(300, 300, 0))))
+        let faintest = Self.check(bytes, width: 600, bend: bend, camera: Self.bendCamera, name: "bent-frame")
+        #expect(faintest > 250)
+        // Its rounded corner is cut where the curve puts it.
+        let corner = try #require(Self.bendCamera.project(bend.point(2, 2)))
+        #expect(Self.pixel(bytes, width: 600, Int(corner.x.rounded()), Int(corner.y.rounded())).a < 40)
+    }
+
     // MARK: The same on screen
 
     /// Saves `layer`, the very tree just drawn off screen, with that

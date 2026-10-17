@@ -12,6 +12,7 @@ public enum Channel: String, Hashable, Sendable, CaseIterable {
     case skew, tilt
     /// Z, in a frame in 3D.
     case depth
+    case bend
     /// A frame in 3D's camera.
     case camera
     /// A clip of the layer's own box, which only the Mask presets drive.
@@ -51,6 +52,7 @@ extension ActionKind {
         case .skew: return .skew
         case .tilt: return .tilt
         case .depth: return .depth
+        case .bend: return .bend
         case .camera: return .camera
         // A preset reaches several; `ActionTracks` asks its recipe which.
         case .preset: return .position
@@ -112,17 +114,22 @@ public struct LayerState: Sendable, Equatable {
     /// Degrees each way (see `Transform.skew`).
     public var skew: Vec2 {
         get { warp.skew }
-        set { warp = Warp(skew: newValue, tilt: warp.tilt, z: warp.z) }
+        set { warp = Warp(skew: newValue, tilt: warp.tilt, z: warp.z, bend: warp.bend) }
     }
     /// A turn in depth (see `Tilt`).
     public var tilt: Tilt {
         get { warp.tilt }
-        set { warp = Warp(skew: warp.skew, tilt: newValue, z: warp.z) }
+        set { warp = Warp(skew: warp.skew, tilt: newValue, z: warp.z, bend: warp.bend) }
     }
     /// Towards the viewer, in a frame in 3D (see `Transform.z`).
     public var z: Double {
         get { warp.z }
-        set { warp = Warp(skew: warp.skew, tilt: warp.tilt, z: newValue) }
+        set { warp = Warp(skew: warp.skew, tilt: warp.tilt, z: newValue, bend: warp.bend) }
+    }
+    /// Degrees of curve each way (see `Transform.bend`).
+    public var bend: Vec2 {
+        get { warp.bend }
+        set { warp = Warp(skew: warp.skew, tilt: warp.tilt, z: warp.z, bend: newValue) }
     }
     /// A frame in 3D's camera, boxed; `.none` for anything else.
     public var camera: CameraState = .none
@@ -175,7 +182,7 @@ public struct LayerState: Sendable, Equatable {
         position = layer.transform.position
         scale = layer.transform.scale
         rotation = layer.transform.rotation
-        warp = Warp(skew: layer.transform.skew, tilt: layer.transform.tilt, z: layer.transform.z)
+        warp = Warp(skew: layer.transform.skew, tilt: layer.transform.tilt, z: layer.transform.z, bend: layer.transform.bend)
         if let space = layer.space3D { camera = .space(space) }
         opacity = layer.opacity
         size = layer.size
@@ -241,30 +248,36 @@ public enum InnerShadow: Sendable, Equatable {
     }
 }
 
-/// A layer's skew, tilt and Z, kept out of line: most layers have none, and
-/// carrying five more numbers in every layer's state made each frame's
-/// evaluation measurably slower.
+/// A layer's skew, tilt, Z and bend, kept out of line: most layers have
+/// none, and carrying five more numbers in every layer's state made each
+/// frame's evaluation measurably slower.
 public enum Warp: Sendable, Equatable {
     case none
-    indirect case warped(skew: Vec2, tilt: Tilt, z: Double)
+    indirect case warped(skew: Vec2, tilt: Tilt, z: Double, bend: Vec2)
 
-    public init(skew: Vec2, tilt: Tilt, z: Double = 0) {
-        self = skew == .zero && tilt == .none && z == 0 ? .none : .warped(skew: skew, tilt: tilt, z: z)
+    public init(skew: Vec2, tilt: Tilt, z: Double = 0, bend: Vec2 = .zero) {
+        self = skew == .zero && tilt == .none && z == 0 && bend == .zero ? .none
+            : .warped(skew: skew, tilt: tilt, z: z, bend: bend)
     }
 
     public var skew: Vec2 {
-        if case .warped(let skew, _, _) = self { return skew }
+        if case .warped(let skew, _, _, _) = self { return skew }
         return .zero
     }
 
     public var tilt: Tilt {
-        if case .warped(_, let tilt, _) = self { return tilt }
+        if case .warped(_, let tilt, _, _) = self { return tilt }
         return .none
     }
 
     public var z: Double {
-        if case .warped(_, _, let z) = self { return z }
+        if case .warped(_, _, let z, _) = self { return z }
         return 0
+    }
+
+    public var bend: Vec2 {
+        if case .warped(_, _, _, let bend) = self { return bend }
+        return .zero
     }
 }
 
@@ -486,6 +499,7 @@ public struct ActionTracks: Sendable {
             case .skew: state.skew = walk(state.skew, list.compactMap(Self.skewStep), at: time)
             case .tilt: state.tilt = walk(state.tilt, steps(list, Self.tiltStep, Self.tiltPart), at: time)
             case .depth: state.z = walk(state.z, list.compactMap(Self.depthStep), at: time)
+            case .bend: state.bend = walk(state.bend, list.compactMap(Self.bendStep), at: time)
             // Only a frame in 3D has a camera to move.
             case .camera:
                 if let space = state.camera.space { state.camera = .space(walk(space, list.compactMap(Self.cameraStep), at: time)) }
@@ -719,6 +733,11 @@ public struct ActionTracks: Sendable {
     private static func depthStep(_ a: Action) -> Step<Double>? {
         guard case .depth(let d) = a.spec else { return nil }
         return Step(a, initial: d.initial, target: d.mode == .to ? { _ in d.end } : { $0 + d.end })
+    }
+
+    private static func bendStep(_ a: Action) -> Step<Vec2>? {
+        guard case .bend(let b) = a.spec else { return nil }
+        return Step(a, initial: b.initial, target: b.mode == .to ? { _ in b.end } : { $0 + b.end })
     }
 
     private static func cameraStep(_ a: Action) -> Step<Space3D>? {

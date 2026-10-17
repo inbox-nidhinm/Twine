@@ -9,6 +9,7 @@ import SwiftUI
 public enum Icon: String, CaseIterable, Sendable {
     case arc
     case backgroundBlur
+    case bend
     case camera
     case changeText
     case color
@@ -123,6 +124,9 @@ public enum Icon: String, CaseIterable, Sendable {
             "M21.3058 8.19434L8.19803 21.3021",
             "M13.5 21.5L21.5 13.5",
             "M2.5 10.5L10.5 2.5"
+        ]
+        case .bend: return [   // Actions/bend.svg
+            "M4.5 6.5 C9.5 4.5 14.5 4.5 19.5 6.5 V17.5 C14.5 15.5 9.5 15.5 4.5 17.5 Z"
         ]
         case .camera: return [   // Actions/camera.svg
             "M3.5 7.5 H15 V16.5 H3.5 Z",

@@ -171,11 +171,14 @@ public struct Camera3D: Sendable, Equatable {
 
 /// A layer placed in a shared space, as drawn: its whole transform into its
 /// parent, and how near it is, to order it among its siblings (larger is
-/// nearer, drawn over smaller). Boxed, since few layers are in 3D and every
-/// layer carries one.
+/// nearer, drawn over smaller). A bent layer is no longer flat: it carries
+/// a grid of where its points land (`BentMesh`), its projection then being
+/// the one through its four corners, for outlines and clicks. Boxed, since
+/// few layers are in 3D and every layer carries one.
 public enum Placed3D: Sendable, Equatable {
     case none
     indirect case placed(projection: Projective, depth: Double)
+    indirect case bent(projection: Projective, depth: Double, mesh: BentMesh)
 
     /// The pose seen through `camera`, ordered by where the layer's own
     /// point `middle` lies.
@@ -184,8 +187,87 @@ public enum Placed3D: Sendable, Equatable {
     }
 
     public var depth: Double {
-        if case .placed(_, let depth) = self { return depth }
-        return 0
+        switch self {
+        case .none: return 0
+        case .placed(_, let depth), .bent(_, let depth, _): return depth
+        }
+    }
+
+    public var projection: Projective? {
+        switch self {
+        case .none: return nil
+        case .placed(let p, _), .bent(let p, _, _): return p
+        }
+    }
+
+    public var mesh: BentMesh? {
+        if case .bent(_, _, let mesh) = self { return mesh }
+        return nil
+    }
+}
+
+/// Where a bent layer's points land in its parent, on a grid of `columns`
+/// by `rows` cells across its box: `points` row by row from the top-left,
+/// `(rows + 1) * (columns + 1)` of them, in the parent's pixels.
+public struct BentMesh: Sendable, Equatable {
+    public var columns: Int
+    public var rows: Int
+    public var points: [Vec2]
+
+    /// Cells across a bent direction, and along a straight one, which
+    /// still needs a few to follow perspective: Core Animation stretches
+    /// each cell flat.
+    static let bentCells = 16
+    static let straightCells = 4
+}
+
+/// A curve on a layer: its own point (u, v) moved off its flat plane onto
+/// the curve, before its pose places it. `bend` is degrees of a circle's
+/// turn across the width (x) and down the height (y); the middle stays
+/// where it was, the edges curving away from the viewer when positive.
+struct Curve {
+    let size: Size2
+    let bend: Vec2
+
+    func point(_ u: Double, _ v: Double) -> Vec3 {
+        var p = Vec3(u, v, 0)
+        if let r = Self.radius(bend.x, size.width) {
+            let phi = (u - size.width / 2) / r
+            p.x = size.width / 2 + r * sin(phi)
+            p.z += r * (cos(phi) - 1)
+        }
+        if let r = Self.radius(bend.y, size.height) {
+            let theta = (v - size.height / 2) / r
+            p.y = size.height / 2 + r * sin(theta)
+            p.z += r * (cos(theta) - 1)
+        }
+        return p
+    }
+
+    /// The circle's radius, negative for a hollow; nil when straight.
+    static func radius(_ degrees: Double, _ length: Double) -> Double? {
+        guard abs(degrees) > 1e-6, length > 0 else { return nil }
+        return length / (degrees * .pi / 180)
+    }
+}
+
+extension Projective {
+    /// The flat map that takes a box of `size` at the origin onto the four
+    /// points `corners` (its top-left, top-right, bottom-right and
+    /// bottom-left), exactly at each: Heckbert's square to quadrilateral.
+    /// Nil when the points are in a line.
+    static func box(_ size: Size2, onto corners: [Vec2]) -> Projective? {
+        guard corners.count == 4, size.width > 0, size.height > 0 else { return nil }
+        let (p0, p1, p2, p3) = (corners[0], corners[1], corners[2], corners[3])
+        let dx1 = p1.x - p2.x, dx2 = p3.x - p2.x, dx3 = p0.x - p1.x + p2.x - p3.x
+        let dy1 = p1.y - p2.y, dy2 = p3.y - p2.y, dy3 = p0.y - p1.y + p2.y - p3.y
+        let det = dx1 * dy2 - dx2 * dy1
+        guard abs(det) > 1e-12 else { return nil }
+        let g = (dx3 * dy2 - dx2 * dy3) / det, h = (dx1 * dy3 - dx3 * dy1) / det
+        let square = Projective(a: p1.x - p0.x + g * p1.x, b: p1.y - p0.y + g * p1.y,
+                                c: p3.x - p0.x + h * p3.x, d: p3.y - p0.y + h * p3.y,
+                                tx: p0.x, ty: p0.y, px: g, py: h, w: 1)
+        return Projective(.scale(Vec2(1 / size.width, 1 / size.height))).then(square)
     }
 }
 
@@ -199,6 +281,9 @@ struct SpaceContext {
     let fade: Double
     let blur: Double
     let backs: Double
+    /// The whole space's turn about `middle`.
+    let orbit: Vec2
+    let middle: Vec3
 
     init(_ space: Space3D, size: Size2) {
         let point = Vec2(space.vanishingPoint.x * size.width, space.vanishingPoint.y * size.height)
@@ -207,30 +292,82 @@ struct SpaceContext {
         fade = min(max(space.depthFade, 0), 1)
         blur = max(space.depthBlur, 0)
         backs = min(max(space.backOpacity, 0), 1)
+        orbit = space.orbit
+        middle = Vec3(size.width / 2, size.height / 2, 0)
     }
 
-    /// Where `layer` sits in the space, `z` towards the viewer.
+    /// The camera a layer outside any 3D space is seen through, as its own
+    /// tilt is: over its anchor, at its tilt's depth. Only a bent layer
+    /// needs one.
+    init(ownOf layer: ResolvedLayer) {
+        let depth = layer.tilt.depth > 1 ? layer.tilt.depth : Tilt.defaultDepth
+        camera = Camera3D(distance: depth, vanishingPoint: layer.position)
+        reach = 1
+        fade = 0
+        blur = 0
+        backs = 1
+        orbit = .zero
+        middle = .zero
+    }
+
+    /// Where `layer` sits in the space, `z` towards the viewer, the space
+    /// turned by its orbit.
     func pose(of layer: ResolvedLayer, z: Double) -> Pose3D {
-        .layer(position: layer.position, z: z, anchor: layer.anchor, scale: layer.scale, rotation: layer.rotation,
-               skew: layer.skew, tilt: layer.tilt, size: layer.size)
+        let pose = Pose3D.layer(position: layer.position, z: z, anchor: layer.anchor, scale: layer.scale,
+                                rotation: layer.rotation, skew: layer.skew, tilt: layer.tilt, size: layer.size)
+        guard orbit != .zero else { return pose }
+        return pose.then(.translation(Vec3(-middle.x, -middle.y, 0)))
+            .then(.turnY(degrees: orbit.y)).then(.turnX(degrees: orbit.x))
+            .then(.translation(middle))
     }
 
     /// `layer` placed in the space: drawn through the camera, ordered by
-    /// its middle's depth, fainter and blurrier behind the frame's plane,
+    /// its middle's depth (unless `ordered` is false, for a layer bent
+    /// among flat siblings), fainter and blurrier behind the frame's plane,
     /// dimmed with its back to the camera, and not drawn at all once any
-    /// corner reaches the camera, where the picture would turn inside out.
-    func place(_ layer: inout ResolvedLayer, z: Double) {
+    /// point reaches the camera, where the picture would turn inside out.
+    /// A bent layer is drawn from a grid of its points, and drawn sharp:
+    /// motion blur's copies step a flat picture.
+    func place(_ layer: inout ResolvedLayer, z: Double, ordered: Bool = true) {
         let pose = pose(of: layer, z: z)
-        let middle = Vec2(layer.size.width / 2, layer.size.height / 2)
-        let placed = Placed3D(pose, camera: camera, middle: middle)
-        layer.placed = placed
-        guard case .placed(let projection, let depth) = placed else { return }
-        let corners = [Vec2(0, 0), Vec2(layer.size.width, 0), Vec2(layer.size.width, layer.size.height), Vec2(0, layer.size.height)]
-        if corners.contains(where: { projection.px * $0.x + projection.py * $0.y + projection.w < Self.nearest }) {
-            layer.opacity = 0
-            return
+        let size = layer.size
+        let middle = Vec2(size.width / 2, size.height / 2)
+        let bend = layer.warp.bend
+        let curve = Curve(size: size, bend: bend)
+        let centre = pose.apply(curve.point(middle.x, middle.y))
+        let depth = ordered ? centre.z : 0
+        if bend != .zero, size.width > 0, size.height > 0 {
+            let columns = bend.x != 0 ? BentMesh.bentCells : BentMesh.straightCells
+            let rows = bend.y != 0 ? BentMesh.bentCells : BentMesh.straightCells
+            var points: [Vec2] = []
+            points.reserveCapacity((rows + 1) * (columns + 1))
+            for j in 0...rows {
+                for i in 0...columns {
+                    let u = size.width * Double(i) / Double(columns), v = size.height * Double(j) / Double(rows)
+                    guard let p = camera.project(pose.apply(curve.point(u, v))), Self.inFront(pose.apply(curve.point(u, v)), camera) else {
+                        layer.opacity = 0
+                        return
+                    }
+                    points.append(p)
+                }
+            }
+            let corners = [points[0], points[columns], points[points.count - 1], points[points.count - 1 - columns]]
+            guard let projection = Projective.box(size, onto: corners) else {
+                layer.opacity = 0
+                return
+            }
+            layer.placed = .bent(projection: projection, depth: depth, mesh: BentMesh(columns: columns, rows: rows, points: points))
+            layer.motion = .none
+        } else {
+            let projection = camera.projection(of: pose)
+            layer.placed = .placed(projection: projection, depth: depth)
+            let corners = [Vec2(0, 0), Vec2(size.width, 0), Vec2(size.width, size.height), Vec2(0, size.height)]
+            if corners.contains(where: { projection.px * $0.x + projection.py * $0.y + projection.w < Self.nearest }) {
+                layer.opacity = 0
+                return
+            }
         }
-        let behind = min(max(-depth / reach, 0), 1)
+        let behind = min(max(-centre.z / reach, 0), 1)
         layer.opacity *= 1 - fade * behind
         layer.blur += blur * behind
         if backs < 1, !camera.seesFront(of: pose, at: middle) { layer.opacity *= backs }
@@ -239,6 +376,11 @@ struct SpaceContext {
     /// How small the perspective divide may get before a layer counts as
     /// at the camera: a twentieth, where it shows twenty times its size.
     static let nearest = 0.05
+
+    static func inFront(_ p: Vec3, _ camera: Camera3D) -> Bool {
+        guard let d = camera.distance else { return true }
+        return 1 - p.z / d >= nearest
+    }
 
     /// Only where it matters: a moving layer's copies for motion blur.
     func projection(of layer: ResolvedLayer, z: Double) -> Projective {

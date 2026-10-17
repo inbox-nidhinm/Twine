@@ -273,7 +273,13 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
             if let blur {
                 resolved.motion = motion(of: layer, resolved, tracks: tracks, at: time, blur, space: space)
             }
-            space?.place(&resolved, z: resolved.warp.z)
+            if let space {
+                space.place(&resolved, z: resolved.warp.z)
+            } else if resolved.warp.bend != .zero {
+                // Bent outside a 3D space: seen as its own tilt is, and
+                // kept in its place among its siblings.
+                SpaceContext(ownOf: resolved).place(&resolved, z: 0, ordered: false)
+            }
             if let mask { masked.append((out.count, mask)) }
             out.append(resolved)
             if layer.isGroup {
@@ -360,6 +366,8 @@ private struct WorldTransforms {
                 if let parent, let frame = layers[parent], let holder = resolved(parent),
                    let space = tracks.state(of: frame, at: time).camera.space {
                     SpaceContext(space, size: holder.size).place(&result!, z: result!.warp.z)
+                } else if result!.warp.bend != .zero {
+                    SpaceContext(ownOf: result!).place(&result!, z: 0, ordered: false)
                 }
             }
         }
@@ -390,10 +398,11 @@ private func motion(of layer: Layer, _ resolved: ResolvedLayer, tracks: ActionTr
         if channels.contains(.rotation) { moved.rotation = state.rotation }
         if channels.contains(.skew) || channels.contains(.tilt) {
             moved.warp = Warp(skew: channels.contains(.skew) ? state.warp.skew : resolved.skew,
-                              tilt: channels.contains(.tilt) ? state.warp.tilt : resolved.tilt, z: resolved.warp.z)
+                              tilt: channels.contains(.tilt) ? state.warp.tilt : resolved.tilt, z: resolved.warp.z,
+                              bend: resolved.warp.bend)
         }
         if channels.contains(.depth) {
-            moved.warp = Warp(skew: moved.skew, tilt: moved.tilt, z: state.z)
+            moved.warp = Warp(skew: moved.skew, tilt: moved.tilt, z: state.z, bend: moved.warp.bend)
         }
         return space?.projection(of: moved, z: moved.warp.z) ?? moved.projection
     }

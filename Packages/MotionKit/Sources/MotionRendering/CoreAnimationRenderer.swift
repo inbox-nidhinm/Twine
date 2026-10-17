@@ -296,6 +296,8 @@ final class Node {
     /// mask layer's blend mode.
     var ignoresBlend = false
     private var blend: BlendMode = .normal
+    /// Whether the container has a mesh warp on it now (see `MeshWarp`).
+    private var meshed = false
     /// A text layer's words: the current text, and the previous one while a
     /// Counter or Change Text moves from one to the other.
     private var textLayers: [CALayer] = []
@@ -386,7 +388,19 @@ final class Node {
         // The anchor point stays at the layer's origin and the whole local
         // transform goes in the matrix, so a layer of zero width or height
         // (a line) still turns about its real anchor.
-        container.transform = (layer.motion.placed ?? layer.projection).caTransform
+        // A bent layer sits square at its parent's origin, and its mesh
+        // carries every point of it to where it is seen.
+        if let mesh = layer.placed.mesh, MeshWarp.isAvailable {
+            container.transform = CATransform3DIdentity
+            container.setValue(MeshWarp.transform(mesh, size: layer.size), forKey: "meshTransform")
+            meshed = true
+        } else {
+            if meshed {
+                container.setValue(nil, forKey: "meshTransform")
+                meshed = false
+            }
+            container.transform = (layer.motion.placed ?? layer.projection).caTransform
+        }
         // Siblings in a shared 3D space are drawn far to near: Core
         // Animation orders sublayers by `zPosition`, which moves nothing
         // here, as the transform sends no depth to the divide.

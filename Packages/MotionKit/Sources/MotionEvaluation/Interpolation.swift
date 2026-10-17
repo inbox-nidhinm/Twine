@@ -33,7 +33,8 @@ extension Space3D: Interpolatable {
                 vanishingPoint: .interpolate(a.vanishingPoint, b.vanishingPoint, t),
                 depthFade: min(max(lerp(a.depthFade, b.depthFade, t), 0), 1),
                 depthBlur: max(lerp(a.depthBlur, b.depthBlur, t), 0),
-                backOpacity: min(max(lerp(a.backOpacity, b.backOpacity, t), 0), 1))
+                backOpacity: min(max(lerp(a.backOpacity, b.backOpacity, t), 0), 1),
+                orbit: .interpolate(a.orbit, b.orbit, t))
     }
 }
 

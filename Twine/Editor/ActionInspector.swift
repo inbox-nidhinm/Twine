@@ -548,6 +548,7 @@ private struct ValueFields: View {
             case .skew(let k): skew(k)
             case .tilt(let t): tilt(t)
             case .depth(let d): depth(d)
+            case .bend(let b): bend(b)
             case .camera(let c): camera(c)
             default: StyleValueFields(controller: controller, action: action, inherited: inherited)
             }
@@ -749,6 +750,34 @@ private struct ValueFields: View {
         }
     }
 
+    // MARK: Bend
+
+    @ViewBuilder private func bend(_ b: BendAction) -> some View {
+        let from = inherited?.bend ?? .zero
+        StackedRow(label: "From", accessory: { clearButton(b.initial != nil) { editBend("Starting Value") { b, _ in b.initial = nil } } }) {
+            OptionalField(unit: "X", value: b.initial?.x, placeholder: from.x, decimals: 1, suffix: "°") { v in
+                editBend("Starting Value") { b, s in b.initial = v.map { Vec2($0, (b.initial ?? s.bend).y) } }
+            }
+            OptionalField(unit: "Y", value: b.initial?.y, placeholder: from.y, decimals: 1, suffix: "°") { v in
+                editBend("Starting Value") { b, s in b.initial = v.map { Vec2((b.initial ?? s.bend).x, $0) } }
+            }
+        }
+        .help("The curve it starts at. Empty starts from the layer's bend when the action begins.")
+        StackedRow(label: b.mode == .to ? "To" : "By", menu: modeEntries(b.mode), swap: swap) {
+            UnitField(unit: "X", value: b.end.x, decimals: 1, suffix: "°") { v in editBend("Bend") { b, _ in b.end.x = v } }
+            UnitField(unit: "Y", value: b.end.y, decimals: 1, suffix: "°") { v in editBend("Bend") { b, _ in b.end.y = v } }
+        }
+        .help("X curves it round an upright line, Y round a level one, each that much of a turn. Positive brings the middle forward.")
+    }
+
+    private func editBend(_ name: String, _ change: @escaping (inout BendAction, LayerState) -> Void) {
+        controller.editActions(name) { a in
+            guard case .bend(var b) = a.spec, let state = controller.inheritedState(for: a) else { return }
+            change(&b, state)
+            a.spec = .bend(b)
+        }
+    }
+
     // MARK: Depth
 
     @ViewBuilder private func depth(_ d: DepthAction) -> some View {
@@ -828,6 +857,14 @@ private struct ValueFields: View {
                               decimals: 0, suffix: "%") { v in set { $0.vanishingPoint.y = (v ?? placeholder.vanishingPoint.y * 100) / 100 } }
                     .help("Where down the frame the camera looks straight at")
             }
+            }
+            HStack(spacing: 8) {
+                OptionalField(unit: "Orbit X", value: space?.orbit.x, placeholder: placeholder.orbit.x, decimals: 1,
+                              suffix: "°") { v in set { $0.orbit.x = v ?? placeholder.orbit.x } }
+                    .help("Tips the whole space about the frame's middle")
+                OptionalField(unit: "Y", value: space?.orbit.y, placeholder: placeholder.orbit.y, decimals: 1,
+                              suffix: "°") { v in set { $0.orbit.y = v ?? placeholder.orbit.y } }
+                    .help("Turns the whole space about the frame's middle: 360° spins a ring once")
             }
             HStack(spacing: 8) {
                 OptionalField(unit: "Fade", value: space.map { $0.depthFade * 100 }, placeholder: placeholder.depthFade * 100,

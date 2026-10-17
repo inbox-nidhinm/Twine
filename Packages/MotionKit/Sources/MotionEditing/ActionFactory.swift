@@ -27,7 +27,7 @@ public enum ActionFactory {
     /// for layers with sound: always a sound, and a video when `hasSound`
     /// says its file has a sound track (see `kinds(for:in:)`).
     public static func kinds(for layer: Layer, hasSound: Bool = false) -> [ActionKind] {
-        let transform: [ActionKind] = [.move, .scale, .rotate, .skew, .tilt, .opacity, .resize, .visibility]
+        let transform: [ActionKind] = [.move, .scale, .rotate, .skew, .tilt, .bend, .opacity, .resize, .visibility]
         switch layer.content {
         case .audio:
             // Sound has nothing to move or fade; it plays, louder or softer.
@@ -123,6 +123,9 @@ public enum ActionFactory {
         case .tilt:
             // Turns it a third of the way round, side to side, at its own depth.
             spec = .tilt(TiltAction(mode: .by, end: Tilt(x: 0, y: 30, depth: state.tilt.depth)))
+        case .bend:
+            // A sixth of a turn across: a gentle curve, its middle forward.
+            spec = .bend(BendAction(mode: .by, end: Vec2(60, 0)))
         case .depth:
             // Towards the viewer, enough to see it come forward.
             spec = .depth(DepthAction(mode: .by, end: 200))

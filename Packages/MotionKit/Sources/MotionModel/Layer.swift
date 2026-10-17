@@ -205,6 +205,12 @@ public struct Transform: Codable, Sendable, Equatable {
     /// Pixels towards the viewer (negative is away), in a frame in 3D
     /// (`Space3D`); anywhere else it changes nothing.
     public var z: Double
+    /// Degrees of curve: `x` bends the layer round an upright line, so its
+    /// width is that much of a circle's turn; `y` round a level line, along
+    /// its height. Positive brings the middle towards the viewer, the edges
+    /// curving away; negative hollows it. Seen through its frame's camera
+    /// in 3D, or from its tilt's depth anywhere else.
+    public var bend: Vec2
 
     public init(position: Vec2, anchor: Vec2) {
         self.position = position
@@ -215,9 +221,10 @@ public struct Transform: Codable, Sendable, Equatable {
         self.skew = .zero
         self.tilt = .none
         self.z = 0
+        self.bend = .zero
     }
 
-    private enum CodingKeys: String, CodingKey { case position, anchor, scale, isScaleLinked, rotation, skew, tilt, z }
+    private enum CodingKeys: String, CodingKey { case position, anchor, scale, isScaleLinked, rotation, skew, tilt, z, bend }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -230,6 +237,7 @@ public struct Transform: Codable, Sendable, Equatable {
         skew = try c.decodeIfPresent(Vec2.self, forKey: .skew) ?? .zero
         tilt = try c.decodeIfPresent(Tilt.self, forKey: .tilt) ?? .none
         z = try c.decodeIfPresent(Double.self, forKey: .z) ?? 0
+        bend = try c.decodeIfPresent(Vec2.self, forKey: .bend) ?? .zero
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -243,6 +251,7 @@ public struct Transform: Codable, Sendable, Equatable {
         if skew != .zero { try c.encode(skew, forKey: .skew) }
         if tilt != .none { try c.encode(tilt, forKey: .tilt) }
         if z != 0 { try c.encode(z, forKey: .z) }
+        if bend != .zero { try c.encode(bend, forKey: .bend) }
     }
 }
 
@@ -486,19 +495,24 @@ public struct Space3D: AnimatableValue {
     /// 0 to 1: how strongly a layer shows when its back is to the camera.
     /// 1 shows it whole, 0 hides it.
     public var backOpacity: Double
+    /// Degrees the whole space is turned about the frame's middle, as if
+    /// the camera went round it: `x` tips it, the top going away, `y`
+    /// turns it, the right going away. A ring of cards spins on `y`.
+    public var orbit: Vec2
 
     public init(distance: Double = Tilt.defaultDepth, isIsometric: Bool = false, vanishingPoint: Vec2 = Vec2(0.5, 0.5),
-                depthFade: Double = 0, depthBlur: Double = 0, backOpacity: Double = 1) {
+                depthFade: Double = 0, depthBlur: Double = 0, backOpacity: Double = 1, orbit: Vec2 = .zero) {
         self.distance = distance
         self.isIsometric = isIsometric
         self.vanishingPoint = vanishingPoint
         self.depthFade = depthFade
         self.depthBlur = depthBlur
         self.backOpacity = backOpacity
+        self.orbit = orbit
     }
 
     private enum CodingKeys: String, CodingKey {
-        case distance, isIsometric, vanishingPoint, depthFade, depthBlur, backOpacity
+        case distance, isIsometric, vanishingPoint, depthFade, depthBlur, backOpacity, orbit
     }
 
     public init(from decoder: Decoder) throws {
@@ -510,6 +524,7 @@ public struct Space3D: AnimatableValue {
         depthFade = try c.decodeIfPresent(Double.self, forKey: .depthFade) ?? 0
         depthBlur = try c.decodeIfPresent(Double.self, forKey: .depthBlur) ?? 0
         backOpacity = try c.decodeIfPresent(Double.self, forKey: .backOpacity) ?? 1
+        orbit = try c.decodeIfPresent(Vec2.self, forKey: .orbit) ?? .zero
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -523,6 +538,7 @@ public struct Space3D: AnimatableValue {
         if depthFade != 0 { try c.encode(depthFade, forKey: .depthFade) }
         if depthBlur != 0 { try c.encode(depthBlur, forKey: .depthBlur) }
         if backOpacity != 1 { try c.encode(backOpacity, forKey: .backOpacity) }
+        if orbit != .zero { try c.encode(orbit, forKey: .orbit) }
     }
 }
 

@@ -190,7 +190,7 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
 
     /// From the layer's own space into its parent's as drawn, tilt and all.
     public var projection: Projective {
-        if case .placed(let projection, _) = placed { return projection }
+        if let projection = placed.projection { return projection }
         return .layer(position: position, anchor: anchor, scale: scale, rotation: rotation, skew: skew, tilt: tilt, size: size)
     }
 }

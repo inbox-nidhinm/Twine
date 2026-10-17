@@ -87,6 +87,7 @@ public enum ActionSpec: Sendable, Equatable {
     case tilt(TiltAction)
     /// Z, in a frame in 3D.
     case depth(DepthAction)
+    case bend(BendAction)
     /// A frame in 3D's camera and depth look.
     case camera(CameraAction)
     case dash(DashAction)
@@ -122,6 +123,7 @@ public enum ActionSpec: Sendable, Equatable {
         case .skew: return .skew
         case .tilt: return .tilt
         case .depth: return .depth
+        case .bend: return .bend
         case .camera: return .camera
         case .dash: return .dash
         case .preset: return .preset
@@ -137,7 +139,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     case arc, star, path
     case play, volume
     case skew, tilt
-    case depth, camera
+    case depth, bend, camera
     /// Added from Add Preset, never from Add Action.
     case preset
 
@@ -170,6 +172,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .skew: return "Skew"
         case .tilt: return "Tilt"
         case .depth: return "Depth"
+        case .bend: return "Bend"
         case .camera: return "Camera"
         case .preset: return "Preset"
         }
@@ -178,7 +181,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     /// The group it is listed under when adding an action.
     public var category: ActionCategory {
         switch self {
-        case .move, .scale, .rotate, .opacity, .resize, .visibility, .skew, .tilt, .depth: return .transform
+        case .move, .scale, .rotate, .opacity, .resize, .visibility, .skew, .tilt, .depth, .bend: return .transform
         case .camera: return .space
         case .color, .stroke, .trim, .dash, .cornerRadius, .shadow, .innerShadow: return .style
         case .layerBlur, .backgroundBlur: return .blur
@@ -731,9 +734,23 @@ public struct DepthAction: Codable, Sendable, Equatable {
     }
 }
 
+/// Degrees of curve each way (see `Transform.bend`). In By mode `end` is
+/// added to the bend it starts from.
+public struct BendAction: Codable, Sendable, Equatable {
+    public var mode: ActionMode
+    public var initial: Vec2?
+    public var end: Vec2
+
+    public init(mode: ActionMode = .to, initial: Vec2? = nil, end: Vec2) {
+        self.mode = mode
+        self.initial = initial
+        self.end = end
+    }
+}
+
 /// A frame in 3D's camera, blended from its starting value to `end`: the
-/// camera's distance and vanishing point, and its depth fade, depth blur
-/// and backs. Whether it is isometric is not blended: that stays as the
+/// camera's distance, vanishing point and orbit, and its depth fade,
+/// depth blur and backs. Whether it is isometric is not blended: that stays as the
 /// frame has it where the action starts.
 public struct CameraAction: Codable, Sendable, Equatable {
     public var initial: Space3D?
@@ -885,7 +902,7 @@ extension ActionSpec: Codable {
     private enum CodingKeys: String, CodingKey {
         case type, move, scale, rotate, opacity, resize, visibility
         case color, stroke, trim, dash, cornerRadius, shadow, innerShadow, layerBlur, backgroundBlur
-        case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume, skew, tilt, depth, camera, preset
+        case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume, skew, tilt, depth, bend, camera, preset
     }
 
     public init(from decoder: Decoder) throws {
@@ -918,6 +935,7 @@ extension ActionSpec: Codable {
         case .skew: self = .skew(try c.decode(SkewAction.self, forKey: .skew))
         case .tilt: self = .tilt(try c.decode(TiltAction.self, forKey: .tilt))
         case .depth: self = .depth(try c.decode(DepthAction.self, forKey: .depth))
+        case .bend: self = .bend(try c.decode(BendAction.self, forKey: .bend))
         case .camera: self = .camera(try c.decode(CameraAction.self, forKey: .camera))
         case .preset: self = .preset(try c.decode(PresetAction.self, forKey: .preset))
         }
@@ -954,6 +972,7 @@ extension ActionSpec: Codable {
         case .skew(let v): try c.encode(v, forKey: .skew)
         case .tilt(let v): try c.encode(v, forKey: .tilt)
         case .depth(let v): try c.encode(v, forKey: .depth)
+        case .bend(let v): try c.encode(v, forKey: .bend)
         case .camera(let v): try c.encode(v, forKey: .camera)
         case .preset(let v): try c.encode(v, forKey: .preset)
         }

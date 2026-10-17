@@ -1090,6 +1090,7 @@ extension ActionKind {
         case .skew: return .skew
         case .tilt: return .tilt
         case .depth: return .depth
+        case .bend: return .bend
         case .camera: return .camera
         case .preset: return .preset
         }

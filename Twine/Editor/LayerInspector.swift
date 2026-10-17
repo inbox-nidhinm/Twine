@@ -1136,6 +1136,12 @@ private struct SpaceSection: View {
                 .help("Where down the frame the camera looks straight at")
             }
             }
+            StackedRow(label: "Orbit") {
+                UnitField(unit: "X", value: space.orbit.x, decimals: 1, suffix: "°") { v in edit { $0.orbit.x = v } }
+                    .help("Tips the whole space about the frame's middle, the top going away")
+                UnitField(unit: "Y", value: space.orbit.y, decimals: 1, suffix: "°") { v in edit { $0.orbit.y = v } }
+                    .help("Turns the whole space about the frame's middle, the right going away, as if the camera went round it")
+            }
             HStack(spacing: 8) {
                 UnitField(unit: "Fade", value: space.depthFade * 100, decimals: 0, suffix: "%",
                           accepts: { $0 >= 0 && $0 <= 100 }) { v in
@@ -1191,6 +1197,7 @@ private struct EffectsSection: View {
     /// while still at zero, until another layer is picked.
     @State private var addedSkew = false
     @State private var addedTilt = false
+    @State private var addedBend = false
 
     private var t: Transform { layer.transform }
     /// Sound is never drawn, so it cannot slant or turn.
@@ -1200,11 +1207,12 @@ private struct EffectsSection: View {
     }
     private var showsSkew: Bool { canWarp && (addedSkew || t.skew != .zero) }
     private var showsTilt: Bool { canWarp && (addedTilt || t.tilt.isTilted) }
+    private var showsBend: Bool { canWarp && (addedBend || t.bend != .zero) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HeaderRow(title: "Effects") {
-                IconButton(icon: .plus, help: "Add a shadow, a blur, a skew or a tilt") {
+                IconButton(icon: .plus, help: "Add a shadow, a blur, a skew, a tilt or a bend") {
                     var entries: [MenuEntry] = [.item("Drop Shadow", icon: .shadow) { add(.dropShadow(DropShadow())) }]
                     // These follow a shape's outline, so only shapes and
                     // frames have them.
@@ -1215,10 +1223,11 @@ private struct EffectsSection: View {
                     if layer.look != nil {
                         entries.append(.item("Background Blur", icon: .backgroundBlur) { add(.backgroundBlur(BackgroundBlur())) })
                     }
-                    if canWarp && !(showsSkew && showsTilt) {
+                    if canWarp && !(showsSkew && showsTilt && showsBend) {
                         entries.append(.separator)
                         if !showsSkew { entries.append(.item("Skew", icon: .skew) { addedSkew = true }) }
                         if !showsTilt { entries.append(.item("Tilt", icon: .tilt) { addedTilt = true }) }
+                        if !showsBend { entries.append(.item("Bend", icon: .bend) { addedBend = true }) }
                     }
                     menus.show(entries, at: CGPoint(x: addFrame.maxX - Theme.menuMinWidth, y: addFrame.maxY + 4))
                 }
@@ -1230,8 +1239,9 @@ private struct EffectsSection: View {
             }
             if showsSkew { skewRows.gridBody() }
             if showsTilt { tiltRows.gridBody() }
+            if showsBend { bendRows.gridBody() }
         }
-        .sectionPadding(empty: layer.effects.isEmpty && !showsSkew && !showsTilt)
+        .sectionPadding(empty: layer.effects.isEmpty && !showsSkew && !showsTilt && !showsBend)
     }
 
     private func titleRow(_ icon: Icon, _ title: String, remove: @escaping () -> Void) -> some View {
@@ -1260,6 +1270,25 @@ private struct EffectsSection: View {
                     controller.edit(layer.id) { l in l.transform.skew.y = v }
                 }
                 .help("Slants its top and bottom, so the right side moves down")
+            }
+        }
+    }
+
+    private var bendRows: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            titleRow(.bend, "Bend") {
+                addedBend = false
+                controller.edit(layer.id) { l in l.transform.bend = .zero }
+            }
+            HStack(spacing: 8) {
+                UnitField(unit: "X", value: t.bend.x, decimals: 1, suffix: "°") { v in
+                    controller.edit(layer.id) { l in l.transform.bend.x = v }
+                }
+                .help("Curves it round an upright line, its width that much of a turn: positive brings the middle forward, negative hollows it")
+                UnitField(unit: "Y", value: t.bend.y, decimals: 1, suffix: "°") { v in
+                    controller.edit(layer.id) { l in l.transform.bend.y = v }
+                }
+                .help("Curves it round a level line, its height that much of a turn: positive brings the middle forward, negative hollows it")
             }
         }
     }

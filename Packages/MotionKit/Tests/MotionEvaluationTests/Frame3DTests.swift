@@ -277,3 +277,89 @@ import MotionModel
         #expect(back == actions)
     }
 }
+
+/// Bend and the camera's orbit.
+@Suite struct BendAndOrbitTests {
+    typealias F = Frame3DTests
+
+    private func close(_ a: Vec2?, _ b: Vec2?, _ tolerance: Double = 1e-6) -> Bool {
+        guard let a, let b else { return false }
+        return abs(a.x - b.x) < tolerance && abs(a.y - b.y) < tolerance
+    }
+
+    @Test func aBoxGoesOntoAnyFourCorners() throws {
+        let corners = [Vec2(10, 20), Vec2(210, 5), Vec2(190, 160), Vec2(30, 140)]
+        let p = try #require(Projective.box(Size2(100, 50), onto: corners))
+        for (point, corner) in zip([Vec2(0, 0), Vec2(100, 0), Vec2(100, 50), Vec2(0, 50)], corners) {
+            #expect(close(p.apply(point), corner, 1e-9))
+        }
+        #expect(Projective.box(Size2(100, 50), onto: [Vec2(0, 0), Vec2(1, 1), Vec2(2, 2), Vec2(3, 3)]) == nil)
+    }
+
+    @Test func aCurveKeepsItsMiddleAndBendsItsEdgesAway() {
+        let curve = Curve(size: Size2(200, 100), bend: Vec2(90, 0))
+        let middle = curve.point(100, 50)
+        #expect(abs(middle.x - 100) < 1e-9 && abs(middle.z) < 1e-9)
+        // A quarter of a circle: the edges are r sin 45° out and r (1 - cos 45°) back.
+        let r = 200 / (Double.pi / 2)
+        let edge = curve.point(200, 50)
+        #expect(abs(edge.x - (100 + r * sin(.pi / 4))) < 1e-9 && abs(edge.z - r * (cos(.pi / 4) - 1)) < 1e-9)
+        // Hollow, the edges come forward instead.
+        #expect(Curve(size: Size2(200, 100), bend: Vec2(-90, 0)).point(200, 50).z > 0)
+        // Straight along the other way.
+        #expect(abs(curve.point(100, 0).y) < 1e-9 && abs(curve.point(100, 0).z) < 1e-9)
+    }
+
+    @Test func aBentLayerIsDrawnFromItsPoints() throws {
+        var card = F.card("C", at: Vec2(400, 300))
+        card.transform.bend = Vec2(90, 0)
+        let flat = try #require(F.scene([card]).layer(card.id))
+        let mesh = try #require(flat.placed.mesh)
+        #expect(mesh.columns == BentMesh.bentCells && mesh.rows == BentMesh.straightCells)
+        #expect(mesh.points.count == 17 * 5)
+        // Outside a 3D space it keeps its place among its siblings.
+        #expect(flat.placed.depth == 0)
+        // Its middle stays where it was; its sides come in and shrink back.
+        let middle = mesh.points[2 * 17 + 8]
+        #expect(close(middle, Vec2(400, 300), 1e-9))
+        let right = mesh.points[2 * 17 + 16]
+        #expect(right.x < 450 && right.x > 400)
+        // The outline goes through its corners.
+        #expect(close(flat.projection.apply(Vec2(100, 0)), mesh.points[16], 1e-9))
+        // In a 3D frame it is ordered by its middle.
+        var deep = card
+        deep.transform.z = -150
+        #expect(try #require(F.scene([F.frame([deep])]).layer(card.id)).placed.depth == -150)
+    }
+
+    @Test func aBendActionCurvesALayer() throws {
+        let card = F.card("C", at: Vec2(400, 300))
+        let bend = Action(target: card.id, start: 0, duration: 1, easing: .linear,
+                          spec: .bend(BendAction(mode: .by, end: Vec2(0, 60))))
+        #expect(F.scene([card], actions: [bend], at: 0).layer(card.id)?.placed == Placed3D.none)
+        let half = try #require(F.scene([card], actions: [bend], at: 0.5).layer(card.id))
+        #expect(half.warp.bend == Vec2(0, 30))
+        #expect(half.placed.mesh?.rows == BentMesh.bentCells)
+    }
+
+    @Test func theOrbitTurnsTheWholeSpace() throws {
+        let front = F.card("Front", at: Vec2(400, 300), z: 200)
+        let back = F.card("Back", at: Vec2(400, 300), z: -200)
+        var space = Space3D(distance: 1000)
+        space.orbit = Vec2(0, 180)
+        let s = F.scene([F.frame([front, back], space: space)])
+        // Half way round, the back is nearest, and the front turned away.
+        #expect(abs(s.layer(back.id)!.placed.depth - 200) < 1e-9)
+        #expect(abs(s.layer(front.id)!.placed.depth + 200) < 1e-9)
+        // A quarter turn swings the front card to the right of the middle.
+        space.orbit = Vec2(0, 90)
+        let q = F.scene([F.frame([front], space: space)])
+        #expect(try #require(q.layer(front.id)).projection.apply(Vec2(50, 40))!.x > 590)
+        // A Camera action spins it.
+        let spin = Action(target: q.layers[0].id, start: 0, duration: 1, easing: .linear,
+                          spec: .camera(CameraAction(initial: Space3D(distance: 1000), end: Space3D(distance: 1000, orbit: Vec2(0, 360)))))
+        let frame = F.frame([front], space: Space3D(distance: 1000))
+        let spinning = Action(target: frame.id, start: spin.start, duration: 1, easing: .linear, spec: spin.spec)
+        #expect(abs(F.scene([frame], actions: [spinning], at: 0.5).layer(front.id)!.placed.depth + 200) < 1e-9)
+    }
+}

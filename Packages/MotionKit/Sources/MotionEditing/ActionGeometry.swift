@@ -105,6 +105,12 @@ public enum ActionGeometry {
             r.mode = mode
             r = settingEnd(r, to: final, from: state.rotation)
             a.spec = .rotate(r)
+        case .bend(var b) where b.mode != mode:
+            let base = b.initial ?? state.bend
+            let final = b.mode == .to ? b.end : base + b.end
+            b.mode = mode
+            b.end = mode == .to ? final : final - base
+            a.spec = .bend(b)
         case .depth(var d) where d.mode != mode:
             let base = d.initial ?? state.z
             let final = d.mode == .to ? d.end : base + d.end
@@ -164,6 +170,12 @@ public enum ActionGeometry {
             d.initial = final
             d.end = d.mode == .to ? base : base - final
             a.spec = .depth(d)
+        case .bend(var b):
+            let base = b.initial ?? state.bend
+            let final = b.mode == .to ? b.end : base + b.end
+            b.initial = final
+            b.end = b.mode == .to ? base : base - final
+            a.spec = .bend(b)
         case .camera(var c):
             guard let start = c.initial ?? state.camera.space else { return nil }
             (c.initial, c.end) = (c.end, start)
