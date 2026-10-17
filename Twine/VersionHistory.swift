@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 207
+    static let pushes = 208
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -107,6 +107,7 @@ enum VersionHistory {
             "The Figma plugin has its new plugin id (1688993758222572916).",
             "The small icon buttons in the panels (the width and height link, the scale link, the corners button, and the add and remove buttons) are drawn in the same grey as the other controls, not the dim grey that reads as switched off. Only a button that cannot be used is dimmed.",
             "Twine's code is under the MIT License.",
+            "The first step towards templates: under the hood, Twine can now place many layers in one shared 3D space, seen through one camera and drawn nearest on top, the same on the canvas and in exports. Nothing in the app uses it yet, and nothing you see changes.",
         ]),
         .init(date: "30 September 2026", title: "Scenes and GIFs", features: [
             "Scenes on the timeline. Pick actions from any layers and choose Group into Scene (in the inspector, or the timeline's right-click menu): they gather under a row with the scene's name, how long it runs and a deep blue bar across its whole span. Drag that bar to move everything in the scene together, or drag its ends to stretch or squeeze it all in proportion. A scene folds with its chevron; double-click its name to rename it there, or use Rename Scene… on the right-click menu, beside Ungroup Scene. Duplicating or pasting an action in a scene, or a layer with actions in one, puts the copies in the same scene. Scenes are saved with the project.",

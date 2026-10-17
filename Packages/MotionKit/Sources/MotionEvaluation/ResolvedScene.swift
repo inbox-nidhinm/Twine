@@ -163,6 +163,10 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
     /// Motion blur: the layer drawn several times across the shutter and
     /// averaged, or `.none`.
     public var motion: MotionSpread = .none
+    /// Its place in a shared 3D space, worked out through the space's
+    /// camera, or `.none` for a layer drawn flat in its parent (tilted or
+    /// not), as every layer is today.
+    public var placed: Placed3D = .none
     /// Degrees each way (see `Transform.skew`).
     public var skew: Vec2 { warp.skew }
     /// A turn in depth (see `Tilt`), which `transform` leaves out and
@@ -186,7 +190,8 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
 
     /// From the layer's own space into its parent's as drawn, tilt and all.
     public var projection: Projective {
-        .layer(position: position, anchor: anchor, scale: scale, rotation: rotation, skew: skew, tilt: tilt, size: size)
+        if case .placed(let projection, _) = placed { return projection }
+        return .layer(position: position, anchor: anchor, scale: scale, rotation: rotation, skew: skew, tilt: tilt, size: size)
     }
 }
 
