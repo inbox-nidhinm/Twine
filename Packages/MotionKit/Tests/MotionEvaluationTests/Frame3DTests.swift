@@ -45,10 +45,21 @@ import MotionModel
         #expect(s.layer(s.layers[0].id)?.placed == Placed3D.none)
     }
 
-    @Test func aFlatFrameLeavesItsChildrenAlone() throws {
-        let card = Self.card("C", at: Vec2(400, 300), z: 200)
+    @Test func aFlatFrameLeavesItsChildrenFlat() throws {
+        let card = Self.card("C", at: Vec2(400, 300))
         let s = Self.scene([Self.frame([card], space: nil)])
         #expect(s.layer(card.id)?.placed == Placed3D.none)
+    }
+
+    @Test func zOutsideA3DFrameIsSeenFromItsOwnTilt() throws {
+        // 600 nearer from its tilt's 1200 away: twice as big about its
+        // anchor, and still in its place among its siblings.
+        let card = Self.card("C", at: Vec2(400, 300), z: 600)
+        let placed = try #require(Self.scene([Self.frame([card], space: nil)]).layer(card.id))
+        #expect(placed.placed.depth == 0)
+        let p = placed.projection
+        #expect(abs(p.apply(Vec2(100, 40))!.x - p.apply(Vec2(0, 40))!.x - 200) < 1e-9)
+        #expect(close(p.apply(Vec2(50, 40)), Vec2(400, 300)))
     }
 
     @Test func aTiltTurnsInTheSpaceSeenByTheCamera() throws {
@@ -126,7 +137,12 @@ import MotionModel
         group.transform.z = -200
         let s = Self.scene([Self.frame([group])])
         #expect(s.layer(group.id)?.placed.depth == -200)
-        #expect(s.layer(inner.id)?.placed == Placed3D.none)
+        // Inside the flat card, its own Z is its own perspective's, not the
+        // frame's camera, and orders nothing.
+        let own = try #require(s.layer(inner.id))
+        #expect(own.placed.depth == 0)
+        #expect(own.projection == Camera3D.ownProjection(position: Vec2(50, 40), z: 300, anchor: Vec2(50, 40), scale: Vec2(1, 1),
+                                                         rotation: 0, skew: .zero, tilt: .none, size: Size2(100, 80)))
     }
 
     @Test func theCacheKeepsUpWithTheFrame() throws {
@@ -248,7 +264,7 @@ import MotionModel
         let frame = F.frame([card], space: nil)
         let move = Action(target: frame.id, start: 0, duration: 1, easing: .linear,
                           spec: .camera(CameraAction(end: Space3D(distance: 100))))
-        #expect(F.scene([frame], actions: [move], at: 1).layer(card.id)?.placed == Placed3D.none)
+        #expect(F.scene([frame], actions: [move], at: 1).layer(card.id) == F.scene([frame]).layer(card.id))
     }
 
     @Test func depthBlursAsItMoves() throws {

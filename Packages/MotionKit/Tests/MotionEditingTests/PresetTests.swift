@@ -111,9 +111,11 @@ private func edgeOn(_ state: LayerState) -> Bool {
             let end = tracks.state(of: layer, at: action.end + 0.01)
             #expect(near(end.position, Vec2(500, 300)) && near(end.scale, Vec2(1, 1)) && near(end.rotation, 10),
                     "\(preset.name)")
-            let middle = tracks.state(of: layer, at: action.start + action.duration * 0.3)
-            #expect(!(near(middle.position, Vec2(500, 300)) && near(middle.scale, Vec2(1, 1)) && near(middle.rotation, 10)),
+            #expect(abs(end.tilt.x) < 1e-6 && abs(end.tilt.y.truncatingRemainder(dividingBy: 360)) < 1e-6 && abs(end.z) < 1e-6,
                     "\(preset.name)")
+            let middle = tracks.state(of: layer, at: action.start + action.duration * 0.3)
+            #expect(!(near(middle.position, Vec2(500, 300)) && near(middle.scale, Vec2(1, 1)) && near(middle.rotation, 10)
+                      && middle.tilt == end.tilt && middle.z == end.z), "\(preset.name)")
         }
     }
 
@@ -159,7 +161,7 @@ private func edgeOn(_ state: LayerState) -> Bool {
             let whole = ActionTracks([earlier, action])
             let state = whole.inheritedState(for: action, of: layer)
             let parts = try #require(Presets.split(action, of: layer, from: state, frameRate: .fps60))
-            #expect(parts.count > 1 || [.fadeIn, .fadeOut, .typewriterIn, .typewriterOut, .pageTurnIn, .pageTurnOut].contains(preset.kind), "\(preset.name)")
+            #expect(parts.count > 1 || [.fadeIn, .fadeOut, .typewriterIn, .typewriterOut, .pageTurnIn, .pageTurnOut, .flipIn, .flipOut, .spin3D].contains(preset.kind), "\(preset.name)")
             let split = ActionTracks([earlier] + parts)
             // A shake's and a wiggle's jolts are a few frames long, and split
             // actions land on frames, so between them they differ a little;

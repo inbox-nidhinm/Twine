@@ -27,7 +27,7 @@ public enum ActionFactory {
     /// for layers with sound: always a sound, and a video when `hasSound`
     /// says its file has a sound track (see `kinds(for:in:)`).
     public static func kinds(for layer: Layer, hasSound: Bool = false) -> [ActionKind] {
-        let transform: [ActionKind] = [.move, .scale, .rotate, .skew, .tilt, .bend, .opacity, .resize, .visibility]
+        let transform: [ActionKind] = [.move, .scale, .rotate, .skew, .tilt, .depth, .bend, .opacity, .resize, .visibility]
         switch layer.content {
         case .audio:
             // Sound has nothing to move or fade; it plays, louder or softer.
@@ -71,14 +71,9 @@ public enum ActionFactory {
     }
 
     /// The kinds for a layer in `project`, which knows whether a video's file
-    /// has sound, and whether the layer sits in a frame in 3D, where it
-    /// takes Depth (after Tilt).
+    /// has sound.
     public static func kinds(for layer: Layer, in project: Project) -> [ActionKind] {
-        var kinds = kinds(for: layer, hasSound: project.hasSound(layer))
-        if project.space3D(holding: layer.id) != nil, let tilt = kinds.firstIndex(of: .tilt) {
-            kinds.insert(.depth, at: tilt + 1)
-        }
-        return kinds
+        kinds(for: layer, hasSound: project.hasSound(layer))
     }
 
     /// Kinds offered for several layers at once: those every one of them takes.

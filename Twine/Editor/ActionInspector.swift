@@ -258,21 +258,20 @@ private struct PresetFields: View {
         case .direction:
             // Its name above, as Easing's is: four choices need the width.
             VStack(alignment: .leading, spacing: 6) {
-                Text(isPageTurn ? "Hinge" : kind.entering == false ? "To" : "From")
+                Text(directionLabel)
                     .font(ThemeFont.label)
                     .foregroundStyle(Theme.textSecondary)
                 SegmentRow(selection: settings.direction ?? own.direction ?? .left, options: PresetDirection.allCases,
                            title: { $0.rawValue.capitalized }, icon: Self.arrow) { d in edit("Direction") { $0.direction = d } }
             }
-            .help(isPageTurn ? "The edge it turns on, as a page on its spine."
-                  : kind.entering == false ? "Which way it leaves." : "Which side it comes in from.")
+            .help(directionHelp)
         case .distance:
             LabeledRow(label: kind == .bounce ? "Height" : "Distance") {
                 UnitField(value: settings.distance ?? own.distance ?? 0, decimals: 0, suffix: "px", accepts: { $0 >= 0 }) { v in
                     edit("Distance") { $0.distance = v }
                 }
             }
-            .help(kind == .shake ? "How far it shakes each way." : kind == .bounce ? "How high it bounces." : "How far it travels.")
+            .help(distanceHelp)
         case .scale:
             LabeledRow(label: kind == .pulse ? "Peak" : kind.entering == false ? "To" : "From") {
                 UnitField(value: (settings.scale ?? own.scale ?? 1) * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 }) { v in
@@ -285,7 +284,8 @@ private struct PresetFields: View {
             LabeledRow(label: "Angle") {
                 UnitField(value: settings.angle ?? own.angle ?? 0, decimals: 0, suffix: "°") { v in edit("Angle") { $0.angle = v } }
             }
-            .help(kind == .wiggle ? "How far it tips each way."
+            .help(kind == .wiggle || kind == .float ? "How far it tips each way."
+                  : kind == .spin3D ? "How far it turns. 360° is a whole turn."
                   : kind.entering == false ? "How far it turns on the way out. Negative turns the other way."
                   : "How far it turns on the way in. Negative turns the other way.")
         case .blur:
@@ -334,8 +334,41 @@ private struct PresetFields: View {
         }
     }
 
-    /// Each side as an arrow pointing to it.
     private var isPageTurn: Bool { kind == .pageTurnIn || kind == .pageTurnOut }
+
+    /// What the four sides mean to this preset.
+    private var directionLabel: String {
+        switch kind {
+        case .pageTurnIn, .pageTurnOut, .swingIn, .swingOut: "Hinge"
+        case .flipIn, .flipOut, .spin3D: "Turn"
+        case .foldIn, .foldOut: "Curve"
+        default: kind.entering == false ? "To" : "From"
+        }
+    }
+
+    private var directionHelp: String {
+        switch kind {
+        case .pageTurnIn, .pageTurnOut: "The edge it turns on, as a page on its spine."
+        case .swingIn, .swingOut: "The edge it hangs from as it swings."
+        case .flipIn, .flipOut, .spin3D: "The side that goes first as it turns over."
+        case .foldIn, .foldOut: "Left or right curls it across; top or bottom, down."
+        default: kind.entering == false ? "Which way it leaves." : "Which side it comes in from."
+        }
+    }
+
+    private var distanceHelp: String {
+        switch kind {
+        case .shake: "How far it shakes each way."
+        case .bounce: "How high it bounces."
+        case .flyIn, .tumbleIn: "How far away it starts."
+        case .flyOut: "How far towards you it goes."
+        case .tumbleOut: "How far away it goes."
+        case .float: "How far towards you it drifts."
+        default: "How far it travels."
+        }
+    }
+
+    /// Each side as an arrow pointing to it.
 
     private static func arrow(_ side: PresetDirection) -> Icon {
         switch side {

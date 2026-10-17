@@ -107,8 +107,8 @@ struct LayerInspector: View {
                     }
                 }
                 .help("Where the anchor point sits, in pixels")
-                // Z means something only in a frame in 3D.
-                if controller.project.space3D(holding: layer.id) != nil {
+                // Z shows in a frame in 3D, and wherever one is set.
+                if t.z != 0 || controller.project.space3D(holding: layer.id) != nil {
                     HStack(spacing: 8) {
                         number("Z", t.z) { l, v in l.transform.z = v }
                             .help("How far towards you it sits, in pixels; negative is further away")

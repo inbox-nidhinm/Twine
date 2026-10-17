@@ -169,6 +169,33 @@ public struct Camera3D: Sendable, Equatable {
     }
 }
 
+extension Camera3D {
+    /// The camera a layer outside any 3D frame is seen through: over its
+    /// anchor (at `position`), from its tilt's depth, as its own tilt is.
+    public static func own(position: Vec2, tilt: Tilt) -> Camera3D {
+        Camera3D(distance: tilt.depth > 1 ? tilt.depth : Tilt.defaultDepth, vanishingPoint: position)
+    }
+
+    /// A flat layer outside any 3D frame placed `z` towards the viewer, as
+    /// drawn: `Projective.layer` with its Z seen through its own camera.
+    public static func ownProjection(position: Vec2, z: Double, anchor: Vec2, scale: Vec2, rotation: Double,
+                                     skew: Vec2, tilt: Tilt, size: Size2) -> Projective {
+        own(position: position, tilt: tilt).projection(of: .layer(position: position, z: z, anchor: anchor, scale: scale,
+                                                                 rotation: rotation, skew: skew, tilt: tilt, size: size))
+    }
+
+    /// Where a point of a layer outside any 3D frame lands, its turn, tilt,
+    /// Z and bend and all, for drawing one by hand (the preset tiles).
+    public static func ownPoints(position: Vec2, z: Double, anchor: Vec2, scale: Vec2, rotation: Double, skew: Vec2,
+                                 tilt: Tilt, bend: Vec2, size: Size2) -> (Vec2) -> Vec2? {
+        let camera = own(position: position, tilt: tilt)
+        let pose = Pose3D.layer(position: position, z: z, anchor: anchor, scale: scale, rotation: rotation,
+                                skew: skew, tilt: tilt, size: size)
+        let curve = Curve(size: size, bend: bend)
+        return { p in camera.project(pose.apply(curve.point(p.x, p.y))) }
+    }
+}
+
 /// A layer placed in a shared space, as drawn: its whole transform into its
 /// parent, and how near it is, to order it among its siblings (larger is
 /// nearer, drawn over smaller). A bent layer is no longer flat: it carries
@@ -297,11 +324,10 @@ struct SpaceContext {
     }
 
     /// The camera a layer outside any 3D space is seen through, as its own
-    /// tilt is: over its anchor, at its tilt's depth. Only a bent layer
-    /// needs one.
+    /// tilt is: over its anchor, at its tilt's depth. Only a layer bent or
+    /// moved in depth needs one.
     init(ownOf layer: ResolvedLayer) {
-        let depth = layer.tilt.depth > 1 ? layer.tilt.depth : Tilt.defaultDepth
-        camera = Camera3D(distance: depth, vanishingPoint: layer.position)
+        camera = Camera3D.own(position: layer.position, tilt: layer.tilt)
         reach = 1
         fade = 0
         blur = 0

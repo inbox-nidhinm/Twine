@@ -86,7 +86,7 @@ import MotionEvaluation
         let group = LayerFactory.group(in: Box(minX: 0, minY: 0, maxX: 1, maxY: 1), children: [], name: "G")
         let audio = Layer(name: "A", content: .audio(AudioContent(mediaID: UUID())), size: Size2(0, 0), position: .zero)
         // A filled rectangle with no stroke: everything but Stroke and Trim.
-        #expect(ActionFactory.kinds(for: square) == [.move, .scale, .rotate, .skew, .tilt, .bend, .opacity, .resize, .visibility,
+        #expect(ActionFactory.kinds(for: square) == [.move, .scale, .rotate, .skew, .tilt, .depth, .bend, .opacity, .resize, .visibility,
                                                      .color, .cornerRadius, .shadow, .innerShadow, .layerBlur, .backgroundBlur])
         #expect(!ActionFactory.kinds(for: group).contains(.resize))
         #expect(ActionFactory.kinds(for: audio) == [.play, .volume])

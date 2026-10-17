@@ -37,6 +37,16 @@ public enum PresetEffect: Sendable, Equatable {
     case reveal(from: RevealBox?, to: RevealBox?)
     /// A page curl from `corner`, from `from` to `to` (0 flat, 1 curled off).
     case curl(corner: PresetCorner, from: Double, to: Double)
+    /// Turns in depth on both lines at once by `by` degrees (a tilt's x and
+    /// y), entering into its own tilt from `by` short of it, or on by that
+    /// much.
+    case turn(by: Vec2, entering: Bool)
+    /// Towards the viewer by `by` pixels (Z): entering, it comes from `by`
+    /// away to its own; otherwise it goes on by that much.
+    case depth(by: Double, entering: Bool)
+    /// Bend, in degrees each way, from `from` (nil carries on) to `to` (nil
+    /// is its own).
+    case bend(from: Vec2?, to: Vec2?)
 
     public var channel: Channel {
         switch self {
@@ -46,9 +56,11 @@ public enum PresetEffect: Sendable, Equatable {
         case .rotate: .rotation
         case .blur: .layerBlur
         case .volume: .volume
-        case .tilt, .turnPage: .tilt
+        case .tilt, .turnPage, .turn: .tilt
         case .reveal: .reveal
         case .curl: .curl
+        case .depth: .depth
+        case .bend: .bend
         }
     }
 
@@ -60,8 +72,10 @@ public enum PresetEffect: Sendable, Equatable {
         case .opacity(let from, _), .scale(let from, _), .volume(let from, _): from != nil
         case .blur(let from, _): from != nil
         case .reveal(let from, _): from != nil
+        case .bend(let from, _): from != nil
         case .curl(_, let from, _): from > 0
-        case .move(_, let entering), .rotate(_, let entering), .tilt(_, let entering), .turnPage(_, _, let entering): entering
+        case .move(_, let entering), .rotate(_, let entering), .tilt(_, let entering), .turnPage(_, _, let entering),
+             .turn(_, let entering), .depth(_, let entering): entering
         }
     }
 }
@@ -115,6 +129,16 @@ public enum PresetRecipe {
         case .shake: PresetAction(preset: kind, distance: 12)
         case .wiggle: PresetAction(preset: kind, angle: 8)
         case .fadeIn, .fadeOut, .fadeSoundIn, .fadeSoundOut, .typewriterIn, .typewriterOut: PresetAction(preset: kind)
+        case .flipIn: PresetAction(preset: kind, direction: .top, angle: 90, fades: false)
+        case .flipOut: PresetAction(preset: kind, direction: .bottom, angle: 90, fades: false)
+        case .swingIn, .swingOut: PresetAction(preset: kind, direction: .top, fades: true)
+        case .foldIn, .foldOut: PresetAction(preset: kind, direction: .left, angle: 180, fades: true)
+        case .tumbleIn, .tumbleOut: PresetAction(preset: kind, distance: 600, angle: 90, fades: true)
+        case .flyIn: PresetAction(preset: kind, distance: 1200, fades: true)
+        case .flyOut: PresetAction(preset: kind, distance: 600, fades: true)
+        case .isoLiftIn, .isoLiftOut: PresetAction(preset: kind, distance: travel / 2, angle: 45, fades: true)
+        case .spin3D: PresetAction(preset: kind, direction: .left, angle: 360)
+        case .float: PresetAction(preset: kind, distance: 60, angle: 8)
         }
     }
 
@@ -127,9 +151,13 @@ public enum PresetRecipe {
     public static func easing(_ kind: PresetKind) -> Easing {
         switch kind {
         case .slideIn, .rotateIn, .blurIn, .shrinkIn, .twistIn, .moveScaleIn, .blurSlideIn, .blurScaleIn,
-             .maskRevealIn, .maskCenterIn, .maskResizeIn, .maskSlideIn, .maskShrinkIn, .pageTurnIn: slowDown
+             .maskRevealIn, .maskCenterIn, .maskResizeIn, .maskSlideIn, .maskShrinkIn, .pageTurnIn,
+             .flipIn, .foldIn, .tumbleIn, .flyIn, .isoLiftIn: slowDown
         case .slideOut, .blurOut, .rotateOut, .dropOut, .shrinkOut, .twistOut, .moveScaleOut, .blurSlideOut, .blurScaleOut,
-             .maskRevealOut, .maskCenterOut, .maskResizeOut, .maskSlideOut, .maskShrinkOut, .pageTurnOut: accelerate
+             .maskRevealOut, .maskCenterOut, .maskResizeOut, .maskSlideOut, .maskShrinkOut, .pageTurnOut,
+             .flipOut, .swingOut, .foldOut, .tumbleOut, .flyOut, .isoLiftOut: accelerate
+        // Falls into place and sways there.
+        case .swingIn: .preset(.spring, intensity: 0.5)
         case .scalePop: .preset(.overshoot, intensity: 0.6)
         case .scaleOut: .preset(.accelerate, intensity: 0.5)
         case .dropIn: .preset(.spring, intensity: 0.5)
@@ -179,6 +207,22 @@ public enum PresetRecipe {
         }
     }
     private static let accelerate = Easing.preset(.accelerate, intensity: 0.6)
+
+    /// A flip's turn: over the top or bottom on a level line, or round the
+    /// left or right on an upright one, the side named going first.
+    private static func flipTurn(_ d: PresetDirection, _ angle: Double) -> Vec2 {
+        switch d {
+        case .top: Vec2(angle, 0)
+        case .bottom: Vec2(-angle, 0)
+        case .left: Vec2(0, -angle)
+        case .right: Vec2(0, angle)
+        }
+    }
+
+    /// A fold's curve: across for left and right, down for top and bottom.
+    private static func foldBend(_ d: PresetDirection, _ angle: Double) -> Vec2 {
+        d == .left || d == .right ? Vec2(angle, 0) : Vec2(0, angle)
+    }
 
     private static func seconds(_ kind: PresetKind, _ settings: PresetAction? = nil) -> (length: Double, parts: [PresetPart]) {
         let own = defaults(kind)
@@ -305,6 +349,49 @@ public enum PresetRecipe {
             return (1, [part(.volume(from: 0, to: nil), for: 1)])
         case .fadeSoundOut:
             return (1, [part(.volume(from: nil, to: 0), for: 1)])
+        // The 3D group. Each turns in depth, seen through its frame's
+        // camera in 3D, or from its own tilt's depth anywhere else.
+        case .flipIn:
+            return (0.6, [part(.turn(by: flipTurn(direction, angle), entering: true), for: 0.6)] + fadeIn(0.3))
+        case .flipOut:
+            return (0.5, [part(.turn(by: flipTurn(direction, angle), entering: false), for: 0.5)] + fadeOut(at: 0.2, 0.3))
+        case .swingIn:
+            return (0.9, [part(.turnPage(hinge: direction, by: 90, entering: true), for: 0.9)] + fadeIn(0.2))
+        case .swingOut:
+            return (0.5, [part(.turnPage(hinge: direction, by: 90, entering: false), for: 0.5)] + fadeOut(at: 0.3, 0.2))
+        case .foldIn:
+            return (0.6, [part(.bend(from: foldBend(direction, angle), to: nil), for: 0.6)] + fadeIn(0.3))
+        case .foldOut:
+            return (0.5, [part(.bend(from: nil, to: foldBend(direction, angle)), for: 0.5)] + fadeOut(at: 0.2, 0.3))
+        case .tumbleIn:
+            return (0.8, [part(.turn(by: Vec2(angle * 0.6, -angle), entering: true), for: 0.8),
+                          part(.rotate(by: angle / 3, entering: true), for: 0.8),
+                          part(.depth(by: -distance, entering: true), for: 0.8)] + fadeIn(0.4))
+        case .tumbleOut:
+            return (0.6, [part(.turn(by: Vec2(-angle * 0.6, angle), entering: false), for: 0.6),
+                          part(.rotate(by: -angle / 3, entering: false), for: 0.6),
+                          part(.depth(by: -distance, entering: false), for: 0.6)] + fadeOut(at: 0.2, 0.4))
+        case .flyIn:
+            return (0.7, [part(.depth(by: -distance, entering: true), for: 0.7)] + fadeIn(0.4))
+        case .flyOut:
+            return (0.5, [part(.depth(by: distance, entering: false), for: 0.5)] + fadeOut(at: 0.1, 0.4))
+        case .isoLiftIn:
+            return (0.7, [part(.turn(by: Vec2(60, 0), entering: true), for: 0.7),
+                          part(.rotate(by: -angle, entering: true), for: 0.7),
+                          part(.move(by: Vec2(0, distance), entering: true), for: 0.7)] + fadeIn(0.3))
+        case .isoLiftOut:
+            return (0.5, [part(.turn(by: Vec2(60, 0), entering: false), for: 0.5),
+                          part(.rotate(by: -angle, entering: false), for: 0.5),
+                          part(.move(by: Vec2(0, distance), entering: false), for: 0.5)] + fadeOut(at: 0.2, 0.3))
+        case .spin3D:
+            return (1, [part(.turn(by: flipTurn(direction, angle), entering: false), for: 1)])
+        // Forward and a little back, then home, each half eased its own way.
+        case .float:
+            let d = distance, a = s.angle ?? own.angle ?? 8
+            return (1, [part(.depth(by: d, entering: false), for: 0.5, easing: .default),
+                        part(.depth(by: -d, entering: false), at: 0.5, for: 0.5, easing: .default),
+                        part(.turn(by: Vec2(a, a / 2), entering: false), for: 0.5, easing: .default),
+                        part(.turn(by: Vec2(-a, -a / 2), entering: false), at: 0.5, for: 0.5, easing: .default)])
         case .pulse:
             let peak = s.scale ?? own.scale ?? 1.12
             return (0.43, [part(.scale(from: nil, to: peak), for: 0.18), part(.scale(from: nil, to: 1), at: 0.18, for: 0.25)])

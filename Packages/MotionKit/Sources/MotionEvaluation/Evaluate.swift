@@ -275,10 +275,10 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
             }
             if let space {
                 space.place(&resolved, z: resolved.warp.z)
-            } else if resolved.warp.bend != .zero {
-                // Bent outside a 3D space: seen as its own tilt is, and
-                // kept in its place among its siblings.
-                SpaceContext(ownOf: resolved).place(&resolved, z: 0, ordered: false)
+            } else if resolved.warp.bend != .zero || resolved.warp.z != 0 {
+                // Bent or moved in depth outside a 3D space: seen as its
+                // own tilt is, and kept in its place among its siblings.
+                SpaceContext(ownOf: resolved).place(&resolved, z: resolved.warp.z, ordered: false)
             }
             if let mask { masked.append((out.count, mask)) }
             out.append(resolved)
@@ -366,8 +366,8 @@ private struct WorldTransforms {
                 if let parent, let frame = layers[parent], let holder = resolved(parent),
                    let space = tracks.state(of: frame, at: time).camera.space {
                     SpaceContext(space, size: holder.size).place(&result!, z: result!.warp.z)
-                } else if result!.warp.bend != .zero {
-                    SpaceContext(ownOf: result!).place(&result!, z: 0, ordered: false)
+                } else if result!.warp.bend != .zero || result!.warp.z != 0 {
+                    SpaceContext(ownOf: result!).place(&result!, z: result!.warp.z, ordered: false)
                 }
             }
         }
@@ -404,7 +404,11 @@ private func motion(of layer: Layer, _ resolved: ResolvedLayer, tracks: ActionTr
         if channels.contains(.depth) {
             moved.warp = Warp(skew: moved.skew, tilt: moved.tilt, z: state.z, bend: moved.warp.bend)
         }
-        return space?.projection(of: moved, z: moved.warp.z) ?? moved.projection
+        if let space { return space.projection(of: moved, z: moved.warp.z) }
+        // Moved in depth outside a 3D frame, as `place` sees it.
+        guard moved.warp.z != 0 else { return moved.projection }
+        return Camera3D.ownProjection(position: moved.position, z: moved.warp.z, anchor: moved.anchor, scale: moved.scale,
+                                      rotation: moved.rotation, skew: moved.skew, tilt: moved.tilt, size: moved.size)
     }
     let spread = MotionSpread(first: placed(at: first), next: placed(at: first + shutter / Double(blur.samples - 1)),
                               last: placed(at: first + shutter), count: blur.samples, size: resolved.size)
@@ -537,6 +541,13 @@ private func units(of text: String, style: TextStyle, width: Double?, _ animatio
     guard states.contains(where: { $0 != TextAnimation.rest }) else { return [] }
     func placed(_ span: TextSpan, _ state: LayerState) -> Projective {
         let centre = Vec2(span.box.width / 2, span.box.height / 2)
+        // A letter moved in depth is seen from its own tilt's depth, over
+        // its middle, as a layer outside a 3D frame is.
+        guard state.z == 0 else {
+            return Camera3D.ownProjection(position: span.box.center + state.position, z: state.z, anchor: centre,
+                                          scale: state.scale, rotation: state.rotation, skew: state.skew,
+                                          tilt: state.tilt, size: Size2(span.box.width, span.box.height))
+        }
         return Projective.layer(position: span.box.center + state.position, anchor: centre,
                                 scale: state.scale, rotation: state.rotation, skew: state.skew, tilt: state.tilt,
                                 size: Size2(span.box.width, span.box.height))

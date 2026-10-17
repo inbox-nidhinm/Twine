@@ -498,8 +498,8 @@ public struct ActionTracks: Sendable {
                 state.opacity = walk(state.opacity, run, at: time)
             case .skew: state.skew = walk(state.skew, list.compactMap(Self.skewStep), at: time)
             case .tilt: state.tilt = walk(state.tilt, steps(list, Self.tiltStep, Self.tiltPart), at: time)
-            case .depth: state.z = walk(state.z, list.compactMap(Self.depthStep), at: time)
-            case .bend: state.bend = walk(state.bend, list.compactMap(Self.bendStep), at: time)
+            case .depth: state.z = walk(state.z, steps(list, Self.depthStep, Self.depthPart), at: time)
+            case .bend: state.bend = walk(state.bend, steps(list, Self.bendStep, Self.bendPart), at: time)
             // Only a frame in 3D has a camera to move.
             case .camera:
                 if let space = state.camera.space { state.camera = .space(walk(space, list.compactMap(Self.cameraStep), at: time)) }
@@ -664,9 +664,24 @@ public struct ActionTracks: Sendable {
             return PartRun(holds: entering) { inherited, own, _ in
                 entering ? (turned(own, -1), own) : (turned(inherited, 0), turned(inherited, 1))
             }
+        case .turn(let by, let entering):
+            func turned(_ t: Tilt, _ k: Double) -> Tilt { Tilt(x: t.x + by.x * k, y: t.y + by.y * k, depth: t.depth) }
+            return PartRun(holds: entering) { inherited, own, _ in
+                entering ? (turned(own, -1), turned(own, 0)) : (turned(inherited, 0), turned(inherited, 1))
+            }
         default:
             return nil
         }
+    }
+
+    private static func depthPart(_ e: PresetEffect) -> PartRun<Double>? {
+        guard case .depth(let by, let entering) = e else { return nil }
+        return PartRun(holds: entering) { inherited, own, _ in entering ? (own + by, own) : (inherited, inherited + by) }
+    }
+
+    private static func bendPart(_ e: PresetEffect) -> PartRun<Vec2>? {
+        guard case .bend(let from, let to) = e else { return nil }
+        return PartRun(holds: from != nil) { inherited, own, _ in (from ?? inherited, to ?? own) }
     }
 
     /// A page's spine on the `side` edge, as a share of the box, and the

@@ -219,6 +219,17 @@ struct PresetThumbnail: View {
                          in: CGRect(x: -w / 2, y: -w / 2, width: w, height: w))
             return
         }
+        // Bent or moved in depth, it is drawn point by point as the canvas
+        // sees it, from its own tilt's depth.
+        if state.z != 0 || state.bend != .zero {
+            let place = Camera3D.ownPoints(position: .zero, z: state.z, anchor: Vec2(side / 2, side / 2), scale: state.scale,
+                                           rotation: state.rotation, skew: state.skew, tilt: state.tilt, bend: state.bend,
+                                           size: Size2(side, side))
+            let flat = RoundedRectangle(cornerRadius: side * PresetPreview.roundness)
+                .path(in: CGRect(x: 0, y: 0, width: side, height: side))
+            context.fill(carried(flat, place, scale: k), with: .color(Theme.previewShape))
+            return
+        }
         // A turn in depth is drawn in its true perspective, about its hinge
         // when it has one, so a page turn swings on its edge.
         if state.tilt.isTilted {
@@ -242,6 +253,41 @@ struct PresetThumbnail: View {
         }
         context.fill(RoundedRectangle(cornerRadius: w * PresetPreview.roundness).path(in: box),
                      with: .color(Theme.previewShape))
+    }
+
+    /// `path` cut into short straight pieces and each point carried by
+    /// `place`, then scaled to the tile: a bend curves straight sides.
+    private static func carried(_ path: Path, _ place: (Vec2) -> Vec2?, scale k: Double) -> Path {
+        var out = Path()
+        var last: CGPoint?
+        func put(_ q: CGPoint, start: Bool) {
+            guard let v = place(Vec2(q.x, q.y)) else { return }
+            let p = CGPoint(x: v.x * k, y: v.y * k)
+            if start { out.move(to: p) } else { out.addLine(to: p) }
+        }
+        path.cgPath.flattened(threshold: 0.5).applyWithBlock { element in
+            let e = element.pointee
+            switch e.type {
+            case .moveToPoint:
+                last = e.points[0]
+                put(e.points[0], start: true)
+            case .addLineToPoint:
+                let to = e.points[0]
+                if let from = last {
+                    let steps = max(Int((hypot(to.x - from.x, to.y - from.y) / 4).rounded(.up)), 1)
+                    for i in 1...steps {
+                        let f = CGFloat(i) / CGFloat(steps)
+                        put(CGPoint(x: from.x + (to.x - from.x) * f, y: from.y + (to.y - from.y) * f), start: false)
+                    }
+                }
+                last = to
+            case .closeSubpath:
+                out.closeSubpath()
+            default:
+                break
+            }
+        }
+        return out
     }
 
     /// `path` carried point by point through `turn`, then scaled to the tile.

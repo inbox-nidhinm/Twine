@@ -202,8 +202,9 @@ public struct Transform: Codable, Sendable, Equatable {
     public var skew: Vec2
     /// A turn in depth, around the anchor, seen in perspective. See `Tilt`.
     public var tilt: Tilt
-    /// Pixels towards the viewer (negative is away), in a frame in 3D
-    /// (`Space3D`); anywhere else it changes nothing.
+    /// Pixels towards the viewer (negative is away): in a frame in 3D
+    /// (`Space3D`) seen through its camera, anywhere else from the layer's
+    /// own tilt's depth, over its anchor, so nearer is larger.
     public var z: Double
     /// Degrees of curve: `x` bends the layer round an upright line, so its
     /// width is that much of a circle's turn; `y` round a level line, along

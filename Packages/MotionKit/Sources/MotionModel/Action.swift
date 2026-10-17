@@ -838,6 +838,16 @@ public enum PresetKind: String, Codable, Sendable, CaseIterable {
     /// onboarding pictures turn, showing what is under it: Out curls it
     /// off, In lays it down the same way played backwards.
     case pageCurlIn = "page-curl-in", pageCurlOut = "page-curl-out"
+    /// The 3D group. Flip turns over on a level or upright line; Swing
+    /// falls into place from an edge with a spring; Fold unrolls from a
+    /// curve; Tumble turns every way as it comes from deep; Fly comes from
+    /// far away or goes past the viewer; Iso Lift rises from lying flat as
+    /// on an isometric floor. Spin 3D (a whole turn in depth) and Float (a
+    /// slow drift in depth) leave the layer where it was.
+    case flipIn = "flip-in", flipOut = "flip-out", swingIn = "swing-in", swingOut = "swing-out"
+    case foldIn = "fold-in", foldOut = "fold-out", tumbleIn = "tumble-in", tumbleOut = "tumble-out"
+    case flyIn = "fly-in", flyOut = "fly-out", isoLiftIn = "iso-lift-in", isoLiftOut = "iso-lift-out"
+    case spin3D = "spin-3d", float
 }
 
 extension PresetKind {
@@ -847,19 +857,24 @@ extension PresetKind {
         switch self {
         case .fadeIn, .slideIn, .scalePop, .rotateIn, .blurIn, .dropIn, .fadeSoundIn, .shrinkIn, .twistIn, .moveScaleIn,
              .maskRevealIn, .maskCenterIn, .maskResizeIn, .maskSlideIn, .maskShrinkIn, .blurSlideIn, .blurScaleIn,
-             .typewriterIn, .pageTurnIn, .pageCurlIn: true
+             .typewriterIn, .pageTurnIn, .pageCurlIn,
+             .flipIn, .swingIn, .foldIn, .tumbleIn, .flyIn, .isoLiftIn: true
         case .fadeOut, .slideOut, .scaleOut, .rotateOut, .blurOut, .dropOut, .fadeSoundOut, .shrinkOut, .twistOut, .moveScaleOut,
              .maskRevealOut, .maskCenterOut, .maskResizeOut, .maskSlideOut, .maskShrinkOut, .blurSlideOut, .blurScaleOut,
-             .typewriterOut, .pageTurnOut, .pageCurlOut: false
-        case .pulse, .bounce, .shake, .wiggle: nil
+             .typewriterOut, .pageTurnOut, .pageCurlOut,
+             .flipOut, .swingOut, .foldOut, .tumbleOut, .flyOut, .isoLiftOut: false
+        case .pulse, .bounce, .shake, .wiggle, .spin3D, .float: nil
         }
     }
 
     public var isSound: Bool { self == .fadeSoundIn || self == .fadeSoundOut }
 
     /// Whether it can only move the whole layer, never a text's letters one
-    /// by one: a sound fade, and a page curl, which curls one picture.
-    public var movesWholeLayer: Bool { isSound || self == .pageCurlIn || self == .pageCurlOut }
+    /// by one: a sound fade, a page curl, which curls one picture, and a
+    /// fold, which bends one.
+    public var movesWholeLayer: Bool {
+        isSound || self == .pageCurlIn || self == .pageCurlOut || self == .foldIn || self == .foldOut
+    }
 }
 
 /// What of a text moves on its own in a preset.

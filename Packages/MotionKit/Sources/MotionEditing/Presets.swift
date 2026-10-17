@@ -47,13 +47,14 @@ public struct Preset: Sendable, Equatable, Identifiable {
 
 /// The headed groups the picker shows presets in, in order.
 public enum PresetGroup: String, Sendable, CaseIterable {
-    case fade, scale, flip, mask, blur, emphasis, text, sound
+    case fade, scale, flip, space, mask, blur, emphasis, text, sound
 
     public var title: String {
         switch self {
         case .fade: "Fade"
         case .scale: "Scale"
         case .flip: "Flip"
+        case .space: "3D"
         case .mask: "Mask"
         case .blur: "Blur"
         case .emphasis: "Emphasis"
@@ -108,7 +109,19 @@ extension PresetKind {
         case .pageTurnOut: .pageTurnIn
         case .pageCurlIn: .pageCurlOut
         case .pageCurlOut: .pageCurlIn
-        case .pulse, .bounce, .shake, .wiggle: nil
+        case .flipIn: .flipOut
+        case .flipOut: .flipIn
+        case .swingIn: .swingOut
+        case .swingOut: .swingIn
+        case .foldIn: .foldOut
+        case .foldOut: .foldIn
+        case .tumbleIn: .tumbleOut
+        case .tumbleOut: .tumbleIn
+        case .flyIn: .flyOut
+        case .flyOut: .flyIn
+        case .isoLiftIn: .isoLiftOut
+        case .isoLiftOut: .isoLiftIn
+        case .pulse, .bounce, .shake, .wiggle, .spin3D, .float: nil
         }
     }
 }
@@ -132,6 +145,14 @@ public enum Presets {
         Preset(.moveScaleIn, "Move & Scale", .scale),
         Preset(.pageTurnIn, "Page Turn", .flip),
         Preset(.pageCurlIn, "Page Curl", .flip),
+        Preset(.flipIn, "Flip", .space),
+        Preset(.swingIn, "Swing", .space),
+        Preset(.foldIn, "Fold", .space),
+        Preset(.tumbleIn, "Tumble", .space),
+        Preset(.flyIn, "Fly", .space),
+        Preset(.isoLiftIn, "Iso Lift", .space),
+        Preset(.spin3D, "Spin 3D", .space),
+        Preset(.float, "Float", .space),
         Preset(.maskRevealIn, "Mask Reveal", .mask),
         Preset(.maskCenterIn, "Mask Center", .mask),
         Preset(.maskResizeIn, "Mask Resize", .mask),
@@ -200,6 +221,14 @@ public enum Presets {
         case .bounce, .shake: [.distance]
         case .wiggle: [.angle]
         case .fadeIn, .fadeOut, .fadeSoundIn, .fadeSoundOut, .typewriterIn, .typewriterOut: []
+        case .flipIn, .flipOut: [.direction, .angle, .fades]
+        case .swingIn, .swingOut: [.direction, .fades]
+        case .foldIn, .foldOut: [.direction, .angle, .fades]
+        case .tumbleIn, .tumbleOut: [.angle, .distance, .fades]
+        case .flyIn, .flyOut: [.distance, .fades]
+        case .isoLiftIn, .isoLiftOut: [.angle, .distance, .fades]
+        case .spin3D: [.direction, .angle]
+        case .float: [.distance, .angle]
         }
     }
 
@@ -233,6 +262,8 @@ public enum Presets {
             case .layerBlur: .layerBlur
             case .volume: .volume
             case .tilt: .tilt
+            case .depth: .depth
+            case .bend: .bend
             // A reveal clips whatever draws, as opacity fades it.
             default: .opacity
             }
@@ -362,6 +393,18 @@ public enum Presets {
                 spec = entering
                     ? .tilt(TiltAction(mode: .to, initial: turned(-1), end: own))
                     : .tilt(TiltAction(mode: .to, end: turned(1)))
+            case .turn(let by, let entering):
+                let own = state.tilt
+                spec = entering
+                    ? .tilt(TiltAction(mode: .to, initial: Tilt(x: own.x - by.x, y: own.y - by.y, depth: own.depth),
+                                       end: Tilt(x: own.x, y: own.y, depth: own.depth)))
+                    : .tilt(TiltAction(mode: .by, end: Tilt(x: by.x, y: by.y, depth: own.depth)))
+            case .depth(let by, let entering):
+                spec = entering
+                    ? .depth(DepthAction(mode: .to, initial: state.z + by, end: state.z))
+                    : .depth(DepthAction(mode: .by, end: by))
+            case .bend(let from, let to):
+                spec = .bend(BendAction(mode: .to, initial: from, end: to ?? state.bend))
             case .reveal, .curl:
                 // Never reached: `splits` turns away any preset that clips or curls.
                 spec = .opacity(OpacityAction(end: ownOpacity))
