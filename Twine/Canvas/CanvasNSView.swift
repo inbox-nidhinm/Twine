@@ -479,10 +479,11 @@ final class CanvasNSView: NSView {
                 return id
             }
         }
-        // By place, front first: `reversed()` and `for in` copied every
-        // layer looked at.
+        // Front first, as drawn: layers in a frame in 3D by their depth.
+        // By place, as `reversed()` and `for in` copied every layer looked at.
         let layers = scene.layers
-        for i in layers.indices.reversed() {
+        let order = scene.drawingOrder()
+        for i in order.reversed() {
             // A plain group draws nothing of its own; a frame does.
             // Through what is drawn, tilts and all, so a click lands on what it sees.
             guard layers[i].content != .group || layers[i].frame != nil, !locked.contains(layers[i].id),
@@ -1345,13 +1346,14 @@ final class CanvasNSView: NSView {
         (spaceHeld ? Cursors.hand : Cursors.arrow).set()
     }
 
-    /// Whether a layer, or a group or frame it sits in, is tilted: its
-    /// outline follows the perspective, but the handles' flat maths would
-    /// not, so they hide and it is sized in the inspector.
+    /// Whether a layer, or a group or frame it sits in, is tilted or
+    /// placed in a frame in 3D: its outline follows the perspective, but
+    /// the handles' flat maths would not, so they hide and it is sized in
+    /// the inspector.
     func isTilted(_ id: UUID, in scene: ResolvedScene) -> Bool {
         var current = scene.layer(id)
         while let layer = current {
-            if layer.tilt.isTilted { return true }
+            if layer.tilt.isTilted || layer.placed != .none { return true }
             current = layer.parentID.flatMap { scene.layer($0) }
         }
         return false

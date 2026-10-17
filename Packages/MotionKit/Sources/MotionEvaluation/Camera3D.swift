@@ -79,18 +79,39 @@ public struct Pose3D: Sendable, Equatable {
         return Pose3D(u: Vec3(c, s, 0), v: Vec3(-s, c, 0), w: Vec3(0, 0, 1), origin: .zero)
     }
 
-    /// A layer of `size` placed as a card is: its `anchor` (pixels from its
-    /// top-left) put at `position`, `z` towards the viewer, scaled, then
-    /// turned about the anchor on z (its rotation), then on y and x (its
-    /// tilt, in `Projective.tilt`'s order).
+    /// A flat transform as a pose, on the plane z = 0.
+    public init(_ flat: Affine) {
+        self.init(u: Vec3(flat.a, flat.b, 0), v: Vec3(flat.c, flat.d, 0), w: Vec3(0, 0, 1),
+                  origin: Vec3(flat.tx, flat.ty, 0))
+    }
+
+    /// A layer placed as `Projective.layer` places it, but in a shared
+    /// space: its anchor (pixels from its top-left) at `position` and `z`
+    /// towards the viewer, scaled, skewed and turned about the anchor as it
+    /// is flat, then tilted in the space: on y and x about the anchor, in
+    /// `Projective.tilt`'s order, or about a hinged tilt's hinge in its box
+    /// of `size`, along the layer's own lines. The tilt's depth is the
+    /// camera's to say, so it is not used.
     public static func layer(position: Vec2, z: Double = 0, anchor: Vec2, scale: Vec2 = Vec2(1, 1),
-                             rotation: Double = 0, tilt: Vec2 = .zero) -> Pose3D {
-        Pose3D.translation(Vec3(-anchor.x, -anchor.y, 0))
-            .then(.scale(scale.x, scale.y))
-            .then(.turnZ(degrees: rotation))
-            .then(.turnY(degrees: tilt.y))
-            .then(.turnX(degrees: tilt.x))
-            .then(.translation(Vec3(position.x, position.y, z)))
+                             rotation: Double = 0, skew: Vec2 = .zero, tilt: Tilt = .none,
+                             size: Size2 = Size2(0, 0)) -> Pose3D {
+        let flat = Affine.layer(position: .zero, anchor: anchor, scale: scale, rotation: rotation, skew: skew)
+        let base = Pose3D(flat)
+        let at = Vec3(position.x, position.y, z)
+        guard tilt.isTilted else { return base.then(.translation(at)) }
+        guard let hinge = tilt.hinge else {
+            return base.then(.turnY(degrees: tilt.y)).then(.turnX(degrees: tilt.x)).then(.translation(at))
+        }
+        let pivot = flat.apply(Vec2(hinge.x * size.width, hinge.y * size.height))
+        return base.then(.translation(Vec3(-pivot.x, -pivot.y, 0))).then(.turnZ(degrees: -rotation))
+            .then(.turnY(degrees: tilt.y)).then(.turnX(degrees: tilt.x))
+            .then(.turnZ(degrees: rotation)).then(.translation(Vec3(pivot.x, pivot.y, 0) + at))
+    }
+
+    /// The same, with a plain turn on x and y for its tilt.
+    public static func layer(position: Vec2, z: Double = 0, anchor: Vec2, scale: Vec2 = Vec2(1, 1),
+                             rotation: Double = 0, tilt: Vec2) -> Pose3D {
+        layer(position: position, z: z, anchor: anchor, scale: scale, rotation: rotation, tilt: Tilt(x: tilt.x, y: tilt.y))
     }
 }
 
@@ -165,5 +186,62 @@ public enum Placed3D: Sendable, Equatable {
     public var depth: Double {
         if case .placed(_, let depth) = self { return depth }
         return 0
+    }
+}
+
+/// A frame's 3D space as its children are placed in it: the camera, and
+/// how depth and facing away change how they look.
+struct SpaceContext {
+    let camera: Camera3D
+    /// How far behind the frame's plane depth fade and blur reach their
+    /// full amount: the frame's longer side.
+    let reach: Double
+    let fade: Double
+    let blur: Double
+    let backs: Double
+
+    init(_ space: Space3D, size: Size2) {
+        let point = Vec2(space.vanishingPoint.x * size.width, space.vanishingPoint.y * size.height)
+        camera = Camera3D(distance: space.isIsometric ? nil : max(space.distance, 1), vanishingPoint: point)
+        reach = max(size.width, size.height, 1)
+        fade = min(max(space.depthFade, 0), 1)
+        blur = max(space.depthBlur, 0)
+        backs = min(max(space.backOpacity, 0), 1)
+    }
+
+    /// Where `layer` sits in the space, `z` towards the viewer.
+    func pose(of layer: ResolvedLayer, z: Double) -> Pose3D {
+        .layer(position: layer.position, z: z, anchor: layer.anchor, scale: layer.scale, rotation: layer.rotation,
+               skew: layer.skew, tilt: layer.tilt, size: layer.size)
+    }
+
+    /// `layer` placed in the space: drawn through the camera, ordered by
+    /// its middle's depth, fainter and blurrier behind the frame's plane,
+    /// dimmed with its back to the camera, and not drawn at all once any
+    /// corner reaches the camera, where the picture would turn inside out.
+    func place(_ layer: inout ResolvedLayer, z: Double) {
+        let pose = pose(of: layer, z: z)
+        let middle = Vec2(layer.size.width / 2, layer.size.height / 2)
+        let placed = Placed3D(pose, camera: camera, middle: middle)
+        layer.placed = placed
+        guard case .placed(let projection, let depth) = placed else { return }
+        let corners = [Vec2(0, 0), Vec2(layer.size.width, 0), Vec2(layer.size.width, layer.size.height), Vec2(0, layer.size.height)]
+        if corners.contains(where: { projection.px * $0.x + projection.py * $0.y + projection.w < Self.nearest }) {
+            layer.opacity = 0
+            return
+        }
+        let behind = min(max(-depth / reach, 0), 1)
+        layer.opacity *= 1 - fade * behind
+        layer.blur += blur * behind
+        if backs < 1, !camera.seesFront(of: pose, at: middle) { layer.opacity *= backs }
+    }
+
+    /// How small the perspective divide may get before a layer counts as
+    /// at the camera: a twentieth, where it shows twenty times its size.
+    static let nearest = 0.05
+
+    /// Only where it matters: a moving layer's copies for motion blur.
+    func projection(of layer: ResolvedLayer, z: Double) -> Projective {
+        camera.projection(of: pose(of: layer, z: z))
     }
 }

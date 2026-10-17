@@ -454,3 +454,39 @@ public struct ResolvedMask: Sendable, Equatable {
         self.transform = transform
     }
 }
+
+extension ResolvedScene {
+    /// Every layer's place in `layers`, back to front as drawn: the list's
+    /// own order, except that layers placed in a 3D space are drawn far to
+    /// near among their siblings, each with everything inside it, as the
+    /// renderer orders them. Layers at the same depth keep their order.
+    /// For finding what a click lands on; nothing per frame asks it.
+    public func drawingOrder() -> [Int] {
+        guard layers.contains(where: { $0.placed != .none }) else { return Array(layers.indices) }
+        var children: [UUID?: [Int]] = [:]
+        let ids = Set(layers.map(\.id))
+        for i in layers.indices {
+            // A layer whose parent is not drawn is listed at the top, as
+            // the list itself would have it.
+            let parent = layers[i].parentID.flatMap { ids.contains($0) ? $0 : nil }
+            children[parent, default: []].append(i)
+        }
+        var out: [Int] = []
+        out.reserveCapacity(layers.count)
+        func add(_ parent: UUID?) {
+            guard var list = children[parent] else { return }
+            if list.contains(where: { layers[$0].placed != .none }) {
+                list = list.enumerated().sorted { a, b in
+                    let da = layers[a.element].placed.depth, db = layers[b.element].placed.depth
+                    return da != db ? da < db : a.offset < b.offset
+                }.map(\.element)
+            }
+            for i in list {
+                out.append(i)
+                add(layers[i].id)
+            }
+        }
+        add(nil)
+        return out
+    }
+}

@@ -230,7 +230,9 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
         still(project.layers)
     }
 
-    func walk(_ layers: [Layer], parent: UUID?, soloedAbove: Bool) {
+    /// `space` is the 3D space of the frame whose children `layers` are,
+    /// if it is in 3D: each is placed in it as it is resolved.
+    func walk(_ layers: [Layer], parent: UUID?, soloedAbove: Bool, space: SpaceContext?) {
         // The mask behind the layers so far in this list: each masks the
         // ones in front of it up to the next, as in Figma. A hidden mask
         // still ends the one before; it masks nothing (see below).
@@ -242,8 +244,10 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
             if soloing && !soloed && !(layer.isGroup && hasSoloedDescendant(layer)) { continue }
             // A still group the same as last time, children and all, is
             // what it was then. Lists never changed since compare at once.
+            // Not in a 3D space: the group's own place there depends on the
+            // frame holding it, which the run does not know.
             let first = out.count
-            let whole = cache != nil && stillGroups.contains(layer.id)
+            let whole = cache != nil && space == nil && stillGroups.contains(layer.id)
             if whole, let run = cache?.run(of: layer, parent: parent) {
                 out.append(contentsOf: run)
                 continue
@@ -263,13 +267,19 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
                                animation: tracks.textAnimation(of: layer, at: time), time: time, blur: blur)
             }
             guard var resolved = made else { continue }
-            if let blur { resolved.motion = motion(of: layer, resolved, tracks: tracks, at: time, blur) }
+            if let blur {
+                resolved.motion = motion(of: layer, resolved, tracks: tracks, at: time, blur, space: space)
+            }
+            space?.place(&resolved, z: layer.transform.z)
             if let mask { masked.append((out.count, mask)) }
             out.append(resolved)
-            if layer.isGroup { walk(layer.children, parent: layer.id, soloedAbove: soloed) }
+            if layer.isGroup {
+                walk(layer.children, parent: layer.id, soloedAbove: soloed,
+                     space: layer.space3D.map { SpaceContext($0, size: resolved.size) })
+            }
         }
     }
-    walk(project.layers, parent: nil, soloedAbove: false)
+    walk(project.layers, parent: nil, soloedAbove: false, space: nil)
 
     if !maskSources.isEmpty {
         let all = project.allLayers
@@ -343,6 +353,10 @@ private struct WorldTransforms {
             if state.isShown {
                 result = resolve(layer, state: state, parent: parent, pictures: pictures,
                                  animation: tracks.textAnimation(of: layer, at: time), time: time)
+                // In a frame in 3D, placed there as the scene's own layers are.
+                if let parent, let space = layers[parent]?.space3D, let holder = resolved(parent) {
+                    SpaceContext(space, size: holder.size).place(&result!, z: layer.transform.z)
+                }
             }
         }
         cache[id] = result
@@ -361,7 +375,7 @@ private struct WorldTransforms {
 /// rest held as they are at `time`, so a layer that also fades or turns by
 /// another action does so sharply.
 private func motion(of layer: Layer, _ resolved: ResolvedLayer, tracks: ActionTracks, at time: Double,
-                    _ blur: MotionContext) -> MotionSpread {
+                    _ blur: MotionContext, space: SpaceContext?) -> MotionSpread {
     guard let (channels, shutter) = tracks.motionBlur(of: layer.id, at: time, frame: blur.frame) else { return .none }
     let first = time - shutter / 2
     func placed(at t: Double) -> Projective {
@@ -374,7 +388,7 @@ private func motion(of layer: Layer, _ resolved: ResolvedLayer, tracks: ActionTr
             moved.warp = Warp(skew: channels.contains(.skew) ? state.warp.skew : resolved.skew,
                               tilt: channels.contains(.tilt) ? state.warp.tilt : resolved.tilt)
         }
-        return moved.projection
+        return space?.projection(of: moved, z: layer.transform.z) ?? moved.projection
     }
     let spread = MotionSpread(first: placed(at: first), next: placed(at: first + shutter / Double(blur.samples - 1)),
                               last: placed(at: first + shutter), count: blur.samples, size: resolved.size)

@@ -20,6 +20,10 @@ struct LayerInspector: View {
                 positionSection
                 PanelDivider()
                 layoutSection
+                if layer.isFrame {
+                    PanelDivider()
+                    SpaceSection(layer: layer, controller: controller)
+                }
                 PanelDivider()
                 appearanceSection
             }
@@ -103,6 +107,14 @@ struct LayerInspector: View {
                     }
                 }
                 .help("Where the anchor point sits, in pixels")
+                // Z means something only in a frame in 3D.
+                if controller.project.space3D(holding: layer.id) != nil {
+                    HStack(spacing: 8) {
+                        number("Z", t.z) { l, v in l.transform.z = v }
+                            .help("How far towards you it sits, in pixels; negative is further away")
+                        Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+                    }
+                }
                 HStack(alignment: .top, spacing: 8) {
                     UnitField(unit: "R", value: t.rotation, decimals: 1, suffix: "°") { v in
                         controller.edit(layer.id) { l in l.transform.rotation = v }
@@ -1068,6 +1080,90 @@ struct InspectorItemTitle: View {
 /// A mask: the layers in front of it in its group or frame show only
 /// where it draws (4 October 2026, as in Figma). Its one control stops it
 /// being a mask; Use as Mask is on the layers' right-click menu.
+/// A frame in 3D: its children placed in one space and seen through one
+/// camera. Off, it is only its header with +; on, its camera and how depth
+/// looks, with − in the header.
+private struct SpaceSection: View {
+    let layer: Layer
+    let controller: EditorController
+
+    private enum Camera: Hashable { case perspective, isometric }
+
+    var body: some View {
+        let space = layer.space3D
+        VStack(alignment: .leading, spacing: 8) {
+            HeaderRow(title: "3D") {
+                if space == nil {
+                    IconButton(icon: .plus, help: "Hold the frame's layers in 3D: each sits at its own depth and turns in one space, seen through one camera, the nearest drawn on top") {
+                        controller.edit(layer.id) { $0.space3D = Space3D() }
+                    }
+                } else {
+                    IconButton(icon: .minus, help: "Back to flat: the layers are drawn in their own order again, each tilt seen from its own depth") {
+                        controller.edit(layer.id) { $0.space3D = nil }
+                    }
+                }
+            }
+            if let space { rows(space).gridBody() }
+        }
+        .sectionPadding(empty: space == nil)
+    }
+
+    private func rows(_ space: Space3D) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SegmentRow(selection: space.isIsometric ? Camera.isometric : .perspective, options: [.perspective, .isometric],
+                       title: { $0 == .perspective ? "Perspective" : "Isometric" }) { camera in
+                edit { $0.isIsometric = camera == .isometric }
+            }
+            .help("Perspective: nearer is larger. Isometric: seen from infinitely far, nothing grows or shrinks with depth.")
+            if !space.isIsometric {
+                HStack(spacing: 8) {
+                    UnitField(unit: "Distance", value: space.distance, decimals: 0, suffix: "px", accepts: { $0 >= 1 }) { v in
+                        edit { $0.distance = v }
+                    }
+                    .help("How far in front of the frame the camera is. Nearer makes the perspective stronger.")
+                }
+            }
+            StackedRow(label: "Vanishing point") {
+                UnitField(unit: "X", value: space.vanishingPoint.x * 100, decimals: 0, suffix: "%") { v in
+                    edit { $0.vanishingPoint.x = v / 100 }
+                }
+                .help("Where across the frame the camera looks straight at")
+                UnitField(unit: "Y", value: space.vanishingPoint.y * 100, decimals: 0, suffix: "%") { v in
+                    edit { $0.vanishingPoint.y = v / 100 }
+                }
+                .help("Where down the frame the camera looks straight at")
+            }
+            HStack(spacing: 8) {
+                UnitField(unit: "Fade", value: space.depthFade * 100, decimals: 0, suffix: "%",
+                          accepts: { $0 >= 0 && $0 <= 100 }) { v in
+                    edit { $0.depthFade = v / 100 }
+                }
+                .help("Depth fade: how much fainter layers grow behind the frame, all of it a frame's length back")
+                UnitField(unit: "Blur", value: space.depthBlur, decimals: 1, suffix: "px", accepts: { $0 >= 0 }) { v in
+                    edit { $0.depthBlur = v }
+                }
+                .help("Depth blur: how much blurrier layers grow behind the frame, all of it a frame's length back")
+            }
+            HStack(spacing: 8) {
+                UnitField(unit: "Backs", value: space.backOpacity * 100, decimals: 0, suffix: "%",
+                          accepts: { $0 >= 0 && $0 <= 100 }) { v in
+                    edit { $0.backOpacity = v / 100 }
+                }
+                .help("How strongly a layer shows with its back to the camera: 100% whole, 0% hidden")
+                Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+            }
+        }
+    }
+
+    private func edit(_ change: @escaping (inout Space3D) -> Void) {
+        controller.edit(layer.id) { l in
+            guard var space = l.space3D else { return }
+            change(&space)
+            l.space3D = space
+        }
+    }
+}
+
 private struct MaskSection: View {
     let layer: Layer
     let controller: EditorController
@@ -1181,8 +1277,9 @@ private struct EffectsSection: View {
                 }
                 .help("Turns it in perspective around an upright line through its anchor, the right side going away")
             }
-            // Depth only matters once it is tilted.
-            if t.tilt.isTilted {
+            // Depth only matters once it is tilted, and not in a frame in
+            // 3D, whose camera it is seen through.
+            if t.tilt.isTilted, controller.project.space3D(holding: layer.id) == nil {
                 UnitField(unit: "Depth", value: t.tilt.depth, decimals: 0, suffix: "px", accepts: { $0 > 1 }) { v in
                     controller.edit(layer.id) { l in l.transform.tilt.depth = v }
                 }

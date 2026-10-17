@@ -144,6 +144,67 @@ import MotionModel
         }
     }
 
+    // MARK: Through the model
+
+    /// A ring of 12 as a frame in 3D: each card's design place, Z and tilt,
+    /// as a person would set them, evaluated as any project is.
+    static func modelRing(turn: Double) -> Project {
+        var cards: [Layer] = []
+        for i in 0..<12 {
+            let angle = turn + Double(i) * 30, a = angle * .pi / 180
+            var c = Layer(name: "C\(i)", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
+                                                                     fills: [Fill(paint: .color(hue(i, of: 12)))])),
+                          size: card, position: Vec2(side / 2 + radius * sin(a), side / 2))
+            c.transform.z = radius * cos(a)
+            c.transform.tilt = Tilt(x: 0, y: angle)
+            cards.append(c)
+        }
+        let frame = Layer(name: "Ring", content: .group(GroupContent(children: cards,
+                                                                     frame: FrameStyle(space: Space3D(distance: 600)))),
+                          size: Size2(side, side), position: Vec2(side / 2, side / 2))
+        return Project(composition: Composition(width: Int(side), height: Int(side), background: Background(isTransparent: true)),
+                       layers: [frame])
+    }
+
+    @Test func aFrameIn3DDrawsItsNearestCardOnTop() throws {
+        let renderer = try #require(OffscreenRenderer(pixelWidth: Int(Self.side), pixelHeight: Int(Self.side)))
+        let width = Int(Self.side)
+        for (turn, front) in [(0.0, 0), (180.0, 6), (90.0, 9)] {
+            let bytes = Self.pixels(try #require(renderer.image(of: evaluate(Self.modelRing(turn: turn), at: 0))),
+                                    width: width, height: width)
+            #expect(Self.pixel(bytes, width: width, 200, 200).near(Self.hue(front, of: 12)), "at \(turn)°")
+        }
+        // The same as the spike's ring placed by hand.
+        let byHand = Self.pixels(try #require(renderer.image(of: Self.ring(turn: 0))), width: width, height: width)
+        let model = Self.pixels(try #require(renderer.image(of: evaluate(Self.modelRing(turn: 0), at: 0))),
+                                width: width, height: width)
+        #expect(byHand == model)
+    }
+
+    @Test func layersAtTheSameDepthKeepTheirOrder() throws {
+        // Switching a frame to 3D must not shuffle layers that sit flat:
+        // each later one is still drawn over the one before.
+        var layers: [Layer] = []
+        for i in 0..<12 {
+            layers.append(Layer(name: "L\(i)", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
+                                                                           fills: [Fill(paint: .color(Self.hue(i, of: 12)))])),
+                                size: Size2(200, 200), position: Vec2(100 + Double(i) * 10, 200)))
+        }
+        let frame = Layer(name: "F", content: .group(GroupContent(children: layers, frame: FrameStyle(space: Space3D()))),
+                          size: Size2(Self.side, Self.side), position: Vec2(Self.side / 2, Self.side / 2))
+        let project = Project(composition: Composition(width: Int(Self.side), height: Int(Self.side),
+                                                       background: Background(isTransparent: true)), layers: [frame])
+        let renderer = try #require(OffscreenRenderer(pixelWidth: Int(Self.side), pixelHeight: Int(Self.side)))
+        let width = Int(Self.side)
+        let bytes = Self.pixels(try #require(renderer.image(of: evaluate(project, at: 0))), width: width, height: width)
+        // Each strip between one layer's left edge and the next shows that layer.
+        for i in 0..<11 {
+            let x = i * 10 + 5
+            #expect(Self.pixel(bytes, width: width, x, 200).near(Self.hue(i, of: 12)), "layer \(i)")
+        }
+        #expect(Self.pixel(bytes, width: width, 250, 200).near(Self.hue(11, of: 12)))
+    }
+
     // MARK: The same on screen
 
     /// Saves `layer`, the very tree just drawn off screen, with that
@@ -204,6 +265,11 @@ import MotionModel
         canvas.contentsScale = 2
         canvas.render(scene)
         try Self.archive(canvas.rootLayer, exported: exported, size: width, "ring")
+        // The model's ring as a project, for the test copy of the app to open.
+        let folder = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TWINE_SPIKE_OUT"]!)
+            .appendingPathComponent("Ring.twine")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try ProjectFormat.encode(Self.modelRing(turn: 20)).write(to: folder.appendingPathComponent(ProjectFormat.documentFileName))
 
         let picture = Self.picture(width: 240, height: 320)
         for (name, layers) in [

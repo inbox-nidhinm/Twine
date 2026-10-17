@@ -49,6 +49,13 @@ extension Project {
         return look(in: layers, parent: nil)
     }
 
+    /// The 3D space a layer is placed in: its parent frame's, when that
+    /// frame is in 3D. Nil for a layer at the top level or in a flat group.
+    public func space3D(holding id: UUID) -> Space3D? {
+        guard let parent = location(of: id)?.parentID else { return nil }
+        return layer(withID: parent)?.space3D
+    }
+
     /// Every layer that is locked or sits in a locked group, which can be
     /// neither picked nor moved on the canvas.
     public var lockedLayers: Set<UUID> {

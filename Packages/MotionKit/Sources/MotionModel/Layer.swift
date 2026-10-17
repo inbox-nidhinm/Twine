@@ -123,6 +123,21 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
         return false
     }
 
+    /// A frame's 3D space, or nil for a flat frame and anything else.
+    /// Setting it on anything but a frame does nothing.
+    public var space3D: Space3D? {
+        get {
+            if case .group(let g) = content { return g.frame?.space }
+            return nil
+        }
+        set {
+            guard case .group(var g) = content, var f = g.frame else { return }
+            f.space = newValue
+            g.frame = f
+            content = .group(g)
+        }
+    }
+
     /// The fills, strokes and outline of a shape, or of a frame as a
     /// rectangle: whatever has a look of its own. Setting it on a frame keeps
     /// the rectangle's corners and drops any other outline.
@@ -187,6 +202,9 @@ public struct Transform: Codable, Sendable, Equatable {
     public var skew: Vec2
     /// A turn in depth, around the anchor, seen in perspective. See `Tilt`.
     public var tilt: Tilt
+    /// Pixels towards the viewer (negative is away), in a frame in 3D
+    /// (`Space3D`); anywhere else it changes nothing.
+    public var z: Double
 
     public init(position: Vec2, anchor: Vec2) {
         self.position = position
@@ -196,9 +214,10 @@ public struct Transform: Codable, Sendable, Equatable {
         self.rotation = 0
         self.skew = .zero
         self.tilt = .none
+        self.z = 0
     }
 
-    private enum CodingKeys: String, CodingKey { case position, anchor, scale, isScaleLinked, rotation, skew, tilt }
+    private enum CodingKeys: String, CodingKey { case position, anchor, scale, isScaleLinked, rotation, skew, tilt, z }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -210,6 +229,7 @@ public struct Transform: Codable, Sendable, Equatable {
         // Files from before skew and tilt have neither.
         skew = try c.decodeIfPresent(Vec2.self, forKey: .skew) ?? .zero
         tilt = try c.decodeIfPresent(Tilt.self, forKey: .tilt) ?? .none
+        z = try c.decodeIfPresent(Double.self, forKey: .z) ?? 0
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -222,6 +242,7 @@ public struct Transform: Codable, Sendable, Equatable {
         // Left out when the layer is straight, so most files stay as they were.
         if skew != .zero { try c.encode(skew, forKey: .skew) }
         if tilt != .none { try c.encode(tilt, forKey: .tilt) }
+        if z != 0 { try c.encode(z, forKey: .z) }
     }
 }
 
@@ -429,11 +450,79 @@ public struct FrameStyle: Codable, Sendable, Equatable {
     public var fills: [Fill]
     public var strokes: [Stroke]
     public var cornerRadii: CornerRadii
+    /// A frame in 3D holds its children in one shared space, seen through
+    /// one camera; nil for a flat frame, and left out of files then.
+    public var space: Space3D?
 
-    public init(fills: [Fill] = [], strokes: [Stroke] = [], cornerRadii: CornerRadii = .zero) {
+    public init(fills: [Fill] = [], strokes: [Stroke] = [], cornerRadii: CornerRadii = .zero, space: Space3D? = nil) {
         self.fills = fills
         self.strokes = strokes
         self.cornerRadii = cornerRadii
+        self.space = space
+    }
+}
+
+/// How a frame in 3D shows its children: each placed in one space by its
+/// own place, Z, turn and tilt, seen through one camera, and drawn nearest
+/// on top. Its children's tilts turn in that space, seen through the
+/// camera rather than from their own depth. Only a frame's own children
+/// are placed: a group or frame inside one is a flat card in it.
+public struct Space3D: Codable, Sendable, Equatable {
+    /// How far in front of the frame the camera is, in pixels: nearer
+    /// makes the perspective stronger. Ignored when isometric.
+    public var distance: Double
+    /// Seen from infinitely far, flat on: nothing grows nearer or shrinks
+    /// further away.
+    public var isIsometric: Bool
+    /// The point the camera looks straight at, as a share of the frame's
+    /// box: (0.5, 0.5) is its middle.
+    public var vanishingPoint: Vec2
+    /// 0 to 1: how much fainter a layer is behind the frame's plane,
+    /// reaching the full amount one frame's longer side behind it.
+    public var depthFade: Double
+    /// Figma's pixels: how much blurrier a layer is behind the frame's
+    /// plane, the full amount one frame's longer side behind it.
+    public var depthBlur: Double
+    /// 0 to 1: how strongly a layer shows when its back is to the camera.
+    /// 1 shows it whole, 0 hides it.
+    public var backOpacity: Double
+
+    public init(distance: Double = Tilt.defaultDepth, isIsometric: Bool = false, vanishingPoint: Vec2 = Vec2(0.5, 0.5),
+                depthFade: Double = 0, depthBlur: Double = 0, backOpacity: Double = 1) {
+        self.distance = distance
+        self.isIsometric = isIsometric
+        self.vanishingPoint = vanishingPoint
+        self.depthFade = depthFade
+        self.depthBlur = depthBlur
+        self.backOpacity = backOpacity
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case distance, isIsometric, vanishingPoint, depthFade, depthBlur, backOpacity
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let standard = Space3D()
+        distance = try c.decodeIfPresent(Double.self, forKey: .distance) ?? standard.distance
+        isIsometric = try c.decodeIfPresent(Bool.self, forKey: .isIsometric) ?? false
+        vanishingPoint = try c.decodeIfPresent(Vec2.self, forKey: .vanishingPoint) ?? standard.vanishingPoint
+        depthFade = try c.decodeIfPresent(Double.self, forKey: .depthFade) ?? 0
+        depthBlur = try c.decodeIfPresent(Double.self, forKey: .depthBlur) ?? 0
+        backOpacity = try c.decodeIfPresent(Double.self, forKey: .backOpacity) ?? 1
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        // Only what differs from a new space, so a frame just switched to
+        // 3D writes `{}`.
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        let standard = Space3D()
+        if distance != standard.distance { try c.encode(distance, forKey: .distance) }
+        if isIsometric { try c.encode(isIsometric, forKey: .isIsometric) }
+        if vanishingPoint != standard.vanishingPoint { try c.encode(vanishingPoint, forKey: .vanishingPoint) }
+        if depthFade != 0 { try c.encode(depthFade, forKey: .depthFade) }
+        if depthBlur != 0 { try c.encode(depthBlur, forKey: .depthBlur) }
+        if backOpacity != 1 { try c.encode(backOpacity, forKey: .backOpacity) }
     }
 }
 
