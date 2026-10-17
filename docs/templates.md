@@ -1,6 +1,6 @@
 # Templates: a plan
 
-Draft, 17 October 2026. Templates are live frames with Split into Layers (the user's choice, 17 October 2026). Milestone 1, the spike, is done; its results are below. The other questions at the end are still open.
+17 October 2026. Milestone 1, the spike, is done; its results are below. The decisions are at the end, before the appendix.
 
 ## What Animos has
 
@@ -49,7 +49,7 @@ As you asked, the 3D work comes in at every level, each built from the one below
 ### Effects and actions (the building blocks)
 
 - **Properties**: Z position (in Position), 3D on a frame (perspective, vanishing point, orthographic, depth fade, depth blur, back faces), Bend (in Effects, like Skew and Tilt).
-- **Actions**: Move gains Z (or a separate Depth action; a question below), Rotate 3D (the Tilt action, which inside a 3D frame turns in the shared space), Bend, and camera actions on a 3D frame: Orbit Camera, Dolly, Perspective.
+- **Actions**: Depth (z towards or away, its own action and channel), Rotate 3D (the Tilt action, which inside a 3D frame turns in the shared space), Bend, and camera actions on a 3D frame: Orbit Camera, Dolly, Perspective.
 
 ### Presets (a new 3D group)
 
@@ -81,7 +81,7 @@ The other way, a template that writes ordinary layers and actions as it goes in,
 - Home: New from Template, which makes a project at the template's size and length.
 - ⌘K search lists templates by name.
 
-**Its inspector**: Slots (drop wells, reorder by dragging, the count), Loop length (setting the composition's length to it, or the template's bar), Card (ratio, corner radius, padding, shadow), then the template's own settings, grouped as Animos groups them, with rare ones behind a settings button.
+**Its inspector**: Slots (drop wells, reorder by dragging, the count), Loop length (how long one loop takes; the template's bar on the timeline sets when it plays), Card (ratio, corner radius, padding, shadow), then the template's own settings, grouped as Animos groups them, with rare ones behind a settings button.
 
 **Keyframing settings**: a later step: a Template action that moves one of its settings over time (Ring tilt from -28° to 0°), on its own bar.
 
@@ -91,7 +91,7 @@ Each ends with the usual gate: a clean `./make-app.sh`, `./test.sh` passing, the
 
 1. **Spike, no interface.** Done: see Spike results.
 2. **3D frames.** The camera on frames, Z position, 3D turns inside, depth sorting, depth fade and blur, back faces, orthographic. The file format goes to 6. Inspector: a 3D section on frames, Z in Position. Canvas: layers in a 3D frame show their outline as tilted layers do now (their handles are flat maths), and are hit where they are drawn.
-3. **3D actions and Bend.** Z on Move, the Tilt action in shared space, Bend as an effect and an action, camera actions.
+3. **3D actions and Bend.** The Depth action, the Tilt action in shared space, Bend as an effect and an action, camera actions.
 4. **3D presets.** The group above, with tiles, letter by letter on text.
 5. **The template engine and the first 23.** The template frame, slots, settings, the recipe system, looping, the picker and its playing tiles, Split into Layers. Then the most 3D groups: 3D & Perspective (12), Isometric (3) and Orbit (8).
 6. **Flat and nearly flat templates (33).** Carousel & Flow, Grid, Spotlight & Focus, Stack & Scatter, Reveal & Wipe. Many lean on things Twine has (masks, reveals, presets).
@@ -121,15 +121,17 @@ What was built, and stays: `Space3D.swift` in MotionEvaluation (`Vec3`, `Pose3D`
 - **Exports matching the canvas.** The spike showed sorting and both bends match; every new piece (shadows on bent cards, depth fade) gets a pixel test, as tilt has.
 - **A private class.** The mesh is not Apple's public API. Twine is internal and already uses several; if it goes, bent cards draw flat.
 - **Matching Animos's look.** We are reading their motion from watching it, not from their code. Each template is ours, made to feel like theirs, tuned by eye with you.
-- **Animos's terms.** Their templates are their product. Building our own versions of the motion for an internal tool is a different thing from copying their artwork; we draw nothing of theirs (no thumbnails, sample pictures or names you would rather not keep). Worth a moment's thought on the names.
+- **Animos's terms.** Their templates are their product. We build our own versions of the motion, under our own names, and draw nothing of theirs (no thumbnails or sample pictures).
 
-## Questions for you
+## Decisions
 
-1. ~~Live or baked?~~ Live frames with Split into Layers (17 October 2026).
-2. **All 69, or a first set?** I would start with the 23 most 3D ones (milestone 5) and see how they feel before the rest.
-3. **Z in Move, or a Depth action of its own?** Move with x, y and z keeps one path; a separate action lets depth have its own easing.
-4. **Names.** Keep Animos's template names, or name them ourselves?
-5. **Where does a template's length come from?** The composition's length (a template fills the whole animation and loops), or a bar on the timeline that can sit among other actions?
+All made on 17 October 2026.
+
+1. **Live, not baked.** A template is a live frame whose settings stay changeable; Split into Layers turns it into ordinary layers and actions.
+2. **The 23 most 3D first.** Milestone 5 builds 3D & Perspective (12), Isometric (3) and Orbit (8); the other 46 wait until those have been tried and judged.
+3. **Depth is its own action.** A Depth action on its own channel, with its own timing and easing, as every other property has. Move stays flat, keeping its curved path on the canvas.
+4. **Our own names.** Each template is named by us, in plain descriptive words (Ring, Tunnel, Globe), so nothing reads as Animos's product. The names in this document are Animos's, for reference.
+5. **A bar for a template's length.** A template has a bar on the timeline, as a video's Play does, as long as the scene when it goes in and looping without a seam inside it. It can be shortened, moved or stretched to sit among other animation; stretching it slows the loop, as a preset's bar stretches its parts.
 
 ## Appendix: each template's settings in Animos
 
