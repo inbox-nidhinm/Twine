@@ -209,6 +209,9 @@ public enum ActionFactory {
             // Fades the sound out, or in to its own level when it is silent.
             let level = state.volume ?? 1
             spec = .volume(VolumeAction(end: level > 0.01 ? 0 : 1))
+        case .template:
+            // Templates come with their frame (`Templates`); this is only for completeness.
+            spec = .template(TemplatePlay())
         case .preset:
             // Presets come from `Presets.action`; this is only for completeness.
             spec = .preset(PresetRecipe.defaults(.fadeIn))

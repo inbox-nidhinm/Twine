@@ -254,8 +254,10 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
             }
             defer { if whole { cache?.keep(Array(out[first...]), of: layer, parent: parent) } }
             let made: ResolvedLayer?
-            // A frame in 3D's camera as it is now, for placing its children.
+            // A frame in 3D's camera as it is now, for placing its children,
+            // and a template's place in its loop.
             var camera = layer.space3D
+            var loop = layer.template?.pose ?? 0
             if let cache, tracks.isStill(layer.id) {
                 made = cache.resolved(layer, parent: parent) {
                     resolve(layer, state: LayerState(design: layer), parent: parent, pictures: pictures,
@@ -266,6 +268,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
                 // Hidden by an action: the layer and everything inside it.
                 guard state.isShown else { continue }
                 camera = state.camera.space
+                loop = state.template.phase ?? loop
                 made = resolve(layer, state: state, parent: parent, pictures: pictures,
                                animation: tracks.textAnimation(of: layer, at: time), time: time, blur: blur)
             }
@@ -282,7 +285,11 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
             }
             if let mask { masked.append((out.count, mask)) }
             out.append(resolved)
-            if layer.isGroup {
+            if let setup = layer.template {
+                // A template's cards, made for this moment, in its camera.
+                let made = TemplateCards.make(layer, setup, phase: loop, size: resolved.size, pictures: pictures)
+                walk(made.cards, parent: layer.id, soloedAbove: soloed, space: SpaceContext(made.space, size: resolved.size))
+            } else if layer.isGroup {
                 walk(layer.children, parent: layer.id, soloedAbove: soloed,
                      space: camera.map { SpaceContext($0, size: resolved.size) })
             }

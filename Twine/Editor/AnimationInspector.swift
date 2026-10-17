@@ -9,7 +9,8 @@ import Theme
 /// sound's level when one sound or video is selected; the foot of an
 /// action's fields offers the same, to add another without leaving it,
 /// and for a preset bar, Swap Preset, to put another in its place.
-/// With nothing selected it is empty.
+/// With nothing selected it offers the templates; with layers selected,
+/// their pictures go into the one picked.
 struct AnimationInspector: View {
     let controller: EditorController
     @Bindable var editor: EditorModel
@@ -19,6 +20,9 @@ struct AnimationInspector: View {
     @State private var pickingPreset = false
     /// The picker is up to swap the selected preset bars rather than add.
     @State private var swappingPreset = false
+    /// The template picker stands in for the tiles until one is picked or
+    /// it is closed.
+    @State private var pickingTemplate = false
 
     var body: some View {
         let layers = controller.selectedLayers
@@ -29,7 +33,13 @@ struct AnimationInspector: View {
         Group {
             // The picker stands in for whatever shows, an action's fields
             // included, so a preset can be added from anywhere.
-            if swappingPreset && !controller.selectedPresetBars.isEmpty {
+            if pickingTemplate {
+                TemplatePicker(pick: { info in
+                                   pickingTemplate = false
+                                   controller.addTemplate(info.kind)
+                               },
+                               close: { pickingTemplate = false })
+            } else if swappingPreset && !controller.selectedPresetBars.isEmpty {
                 PresetPicker(presets: controller.swappablePresets, swapping: true,
                              pick: { preset in
                                  swappingPreset = false
@@ -59,11 +69,20 @@ struct AnimationInspector: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HeaderRow(title: "Actions") {}
                         ActionTiles(newActions: actionEntries(controller.availableActions),
-                                    hasPresets: !controller.availablePresets.isEmpty) { pickingPreset = true }
+                                    hasPresets: !controller.availablePresets.isEmpty,
+                                    pickPreset: { pickingPreset = true },
+                                    pickTemplate: { pickingTemplate = true })
                             .padding(.horizontal, Theme.panelPad)
                     }
                     .padding(.bottom, Theme.panelPad)
                 }
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    HeaderRow(title: "Templates") {}
+                    TemplateTile { pickingTemplate = true }
+                        .padding(.horizontal, Theme.panelPad)
+                }
+                .padding(.bottom, Theme.panelPad)
             }
         }
         .onChange(of: layers.map(\.id)) { pickingPreset = false; swappingPreset = false }

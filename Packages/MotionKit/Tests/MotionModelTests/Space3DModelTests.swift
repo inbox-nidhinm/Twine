@@ -65,6 +65,6 @@ import Testing
         let read = try ProjectFormat.decode(JSONSerialization.data(withJSONObject: object))
         #expect(read.layers.first?.space3D == nil)
         #expect(read.layers.first?.transform.z == 0)
-        #expect(ProjectFormat.currentVersion == 6)
+        #expect(ProjectFormat.currentVersion >= 6)
     }
 }

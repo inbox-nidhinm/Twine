@@ -12,6 +12,7 @@ struct ActionTiles: View {
     let newActions: [MenuEntry]
     let hasPresets: Bool
     let pickPreset: () -> Void
+    var pickTemplate: (() -> Void)? = nil
 
     @Environment(MenuHost.self) private var menus
     @State private var newFrame: CGRect = .zero
@@ -25,6 +26,24 @@ struct ActionTiles: View {
             .help("Adds an action at the playhead, half a second long.")
             BigTile(icon: .presets, title: "Select Preset", disabled: !hasPresets, action: pickPreset)
                 .help("Picks a ready-made animation to add at the playhead, as one bar you can adjust.")
+            if let pickTemplate {
+                BigTile(icon: .template, title: "Templates", action: pickTemplate)
+                    .help("Picks a whole scene of cards, a ring, a globe or a tunnel, with the selected pictures in it.")
+            }
+        }
+    }
+}
+
+/// The Templates tile on its own, for when nothing is selected.
+struct TemplateTile: View {
+    let action: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            BigTile(icon: .template, title: "Templates", action: action)
+                .help("Picks a whole scene of cards, a ring, a globe or a tunnel, to fill with your pictures.")
+            Color.clear.frame(maxWidth: .infinity)
+            Color.clear.frame(maxWidth: .infinity)
         }
     }
 }

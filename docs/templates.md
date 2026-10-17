@@ -93,7 +93,22 @@ Each ends with the usual gate: a clean `./make-app.sh`, `./test.sh` passing, the
 2. **3D frames.** Done (17 October 2026): the camera on frames, Z position, tilts turning in the shared space (hinged ones too), depth sorting, depth fade and blur, back faces, isometric, file format 6, the 3D section and Z in the inspector, outlines and clicks on the canvas by what is drawn in front, masks and motion blur placed through the camera. Left for later: dragging in perspective (a drag is flat, so a little off, as in a tilted group), handles on 3D layers, and nested 3D (a group inside a 3D frame is a flat card).
 3. **3D actions and Bend.** Done (17 October 2026): the Depth action, the Camera action with an orbit that turns the whole space (a ring spins with one action), and Bend as an effect and an action, drawn with the mesh warp (the Tilt action already turns in the shared space). A bent layer's outline runs through its corners, and a bent mask is placed flat.
 4. **3D presets.** Done (17 October 2026): Flip, Swing, Fold, Tumble, Fly, Iso Lift, Spin 3D and Float in a 3D group, with playing tiles, letter by letter on text (but Fold). Z and the Depth action now work outside 3D frames too, seen from the layer's own tilt's depth, so these presets suit any layer.
-5. **The template engine and the first 23.** The template frame, slots, settings, the recipe system, looping, the picker and its playing tiles, Split into Layers. Then the most 3D groups: 3D & Perspective (12), Isometric (3) and Orbit (8).
+5. **The template engine and the first 23.** Done (17 October 2026): the template frame, slots, settings, the recipes, the bar and its seamless loop, the picker and its playing tiles, the Template section, Split into Layers, and 3D & Perspective (12), Isometric (3) and Orbit (8). Not yet: videos in slots (pictures only), dropping pictures straight onto a slot, and the fuller Animos settings (only the main ones of each are offered). Our names, by Animos's:
+
+   | Animos | Twine | Animos | Twine |
+   |---|---|---|---|
+   | Showcase Stream | Ring Stream | Iso Cascade | Iso Stream |
+   | Sphere Wall | Curved Wall | Iso Focus | Iso Spotlight |
+   | Card Globe | Globe | Iso Orbit | Iso Swing |
+   | Orbit Globe | Tilted Globe | Orbit Showcase | Orbit |
+   | Sphere Cascade | Curved Cascade | Orbit Bloom | Halo |
+   | Totem Wall | Column Wall | Orbit Carousel | Quad Orbit |
+   | Parallax Totem | Parallax Columns | Photo Orbit | Photo Loop |
+   | Card Tunnel | Tunnel | Focus Orbit | Zoom Orbit |
+   | Spiral Stream | Spiral | Vortex Spin | Vortex |
+   | Depth Stack Scroll | Depth Stack | Wheel Spin | Wheel |
+   | Cover Ring | Carousel Ring | Wheel Spin Bottom | Half Wheel |
+   | Cover Ring Vertical | Vertical Ring | | |
 6. **Flat and nearly flat templates (33).** Carousel & Flow, Grid, Spotlight & Focus, Stack & Scatter, Reveal & Wipe. Many lean on things Twine has (masks, reveals, presets).
 7. **Multiscene (13).** The hardest: each moves through several layouts with camera moves between them.
 8. **Keyframed settings and New from Template on Home.**

@@ -15,6 +15,8 @@ public enum Channel: String, Hashable, Sendable, CaseIterable {
     case bend
     /// A frame in 3D's camera.
     case camera
+    /// How far a template frame has played round its loop.
+    case template
     /// A clip of the layer's own box, which only the Mask presets drive.
     case reveal
     /// A page curl, which only the Page Curl presets drive.
@@ -54,6 +56,7 @@ extension ActionKind {
         case .depth: return .depth
         case .bend: return .bend
         case .camera: return .camera
+        case .template: return .template
         // A preset reaches several; `ActionTracks` asks its recipe which.
         case .preset: return .position
         }
@@ -133,6 +136,10 @@ public struct LayerState: Sendable, Equatable {
     }
     /// A frame in 3D's camera, boxed; `.none` for anything else.
     public var camera: CameraState = .none
+    /// How many loops a template frame has played, from its pose; its
+    /// fraction is where in the loop it is. Boxed; `.none` for anything
+    /// but a template.
+    public var template: TemplateState = .none
     /// Not clamped here, so an overshooting fade still reads true; the scene
     /// clamps it to 0...1 for drawing.
     public var opacity: Double
@@ -184,6 +191,7 @@ public struct LayerState: Sendable, Equatable {
         rotation = layer.transform.rotation
         warp = Warp(skew: layer.transform.skew, tilt: layer.transform.tilt, z: layer.transform.z, bend: layer.transform.bend)
         if let space = layer.space3D { camera = .space(space) }
+        if let setup = layer.template { template = .at(setup.pose) }
         opacity = layer.opacity
         size = layer.size
         isShown = true
@@ -278,6 +286,23 @@ public enum Warp: Sendable, Equatable {
     public var bend: Vec2 {
         if case .warped(_, _, _, let bend) = self { return bend }
         return .zero
+    }
+}
+
+/// How far a template frame has played, kept out of line as `Warp` is:
+/// only templates have one.
+public enum TemplateState: Sendable, Equatable {
+    case none
+    indirect case at(Double)
+
+    public var loops: Double? {
+        if case .at(let v) = self { return v }
+        return nil
+    }
+
+    /// Where in its loop it is, 0 up to 1.
+    public var phase: Double? {
+        loops.map { $0 - $0.rounded(.down) }
     }
 }
 
@@ -500,6 +525,9 @@ public struct ActionTracks: Sendable {
             case .tilt: state.tilt = walk(state.tilt, steps(list, Self.tiltStep, Self.tiltPart), at: time)
             case .depth: state.z = walk(state.z, steps(list, Self.depthStep, Self.depthPart), at: time)
             case .bend: state.bend = walk(state.bend, steps(list, Self.bendStep, Self.bendPart), at: time)
+            // A template's bar adds its loops to wherever it rests.
+            case .template:
+                if let loops = state.template.loops { state.template = .at(walk(loops, list.compactMap(Self.templateStep), at: time)) }
             // Only a frame in 3D has a camera to move.
             case .camera:
                 if let space = state.camera.space { state.camera = .space(walk(space, list.compactMap(Self.cameraStep), at: time)) }
@@ -748,6 +776,11 @@ public struct ActionTracks: Sendable {
     private static func depthStep(_ a: Action) -> Step<Double>? {
         guard case .depth(let d) = a.spec else { return nil }
         return Step(a, initial: d.initial, target: d.mode == .to ? { _ in d.end } : { $0 + d.end })
+    }
+
+    private static func templateStep(_ a: Action) -> Step<Double>? {
+        guard case .template(let t) = a.spec else { return nil }
+        return Step(a, initial: nil, target: { $0 + t.loops })
     }
 
     private static func bendStep(_ a: Action) -> Step<Vec2>? {

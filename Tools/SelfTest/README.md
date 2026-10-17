@@ -63,6 +63,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `offers` | Logs what Add Action and Add Preset offer for the selection |
 | `add KIND` | Adds an action by its kind's name (`move`, `path`, `volume`...), as the Add Action menu does |
 | `warp SX SY TX TY` | Sets the selected layer's skew and tilt, as the Layer fields do |
+| `template KIND`, `tset KEY VALUE`, `tsplit`, `render NAME` | Adds a template by its id (`ring-stream`, `globe`...) with the selected pictures in its slots, logging `TEMPLATE` with its slots, cards and bar; sets one of the selected template's settings (a number, or a choice's key); Split into Layers, logging `SPLIT`; draws the composition as it shows now, through the export renderer, into `NAME.png`, which needs no screen (window shots fail while the Mac is locked) |
 | `preset ID`, `split`, `sample T` | Adds a preset by its id (`slide-in`, `shake`, a Text one as `text-letters-rise`...), as the picker does; Split into Actions on the selected bars; logs the selected layers' position and opacity at time T |
 | `cursor` | Logs which of the app's pointers is current |
 | `perfpreview S` | The export panel's preview playing for S seconds (open the panel first with `call exportmovie`) |

@@ -492,6 +492,11 @@ final class CanvasNSView: NSView {
             // few screen points whatever the layer's own scale.
             let localTolerance = tolerance / max(sqrt(abs(world.determinant)), 1e-6)
             guard hits(layers[i], at: local, tolerance: localTolerance), shows(layers[i], at: local, in: scene) else { continue }
+            // A template's cards are made as it plays, not kept: a click on
+            // one picks the template.
+            if let parent = layers[i].parentID, TemplateCards.isCard(layers[i].id, of: parent) {
+                return deep ? parent : inContext(parent)
+            }
             return deep ? layers[i].id : inContext(layers[i].id)
         }
         return nil

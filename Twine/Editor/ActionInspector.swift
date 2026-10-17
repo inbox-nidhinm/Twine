@@ -582,6 +582,7 @@ private struct ValueFields: View {
             case .tilt(let t): tilt(t)
             case .depth(let d): depth(d)
             case .bend(let b): bend(b)
+            case .template(let t): loops(t)
             case .camera(let c): camera(c)
             default: StyleValueFields(controller: controller, action: action, inherited: inherited)
             }
@@ -781,6 +782,21 @@ private struct ValueFields: View {
             change(&t, state)
             a.spec = .tilt(t)
         }
+    }
+
+    // MARK: Template
+
+    @ViewBuilder private func loops(_ t: TemplatePlay) -> some View {
+        StackedRow(label: "Loops") {
+            UnitField(value: t.loops, decimals: 0, accepts: { $0 >= 1 && $0 <= 1000 }) { v in
+                controller.editActions("Loops") { a in
+                    guard case .template(var play) = a.spec else { return }
+                    play.loops = v.rounded()
+                    a.spec = .template(play)
+                }
+            }
+        }
+        .help("How many times the template goes round in its bar. Stretching the bar slows it; it always ends where it began.")
     }
 
     // MARK: Bend

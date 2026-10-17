@@ -1092,6 +1092,7 @@ extension ActionKind {
         case .depth: return .depth
         case .bend: return .bend
         case .camera: return .camera
+        case .template: return .template
         case .preset: return .preset
         }
     }

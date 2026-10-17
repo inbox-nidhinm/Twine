@@ -437,14 +437,19 @@ public struct GroupContent: Codable, Sendable, Equatable {
     public var clipsContent: Bool
     /// Nil for a plain group.
     public var frame: FrameStyle?
+    /// A template frame's setup: its cards are worked out from it, so its
+    /// children are left empty. Nil for every other frame and group, and
+    /// left out of files then.
+    public var template: TemplateSetup?
 
-    public init(children: [Layer] = [], clipsContent: Bool = false, frame: FrameStyle? = nil) {
+    public init(children: [Layer] = [], clipsContent: Bool = false, frame: FrameStyle? = nil, template: TemplateSetup? = nil) {
         self.children = children
         self.clipsContent = clipsContent
         self.frame = frame
+        self.template = template
     }
 
-    private enum CodingKeys: String, CodingKey { case children, clipsContent, frame }
+    private enum CodingKeys: String, CodingKey { case children, clipsContent, frame, template }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -452,6 +457,7 @@ public struct GroupContent: Codable, Sendable, Equatable {
         clipsContent = try c.decode(Bool.self, forKey: .clipsContent)
         // Frames arrived after the first files with groups.
         frame = try c.decodeIfPresent(FrameStyle.self, forKey: .frame)
+        template = try c.decodeIfPresent(TemplateSetup.self, forKey: .template)
     }
 }
 
@@ -681,7 +687,8 @@ extension Layer {
     /// Every imported file the layer shows or plays.
     public var mediaIDs: [UUID] {
         switch content {
-        case .shape, .group: return look?.fills.compactMap { $0.paint.imagePaint?.mediaID } ?? []
+        case .shape, .group:
+            return (look?.fills.compactMap { $0.paint.imagePaint?.mediaID } ?? []) + (template?.mediaIDs ?? [])
         case .video(let v): return [v.mediaID]
         case .audio(let a): return [a.mediaID]
         case .text: return []

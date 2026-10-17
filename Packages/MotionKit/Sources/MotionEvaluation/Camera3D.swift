@@ -246,6 +246,7 @@ public struct BentMesh: Sendable, Equatable {
     /// each cell flat.
     static let bentCells = 16
     static let straightCells = 4
+    static let doubleCells = 8
 }
 
 /// A curve on a layer: its own point (u, v) moved off its flat plane onto
@@ -363,8 +364,13 @@ struct SpaceContext {
         let centre = pose.apply(curve.point(middle.x, middle.y))
         let depth = ordered ? centre.z : 0
         if bend != .zero, size.width > 0, size.height > 0 {
-            let columns = bend.x != 0 ? BentMesh.bentCells : BentMesh.straightCells
-            let rows = bend.y != 0 ? BentMesh.bentCells : BentMesh.straightCells
+            // Curved both ways, a card is a small patch of a sphere, and
+            // fewer cells follow it: 16 by 16 cost a globe of 36 cards 22 ms
+            // a 1080p frame.
+            let both = bend.x != 0 && bend.y != 0
+            let cells = both ? BentMesh.doubleCells : BentMesh.bentCells
+            let columns = bend.x != 0 ? cells : BentMesh.straightCells
+            let rows = bend.y != 0 ? cells : BentMesh.straightCells
             var points: [Vec2] = []
             points.reserveCapacity((rows + 1) * (columns + 1))
             for j in 0...rows {

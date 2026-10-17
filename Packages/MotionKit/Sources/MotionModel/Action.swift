@@ -90,6 +90,8 @@ public enum ActionSpec: Sendable, Equatable {
     case bend(BendAction)
     /// A frame in 3D's camera and depth look.
     case camera(CameraAction)
+    /// When a template frame plays (see `TemplateSetup`).
+    case template(TemplatePlay)
     case dash(DashAction)
     /// A ready-made animation on one bar: several properties at once, with
     /// the settings its preset offers. See `PresetAction`.
@@ -125,6 +127,7 @@ public enum ActionSpec: Sendable, Equatable {
         case .depth: return .depth
         case .bend: return .bend
         case .camera: return .camera
+        case .template: return .template
         case .dash: return .dash
         case .preset: return .preset
         }
@@ -140,6 +143,8 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     case play, volume
     case skew, tilt
     case depth, bend, camera
+    /// Added with its template, never from Add Action.
+    case template
     /// Added from Add Preset, never from Add Action.
     case preset
 
@@ -174,6 +179,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .depth: return "Depth"
         case .bend: return "Bend"
         case .camera: return "Camera"
+        case .template: return "Template"
         case .preset: return "Preset"
         }
     }
@@ -182,7 +188,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     public var category: ActionCategory {
         switch self {
         case .move, .scale, .rotate, .opacity, .resize, .visibility, .skew, .tilt, .depth, .bend: return .transform
-        case .camera: return .space
+        case .camera, .template: return .space
         case .color, .stroke, .trim, .dash, .cornerRadius, .shadow, .innerShadow: return .style
         case .layerBlur, .backgroundBlur: return .blur
         case .letterSpacing, .lineHeight, .counter, .changeText: return .text
@@ -917,7 +923,7 @@ extension ActionSpec: Codable {
     private enum CodingKeys: String, CodingKey {
         case type, move, scale, rotate, opacity, resize, visibility
         case color, stroke, trim, dash, cornerRadius, shadow, innerShadow, layerBlur, backgroundBlur
-        case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume, skew, tilt, depth, bend, camera, preset
+        case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume, skew, tilt, depth, bend, camera, template, preset
     }
 
     public init(from decoder: Decoder) throws {
@@ -952,6 +958,7 @@ extension ActionSpec: Codable {
         case .depth: self = .depth(try c.decode(DepthAction.self, forKey: .depth))
         case .bend: self = .bend(try c.decode(BendAction.self, forKey: .bend))
         case .camera: self = .camera(try c.decode(CameraAction.self, forKey: .camera))
+        case .template: self = .template(try c.decode(TemplatePlay.self, forKey: .template))
         case .preset: self = .preset(try c.decode(PresetAction.self, forKey: .preset))
         }
     }
@@ -989,6 +996,7 @@ extension ActionSpec: Codable {
         case .depth(let v): try c.encode(v, forKey: .depth)
         case .bend(let v): try c.encode(v, forKey: .bend)
         case .camera(let v): try c.encode(v, forKey: .camera)
+        case .template(let v): try c.encode(v, forKey: .template)
         case .preset(let v): try c.encode(v, forKey: .preset)
         }
     }

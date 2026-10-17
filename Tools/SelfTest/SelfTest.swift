@@ -2,6 +2,8 @@ import AppKit
 import MotionModel
 import MotionEditing
 import MotionEvaluation
+import MotionRendering
+import ImageIO
 
 #if SELFTEST
 // Test driver for the separate test copy of the app. Installed into the app
@@ -217,6 +219,40 @@ enum SelfTest {
                         l.transform.tilt = Tilt(x: v[2], y: v[3], depth: l.transform.tilt.depth)
                     }
                 } else { log("warp needs four numbers and a selection") }
+            case "template":
+                // Adds a template by its id (`ring-stream`, `globe`...), as the picker does, and logs it.
+                if let kind = TemplateKind(rawValue: parts[1]) {
+                    controller.addTemplate(kind)
+                    if let id = controller.selection.first, let t = controller.project.layer(withID: id)?.template {
+                        log("TEMPLATE \(t.kind.rawValue) slots=\(t.slots.count) filled=\(t.mediaIDs.count) cards=\(controller.scene.layers.filter { $0.parentID == id }.count) bar=\(controller.project.actions.contains { $0.targetLayerID == id && $0.spec.kind == .template })")
+                    }
+                } else { log("unknown template \(parts[1])") }
+            case "tsplit":
+                // Split into Layers on the selected template, and logs what it made.
+                if let id = controller.selection.first {
+                    controller.splitTemplate(id)
+                    let frame = controller.project.layer(withID: id)
+                    log("SPLIT template=\(frame?.template != nil) children=\(frame?.children.count ?? 0) actions=\(controller.project.actions.count) scenes=\(controller.project.scenes.map(\.name))")
+                }
+            case "tset":
+                // Sets a template setting by its key: tset KEY NUMBER, or tset KEY choice.
+                if let id = controller.selection.first, parts.count > 2 {
+                    controller.editTemplate(id) { setup in
+                        setup.settings[parts[1]] = Double(parts[2]).map { .number($0) } ?? .choice(parts[2])
+                    }
+                }
+            case "render":
+                // Draws the composition as it shows now through the export
+                // renderer into NAME.png in the shots folder: no screen needed.
+                let size = controller.project.composition
+                if let renderer = OffscreenRenderer(pixelWidth: size.width, pixelHeight: size.height),
+                   let image = renderer.image(of: controller.scene),
+                   let out = CGImageDestinationCreateWithURL(URL(fileURLWithPath: shots + "/" + parts[1] + ".png") as CFURL,
+                                                             "public.png" as CFString, 1, nil) {
+                    CGImageDestinationAddImage(out, image, nil)
+                    CGImageDestinationFinalize(out)
+                    log("RENDER \(parts[1])")
+                }
             case "preset":
                 // Adds a preset by its id (`slide-in`, `text-letters-rise`...), as the picker does.
                 if let preset = Presets.library.first(where: { $0.id == parts[1] }) {

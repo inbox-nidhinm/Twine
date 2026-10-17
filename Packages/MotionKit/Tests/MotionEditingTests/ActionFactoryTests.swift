@@ -44,9 +44,10 @@ import MotionEvaluation
         let spatial = Project(layers: [deep])
         let in3D = ActionFactory.kinds(for: card, in: spatial) + ActionFactory.kinds(for: deep, in: spatial)
         // Between them, every kind is offered somewhere, but presets, which
-        // Add Preset offers instead.
+        // Add Preset offers instead, and template bars, which come with
+        // their templates.
         #expect(Set(layers.flatMap { ActionFactory.kinds(for: $0, hasSound: true) } + in3D)
-                == Set(ActionKind.allCases).subtracting([.preset]))
+                == Set(ActionKind.allCases).subtracting([.preset, .template]))
         for (layer, kind) in [(card, ActionKind.depth), (deep, .camera)] {
             let a = ActionFactory.make(kind, for: layer, at: 1, state: LayerState(design: layer), frameRate: .fps60, rowOrder: 0)
             let p = Project(layers: [deep], actions: [a])

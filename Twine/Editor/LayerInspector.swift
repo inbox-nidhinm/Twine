@@ -20,7 +20,11 @@ struct LayerInspector: View {
                 positionSection
                 PanelDivider()
                 layoutSection
-                if layer.isFrame {
+                if let setup = layer.template {
+                    // A template sets its own camera.
+                    PanelDivider()
+                    TemplateSection(layer: layer, setup: setup, controller: controller)
+                } else if layer.isFrame {
                     PanelDivider()
                     SpaceSection(layer: layer, controller: controller)
                 }

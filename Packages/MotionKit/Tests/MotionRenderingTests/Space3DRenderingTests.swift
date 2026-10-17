@@ -597,6 +597,29 @@ import MotionModel
         }
         print("SPIKE BENCH ring of 24 flat cards: evaluate and place \(ms(place)), layer tree \(ms(update)), 1080p export frame \(ms(draw))")
 
+        // Templates, which make their cards afresh every frame.
+        for kind in [TemplateKind.ringStream, .globe, .tunnel, .curvedWall] {
+            let setup = TemplateSetup(kind: kind, slots: Array(repeating: nil, count: TemplateRecipes.slotCount(kind)))
+            let frame = Layer(name: "T", content: .group(GroupContent(clipsContent: true, frame: FrameStyle(), template: setup)),
+                              size: Size2(1920, 1080), position: Vec2(960, 540))
+            let bar = Action(target: frame.id, start: 0, duration: 10, easing: .linear, spec: .template(TemplatePlay()))
+            let project = Project(composition: Composition(width: 1920, height: 1080, duration: 10), layers: [frame], actions: [bar])
+            let tree = CoreAnimationRenderer()
+            let cache = EvaluationCache()
+            var made = 0.0, built = 0.0, drawn = 0.0
+            for f in 0..<frames {
+                let t0 = CACurrentMediaTime()
+                let scene = evaluate(project, at: Double(f) / 60, cache: cache)
+                let t1 = CACurrentMediaTime()
+                tree.render(scene)
+                let t2 = CACurrentMediaTime()
+                _ = offscreen.image(of: scene)
+                let t3 = CACurrentMediaTime()
+                (made, built, drawn) = (made + t1 - t0, built + t2 - t1, drawn + t3 - t2)
+            }
+            print("SPIKE BENCH template \(kind.rawValue): evaluate \(ms(made)), layer tree \(ms(built)), 1080p export frame \(ms(drawn))")
+        }
+
         // 24 bent cards on a ring of their own, the camera turning it, each
         // way of bending.
         let picture = Self.picture(width: 480, height: 640)

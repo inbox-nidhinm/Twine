@@ -584,6 +584,49 @@ final class EditorController {
         }
     }
 
+    // MARK: Templates
+
+    /// Adds a template filling the composition in front of everything, its
+    /// bar across the scene, and selects it. The selected picture layers go
+    /// into its slots in their place.
+    func addTemplate(_ kind: TemplateKind) {
+        let pictures = selectedLayers.filter { $0.picture != nil }
+        let (command, id) = Templates.adding(kind, to: project, replacing: pictures)
+        guard perform(command) else { return }
+        editor.selectedActions = []
+        editor.selection = [id]
+    }
+
+    /// Turns a template into an ordinary frame in 3D of cards and actions.
+    func splitTemplate(_ id: UUID) {
+        guard let command = Templates.split(id, in: project) else { return NSSound.beep() }
+        if perform(command) { editor.selection = [id] }
+    }
+
+    /// Changes a template's setup, as one undo step.
+    func editTemplate(_ id: UUID, _ change: (inout TemplateSetup) -> Void) {
+        edit(id) { layer in
+            guard var setup = layer.template else { return }
+            change(&setup)
+            layer.template = setup
+        }
+    }
+
+    /// Puts a picture chosen in a panel into slot `slot` of template `id`.
+    func chooseTemplatePicture(_ id: UUID, slot: Int) {
+        chooseFile([.image]) { [weak self] url in self?.setTemplatePicture(id, slot: slot, from: url) }
+    }
+
+    func setTemplatePicture(_ id: UUID, slot: Int, from url: URL) {
+        Task { @MainActor in
+            guard let (asset, isNew) = await bringIn(url, as: .image), var layer = project.layer(withID: id),
+                  var setup = layer.template, setup.slots.indices.contains(slot) else { return }
+            setup.slots[slot] = asset.id
+            layer.template = setup
+            perform(.batch((isNew ? [.addMedia(asset)] : []) + [.updateLayers([layer])], name: "Template Picture"))
+        }
+    }
+
     /// Changes how a layer's picture fills it. Crop starts cropping on the
     /// canvas, with the picture where it was.
     func setPictureMode(_ id: UUID, _ mode: ImageScaleMode) {

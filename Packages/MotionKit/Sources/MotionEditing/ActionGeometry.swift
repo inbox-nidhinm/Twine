@@ -250,7 +250,7 @@ public enum ActionGeometry {
             guard !d.followsTrim else { return nil }
             d.direction = d.direction == .forward ? .backward : .forward
             a.spec = .dash(d)
-        case .visibility, .changeText, .play, .preset:
+        case .visibility, .changeText, .play, .preset, .template:
             return nil
         }
         return a
