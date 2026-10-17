@@ -1089,6 +1089,8 @@ extension ActionKind {
         case .volume: return .speaker
         case .skew: return .skew
         case .tilt: return .tilt
+        case .depth: return .depth
+        case .camera: return .camera
         case .preset: return .preset
         }
     }

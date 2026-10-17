@@ -38,7 +38,10 @@ public enum ActionFactory {
             var kinds = transform
             if let top = frame.fills.last, !top.paint.isImage { kinds.append(.color) }
             if !frame.strokes.isEmpty { kinds.append(.stroke) }
-            return kinds + [.cornerRadius, .shadow, .innerShadow, .layerBlur, .backgroundBlur]
+            kinds += [.cornerRadius, .shadow, .innerShadow, .layerBlur, .backgroundBlur]
+            // A frame in 3D has a camera to move.
+            if frame.space != nil { kinds.append(.camera) }
+            return kinds
         case .shape(let shape):
             var kinds = transform
             // A picture has no colour to change.
@@ -68,9 +71,14 @@ public enum ActionFactory {
     }
 
     /// The kinds for a layer in `project`, which knows whether a video's file
-    /// has sound.
+    /// has sound, and whether the layer sits in a frame in 3D, where it
+    /// takes Depth (after Tilt).
     public static func kinds(for layer: Layer, in project: Project) -> [ActionKind] {
-        kinds(for: layer, hasSound: project.hasSound(layer))
+        var kinds = kinds(for: layer, hasSound: project.hasSound(layer))
+        if project.space3D(holding: layer.id) != nil, let tilt = kinds.firstIndex(of: .tilt) {
+            kinds.insert(.depth, at: tilt + 1)
+        }
+        return kinds
     }
 
     /// Kinds offered for several layers at once: those every one of them takes.
@@ -115,6 +123,15 @@ public enum ActionFactory {
         case .tilt:
             // Turns it a third of the way round, side to side, at its own depth.
             spec = .tilt(TiltAction(mode: .by, end: Tilt(x: 0, y: 30, depth: state.tilt.depth)))
+        case .depth:
+            // Towards the viewer, enough to see it come forward.
+            spec = .depth(DepthAction(mode: .by, end: 200))
+        case .camera:
+            // The camera in to half its distance, so the perspective deepens.
+            let space = state.camera.space ?? Space3D()
+            var end = space
+            end.distance = max((space.distance / 2).rounded(), 1)
+            spec = .camera(CameraAction(end: end))
         case .opacity:
             spec = .opacity(OpacityAction(end: 0))
         case .resize:

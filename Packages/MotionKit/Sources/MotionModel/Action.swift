@@ -85,6 +85,10 @@ public enum ActionSpec: Sendable, Equatable {
     case volume(VolumeAction)
     case skew(SkewAction)
     case tilt(TiltAction)
+    /// Z, in a frame in 3D.
+    case depth(DepthAction)
+    /// A frame in 3D's camera and depth look.
+    case camera(CameraAction)
     case dash(DashAction)
     /// A ready-made animation on one bar: several properties at once, with
     /// the settings its preset offers. See `PresetAction`.
@@ -117,6 +121,8 @@ public enum ActionSpec: Sendable, Equatable {
         case .volume: return .volume
         case .skew: return .skew
         case .tilt: return .tilt
+        case .depth: return .depth
+        case .camera: return .camera
         case .dash: return .dash
         case .preset: return .preset
         }
@@ -131,6 +137,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     case arc, star, path
     case play, volume
     case skew, tilt
+    case depth, camera
     /// Added from Add Preset, never from Add Action.
     case preset
 
@@ -162,6 +169,8 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .volume: return "Volume"
         case .skew: return "Skew"
         case .tilt: return "Tilt"
+        case .depth: return "Depth"
+        case .camera: return "Camera"
         case .preset: return "Preset"
         }
     }
@@ -169,7 +178,8 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     /// The group it is listed under when adding an action.
     public var category: ActionCategory {
         switch self {
-        case .move, .scale, .rotate, .opacity, .resize, .visibility, .skew, .tilt: return .transform
+        case .move, .scale, .rotate, .opacity, .resize, .visibility, .skew, .tilt, .depth: return .transform
+        case .camera: return .space
         case .color, .stroke, .trim, .dash, .cornerRadius, .shadow, .innerShadow: return .style
         case .layerBlur, .backgroundBlur: return .blur
         case .letterSpacing, .lineHeight, .counter, .changeText: return .text
@@ -182,7 +192,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
 }
 
 public enum ActionCategory: String, Sendable, CaseIterable {
-    case transform, style, blur, text, shape, media
+    case transform, style, blur, text, shape, media, space
 
     public var title: String {
         switch self {
@@ -192,6 +202,7 @@ public enum ActionCategory: String, Sendable, CaseIterable {
         case .text: return "Text"
         case .shape: return "Shape"
         case .media: return "Media"
+        case .space: return "3D"
         }
     }
 }
@@ -706,6 +717,34 @@ public struct TiltAction: Codable, Sendable, Equatable {
     }
 }
 
+/// Z, towards the viewer, in pixels (see `Transform.z`). In By mode `end`
+/// is added to the Z it starts from.
+public struct DepthAction: Codable, Sendable, Equatable {
+    public var mode: ActionMode
+    public var initial: Double?
+    public var end: Double
+
+    public init(mode: ActionMode = .to, initial: Double? = nil, end: Double) {
+        self.mode = mode
+        self.initial = initial
+        self.end = end
+    }
+}
+
+/// A frame in 3D's camera, blended from its starting value to `end`: the
+/// camera's distance and vanishing point, and its depth fade, depth blur
+/// and backs. Whether it is isometric is not blended: that stays as the
+/// frame has it where the action starts.
+public struct CameraAction: Codable, Sendable, Equatable {
+    public var initial: Space3D?
+    public var end: Space3D
+
+    public init(initial: Space3D? = nil, end: Space3D) {
+        self.initial = initial
+        self.end = end
+    }
+}
+
 /// A preset on one bar. It remembers which preset it is and the settings
 /// the inspector shows for it; what it does to the layer is worked out when
 /// it plays (`PresetRecipe`, in MotionEvaluation), from the layer as it is
@@ -846,7 +885,7 @@ extension ActionSpec: Codable {
     private enum CodingKeys: String, CodingKey {
         case type, move, scale, rotate, opacity, resize, visibility
         case color, stroke, trim, dash, cornerRadius, shadow, innerShadow, layerBlur, backgroundBlur
-        case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume, skew, tilt, preset
+        case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume, skew, tilt, depth, camera, preset
     }
 
     public init(from decoder: Decoder) throws {
@@ -878,6 +917,8 @@ extension ActionSpec: Codable {
         case .volume: self = .volume(try c.decode(VolumeAction.self, forKey: .volume))
         case .skew: self = .skew(try c.decode(SkewAction.self, forKey: .skew))
         case .tilt: self = .tilt(try c.decode(TiltAction.self, forKey: .tilt))
+        case .depth: self = .depth(try c.decode(DepthAction.self, forKey: .depth))
+        case .camera: self = .camera(try c.decode(CameraAction.self, forKey: .camera))
         case .preset: self = .preset(try c.decode(PresetAction.self, forKey: .preset))
         }
     }
@@ -912,6 +953,8 @@ extension ActionSpec: Codable {
         case .volume(let v): try c.encode(v, forKey: .volume)
         case .skew(let v): try c.encode(v, forKey: .skew)
         case .tilt(let v): try c.encode(v, forKey: .tilt)
+        case .depth(let v): try c.encode(v, forKey: .depth)
+        case .camera(let v): try c.encode(v, forKey: .camera)
         case .preset(let v): try c.encode(v, forKey: .preset)
         }
     }

@@ -9,10 +9,12 @@ import SwiftUI
 public enum Icon: String, CaseIterable, Sendable {
     case arc
     case backgroundBlur
+    case camera
     case changeText
     case color
     case counter
     case dash
+    case depth
     case filter
     case innerShadow
     case layerBlur
@@ -122,6 +124,10 @@ public enum Icon: String, CaseIterable, Sendable {
             "M13.5 21.5L21.5 13.5",
             "M2.5 10.5L10.5 2.5"
         ]
+        case .camera: return [   // Actions/camera.svg
+            "M3.5 7.5 H15 V16.5 H3.5 Z",
+            "M15 10.5 L20.5 7.5 V16.5 L15 13.5"
+        ]
         case .changeText: return [   // Actions/change-text.svg
             "M4 5 H12",
             "M8 5 V14",
@@ -144,6 +150,10 @@ public enum Icon: String, CaseIterable, Sendable {
             "M9 12 H11.5",
             "M14.5 12 H20",
             "M17 9 L20 12 L17 15"
+        ]
+        case .depth: return [   // Actions/depth.svg
+            "M4.5 9.5 H14.5 V19.5 H4.5 Z",
+            "M9.5 9.5 V4.5 H19.5 V14.5 H14.5"
         ]
         case .filter: return [   // Actions/filter.svg
             "M4 5 H20 L14 12 V19 L10 17 V12 Z"

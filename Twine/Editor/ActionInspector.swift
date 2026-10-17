@@ -547,6 +547,8 @@ private struct ValueFields: View {
             case .visibility(let v): visibility(v)
             case .skew(let k): skew(k)
             case .tilt(let t): tilt(t)
+            case .depth(let d): depth(d)
+            case .camera(let c): camera(c)
             default: StyleValueFields(controller: controller, action: action, inherited: inherited)
             }
         }
@@ -725,6 +727,8 @@ private struct ValueFields: View {
             UnitField(unit: "Y", value: t.end.y, decimals: 1, suffix: "°") { v in editTilt("Tilt") { t, _ in t.end.y = v } }
         }
         .help("X tips it back around a level line through its anchor, the top going away; Y turns it around an upright line, the right side going away. 180° shows its back.")
+        // In a frame in 3D its camera sets the perspective.
+        if controller.project.space3D(holding: action.targetLayerID) == nil {
         StackedRow(label: "Depth") {
             UnitField(value: t.end.depth, decimals: 0, suffix: "px", accepts: { $0 > 1 }) { v in
                 editTilt("Depth") { t, _ in
@@ -734,6 +738,7 @@ private struct ValueFields: View {
             }
         }
         .help("How far away it is seen from. Nearer makes the perspective stronger.")
+        }
     }
 
     private func editTilt(_ name: String, _ change: @escaping (inout TiltAction, LayerState) -> Void) {
@@ -741,6 +746,115 @@ private struct ValueFields: View {
             guard case .tilt(var t) = a.spec, let state = controller.inheritedState(for: a) else { return }
             change(&t, state)
             a.spec = .tilt(t)
+        }
+    }
+
+    // MARK: Depth
+
+    @ViewBuilder private func depth(_ d: DepthAction) -> some View {
+        StackedRow(label: "From", accessory: { clearButton(d.initial != nil) { editDepth("Starting Value") { $0.initial = nil } } }) {
+            OptionalField(unit: "Z", value: d.initial, placeholder: inherited?.z ?? 0, decimals: 1, suffix: "px") { v in
+                editDepth("Starting Value") { $0.initial = v }
+            }
+        }
+        .help("The depth it starts at. Empty starts from the layer's Z when the action begins.")
+        StackedRow(label: d.mode == .to ? "To" : "By", menu: modeEntries(d.mode), swap: swap) {
+            UnitField(unit: "Z", value: d.end, decimals: 1, suffix: "px") { v in editDepth("Depth") { $0.end = v } }
+        }
+        .help(d.mode == .to ? "The depth it ends at: towards you, or away when negative." : "How far it comes towards you, or goes away when negative.")
+    }
+
+    private func editDepth(_ name: String, _ change: @escaping (inout DepthAction) -> Void) {
+        controller.editActions(name) { a in
+            guard case .depth(var d) = a.spec else { return }
+            change(&d)
+            a.spec = .depth(d)
+        }
+    }
+
+    // MARK: Camera
+
+    @ViewBuilder private func camera(_ c: CameraAction) -> some View {
+        let from = inherited?.camera.space ?? Space3D()
+        let isometric = from.isIsometric
+        StackedRow(label: "From", accessory: { clearButton(c.initial != nil) { editCamera("Starting Value") { c, _ in c.initial = nil } } }) {
+            cameraFields(c.initial, placeholder: from, isometric: isometric, first: true) { change in
+                editCamera("Starting Value") { c, start in
+                    var space = c.initial ?? start
+                    change(&space)
+                    c.initial = space
+                }
+            }
+        }
+        .help("The camera it starts from. Empty starts from the frame's camera when the action begins.")
+        cameraFields(c.initial, placeholder: from, isometric: isometric, first: false) { change in
+            editCamera("Starting Value") { c, start in
+                var space = c.initial ?? start
+                change(&space)
+                c.initial = space
+            }
+        }
+        StackedRow(label: "To", swap: swap) {
+            cameraFields(c.end, placeholder: c.end, isometric: isometric, first: true) { change in
+                editCamera("Camera") { c, _ in change(&c.end) }
+            }
+        }
+        cameraFields(c.end, placeholder: c.end, isometric: isometric, first: false) { change in
+            editCamera("Camera") { c, _ in change(&c.end) }
+        }
+    }
+
+    /// The camera's numbers: its distance on the first row (left out when
+    /// isometric, where it means nothing), then the rest, each row its own.
+    /// Empty fields show `placeholder`'s values.
+    @ViewBuilder private func cameraFields(_ space: Space3D?, placeholder: Space3D, isometric: Bool, first: Bool,
+                                           _ set: @escaping (@escaping (inout Space3D) -> Void) -> Void) -> some View {
+        if first {
+            if isometric {
+                Text("Isometric").font(ThemeFont.label).foregroundStyle(Theme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                OptionalField(unit: "Distance", value: space?.distance, placeholder: placeholder.distance, decimals: 0,
+                              suffix: "px", accepts: { $0 >= 1 }) { v in set { $0.distance = v ?? placeholder.distance } }
+                    .help("How far in front of the frame the camera is. Nearer makes the perspective stronger.")
+            }
+        } else {
+            if !isometric {
+            HStack(spacing: 8) {
+                OptionalField(unit: "X", value: space.map { $0.vanishingPoint.x * 100 }, placeholder: placeholder.vanishingPoint.x * 100,
+                              decimals: 0, suffix: "%") { v in set { $0.vanishingPoint.x = (v ?? placeholder.vanishingPoint.x * 100) / 100 } }
+                    .help("Where across the frame the camera looks straight at")
+                OptionalField(unit: "Y", value: space.map { $0.vanishingPoint.y * 100 }, placeholder: placeholder.vanishingPoint.y * 100,
+                              decimals: 0, suffix: "%") { v in set { $0.vanishingPoint.y = (v ?? placeholder.vanishingPoint.y * 100) / 100 } }
+                    .help("Where down the frame the camera looks straight at")
+            }
+            }
+            HStack(spacing: 8) {
+                OptionalField(unit: "Fade", value: space.map { $0.depthFade * 100 }, placeholder: placeholder.depthFade * 100,
+                              decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
+                    set { $0.depthFade = (v ?? placeholder.depthFade * 100) / 100 }
+                }
+                .help("Depth fade: how much fainter layers grow behind the frame")
+                OptionalField(unit: "Blur", value: space?.depthBlur, placeholder: placeholder.depthBlur, decimals: 1,
+                              suffix: "px", accepts: { $0 >= 0 }) { v in set { $0.depthBlur = v ?? placeholder.depthBlur } }
+                    .help("Depth blur: how much blurrier layers grow behind the frame")
+            }
+            HStack(spacing: 8) {
+                OptionalField(unit: "Backs", value: space.map { $0.backOpacity * 100 }, placeholder: placeholder.backOpacity * 100,
+                              decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
+                    set { $0.backOpacity = (v ?? placeholder.backOpacity * 100) / 100 }
+                }
+                .help("How strongly a layer shows with its back to the camera")
+                Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+            }
+        }
+    }
+
+    private func editCamera(_ name: String, _ change: @escaping (inout CameraAction, Space3D) -> Void) {
+        controller.editActions(name) { a in
+            guard case .camera(var c) = a.spec, let state = controller.inheritedState(for: a) else { return }
+            change(&c, state.camera.space ?? Space3D())
+            a.spec = .camera(c)
         }
     }
 

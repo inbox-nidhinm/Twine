@@ -254,6 +254,8 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
             }
             defer { if whole { cache?.keep(Array(out[first...]), of: layer, parent: parent) } }
             let made: ResolvedLayer?
+            // A frame in 3D's camera as it is now, for placing its children.
+            var camera = layer.space3D
             if let cache, tracks.isStill(layer.id) {
                 made = cache.resolved(layer, parent: parent) {
                     resolve(layer, state: LayerState(design: layer), parent: parent, pictures: pictures,
@@ -263,6 +265,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
                 let state = tracks.state(of: layer, at: time)
                 // Hidden by an action: the layer and everything inside it.
                 guard state.isShown else { continue }
+                camera = state.camera.space
                 made = resolve(layer, state: state, parent: parent, pictures: pictures,
                                animation: tracks.textAnimation(of: layer, at: time), time: time, blur: blur)
             }
@@ -270,12 +273,12 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
             if let blur {
                 resolved.motion = motion(of: layer, resolved, tracks: tracks, at: time, blur, space: space)
             }
-            space?.place(&resolved, z: layer.transform.z)
+            space?.place(&resolved, z: resolved.warp.z)
             if let mask { masked.append((out.count, mask)) }
             out.append(resolved)
             if layer.isGroup {
                 walk(layer.children, parent: layer.id, soloedAbove: soloed,
-                     space: layer.space3D.map { SpaceContext($0, size: resolved.size) })
+                     space: camera.map { SpaceContext($0, size: resolved.size) })
             }
         }
     }
@@ -354,8 +357,9 @@ private struct WorldTransforms {
                 result = resolve(layer, state: state, parent: parent, pictures: pictures,
                                  animation: tracks.textAnimation(of: layer, at: time), time: time)
                 // In a frame in 3D, placed there as the scene's own layers are.
-                if let parent, let space = layers[parent]?.space3D, let holder = resolved(parent) {
-                    SpaceContext(space, size: holder.size).place(&result!, z: layer.transform.z)
+                if let parent, let frame = layers[parent], let holder = resolved(parent),
+                   let space = tracks.state(of: frame, at: time).camera.space {
+                    SpaceContext(space, size: holder.size).place(&result!, z: result!.warp.z)
                 }
             }
         }
@@ -386,9 +390,12 @@ private func motion(of layer: Layer, _ resolved: ResolvedLayer, tracks: ActionTr
         if channels.contains(.rotation) { moved.rotation = state.rotation }
         if channels.contains(.skew) || channels.contains(.tilt) {
             moved.warp = Warp(skew: channels.contains(.skew) ? state.warp.skew : resolved.skew,
-                              tilt: channels.contains(.tilt) ? state.warp.tilt : resolved.tilt)
+                              tilt: channels.contains(.tilt) ? state.warp.tilt : resolved.tilt, z: resolved.warp.z)
         }
-        return space?.projection(of: moved, z: layer.transform.z) ?? moved.projection
+        if channels.contains(.depth) {
+            moved.warp = Warp(skew: moved.skew, tilt: moved.tilt, z: state.z)
+        }
+        return space?.projection(of: moved, z: moved.warp.z) ?? moved.projection
     }
     let spread = MotionSpread(first: placed(at: first), next: placed(at: first + shutter / Double(blur.samples - 1)),
                               last: placed(at: first + shutter), count: blur.samples, size: resolved.size)

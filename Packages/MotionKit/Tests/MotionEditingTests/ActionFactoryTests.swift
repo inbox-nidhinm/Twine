@@ -34,9 +34,24 @@ import MotionEvaluation
         let video = Layer(name: "V", content: .video(VideoContent(mediaID: UUID())), size: Size2(10, 10), position: .zero)
         let pen = PathEditing.reshaped(star, to: PathEditing.path(of: star)!).layer
         let layers = [stroked, text, ellipse, star, video, pen]
+        // A card in a frame in 3D, which takes Depth, and the frame Camera.
+        var card = square
+        card.transform.position = Vec2(200, 150)
+        // Set back, so the camera's distance shows on it.
+        card.transform.z = -200
+        let deep = Layer(name: "F", content: .group(GroupContent(children: [card], frame: FrameStyle(space: Space3D()))),
+                         size: Size2(400, 300), position: Vec2(200, 150))
+        let spatial = Project(layers: [deep])
+        let in3D = ActionFactory.kinds(for: card, in: spatial) + ActionFactory.kinds(for: deep, in: spatial)
         // Between them, every kind is offered somewhere, but presets, which
         // Add Preset offers instead.
-        #expect(Set(layers.flatMap { ActionFactory.kinds(for: $0, hasSound: true) }) == Set(ActionKind.allCases).subtracting([.preset]))
+        #expect(Set(layers.flatMap { ActionFactory.kinds(for: $0, hasSound: true) } + in3D)
+                == Set(ActionKind.allCases).subtracting([.preset]))
+        for (layer, kind) in [(card, ActionKind.depth), (deep, .camera)] {
+            let a = ActionFactory.make(kind, for: layer, at: 1, state: LayerState(design: layer), frameRate: .fps60, rowOrder: 0)
+            let p = Project(layers: [deep], actions: [a])
+            #expect(evaluate(p, at: 0.5).layer(card.id) != evaluate(p, at: 5).layer(card.id), "\(kind) changes nothing")
+        }
         for layer in layers {
             // Volume is heard, not seen; it has a test of its own.
             for kind in ActionFactory.kinds(for: layer) where kind != .volume {

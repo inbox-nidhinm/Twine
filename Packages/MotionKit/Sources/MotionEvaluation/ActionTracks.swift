@@ -10,6 +10,10 @@ public enum Channel: String, Hashable, Sendable, CaseIterable {
     case letterSpacing, lineHeight, text, arc, star, path
     case media, volume
     case skew, tilt
+    /// Z, in a frame in 3D.
+    case depth
+    /// A frame in 3D's camera.
+    case camera
     /// A clip of the layer's own box, which only the Mask presets drive.
     case reveal
     /// A page curl, which only the Page Curl presets drive.
@@ -46,6 +50,8 @@ extension ActionKind {
         case .volume: return .volume
         case .skew: return .skew
         case .tilt: return .tilt
+        case .depth: return .depth
+        case .camera: return .camera
         // A preset reaches several; `ActionTracks` asks its recipe which.
         case .preset: return .position
         }
@@ -101,18 +107,25 @@ public struct LayerState: Sendable, Equatable {
     public var scale: Vec2
     /// Degrees, clockwise, never wrapped.
     public var rotation: Double
-    /// Skew and tilt, boxed when there are any (see `Warp`).
+    /// Skew, tilt and Z, boxed when there are any (see `Warp`).
     public var warp: Warp
     /// Degrees each way (see `Transform.skew`).
     public var skew: Vec2 {
         get { warp.skew }
-        set { warp = Warp(skew: newValue, tilt: warp.tilt) }
+        set { warp = Warp(skew: newValue, tilt: warp.tilt, z: warp.z) }
     }
     /// A turn in depth (see `Tilt`).
     public var tilt: Tilt {
         get { warp.tilt }
-        set { warp = Warp(skew: warp.skew, tilt: newValue) }
+        set { warp = Warp(skew: warp.skew, tilt: newValue, z: warp.z) }
     }
+    /// Towards the viewer, in a frame in 3D (see `Transform.z`).
+    public var z: Double {
+        get { warp.z }
+        set { warp = Warp(skew: warp.skew, tilt: warp.tilt, z: newValue) }
+    }
+    /// A frame in 3D's camera, boxed; `.none` for anything else.
+    public var camera: CameraState = .none
     /// Not clamped here, so an overshooting fade still reads true; the scene
     /// clamps it to 0...1 for drawing.
     public var opacity: Double
@@ -162,7 +175,8 @@ public struct LayerState: Sendable, Equatable {
         position = layer.transform.position
         scale = layer.transform.scale
         rotation = layer.transform.rotation
-        warp = Warp(skew: layer.transform.skew, tilt: layer.transform.tilt)
+        warp = Warp(skew: layer.transform.skew, tilt: layer.transform.tilt, z: layer.transform.z)
+        if let space = layer.space3D { camera = .space(space) }
         opacity = layer.opacity
         size = layer.size
         isShown = true
@@ -227,25 +241,42 @@ public enum InnerShadow: Sendable, Equatable {
     }
 }
 
-/// A layer's skew and tilt, kept out of line: most layers have neither, and
+/// A layer's skew, tilt and Z, kept out of line: most layers have none, and
 /// carrying five more numbers in every layer's state made each frame's
 /// evaluation measurably slower.
 public enum Warp: Sendable, Equatable {
     case none
-    indirect case warped(skew: Vec2, tilt: Tilt)
+    indirect case warped(skew: Vec2, tilt: Tilt, z: Double)
 
-    public init(skew: Vec2, tilt: Tilt) {
-        self = skew == .zero && tilt == .none ? .none : .warped(skew: skew, tilt: tilt)
+    public init(skew: Vec2, tilt: Tilt, z: Double = 0) {
+        self = skew == .zero && tilt == .none && z == 0 ? .none : .warped(skew: skew, tilt: tilt, z: z)
     }
 
     public var skew: Vec2 {
-        if case .warped(let skew, _) = self { return skew }
+        if case .warped(let skew, _, _) = self { return skew }
         return .zero
     }
 
     public var tilt: Tilt {
-        if case .warped(_, let tilt) = self { return tilt }
+        if case .warped(_, let tilt, _) = self { return tilt }
         return .none
+    }
+
+    public var z: Double {
+        if case .warped(_, _, let z) = self { return z }
+        return 0
+    }
+}
+
+/// A frame in 3D's camera, kept out of line as `Warp` is: only frames in
+/// 3D have one.
+public enum CameraState: Sendable, Equatable {
+    case none
+    indirect case space(Space3D)
+
+    public var space: Space3D? {
+        if case .space(let s) = self { return s }
+        return nil
     }
 }
 
@@ -284,7 +315,7 @@ public struct ActionTracks: Sendable {
     }
 
     /// The channels motion blur spreads: those that move a layer.
-    static let moving: Set<Channel> = [.position, .scale, .rotation, .skew, .tilt]
+    static let moving: Set<Channel> = [.position, .scale, .rotation, .skew, .tilt, .depth]
 
     public init(_ actions: [Action]) {
         // In presets, which show their layer as a Show does (rule 10).
@@ -454,6 +485,10 @@ public struct ActionTracks: Sendable {
                 state.opacity = walk(state.opacity, run, at: time)
             case .skew: state.skew = walk(state.skew, list.compactMap(Self.skewStep), at: time)
             case .tilt: state.tilt = walk(state.tilt, steps(list, Self.tiltStep, Self.tiltPart), at: time)
+            case .depth: state.z = walk(state.z, list.compactMap(Self.depthStep), at: time)
+            // Only a frame in 3D has a camera to move.
+            case .camera:
+                if let space = state.camera.space { state.camera = .space(walk(space, list.compactMap(Self.cameraStep), at: time)) }
             case .reveal:
                 state.reveal = Reveal(walk(state.reveal.box, steps(list, { _ in nil }, Self.revealPart), at: time))
             case .curl:
@@ -679,6 +714,16 @@ public struct ActionTracks: Sendable {
         guard case .tilt(let t) = a.spec else { return nil }
         return Step(a, initial: t.initial,
                     target: t.mode == .to ? { _ in t.end } : { Tilt(x: $0.x + t.end.x, y: $0.y + t.end.y, depth: t.end.depth) })
+    }
+
+    private static func depthStep(_ a: Action) -> Step<Double>? {
+        guard case .depth(let d) = a.spec else { return nil }
+        return Step(a, initial: d.initial, target: d.mode == .to ? { _ in d.end } : { $0 + d.end })
+    }
+
+    private static func cameraStep(_ a: Action) -> Step<Space3D>? {
+        guard case .camera(let c) = a.spec else { return nil }
+        return Step(a, initial: c.initial, target: { _ in c.end })
     }
 
     private static func opacityStep(_ a: Action) -> Step<Double>? {

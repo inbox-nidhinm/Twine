@@ -25,6 +25,18 @@ extension Tilt: Interpolatable {
     }
 }
 
+extension Space3D: Interpolatable {
+    /// Isometric or not is never blended: it stays as it was where the
+    /// action starts. Fade and backs keep to 0...1, the distance above 1.
+    public static func interpolate(_ a: Space3D, _ b: Space3D, _ t: Double) -> Space3D {
+        Space3D(distance: max(lerp(a.distance, b.distance, t), 1), isIsometric: a.isIsometric,
+                vanishingPoint: .interpolate(a.vanishingPoint, b.vanishingPoint, t),
+                depthFade: min(max(lerp(a.depthFade, b.depthFade, t), 0), 1),
+                depthBlur: max(lerp(a.depthBlur, b.depthBlur, t), 0),
+                backOpacity: min(max(lerp(a.backOpacity, b.backOpacity, t), 0), 1))
+    }
+}
+
 extension Vec2: Interpolatable {
     public static func interpolate(_ a: Vec2, _ b: Vec2, _ t: Double) -> Vec2 {
         Vec2(lerp(a.x, b.x, t), lerp(a.y, b.y, t))

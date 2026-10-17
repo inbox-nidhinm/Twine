@@ -91,7 +91,7 @@ Each ends with the usual gate: a clean `./make-app.sh`, `./test.sh` passing, the
 
 1. **Spike, no interface.** Done: see Spike results.
 2. **3D frames.** Done (17 October 2026): the camera on frames, Z position, tilts turning in the shared space (hinged ones too), depth sorting, depth fade and blur, back faces, isometric, file format 6, the 3D section and Z in the inspector, outlines and clicks on the canvas by what is drawn in front, masks and motion blur placed through the camera. Left for later: dragging in perspective (a drag is flat, so a little off, as in a tilted group), handles on 3D layers, and nested 3D (a group inside a 3D frame is a flat card).
-3. **3D actions and Bend.** The Depth action, the Tilt action in shared space, Bend as an effect and an action, camera actions.
+3. **3D actions and Bend.** The Depth action and the Camera action are done (17 October 2026; the Tilt action already turns in the shared space). Left: Bend as an effect and an action, and an orbit for the camera.
 4. **3D presets.** The group above, with tiles, letter by letter on text.
 5. **The template engine and the first 23.** The template frame, slots, settings, the recipe system, looping, the picker and its playing tiles, Split into Layers. Then the most 3D groups: 3D & Perspective (12), Isometric (3) and Orbit (8).
 6. **Flat and nearly flat templates (33).** Carousel & Flow, Grid, Spotlight & Focus, Stack & Scatter, Reveal & Wipe. Many lean on things Twine has (masks, reveals, presets).

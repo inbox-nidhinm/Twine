@@ -1123,6 +1123,8 @@ private struct SpaceSection: View {
                     .help("How far in front of the frame the camera is. Nearer makes the perspective stronger.")
                 }
             }
+            // Seen from infinitely far, the camera has no point to look at.
+            if !space.isIsometric {
             StackedRow(label: "Vanishing point") {
                 UnitField(unit: "X", value: space.vanishingPoint.x * 100, decimals: 0, suffix: "%") { v in
                     edit { $0.vanishingPoint.x = v / 100 }
@@ -1132,6 +1134,7 @@ private struct SpaceSection: View {
                     edit { $0.vanishingPoint.y = v / 100 }
                 }
                 .help("Where down the frame the camera looks straight at")
+            }
             }
             HStack(spacing: 8) {
                 UnitField(unit: "Fade", value: space.depthFade * 100, decimals: 0, suffix: "%",

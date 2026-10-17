@@ -105,6 +105,12 @@ public enum ActionGeometry {
             r.mode = mode
             r = settingEnd(r, to: final, from: state.rotation)
             a.spec = .rotate(r)
+        case .depth(var d) where d.mode != mode:
+            let base = d.initial ?? state.z
+            let final = d.mode == .to ? d.end : base + d.end
+            d.mode = mode
+            d.end = mode == .to ? final : final - base
+            a.spec = .depth(d)
         default:
             break
         }
@@ -152,6 +158,16 @@ public enum ActionGeometry {
             t.end = t.mode == .to ? Tilt(x: base.x, y: base.y, depth: depth)
                 : Tilt(x: base.x - final.x, y: base.y - final.y, depth: depth)
             a.spec = .tilt(t)
+        case .depth(var d):
+            let base = d.initial ?? state.z
+            let final = d.mode == .to ? d.end : base + d.end
+            d.initial = final
+            d.end = d.mode == .to ? base : base - final
+            a.spec = .depth(d)
+        case .camera(var c):
+            guard let start = c.initial ?? state.camera.space else { return nil }
+            (c.initial, c.end) = (c.end, start)
+            a.spec = .camera(c)
         case .opacity(var o):
             (o.initial, o.end) = (o.end, o.initial ?? state.opacity)
             a.spec = .opacity(o)

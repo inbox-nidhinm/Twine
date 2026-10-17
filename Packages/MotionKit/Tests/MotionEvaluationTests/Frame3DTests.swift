@@ -197,3 +197,83 @@ import MotionModel
         #expect(abs(w - 100 / 0.7) < 1e-6)
     }
 }
+
+/// The Depth and Camera actions.
+@Suite struct Actions3DTests {
+    typealias F = Frame3DTests
+
+    @Test func aDepthActionBringsALayerForward() throws {
+        let card = F.card("C", at: Vec2(400, 300), z: -100)
+        let frame = F.frame([card])
+        let to = Action(target: card.id, start: 0, duration: 1, easing: .linear, spec: .depth(DepthAction(mode: .to, end: 300)))
+        #expect(F.scene([frame], actions: [to], at: 0.5).layer(card.id)?.placed.depth == 100)
+        #expect(F.scene([frame], actions: [to], at: 1).layer(card.id)?.placed.depth == 300)
+        // By adds to where it starts; a starting value holds from 0 s.
+        let by = Action(target: card.id, start: 1, duration: 1, easing: .linear,
+                        spec: .depth(DepthAction(mode: .by, initial: -500, end: 200)))
+        #expect(F.scene([frame], actions: [by], at: 0).layer(card.id)?.placed.depth == -500)
+        #expect(F.scene([frame], actions: [by], at: 2).layer(card.id)?.placed.depth == -300)
+    }
+
+    @Test func aCameraActionMovesTheCamera() throws {
+        let card = F.card("C", at: Vec2(400, 300), z: 200)
+        let frame = F.frame([card], space: Space3D(distance: 1000))
+        var end = Space3D(distance: 400)
+        end.depthFade = 1
+        let move = Action(target: frame.id, start: 0, duration: 1, easing: .linear, spec: .camera(CameraAction(end: end)))
+        func width(at t: Double) throws -> Double {
+            let p = try #require(F.scene([frame], actions: [move], at: t).layer(card.id)).projection
+            return p.apply(Vec2(100, 40))!.x - p.apply(Vec2(0, 40))!.x
+        }
+        #expect(abs(try width(at: 0) - 100 / 0.8) < 1e-9)
+        // Half way the camera is 700 away.
+        #expect(abs(try width(at: 0.5) - 100 / (1 - 200.0 / 700)) < 1e-9)
+        #expect(abs(try width(at: 1) - 100 / 0.5) < 1e-9)
+    }
+
+    @Test func aCameraBlendsItsNumbersButNotIsometric() {
+        let a = Space3D(distance: 1000, isIsometric: true, vanishingPoint: Vec2(0, 0), depthFade: 0, depthBlur: 0, backOpacity: 1)
+        let b = Space3D(distance: 200, isIsometric: false, vanishingPoint: Vec2(1, 1), depthFade: 1, depthBlur: 10, backOpacity: 0)
+        let half = Space3D.interpolate(a, b, 0.5)
+        #expect(half.distance == 600 && half.vanishingPoint == Vec2(0.5, 0.5))
+        #expect(half.depthFade == 0.5 && half.depthBlur == 5 && half.backOpacity == 0.5)
+        #expect(half.isIsometric)
+        // Overshooting easings never take the camera past it, or fades out of range.
+        let past = Space3D.interpolate(a, b, 1.6)
+        #expect(past.distance >= 1 && past.depthFade == 1 && past.backOpacity == 0)
+    }
+
+    @Test func aCameraActionOnAFlatFrameDoesNothing() throws {
+        let card = F.card("C", at: Vec2(400, 300), z: 200)
+        let frame = F.frame([card], space: nil)
+        let move = Action(target: frame.id, start: 0, duration: 1, easing: .linear,
+                          spec: .camera(CameraAction(end: Space3D(distance: 100))))
+        #expect(F.scene([frame], actions: [move], at: 1).layer(card.id)?.placed == Placed3D.none)
+    }
+
+    @Test func depthBlursAsItMoves() throws {
+        let card = F.card("C", at: Vec2(400, 300))
+        var move = Action(target: card.id, start: 0, duration: 1, easing: .linear,
+                          spec: .depth(DepthAction(mode: .by, end: 600)))
+        move.motionBlur = 0.5
+        #expect(move.canMotionBlur)
+        let project = Project(composition: Composition(width: 800, height: 600, frameRate: .fps30),
+                              layers: [F.frame([card])], actions: [move])
+        guard case .exact(let moments) = try #require(evaluate(project, at: 0.5, motionBlur: .export).layer(card.id)).motion else {
+            Issue.record("an exact spread")
+            return
+        }
+        // Nearer at the shutter's close than at its open.
+        let w = { (p: Projective) in p.apply(Vec2(100, 40))!.x - p.apply(Vec2(0, 40))!.x }
+        #expect(w(moments.last!) > w(moments.first!))
+    }
+
+    @Test func theNewActionsKeepInFiles() throws {
+        let actions = [Action(target: UUID(), start: 0, duration: 1, easing: .linear,
+                              spec: .depth(DepthAction(mode: .by, initial: -20, end: 300))),
+                       Action(target: UUID(), start: 0, duration: 1, easing: .linear,
+                              spec: .camera(CameraAction(initial: Space3D(distance: 900), end: Space3D(distance: 300, depthBlur: 4))))]
+        let back = try JSONDecoder().decode([Action].self, from: JSONEncoder().encode(actions))
+        #expect(back == actions)
+    }
+}

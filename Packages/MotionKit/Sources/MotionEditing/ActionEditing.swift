@@ -204,7 +204,7 @@ public enum ActionEditing {
 
     /// `action` moved from a layer that stood at `from` to one standing at
     /// `to`: its To value and its starting value shifted by the difference
-    /// in place, turn, skew and tilt, and scaled by the ratio of scale and
+    /// in place, turn, skew, tilt and Z, and scaled by the ratio of scale and
     /// size, so it makes the same motion. By values already are relative
     /// and stay; a curved Move's handles are relative to its ends.
     public static func carried(_ action: Action, from: ActionOrigin, to: ActionOrigin) -> Action {
@@ -243,6 +243,11 @@ public enum ActionEditing {
             if t.mode == .to { t.end = tilted(t.end) }
             t.initial = t.initial.map(tilted)
             a.spec = .tilt(t)
+        case .depth(var d):
+            let nearer = (to.z ?? 0) - (from.z ?? 0)
+            if d.mode == .to { d.end += nearer }
+            d.initial = d.initial.map { $0 + nearer }
+            a.spec = .depth(d)
         default:
             break
         }
@@ -359,18 +364,22 @@ public struct ActionOrigin: Codable, Sendable, Equatable {
     public var size: Size2
     public var skew: Vec2
     public var tilt: Tilt
+    /// Z, in a frame in 3D; nil (0) from a copy made before Z.
+    public var z: Double?
 
-    public init(position: Vec2, scale: Vec2, rotation: Double, size: Size2, skew: Vec2 = .zero, tilt: Tilt = .none) {
+    public init(position: Vec2, scale: Vec2, rotation: Double, size: Size2, skew: Vec2 = .zero, tilt: Tilt = .none,
+                z: Double = 0) {
         self.position = position
         self.scale = scale
         self.rotation = rotation
         self.size = size
         self.skew = skew
         self.tilt = tilt
+        self.z = z
     }
 
     public init(_ state: LayerState) {
         self.init(position: state.position, scale: state.scale, rotation: state.rotation, size: state.size,
-                  skew: state.warp.skew, tilt: state.warp.tilt)
+                  skew: state.warp.skew, tilt: state.warp.tilt, z: state.warp.z)
     }
 }

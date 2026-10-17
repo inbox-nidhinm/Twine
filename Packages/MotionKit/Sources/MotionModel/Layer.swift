@@ -467,7 +467,7 @@ public struct FrameStyle: Codable, Sendable, Equatable {
 /// on top. Its children's tilts turn in that space, seen through the
 /// camera rather than from their own depth. Only a frame's own children
 /// are placed: a group or frame inside one is a flat card in it.
-public struct Space3D: Codable, Sendable, Equatable {
+public struct Space3D: AnimatableValue {
     /// How far in front of the frame the camera is, in pixels: nearer
     /// makes the perspective stronger. Ignored when isometric.
     public var distance: Double
