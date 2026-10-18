@@ -193,19 +193,20 @@ public enum Templates {
     public static func split(_ id: UUID, in project: Project) -> EditorCommand? {
         guard let frame = project.layer(withID: id), let setup = frame.template else { return nil }
         let pictures = project.pictureSizes
+        let clips = project.videoClips
         let bar = project.actions.first { $0.targetLayerID == id && $0.spec.kind == .template }
         let play: TemplatePlay? = if let bar, case .template(let p) = bar.spec, bar.duration > 0 { p } else { nil }
         let steps = play.map { max(Int((Double(splitSteps(for: setup.kind)) * $0.loops).rounded(.up)), 1) } ?? 0
         // Every step's cards, from where it rests, with its settings as its
         // Template Setting actions have them then.
         let tracks = ActionTracks(project.actions)
-        var moments = [TemplateCards.make(frame, setup, phase: setup.pose, size: frame.size, pictures: pictures)]
+        var moments = [TemplateCards.make(frame, setup, phase: setup.pose, size: frame.size, pictures: pictures, videos: clips)]
         if let bar, let play {
             for k in stride(from: 1, through: steps, by: 1) {
                 let time = bar.start + bar.duration * Double(k) / Double(steps)
                 let tuned = setup.tuned(tracks.state(of: frame, at: time).template.settings)
                 moments.append(TemplateCards.make(frame, tuned, phase: setup.pose + play.loops * Double(k) / Double(steps),
-                                                  size: frame.size, pictures: pictures))
+                                                  size: frame.size, pictures: pictures, videos: clips))
             }
         }
         // A moving Cards setting can show more cards at one step than at
@@ -236,12 +237,25 @@ public enum Templates {
         flat.children = cards
         var commands: [EditorCommand] = [.updateLayers([flat])]
         var made: [Action] = []
-        if let bar, play != nil {
-            var row = ActionFactory.nextRowOrder(in: project)
-            func add(_ target: UUID, _ start: Double, _ duration: Double, _ spec: ActionSpec) {
-                made.append(Action(target: target, start: start, duration: duration, easing: .linear, rowOrder: row, spec: spec))
-                row += 1
+        var row = ActionFactory.nextRowOrder(in: project)
+        func add(_ target: UUID, _ start: Double, _ duration: Double, _ spec: ActionSpec) {
+            made.append(Action(target: target, start: start, duration: duration, easing: .linear, rowOrder: row, spec: spec))
+            row += 1
+        }
+        // A video in a card played round with the scene; as layers, it
+        // plays the same, a Play bar after another to the scene's end.
+        for card in cards {
+            for video in card.children {
+                guard case .video(let content) = video.content, let length = clips[content.mediaID]?.length, length > 0 else { continue }
+                let end = project.composition.duration
+                var start = 0.0
+                while start < end - 1e-6, made.count < 100_000 {
+                    add(video.id, start, min(length, end - start), .play(PlayAction(trimStart: 0)))
+                    start += length
+                }
             }
+        }
+        if let bar, play != nil {
             // The turns each card was last given, unwound past whole turns.
             var turns = rest.cards.map { ($0.transform.rotation, $0.transform.tilt) }
             for k in stride(from: 1, through: steps, by: 1) {

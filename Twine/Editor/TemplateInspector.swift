@@ -42,12 +42,16 @@ struct TemplateSection: View {
 
     // MARK: Pictures
 
-    /// A well for each slot: a click chooses its picture, and a filled one
-    /// can be emptied; an empty slot shows a plain card.
+    /// A well for each slot: a click chooses its picture or video, files
+    /// dropped on one go into it and the slots after it, and a filled one
+    /// can be emptied; an empty slot shows a plain card. Files dropped
+    /// beside the wells go in after the last.
     private var slots: some View {
         LazyVGrid(columns: wells, alignment: .leading, spacing: 6) {
             ForEach(Array(setup.slots.enumerated()), id: \.offset) { index, media in
                 SlotWell(image: media.flatMap(controller.preview(of:)), number: index + 1,
+                         isVideo: media.map { m in controller.project.media.contains { $0.id == m && $0.kind == .video } } ?? false,
+                         drop: { controller.setTemplateMedia(layer.id, from: index, urls: $0) },
                          choose: { controller.chooseTemplatePicture(layer.id, slot: index) },
                          remove: {
                              controller.editTemplate(layer.id) { setup in
@@ -56,6 +60,10 @@ struct TemplateSection: View {
                          },
                          filled: media != nil)
             }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            controller.setTemplateMedia(layer.id, from: setup.slots.count, urls: urls)
+            return true
         }
     }
 
@@ -131,11 +139,14 @@ struct TemplateSection: View {
 private struct SlotWell: View {
     let image: CGImage?
     let number: Int
+    let isVideo: Bool
+    let drop: ([URL]) -> Void
     let choose: () -> Void
     let remove: () -> Void
     let filled: Bool
 
     @State private var hovering = false
+    @State private var targeted = false
 
     /// Small, so a dozen slots take a few rows rather than the panel.
     static let side = Theme.control * 1.5
@@ -144,18 +155,27 @@ private struct SlotWell: View {
         let shape = RoundedRectangle(cornerRadius: Theme.radiusControl)
         Button(action: choose) {
             ZStack {
-                shape.fill(hovering ? Theme.panelHover : Theme.panelRaised)
+                shape.fill(hovering || targeted ? Theme.panelHover : Theme.panelRaised)
                 if filled, let image {
                     Image(decorative: image, scale: 1).resizable().aspectRatio(contentMode: .fill)
+                    if isVideo {
+                        IconView(.video, size: Self.side * 0.45)
+                            .foregroundStyle(Theme.textPrimary)
+                            .shadow(color: Theme.shadow, radius: 2)
+                    }
                 } else {
                     Text("\(number)").font(ThemeFont.label).foregroundStyle(Theme.textTertiary)
                 }
             }
             .frame(width: Self.side, height: Self.side)
             .clipShape(shape)
-            .overlay(shape.strokeBorder(Theme.edge, lineWidth: 1))
+            .overlay(shape.strokeBorder(targeted ? Theme.textSecondary : Theme.edge, lineWidth: 1))
         }
         .buttonStyle(.plain)
+        .dropDestination(for: URL.self) { urls, _ in
+            drop(urls)
+            return true
+        } isTargeted: { targeted = $0 }
         .overlay(alignment: .topTrailing) {
             if hovering {
                 IconButton(icon: .close, help: filled ? "Empty this slot" : "Remove this slot", action: remove)
@@ -164,6 +184,6 @@ private struct SlotWell: View {
             }
         }
         .onHover { hovering = $0 }
-        .help(filled ? "Choose another picture" : "Choose a picture")
+        .help(filled ? "Choose another picture or video, or drop files here" : "Choose a picture or video, or drop files here")
     }
 }

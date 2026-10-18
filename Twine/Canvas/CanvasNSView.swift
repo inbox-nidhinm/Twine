@@ -479,6 +479,16 @@ final class CanvasNSView: NSView {
                 return id
             }
         }
+        guard let i = drawn(at: point, tolerance: tolerance, locked: locked, in: scene) else { return nil }
+        let layers = scene.layers
+        // A template's cards are made as it plays, not kept: a click on
+        // one, or on the video inside one, picks the template.
+        if let card = templateCard(of: i, in: scene) { return deep ? card.template : inContext(card.template) }
+        return deep ? layers[i].id : inContext(layers[i].id)
+    }
+
+    /// The scene's index of the front layer drawn under `point`.
+    private func drawn(at point: Vec2, tolerance: Double, locked: Set<UUID>, in scene: ResolvedScene) -> Int? {
         // Front first, as drawn: layers in a frame in 3D by their depth.
         // By place, as `reversed()` and `for in` copied every layer looked at.
         let layers = scene.layers
@@ -492,14 +502,26 @@ final class CanvasNSView: NSView {
             // few screen points whatever the layer's own scale.
             let localTolerance = tolerance / max(sqrt(abs(world.determinant)), 1e-6)
             guard hits(layers[i], at: local, tolerance: localTolerance), shows(layers[i], at: local, in: scene) else { continue }
-            // A template's cards are made as it plays, not kept: a click on
-            // one picks the template.
-            if let parent = layers[i].parentID, TemplateCards.isCard(layers[i].id, of: parent) {
-                return deep ? parent : inContext(parent)
-            }
-            return deep ? layers[i].id : inContext(layers[i].id)
+            return i
         }
         return nil
+    }
+
+    /// The template card the scene's layer `i` is, or holds it (a video
+    /// card's video), with its template.
+    private func templateCard(of i: Int, in scene: ResolvedScene) -> (template: UUID, card: UUID)? {
+        let layer = scene.layers[i]
+        guard let parent = layer.parentID else { return nil }
+        if TemplateCards.isCard(layer.id, of: parent) { return (parent, layer.id) }
+        if let outer = scene.parentID(of: parent), TemplateCards.isCard(parent, of: outer) { return (outer, parent) }
+        return nil
+    }
+
+    /// The template and card under `point`, for dropping files onto a card.
+    func templateCard(at point: Vec2) -> (template: UUID, card: UUID)? {
+        guard let scene, let controller,
+              let i = drawn(at: point, tolerance: 5 / zoom, locked: controller.project.lockedLayers, in: scene) else { return nil }
+        return templateCard(of: i, in: scene)
     }
 
     /// Which of a layer and the groups and frames around it a click picks:
@@ -596,7 +618,13 @@ final class CanvasNSView: NSView {
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         let urls = importable(sender)
         guard !urls.isEmpty, let controller else { return false }
-        controller.importMedia(urls, at: viewToComposition(convert(sender.draggingLocation, from: nil)))
+        let point = viewToComposition(convert(sender.draggingLocation, from: nil))
+        // On a template's card, into its slots.
+        if let card = templateCard(at: point) {
+            controller.dropOnTemplate(card.template, card: card.card, urls: urls)
+            return true
+        }
+        controller.importMedia(urls, at: point)
         return true
     }
 

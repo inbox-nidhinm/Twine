@@ -614,17 +614,63 @@ final class EditorController {
 
     /// Puts a picture chosen in a panel into slot `slot` of template `id`.
     func chooseTemplatePicture(_ id: UUID, slot: Int) {
-        chooseFile([.image]) { [weak self] url in self?.setTemplatePicture(id, slot: slot, from: url) }
+        chooseFile([.image, .movie]) { [weak self] url in self?.setTemplatePicture(id, slot: slot, from: url) }
     }
 
     func setTemplatePicture(_ id: UUID, slot: Int, from url: URL) {
+        setTemplateMedia(id, from: slot, urls: [url])
+    }
+
+    /// Pictures or videos into template `id`'s slots, the first into
+    /// `slot` and the rest after it, adding slots past the end. Files that
+    /// are neither are left out with a beep.
+    func setTemplateMedia(_ id: UUID, from slot: Int, urls: [URL]) {
         Task { @MainActor in
-            guard let (asset, isNew) = await bringIn(url, as: .image), var layer = project.layer(withID: id),
-                  var setup = layer.template, setup.slots.indices.contains(slot) else { return }
-            setup.slots[slot] = asset.id
+            var assets: [MediaAsset] = []
+            var added: [MediaAsset] = []
+            for url in urls {
+                guard let (asset, isNew) = await bringIn(url, as: Self.slotKind(of: url)) else { continue }
+                assets.append(asset)
+                if isNew, !added.contains(where: { $0.id == asset.id }) { added.append(asset) }
+            }
+            guard !assets.isEmpty, var layer = project.layer(withID: id), var setup = layer.template else { return }
+            for (k, asset) in assets.enumerated() {
+                let i = max(slot, 0) + k
+                guard i < TemplateCards.maxSlots else { break }
+                if i < setup.slots.count { setup.slots[i] = asset.id } else { setup.slots.append(asset.id) }
+            }
             layer.template = setup
-            perform(.batch((isNew ? [.addMedia(asset)] : []) + [.updateLayers([layer])], name: "Template Picture"))
+            perform(.batch(added.map { .addMedia($0) } + [.updateLayers([layer])],
+                           name: assets.count == 1 ? "Template Picture" : "Template Pictures"))
         }
+    }
+
+    /// Files dropped on one of template `id`'s cards on the canvas go into
+    /// the slot that card shows, or, on an empty card, the first empty slot.
+    func dropOnTemplate(_ id: UUID, card: UUID, urls: [URL]) {
+        guard let setup = project.layer(withID: id)?.template else { return }
+        let shown = scene.layers.lazy.filter { $0.id == card || $0.parentID == card }.compactMap(Self.media(of:)).first
+        let slot = shown.flatMap { m in setup.slots.firstIndex(of: m) }
+            ?? setup.slots.firstIndex(of: nil) ?? setup.slots.count
+        setTemplateMedia(id, from: slot, urls: urls)
+    }
+
+    /// The picture or video a drawn layer shows.
+    private static func media(of layer: ResolvedLayer) -> UUID? {
+        switch layer.content {
+        case .video(let media, _, _): return media
+        case .shape(let shape):
+            for paint in shape.fills { if case .image(let image) = paint { return image.mediaID } }
+            return nil
+        default: return nil
+        }
+    }
+
+    /// A video's file goes into a slot as a video; anything else as a picture.
+    private static func slotKind(of url: URL) -> MediaKind {
+        if WebMConversion.isWebM(url) { return .video }
+        let type = UTType(filenameExtension: url.pathExtension)
+        return type?.conforms(to: .movie) == true || type?.conforms(to: .audiovisualContent) == true ? .video : .image
     }
 
     /// Changes how a layer's picture fills it. Crop starts cropping on the

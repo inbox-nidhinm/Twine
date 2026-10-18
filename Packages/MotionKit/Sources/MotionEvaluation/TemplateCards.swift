@@ -10,21 +10,37 @@ import MotionModel
 /// from one moment to the next (`TemplateCards.id`).
 public enum TemplateCards {
     /// The frame's camera and cards at `phase`, in a frame of `size`.
-    /// `pictures` gives the slots' pictures' shapes, for Auto cards.
+    /// `pictures` gives the slots' pictures' shapes, for Auto cards, and
+    /// `videos` the slots' videos: a card showing one is a rounded frame
+    /// clipping the video, muted, which `evaluate` keeps playing round.
     public static func make(_ frame: Layer, _ setup: TemplateSetup, phase: Double, size: Size2,
-                            pictures: [UUID: Size2]) -> (space: Space3D, cards: [Layer]) {
+                            pictures: [UUID: Size2], videos: [UUID: VideoClip] = [:]) -> (space: Space3D, cards: [Layer]) {
         let scene = TemplateRecipes.scene(setup, phase: phase, size: size)
         let slots = setup.slots.isEmpty ? [nil] : Array(setup.slots.prefix(maxSlots))
         let cards = scene.cards.map { card -> Layer in
             let slot = (card.slot ?? card.index) % slots.count
             let media = card.color == nil ? slots[(slot + slots.count) % slots.count] : nil
-            let own = media.flatMap { pictures[$0] }.map { $0.height > 0 ? $0.width / $0.height : 1 }
+            let own = media.flatMap { pictures[$0] ?? videos[$0]?.size }.map { $0.height > 0 ? $0.width / $0.height : 1 }
             let aspect = setup.ratio.aspect ?? own ?? (card.cell.height > 0 ? card.cell.width / card.cell.height : 1)
             // A piece of a bigger picture, or a plain card, is its cell exactly.
             let box = card.area != nil || card.color != nil ? card.cell : fitted(aspect, in: card.cell)
             let corner = card.rounded ? min(max(setup.cornerRadius, 0), 0.5) * min(box.width, box.height) : 0
+            let id = id(of: card.index, in: frame.id)
             let paint: Paint
-            if let color = card.color {
+            if let media, videos[media] != nil {
+                // The video's own box: the card's, or for a piece of a
+                // bigger picture the area it covers, clipped to the card.
+                let clip = card.area.map { covering(own ?? 1, $0) } ?? Box(origin: .zero, size: box)
+                let video = Layer(id: videoID(of: id), name: "Video",
+                                  content: .video(VideoContent(mediaID: media, isMuted: true, fit: .fill)),
+                                  size: Size2(clip.width, clip.height), position: clip.center)
+                var layer = Layer(id: id, name: "Card \(card.index + 1)",
+                                  content: .group(GroupContent(children: [video], clipsContent: true,
+                                                               frame: FrameStyle(cornerRadii: CornerRadii(all: corner)))),
+                                  size: box, position: card.position)
+                placed(&layer, card, box, setup)
+                return layer
+            } else if let color = card.color {
                 paint = .color(color)
             } else if let media, let area = card.area, box.width > 0, box.height > 0 {
                 // The picture covering its area, given as fractions of the card.
@@ -37,10 +53,18 @@ public enum TemplateCards {
             } else {
                 paint = .color(placeholder(card.area != nil ? slot : card.index))
             }
-            var layer = Layer(id: id(of: card.index, in: frame.id), name: "Card \(card.index + 1)",
+            var layer = Layer(id: id, name: "Card \(card.index + 1)",
                               content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: CornerRadii(all: corner)),
                                                            fills: [Fill(paint: paint)])),
                               size: box, position: card.position)
+            placed(&layer, card, box, setup)
+            return layer
+        }
+        return (scene.space, cards)
+    }
+
+    /// A card's place, turns, bend, strength and shadow, as its recipe gives them.
+    private static func placed(_ layer: inout Layer, _ card: TemplateCard, _ box: Size2, _ setup: TemplateSetup) {
             layer.transform.z = card.z
             layer.transform.rotation = card.rotation
             layer.transform.tilt = Tilt(x: card.tilt.x, y: card.tilt.y)
@@ -51,9 +75,21 @@ public enum TemplateCards {
                 let shadow = DropShadow(color: .black, offset: Vec2(0, box.height * 0.04), blur: box.height * 0.12, opacity: 0.35)
                 layer.effects = [Effect(kind: .dropShadow(shadow))]
             }
-            return layer
-        }
-        return (scene.space, cards)
+    }
+
+    /// The video inside card `card`'s frame: steady, and never taken for a card.
+    public static func videoID(of card: UUID) -> UUID {
+        var u = card.uuid
+        u.9 ^= 0x3C
+        return UUID(uuid: u)
+    }
+
+    /// Where a video in a card is, `time` seconds into the scene: going
+    /// round from its start, so it plays on for as long as the template does.
+    public static func videoTime(_ time: Double, length: Double) -> Double {
+        guard length > 0, time.isFinite else { return 0 }
+        let t = time.truncatingRemainder(dividingBy: length)
+        return t < 0 ? t + length : t
     }
 
     /// The most slots a template draws from.

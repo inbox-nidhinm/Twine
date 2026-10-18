@@ -194,6 +194,8 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
     }
     note(project.layers)
     let pictures = project.pictureSizes
+    // Worked out only once a template asks.
+    var videos: [UUID: VideoClip]?
     cache?.begin(pictures: pictures)
     defer { cache?.end() }
     var out: [ResolvedLayer] = []
@@ -289,8 +291,20 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
             out.append(resolved)
             if let setup = layer.template {
                 // A template's cards, made for this moment, in its camera.
-                let made = TemplateCards.make(layer, setup.tuned(tuned), phase: loop, size: resolved.size, pictures: pictures)
+                if videos == nil { videos = project.videoClips }
+                let clips = videos ?? [:]
+                let made = TemplateCards.make(layer, setup.tuned(tuned), phase: loop, size: resolved.size, pictures: pictures,
+                                              videos: clips)
+                let first = out.count
                 walk(made.cards, parent: layer.id, soloedAbove: soloed, space: SpaceContext(made.space, size: resolved.size))
+                // Videos in its cards play round with the scene.
+                if !clips.isEmpty {
+                    for i in first..<out.count {
+                        if case .video(let media, _, let fit) = out[i].content, let clip = clips[media] {
+                            out[i].content = .video(mediaID: media, sourceTime: TemplateCards.videoTime(time, length: clip.length), fit: fit)
+                        }
+                    }
+                }
             } else if layer.isGroup {
                 walk(layer.children, parent: layer.id, soloedAbove: soloed,
                      space: camera.map { SpaceContext($0, size: resolved.size) })
@@ -680,7 +694,29 @@ private func resolve(_ paint: Paint, size: Size2, pictures: [UUID: Size2]) -> Re
     }
 }
 
+/// A video file's shape and length, for a template card showing it.
+public struct VideoClip: Sendable, Equatable {
+    public var size: Size2
+    public var length: Double
+
+    public init(size: Size2, length: Double) {
+        self.size = size
+        self.length = length
+    }
+}
+
 extension Project {
+    /// Every video's size in pixels and length, by its id, for template cards.
+    public var videoClips: [UUID: VideoClip] {
+        var clips: [UUID: VideoClip] = [:]
+        for asset in media where asset.kind == .video {
+            if let w = asset.pixelWidth, let h = asset.pixelHeight {
+                clips[asset.id] = VideoClip(size: Size2(Double(w), Double(h)), length: asset.duration ?? 0)
+            }
+        }
+        return clips
+    }
+
     /// Every picture's own size in pixels, by its id, for placing picture
     /// fills.
     public var pictureSizes: [UUID: Size2] {

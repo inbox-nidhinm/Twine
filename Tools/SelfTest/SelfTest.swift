@@ -227,6 +227,29 @@ enum SelfTest {
                         log("TEMPLATE \(t.kind.rawValue) slots=\(t.slots.count) filled=\(t.mediaIDs.count) cards=\(controller.scene.layers.filter { $0.parentID == id }.count) bar=\(controller.project.actions.contains { $0.targetLayerID == id && $0.spec.kind == .template })")
                     }
                 } else { log("unknown template \(parts[1])") }
+            case "tslot":
+                // Puts the file at PATH (a picture or video) into slot N of the selected template, as choosing it does.
+                if let id = controller.selection.first, let n = Int(parts[1]) {
+                    controller.setTemplateMedia(id, from: n, urls: [URL(fileURLWithPath: parts[2])])
+                }
+            case "tdrop":
+                // Drops the file at PATH on the canvas at composition point X Y, as dragging it from the Finder does.
+                if let x = Double(parts[1]), let y = Double(parts[2]) {
+                    let url = URL(fileURLWithPath: parts[3])
+                    if let card = controller.canvas?.templateCard(at: Vec2(x, y)) {
+                        log("TDROP card of \(card.template == controller.selection.first ? "the selected template" : "another layer")")
+                        controller.dropOnTemplate(card.template, card: card.card, urls: [url])
+                    } else {
+                        log("TDROP no card there")
+                        controller.importMedia([url], at: Vec2(x, y))
+                    }
+                }
+            case "tslots":
+                // Logs the selected template's slots: p for a picture, v for a video, - for empty.
+                if let id = controller.selection.first, let t = controller.project.layer(withID: id)?.template {
+                    let kinds = t.slots.map { m in m.flatMap { m in controller.project.media.first { $0.id == m } }.map { $0.kind == .video ? "v" : "p" } ?? "-" }
+                    log("TSLOTS \(kinds.joined())")
+                }
             case "tsplit":
                 // Split into Layers on the selected template, and logs what it made.
                 if let id = controller.selection.first {
@@ -245,8 +268,10 @@ enum SelfTest {
                 // Draws the composition as it shows now through the export
                 // renderer into NAME.png in the shots folder: no screen needed.
                 let size = controller.project.composition
-                if let renderer = OffscreenRenderer(pixelWidth: size.width, pixelHeight: size.height),
-                   let image = renderer.image(of: controller.scene),
+                let renderer = OffscreenRenderer(pixelWidth: size.width, pixelHeight: size.height)
+                // With the project's pictures and videos, as the canvas has them.
+                renderer?.media = controller.media
+                if let renderer, let image = renderer.image(of: controller.scene),
                    let out = CGImageDestinationCreateWithURL(URL(fileURLWithPath: shots + "/" + parts[1] + ".png") as CFURL,
                                                              "public.png" as CFString, 1, nil) {
                     CGImageDestinationAddImage(out, image, nil)

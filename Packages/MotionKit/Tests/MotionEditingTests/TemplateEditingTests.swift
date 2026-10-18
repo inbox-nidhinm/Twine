@@ -203,4 +203,40 @@ import MotionEvaluation
         #expect(project.actions.count == 1 && project.actions[0].duration == 16 && project.actions[0].spec == .template(TemplatePlay()))
         #expect(Templates.project(.globe, composition: Composition()).composition.duration == 12)
     }
+
+    // MARK: Videos in slots
+
+    private func clip(seconds: Double) -> MediaAsset {
+        MediaAsset(kind: .video, fileName: "clip.mov", originalName: "clip.mov", contentHash: "c",
+                   pixelWidth: 1920, pixelHeight: 1080, duration: seconds, hasAudio: true)
+    }
+
+    @Test func aVideoInASlotPlaysRoundInARoundedCard() throws {
+        let video = clip(seconds: 3)
+        var frame = Templates.frame(.slideCarousel, filling: Composition(width: 1280, height: 720), pictures: [video.id])
+        frame.template?.slots = [video.id]
+        let bar = Action(target: frame.id, start: 0, duration: 8, easing: .linear, rowOrder: 0, spec: .template(TemplatePlay()))
+        let project = Project(composition: Composition(width: 1280, height: 720, duration: 8), layers: [frame], actions: [bar],
+                              media: [video])
+        let scene = evaluate(project, at: 7.5)
+        let videos = scene.layers.filter { if case .video = $0.content { return true } else { return false } }
+        #expect(!videos.isEmpty)
+        for v in videos {
+            // Muted, inside a card frame that rounds and clips it, at 7.5 s into a 3 s clip.
+            guard case .video(let media, let time, _) = v.content else { continue }
+            #expect(media == video.id && abs(time - 1.5) < 1e-9)
+            let card = try #require(v.parentID)
+            #expect(TemplateCards.isCard(card, of: frame.id))
+            #expect(!TemplateCards.isCard(v.id, of: frame.id) && !TemplateCards.isCard(v.id, of: card))
+        }
+        // Split, each video plays on with Play bars back to back, as long as the scene.
+        let command = try #require(Templates.split(frame.id, in: project))
+        let store = store(project)
+        try store.perform(command)
+        let split = try #require(store.project.layer(withID: frame.id))
+        let child = try #require(split.children.first?.children.first)
+        if case .video(let content) = child.content { #expect(content.isMuted) } else { Issue.record("no video") }
+        let plays = store.project.actions.filter { $0.targetLayerID == child.id && $0.spec.kind == .play }.sorted { $0.start < $1.start }
+        #expect(plays.map(\.start) == [0, 3, 6] && plays.last?.duration == 2)
+    }
 }
