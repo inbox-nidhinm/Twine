@@ -384,7 +384,8 @@ extension Layer {
         case .text: return .text
         case .video: return .video
         case .audio: return .audio
-        case .group(let g): return g.frame == nil ? .group : .frame
+        // A template is a frame, but reads as its own kind.
+        case .group(let g): return g.template != nil ? .templateLayer : g.frame == nil ? .group : .frame
         }
     }
 }

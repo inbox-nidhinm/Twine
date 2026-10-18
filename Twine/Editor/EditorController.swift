@@ -183,20 +183,9 @@ final class EditorController {
         perform(moved.isEmpty ? .batch([update], name: "Corner Radius") : .batch([update, .updateActions(moved)], name: "Corner Radius"))
     }
 
-    /// Layer edits as one command. A layer whose design position moved
-    /// takes its Move actions' absolute positions (To ends, initial values)
-    /// with it, so its whole animation travels with it in either mode.
-    func layerUpdate(_ layers: [Layer]) -> EditorCommand {
-        var carried: [Action] = []
-        for layer in layers {
-            guard let old = project.layer(withID: layer.id) else { continue }
-            let delta = layer.transform.position - old.transform.position
-            guard delta != .zero else { continue }
-            carried += project.actions(on: layer.id).filter { $0.spec.kind == .move }
-                .map { $0.remapped(point: { $0 + delta }, vector: { $0 }) }
-        }
-        return carried.isEmpty ? .updateLayers(layers) : .batch([.updateLayers(layers), .updateActions(carried)], name: "Edit Layer")
-    }
+    /// Layer edits as one command, carrying Move actions with a moved
+    /// layer (`Project.updating`).
+    func layerUpdate(_ layers: [Layer]) -> EditorCommand { project.updating(layers) }
 
     /// A canvas resize or turn in Animate: the layers' design changes and
     /// their animation follows (the user's choice, 5 October 2026): their

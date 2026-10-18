@@ -157,4 +157,19 @@ extension Project {
     public func actions(on layerID: UUID) -> [Action] {
         actions.filter { $0.targetLayerID == layerID }
     }
+
+    /// Layer edits as one command. A layer whose design position moved
+    /// takes its Move actions' absolute positions (To ends, initial values)
+    /// with it, so its whole animation travels with it in either mode.
+    public func updating(_ layers: [Layer]) -> EditorCommand {
+        var carried: [Action] = []
+        for layer in layers {
+            guard let old = self.layer(withID: layer.id) else { continue }
+            let delta = layer.transform.position - old.transform.position
+            guard delta != .zero else { continue }
+            carried += actions(on: layer.id).filter { $0.spec.kind == .move }
+                .map { $0.remapped(point: { $0 + delta }, vector: { $0 }) }
+        }
+        return carried.isEmpty ? .updateLayers(layers) : .batch([.updateLayers(layers), .updateActions(carried)], name: "Edit Layer")
+    }
 }
