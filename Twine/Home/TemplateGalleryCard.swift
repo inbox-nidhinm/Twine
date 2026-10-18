@@ -12,20 +12,24 @@ struct TemplateGalleryCard: View {
     @State private var group: TemplateGroup = .perspective
     @State private var hoveredGroup: TemplateGroup?
 
-    private let columns = Array(repeating: GridItem(.fixed(Theme.templateTileWidth), spacing: Theme.templateTileGap), count: 3)
-
     var body: some View {
-        ZStack {
-            Theme.badge
-                .contentShape(Rectangle())
-                .onTapGesture(perform: close)
+        GeometryReader { window in
+            let width = window.size.width * Theme.templateGalleryWidthShare
+            ZStack {
+                // The app's own ground, as onboarding has: nothing behind
+                // shows through.
+                Theme.canvas
+                    .grained()
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: close)
 
-            HStack(alignment: .top, spacing: Theme.templateGalleryGap) {
-                groups
-                templates
+                HStack(alignment: .top, spacing: Theme.templateGalleryGap) {
+                    groups
+                    templates(width: max(width - Theme.templateSidebarWidth - Theme.templateGalleryGap, 0))
+                }
+                .frame(width: width, height: window.size.height * Theme.templateGalleryHeightShare)
+                .onExitCommand(perform: close)
             }
-            .frame(height: Theme.templateGalleryHeight)
-            .onExitCommand(perform: close)
         }
     }
 
@@ -76,8 +80,14 @@ struct TemplateGalleryCard: View {
 
     // MARK: Templates
 
-    private var templates: some View {
-        VStack(alignment: .leading, spacing: 0) {
+    /// The chosen group's tiles in a panel `width` wide: as many across as
+    /// fit at their own width, sharing out what is left.
+    private func templates(width: CGFloat) -> some View {
+        let inside = width - Theme.templateGalleryPad * 2
+        let across = max(Int((inside + Theme.templateTileGap) / (Theme.templateTileWidth + Theme.templateTileGap)), 1)
+        let tile = max((inside - Theme.templateTileGap * CGFloat(across - 1)) / CGFloat(across), 1)
+        let columns = Array(repeating: GridItem(.fixed(tile), spacing: Theme.templateTileGap), count: across)
+        return VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(group.title)
                     .displayTitle(18)
@@ -92,15 +102,17 @@ struct TemplateGalleryCard: View {
             ScrollView {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.templateTileGap) {
                     ForEach(Templates.library.filter { $0.group == group }) { info in
-                        GalleryTile(info: info) { library.newProject(from: info.kind) }
+                        GalleryTile(info: info, width: tile) { library.newProject(from: info.kind) }
                     }
                 }
                 .padding(Theme.templateGalleryPad)
             }
-            // A new group starts at its top.
+            // Opens at the top, and a new group starts at its top: laid out
+            // once at no width first, the grid otherwise opened part way down.
+            .defaultScrollAnchor(.top)
             .id(group)
         }
-        .frame(width: Theme.templateGalleryWidth)
+        .frame(width: width)
         .frame(maxHeight: .infinity)
         .floatingPanel()
     }
@@ -110,7 +122,12 @@ struct TemplateGalleryCard: View {
 /// name. Under the pointer it plays its loop.
 private struct GalleryTile: View {
     let info: TemplateInfo
+    /// The tile's width; it keeps its shape, and its picture is square.
+    let width: CGFloat
     let action: () -> Void
+
+    private var side: CGFloat { max(width - Theme.templateTileInset * 2, 1) }
+    private var style: TemplatePosters.Style { .gallery(side: side) }
 
     @State private var hovering = false
     @State private var image: CGImage?
@@ -127,8 +144,7 @@ private struct GalleryTile: View {
                     }
                 }
                 // Kept off the tile's edges, as the name is.
-                .frame(width: Theme.templateTileWidth - Theme.templateTileInset * 2,
-                       height: Theme.templateTileWidth - Theme.templateTileInset * 2)
+                .frame(width: side, height: side)
                 .padding([.top, .horizontal], Theme.templateTileInset)
                 Spacer(minLength: 0)
                 Text(info.name)
@@ -138,7 +154,7 @@ private struct GalleryTile: View {
                     .padding(.horizontal, Theme.templateTileInset)
                     .padding(.bottom, Theme.templateTileInset)
             }
-            .frame(width: Theme.templateTileWidth, height: Theme.templateTileHeight, alignment: .topLeading)
+            .frame(width: width, height: width * Theme.templateTileHeight / Theme.templateTileWidth, alignment: .topLeading)
             .background(shape.fill(hovering ? Theme.templateTileHover : Theme.templateTile))
             .clipShape(shape)
             .contentShape(shape)
@@ -146,15 +162,15 @@ private struct GalleryTile: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         // The still, then, under the pointer, the loop playing until it leaves.
-        .task(id: hovering) {
+        .task(id: TileState(hovering: hovering, style: style)) {
             guard hovering else {
-                image = await TemplatePosters.poster(info.kind, style: .gallery)
+                image = await TemplatePosters.poster(info.kind, style: style)
                 return
             }
             let started = Date()
             while !Task.isCancelled {
                 if let frame = await TemplatePosters.image(info.kind, phase: Date().timeIntervalSince(started) / TemplatePosters.period,
-                                                           style: .gallery) {
+                                                           style: style) {
                     image = frame
                 }
                 try? await Task.sleep(for: .milliseconds(33))
@@ -162,4 +178,10 @@ private struct GalleryTile: View {
         }
         .help("Makes a new project holding \(info.name), as long as one loop of it.")
     }
+}
+
+/// What a tile's picture depends on: whether it plays, and its size.
+private struct TileState: Equatable {
+    let hovering: Bool
+    let style: TemplatePosters.Style
 }

@@ -140,8 +140,14 @@ enum TemplatePosters {
         let ground: Bool
 
         static let tile = Style(width: 320, height: 200, ground: true)
-        static let gallery = Style(width: Int((Theme.templateTileWidth - Theme.templateTileInset * 2) * 2),
-                                   height: Int((Theme.templateTileWidth - Theme.templateTileInset * 2) * 2), ground: false)
+
+        /// Home's square pictures, drawn on nothing at twice `side` points,
+        /// rounded up to a step so a window being resized draws a few sizes
+        /// rather than every one.
+        static func gallery(side: CGFloat) -> Style {
+            let pixels = Int((side / 40).rounded(.up) * 80)
+            return Style(width: max(pixels, 80), height: max(pixels, 80), ground: false)
+        }
     }
 
     static let width = Style.tile.width

@@ -301,8 +301,12 @@ public enum Theme {
     /// thumbnail spans.
     public static let infoCardWidth: CGFloat = 340
     /// Home's New from Template screen: a panel of the groups beside a
-    /// panel of the chosen group's tiles, three across, each a picture of
-    /// the template over its name.
+    /// panel of the chosen group's tiles, each a picture of the template
+    /// over its name, as many across as fit at this width or wider. The
+    /// screen takes these shares of the window (the user's choice, 19
+    /// October 2026).
+    public static let templateGalleryWidthShare: CGFloat = 0.75
+    public static let templateGalleryHeightShare: CGFloat = 0.8
     public static let templateTileWidth: CGFloat = 196
     public static let templateTileHeight: CGFloat = 240
     public static let templateTileGap: CGFloat = 16
@@ -311,10 +315,8 @@ public enum Theme {
     public static let templateGalleryPad: CGFloat = 20
     public static let templateGalleryHeader: CGFloat = 50
     public static let templateGalleryGap: CGFloat = 24
-    public static let templateGalleryHeight: CGFloat = 600
     /// The groups' panel, as wide as Home's sidebar.
     public static let templateSidebarWidth: CGFloat = panelWidth - floatInset * 2
-    public static let templateGalleryWidth: CGFloat = templateTileWidth * 3 + templateTileGap * 2 + templateGalleryPad * 2
     /// The Settings page's cards: the narrowest a column of them may be
     /// (three side by side when the window has room, else two), a row's
     /// height, the icon tile at a row's left, the width of a menu or number
