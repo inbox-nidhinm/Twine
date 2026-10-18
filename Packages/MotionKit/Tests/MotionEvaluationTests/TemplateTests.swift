@@ -69,8 +69,35 @@ import MotionModel
         #expect(cards.allSatisfy { TemplateCards.isCard($0.id, of: frame.id) })
         #expect(!TemplateCards.isCard(frame.id, of: frame.id))
         #expect(cards.first?.id == TemplateCards.id(of: 0, in: frame.id))
-        // Cards follow the ring's curve.
-        #expect(cards.allSatisfy { $0.placed.mesh != nil })
+        // Cards follow the ring's curve, but for those seen edge-on, which
+        // wrap round their own outline and are drawn flat.
+        let flat = cards.filter { $0.placed.mesh == nil }
+        #expect(cards.count - flat.count >= 10)
+        for card in flat {
+            let corners = [Vec2(0, 0), Vec2(card.size.width, 0)].compactMap { card.placed.projection?.apply($0) }
+            #expect(corners.count == 2 && abs(corners[0].x - corners[1].x) < card.size.width * 0.3, "only edge-on cards are flat")
+        }
+    }
+
+    /// A curved card turned until it wraps round its own outline folds its
+    /// mesh; it is then drawn flat through its corners, which the window
+    /// server draws right where it drew a folded mesh as a large slab.
+    @Test func aCurvedCardSeenEdgeOnIsDrawnFlat() {
+        func placed(turn: Double) -> Placed3D {
+            var card = Layer(name: "C", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero))),
+                             size: Size2(200, 260), position: Vec2(640, 360))
+            card.transform.tilt = Tilt(x: 0, y: turn)
+            card.transform.bend = Vec2(40, 0)
+            let frame = Layer(name: "F", content: .group(GroupContent(children: [card], frame: FrameStyle(space: Space3D(distance: 1200)))),
+                              size: Size2(1280, 720), position: Vec2(640, 360))
+            return evaluate(Project(composition: Composition(width: 1280, height: 720), layers: [frame]), at: 0).layer(card.id)!.placed
+        }
+        // Facing the camera, or turned well round: curved.
+        #expect(placed(turn: 0).mesh != nil)
+        #expect(placed(turn: 50).mesh != nil)
+        // Edge-on: its mesh would fold, so it is flat.
+        #expect(placed(turn: 90).mesh == nil)
+        if case .placed = placed(turn: 90) {} else { Issue.record("not drawn flat") }
     }
 
     @Test func picturesFillTheirSlotsAndGoRoundAgain() throws {

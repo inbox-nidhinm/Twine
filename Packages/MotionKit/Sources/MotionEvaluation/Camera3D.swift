@@ -247,6 +247,24 @@ public struct BentMesh: Sendable, Equatable {
     static let bentCells = 16
     static let straightCells = 4
     static let doubleCells = 8
+
+    /// Whether, as projected, some cells face one way and some the other:
+    /// the layer is seen wrapping round its own outline.
+    public var folds: Bool {
+        var facing = 0.0
+        for j in 0..<rows {
+            for i in 0..<columns {
+                let a = points[j * (columns + 1) + i], b = points[j * (columns + 1) + i + 1]
+                let c = points[(j + 1) * (columns + 1) + i + 1], d = points[(j + 1) * (columns + 1) + i]
+                // Twice the cell's signed area, from its diagonals.
+                let area = (c.x - a.x) * (d.y - b.y) - (c.y - a.y) * (d.x - b.x)
+                // Cells too thin to have a side are left out.
+                guard abs(area) > 1e-3 else { continue }
+                if facing == 0 { facing = area } else if (area > 0) != (facing > 0) { return true }
+            }
+        }
+        return false
+    }
 }
 
 /// A curve on a layer: its own point (u, v) moved off its flat plane onto
@@ -388,7 +406,14 @@ struct SpaceContext {
                 layer.opacity = 0
                 return
             }
-            layer.placed = .bent(projection: projection, depth: depth, mesh: BentMesh(columns: columns, rows: rows, points: points))
+            let mesh = BentMesh(columns: columns, rows: rows, points: points)
+            // Seen nearly edge-on, a curved layer wraps round its own
+            // outline and its mesh folds over, some cells facing one way and
+            // the rest the other. The window server draws a folded mesh as
+            // a large slab (exports drew it right), so for those moments,
+            // when it is a sliver anyway, it is drawn flat through its corners.
+            layer.placed = mesh.folds ? .placed(projection: projection, depth: depth)
+                : .bent(projection: projection, depth: depth, mesh: mesh)
             layer.motion = .none
         } else {
             let projection = camera.projection(of: pose)
