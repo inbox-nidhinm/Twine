@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 221
+    static let pushes = 222
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -92,6 +92,7 @@ enum VersionHistory {
             "Corner radius on every shape with corners, as in Figma: polygons have a Radius field beside their sides, and paths one too. Double-click a shape to edit its points, pick one or several, and the Radius field rounds just those corners, showing the largest dimmed when they differ. A rectangle keeps its four corners; a polygon or star becomes a path once its points differ. The outline you edit shows the rounding, with each point at the corner it rounds, and rounded shapes keep their corners when they turn into paths. The Corner Radius action works on polygons too, and a Path action carries each point's radius along, so corners can round and sharpen as it plays.",
         ], fixes: [
             "Curved cards no longer turn into a large grey slab on the canvas and in the export preview as they pass edge-on (Ring Stream's cards at the ring's sides, for one), and they stay curved all the way round. Seen edge-on, a curved card wraps round its own outline; the screen now knows how deep each part of it is, so it draws the near side over the far. Exported movies never had the slab.",
+            "Curved cards have two faces: as one turns away, the part still facing you stays at full strength and only the part facing away fades to the back fade, smoothly, and neither shows through the other. The whole card used to dim at once as its middle passed edge-on.",
             "The template picker's first tiles (Ring Stream to Tunnel) were empty in the app as built: the tiles drawn while the picker was still opening came out blank and stayed so. Tiles are now drawn away from the main thread, as exports are, and a blank one is drawn again.",
             "Split into Layers on a template whose cards turn round (a Wheel, or any bar holding more than one loop) no longer makes them spin the long way back at the end of each turn.",
             "Rounded corners copied from Figma with the Twine plugin come in rounded. A vector's rounded points arrived sharp, since Figma keeps their radius apart from the outline the plugin copied; they now come in carrying their radius, which you can change point by point. Rounded polygons come in as polygons with their radius, rather than as a flattened outline.",

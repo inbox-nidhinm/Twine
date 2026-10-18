@@ -231,6 +231,9 @@ public enum Placed3D: Sendable, Equatable {
         if case .bent(_, _, let mesh) = self { return mesh }
         return nil
     }
+
+    /// For the back of a bent layer split in two, the layer it is the back of.
+    public var backOf: UUID? { mesh?.owner }
 }
 
 /// Where a bent layer's points land in its parent, on a grid of `columns`
@@ -240,6 +243,45 @@ public struct BentMesh: Sendable, Equatable {
     public var columns: Int
     public var rows: Int
     public var points: [Vec2]
+    /// Which faces a renderer draws: all, or for a layer split in two, those
+    /// facing the camera or those facing away.
+    public enum Side: Sendable, Equatable { case both, front, back }
+    public var side: Side = .both
+    /// For the back of a layer split in two, the layer it is the back of.
+    public var owner: UUID?
+
+    /// Whether cell (`i`, `j`) faces the camera: as drawn, its corners
+    /// keep the turn they have on the layer. A cell seen exactly edge-on
+    /// counts as facing it.
+    public func facesFront(_ i: Int, _ j: Int) -> Bool {
+        let a = points[j * (columns + 1) + i], b = points[j * (columns + 1) + i + 1]
+        let c = points[(j + 1) * (columns + 1) + i + 1], d = points[(j + 1) * (columns + 1) + i]
+        // Twice the signed area, from the diagonals; positive on the layer.
+        return (c.x - a.x) * (d.y - b.y) - (c.y - a.y) * (d.x - b.x) >= -1e-6
+    }
+
+    /// How many cells face each way, and how deep each side lies on average.
+    func facing() -> (front: Int, back: Int, frontDepth: Double, backDepth: Double) {
+        var front = 0, back = 0, frontDepth = 0.0, backDepth = 0.0
+        for j in 0..<rows {
+            for i in 0..<columns {
+                var z = 0.0
+                if depths.count == points.count {
+                    z = (depths[j * (columns + 1) + i] + depths[(j + 1) * (columns + 1) + i + 1]) / 2
+                }
+                if facesFront(i, j) { front += 1; frontDepth += z } else { back += 1; backDepth += z }
+            }
+        }
+        return (front, back, front > 0 ? frontDepth / Double(front) : 0, back > 0 ? backDepth / Double(back) : 0)
+    }
+
+    /// The id of the back of layer `id`, when it is split in two.
+    public static func backID(of id: UUID) -> UUID {
+        var u = id.uuid
+        u.6 ^= 0x5B
+        return UUID(uuid: u)
+    }
+
     /// Each point's depth, towards the viewer, in the frame's pixels. Seen
     /// nearly edge-on, a bent layer wraps round its own outline and its
     /// mesh folds over itself; without depths the window server drew the
@@ -361,8 +403,13 @@ struct SpaceContext {
     /// dimmed with its back to the camera, and not drawn at all once any
     /// point reaches the camera, where the picture would turn inside out.
     /// A bent layer is drawn from a grid of its points, and drawn sharp:
-    /// motion blur's copies step a flat picture.
-    func place(_ layer: inout ResolvedLayer, z: Double, ordered: Bool = true) {
+    /// motion blur's copies step a flat picture. A bent layer partly turned
+    /// away has two faces: the part facing the camera stays as it is, and
+    /// the part facing away is returned as a layer of its own (its back,
+    /// `BentMesh.backID`), dimmed, to be drawn before it, so the farther
+    /// face is under the nearer and neither shows through the other.
+    @discardableResult
+    func place(_ layer: inout ResolvedLayer, z: Double, ordered: Bool = true) -> ResolvedLayer? {
         let pose = pose(of: layer, z: z)
         let size = layer.size
         let middle = Vec2(size.width / 2, size.height / 2)
@@ -370,6 +417,9 @@ struct SpaceContext {
         let curve = Curve(size: size, bend: bend)
         let centre = pose.apply(curve.point(middle.x, middle.y))
         let depth = ordered ? centre.z : 0
+        // A bent layer turned wholly away, and the back of one turned partly away.
+        var backFaced = false
+        var split: Placed3D?
         if bend != .zero, size.width > 0, size.height > 0 {
             // Curved both ways, a card is a small patch of a sphere, and
             // fewer cells follow it: 16 by 16 cost a globe of 36 cards 22 ms
@@ -388,7 +438,7 @@ struct SpaceContext {
                     let at = pose.apply(curve.point(u, v))
                     guard let p = camera.project(at), Self.inFront(at, camera) else {
                         layer.opacity = 0
-                        return
+                        return nil
                     }
                     points.append(p)
                     depths.append(at.z)
@@ -397,25 +447,59 @@ struct SpaceContext {
             let corners = [points[0], points[columns], points[points.count - 1], points[points.count - 1 - columns]]
             guard let projection = Projective.box(size, onto: corners) else {
                 layer.opacity = 0
-                return
+                return nil
             }
             var mesh = BentMesh(columns: columns, rows: rows, points: points)
             mesh.depths = depths
             layer.placed = .bent(projection: projection, depth: depth, mesh: mesh)
             layer.motion = .none
+            // Which way each part faces, when backs are dimmed. A group
+            // keeps one face: its children follow it as one.
+            var group = false
+            if case .group = layer.content { group = true }
+            if backs < 1, !group {
+                let facing = mesh.facing()
+                if facing.back == 0 {
+                    // All front.
+                } else if facing.front == 0 {
+                    backFaced = true
+                } else {
+                    var front = mesh, back = mesh
+                    front.side = .front
+                    back.side = .back
+                    back.owner = layer.id
+                    layer.placed = .bent(projection: projection, depth: ordered ? facing.frontDepth : 0, mesh: front)
+                    split = .bent(projection: projection, depth: ordered ? facing.backDepth : 0, mesh: back)
+                }
+            }
         } else {
             let projection = camera.projection(of: pose)
             layer.placed = .placed(projection: projection, depth: depth)
             let corners = [Vec2(0, 0), Vec2(size.width, 0), Vec2(size.width, size.height), Vec2(0, size.height)]
             if corners.contains(where: { projection.px * $0.x + projection.py * $0.y + projection.w < Self.nearest }) {
                 layer.opacity = 0
-                return
+                return nil
             }
         }
         let behind = min(max(-centre.z / reach, 0), 1)
         layer.opacity *= 1 - fade * behind
         layer.blur += blur * behind
-        if backs < 1, !camera.seesFront(of: pose, at: middle) { layer.opacity *= backs }
+        if let split {
+            var back = layer
+            back.id = BentMesh.backID(of: layer.id)
+            back.placed = split
+            back.opacity *= backs
+            return back
+        }
+        if backs < 1, backFaced || (layer.placed.mesh == nil || isGroupContent(layer)) && !camera.seesFront(of: pose, at: middle) {
+            layer.opacity *= backs
+        }
+        return nil
+    }
+
+    private func isGroupContent(_ layer: ResolvedLayer) -> Bool {
+        if case .group = layer.content { return true }
+        return false
     }
 
     /// How small the perspective divide may get before a layer counts as

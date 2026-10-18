@@ -280,12 +280,18 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
             if let blur {
                 resolved.motion = motion(of: layer, resolved, tracks: tracks, at: time, blur, space: space)
             }
+            var back: ResolvedLayer?
             if let space {
-                space.place(&resolved, z: resolved.warp.z)
+                back = space.place(&resolved, z: resolved.warp.z)
             } else if resolved.warp.bend != .zero || resolved.warp.z != 0 {
                 // Bent or moved in depth outside a 3D space: seen as its
                 // own tilt is, and kept in its place among its siblings.
-                SpaceContext(ownOf: resolved).place(&resolved, z: resolved.warp.z, ordered: false)
+                back = SpaceContext(ownOf: resolved).place(&resolved, z: resolved.warp.z, ordered: false)
+            }
+            // The back of a layer partly turned away goes first, under it.
+            if let back {
+                if let mask { masked.append((out.count, mask)) }
+                out.append(back)
             }
             if let mask { masked.append((out.count, mask)) }
             out.append(resolved)

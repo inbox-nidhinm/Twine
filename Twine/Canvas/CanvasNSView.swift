@@ -484,7 +484,9 @@ final class CanvasNSView: NSView {
         // A template's cards are made as it plays, not kept: a click on
         // one, or on the video inside one, picks the template.
         if let card = templateCard(of: i, in: scene) { return deep ? card.template : inContext(card.template) }
-        return deep ? layers[i].id : inContext(layers[i].id)
+        // The back of a curved layer partly turned away is that layer.
+        let id = layers[i].placed.backOf ?? layers[i].id
+        return deep ? id : inContext(id)
     }
 
     /// The scene's index of the front layer drawn under `point`.
@@ -512,7 +514,8 @@ final class CanvasNSView: NSView {
     private func templateCard(of i: Int, in scene: ResolvedScene) -> (template: UUID, card: UUID)? {
         let layer = scene.layers[i]
         guard let parent = layer.parentID else { return nil }
-        if TemplateCards.isCard(layer.id, of: parent) { return (parent, layer.id) }
+        let own = layer.placed.backOf ?? layer.id
+        if TemplateCards.isCard(own, of: parent) { return (parent, own) }
         if let outer = scene.parentID(of: parent), TemplateCards.isCard(parent, of: outer) { return (outer, parent) }
         return nil
     }

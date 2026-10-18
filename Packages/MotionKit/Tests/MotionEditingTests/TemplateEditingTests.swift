@@ -133,7 +133,9 @@ import MotionEvaluation
         try store.perform(add)
         try store.perform(.insertActions([setting("count", on: id, from: 2, length: 2, to: 24),
                                           setting(TemplateSettingAction.cornerRadius, on: id, from: 0, length: 1, to: 30, row: 11)]))
-        func cards(at t: Double) -> [ResolvedLayer] { evaluate(store.project, at: t).layers.filter { $0.parentID == id } }
+        func cards(at t: Double) -> [ResolvedLayer] {
+            evaluate(store.project, at: t).layers.filter { $0.parentID == id && $0.placed.backOf == nil }
+        }
         // Before its bar the frame's own 12; after, 24; halfway, 18.
         #expect(cards(at: 1).count == 12)
         #expect(cards(at: 3).count == 18)

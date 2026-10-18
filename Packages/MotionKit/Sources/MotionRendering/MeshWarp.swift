@@ -57,11 +57,14 @@ enum MeshWarp {
         faces.reserveCapacity(mesh.rows * mesh.columns)
         for j in 0..<mesh.rows {
             for i in 0..<mesh.columns {
+                // Only its own side, for a layer split into front and back.
+                if mesh.side != .both, mesh.facesFront(i, j) != (mesh.side == .front) { continue }
                 let a = UInt32(j * (mesh.columns + 1) + i), b = a + 1
                 let c = UInt32((j + 1) * (mesh.columns + 1) + i + 1), d = c - 1
                 faces.append(Face(indices: (a, b, c, d), w: (0, 0, 0, 0)))
             }
         }
+        guard !faces.isEmpty else { return nil }
         return vertices.withUnsafeBytes { v in
             faces.withUnsafeBytes { f in
                 make(kind, selector, UInt(vertices.count), v.baseAddress!, UInt(faces.count), f.baseAddress!, "width")

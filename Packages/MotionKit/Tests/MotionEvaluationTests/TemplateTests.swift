@@ -61,7 +61,8 @@ import MotionModel
     @Test func aTemplateFrameDrawsItsCardsInItsSpace() throws {
         let frame = Self.frame(.ringStream)
         let scene = evaluate(Project(composition: Composition(width: 1280, height: 720), layers: [frame]), at: 0)
-        let cards = scene.layers.filter { $0.parentID == frame.id }
+        // The cards themselves, not the backs of those partly turned away.
+        let cards = scene.layers.filter { $0.parentID == frame.id && $0.placed.backOf == nil }
         #expect(cards.count == 12)
         #expect(cards.allSatisfy { $0.placed != .none })
         // Each card's id is its own, steady, and known as the frame's.
@@ -186,5 +187,41 @@ import MotionModel
         let strip = TemplateRecipes.scene(Self.frame(.zoomStrip).template!, phase: 0.01, size: Self.size)
         let grid = TemplateRecipes.scene(Self.frame(.zoomStrip).template!, phase: 0.8, size: Self.size)
         #expect(abs(strip.cards[0].scale - grid.cards[0].scale * 2) < 1e-6)
+    }
+
+    /// A curved card partly turned away has two faces: the part facing
+    /// the camera at its own strength, and the part facing away as a layer
+    /// of its own, dimmed by the space's backs and drawn first, under it.
+    @Test func aCurvedCardPartlyTurnedAwayHasTwoFaces() throws {
+        func scene(turn: Double) -> (ResolvedScene, UUID) {
+            var card = Layer(name: "C", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero))),
+                             size: Size2(200, 260), position: Vec2(640, 360))
+            card.transform.tilt = Tilt(x: 0, y: turn)
+            card.transform.bend = Vec2(60, 0)
+            let frame = Layer(name: "F", content: .group(GroupContent(children: [card],
+                                                                      frame: FrameStyle(space: Space3D(distance: 1200, backOpacity: 0.4)))),
+                              size: Size2(1280, 720), position: Vec2(640, 360))
+            return (evaluate(Project(composition: Composition(width: 1280, height: 720), layers: [frame]), at: 0), card.id)
+        }
+        // Facing the camera: one face, whole.
+        let (facing, id) = scene(turn: 0)
+        #expect(facing.layers.filter { $0.parentID != nil }.count == 1)
+        #expect(facing.layer(id)?.opacity == 1 && facing.layer(id)?.placed.mesh?.side == .both)
+        // Turned wholly away: one face, dimmed.
+        let (away, id2) = scene(turn: 180)
+        #expect(away.layers.filter { $0.parentID != nil }.count == 1)
+        #expect(abs((away.layer(id2)?.opacity ?? 0) - 0.4) < 1e-9)
+        // Turned past edge-on: a front at full strength and a back, dimmed, before it.
+        let (both, id3) = scene(turn: 90)
+        let cards = both.layers.filter { $0.parentID != nil }
+        #expect(cards.count == 2)
+        let back = try #require(cards.first), front = try #require(cards.last)
+        #expect(front.id == id3 && front.opacity == 1 && front.placed.mesh?.side == .front)
+        #expect(back.id == BentMesh.backID(of: id3) && back.placed.backOf == id3 && back.placed.mesh?.side == .back)
+        #expect(abs(back.opacity - 0.4) < 1e-9)
+        // Every cell is on exactly one side.
+        let mesh = try #require(front.placed.mesh)
+        let fronts = (0..<mesh.rows).flatMap { j in (0..<mesh.columns).map { i in mesh.facesFront(i, j) } }
+        #expect(fronts.contains(true) && fronts.contains(false))
     }
 }
