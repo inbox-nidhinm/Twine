@@ -56,6 +56,9 @@ public enum Theme {
     public static let rowCurrent = accent.opacity(0.22)
     /// A row under the pointer. Translucent so the grain shows through.
     public static let rowHover = Color.white.opacity(0.057)
+    /// A template's tile on Home's New from Template screen, and under the pointer.
+    public static let templateTile = Color(red: 0x41 / 255, green: 0x41 / 255, blue: 0x41 / 255)
+    public static let templateTileHover = Color(red: 0x4A / 255, green: 0x4A / 255, blue: 0x4A / 255)
     /// The playhead: its line down the timeline and the pill in the ruler
     /// that carries the time. Teal, so it never reads as a selection.
     public static let playhead = Color(red: 0x2B / 255, green: 0x88 / 255, blue: 0x85 / 255)
@@ -297,9 +300,21 @@ public enum Theme {
     /// The home screen's Info card on a project: its width, which its
     /// thumbnail spans.
     public static let infoCardWidth: CGFloat = 340
-    /// Home's New from Template card: four tiles across.
-    public static let templateGalleryWidth: CGFloat = 760
-    public static let templateGalleryHeight: CGFloat = 560
+    /// Home's New from Template screen: a panel of the groups beside a
+    /// panel of the chosen group's tiles, three across, each a picture of
+    /// the template over its name.
+    public static let templateTileWidth: CGFloat = 196
+    public static let templateTileHeight: CGFloat = 240
+    public static let templateTileGap: CGFloat = 16
+    /// The name's inset from a tile's left and bottom.
+    public static let templateTileInset: CGFloat = 16
+    public static let templateGalleryPad: CGFloat = 20
+    public static let templateGalleryHeader: CGFloat = 50
+    public static let templateGalleryGap: CGFloat = 24
+    public static let templateGalleryHeight: CGFloat = 600
+    /// The groups' panel, as wide as Home's sidebar.
+    public static let templateSidebarWidth: CGFloat = panelWidth - floatInset * 2
+    public static let templateGalleryWidth: CGFloat = templateTileWidth * 3 + templateTileGap * 2 + templateGalleryPad * 2
     /// The Settings page's cards: the narrowest a column of them may be
     /// (three side by side when the window has room, else two), a row's
     /// height, the icon tile at a row's left, the width of a menu or number
@@ -346,6 +361,8 @@ public enum ThemeFont {
     public static let searchResult = Font.system(size: 12)
     /// The document name.
     public static let title = Font.system(size: 13, weight: .semibold)
+    /// A template's name on its tile on Home's New from Template screen.
+    public static let tileName = Font.system(size: 13)
     /// Tiny numbers on tiles and markers.
     public static let micro = Font.system(size: 8, weight: .medium)
 

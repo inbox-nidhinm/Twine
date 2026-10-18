@@ -132,21 +132,35 @@ private struct TemplateChoice: View {
 /// comes out empty all the same is drawn again rather than kept.
 @MainActor
 enum TemplatePosters {
-    static let width = 320
-    static let height = 200
+    /// How a still is drawn: the picker's on its dark ground, or Home's
+    /// square ones on nothing, so they sit on their tiles.
+    nonisolated struct Style: Hashable, Sendable {
+        let width: Int
+        let height: Int
+        let ground: Bool
+
+        static let tile = Style(width: 320, height: 200, ground: true)
+        static let gallery = Style(width: Int((Theme.templateTileWidth - Theme.templateTileInset * 2) * 2),
+                                   height: Int((Theme.templateTileWidth - Theme.templateTileInset * 2) * 2), ground: false)
+    }
+
+    static let width = Style.tile.width
+    static let height = Style.tile.height
     /// How long a tile takes to play one loop.
     static let period = 6.0
     /// Where in its loop a still shows it, a little way in.
     static let rest = 0.12
 
     private static let drawing = Drawing()
-    private static var stills: [TemplateKind: CGImage] = [:]
+    private nonisolated struct Key: Hashable { let kind: TemplateKind; let style: Style }
+    private static var stills: [Key: CGImage] = [:]
 
-    static func poster(_ kind: TemplateKind) async -> CGImage? {
-        if let known = stills[kind] { return known }
+    static func poster(_ kind: TemplateKind, style: Style = .tile) async -> CGImage? {
+        let key = Key(kind: kind, style: style)
+        if let known = stills[key] { return known }
         for attempt in 0..<4 {
-            if let made = await image(kind, phase: rest), !Drawing.isBlank(made) {
-                stills[kind] = made
+            if let made = await image(kind, phase: rest, style: style), !Drawing.isBlank(made) {
+                stills[key] = made
                 return made
             }
             try? await Task.sleep(for: .milliseconds(100 * (attempt + 1)))
@@ -155,37 +169,41 @@ enum TemplatePosters {
         return nil
     }
 
-    static func image(_ kind: TemplateKind, phase: Double) async -> CGImage? {
-        await drawing.image(kind, phase: phase, width: width, height: height)
+    static func image(_ kind: TemplateKind, phase: Double, style: Style = .tile) async -> CGImage? {
+        await drawing.image(kind, phase: phase, style: style)
     }
 
-    /// One renderer, used on one queue only.
+    /// The renderers, one a size, used on one queue only.
     private nonisolated final class Drawing: @unchecked Sendable {
         private let queue = DispatchQueue(label: "Twine.TemplatePosters")
-        private var renderer: OffscreenRenderer?
+        private var renderers: [Style: OffscreenRenderer] = [:]
 
-        func image(_ kind: TemplateKind, phase: Double, width: Int, height: Int) async -> CGImage? {
+        func image(_ kind: TemplateKind, phase: Double, style: Style) async -> CGImage? {
             await withCheckedContinuation { done in
                 queue.async { [self] in
-                    if renderer == nil { renderer = OffscreenRenderer(pixelWidth: width, pixelHeight: height) }
-                    let composition = Composition(width: width, height: height)
+                    if renderers[style] == nil { renderers[style] = OffscreenRenderer(pixelWidth: style.width, pixelHeight: style.height) }
+                    var composition = Composition(width: style.width, height: style.height)
+                    composition.background = Background(isTransparent: !style.ground)
                     var frame = Templates.frame(kind, filling: composition)
-                    frame.look = ShapeContent(geometry: .rectangle(cornerRadii: .zero), fills: [Fill(paint: .color(RGBA(0.1, 0.1, 0.11)))])
+                    frame.look = ShapeContent(geometry: .rectangle(cornerRadii: .zero),
+                                              fills: style.ground ? [Fill(paint: .color(RGBA(0.1, 0.1, 0.11)))] : [])
                     frame.template?.pose = phase - phase.rounded(.down)
-                    done.resume(returning: renderer?.image(of: evaluateDesign(Project(composition: composition, layers: [frame]))))
+                    done.resume(returning: renderers[style]?.image(of: evaluateDesign(Project(composition: composition, layers: [frame]))))
                 }
             }
         }
 
-        /// Whether nothing was drawn: every poster has a solid ground, so
-        /// a see-through middle means the drawing came out empty.
+        /// Whether nothing at all was drawn: no pixel in a sparse grid
+        /// over the picture has any strength.
         static func isBlank(_ image: CGImage) -> Bool {
             guard let data = image.dataProvider?.data, let bytes = CFDataGetBytePtr(data) else { return true }
             let row = image.bytesPerRow, length = CFDataGetLength(data)
-            // Alpha is the last byte of each BGRA pixel; look at a few.
-            for (x, y) in [(image.width / 2, image.height / 2), (2, 2), (image.width - 3, image.height - 3)] {
-                let i = y * row + x * 4 + 3
-                if i < length, bytes[i] > 0 { return false }
+            // Alpha is the last byte of each BGRA pixel.
+            for y in stride(from: 0, to: image.height, by: 8) {
+                for x in stride(from: 0, to: image.width, by: 8) {
+                    let i = y * row + x * 4 + 3
+                    if i < length, bytes[i] > 0 { return false }
+                }
             }
             return true
         }
