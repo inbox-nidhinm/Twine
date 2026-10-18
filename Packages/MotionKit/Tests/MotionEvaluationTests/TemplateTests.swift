@@ -224,4 +224,22 @@ import MotionModel
         let fronts = (0..<mesh.rows).flatMap { j in (0..<mesh.columns).map { i in mesh.facesFront(i, j) } }
         #expect(fronts.contains(true) && fronts.contains(false))
     }
+
+    /// Empty slots show the app's sample pictures, a different one each,
+    /// in their own shapes; a filled slot shows its own picture.
+    @Test func emptySlotsShowSamples() throws {
+        var setup = Self.frame(.carouselRing, slots: 4).template!
+        let own = UUID()
+        setup.slots[1] = own
+        let frame = Self.frame(.carouselRing, slots: 4)
+        let made = TemplateCards.make(frame, setup, phase: 0, size: Self.size, pictures: [own: Size2(400, 300)])
+        func media(_ l: Layer) -> UUID? { l.look?.fills.first?.paint.imagePaint?.mediaID }
+        let shown = made.cards.prefix(4).map(media)
+        #expect(shown[1] == own)
+        #expect(shown[0] == TemplateSamples.sample(for: 0).id && shown[2] == TemplateSamples.sample(for: 2).id)
+        #expect(Set(TemplateSamples.all.map(\.id)).count == TemplateSamples.all.count)
+        // The samples' sizes are known wherever pictures are placed.
+        let sizes = Project().pictureSizes
+        #expect(TemplateSamples.all.allSatisfy { sizes[$0.id] == $0.size })
+    }
 }

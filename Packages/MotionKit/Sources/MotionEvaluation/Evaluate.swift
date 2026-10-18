@@ -724,9 +724,10 @@ extension Project {
     }
 
     /// Every picture's own size in pixels, by its id, for placing picture
-    /// fills.
+    /// fills: the project's, and the samples templates show in empty slots.
     public var pictureSizes: [UUID: Size2] {
         var sizes: [UUID: Size2] = [:]
+        for sample in TemplateSamples.all { sizes[sample.id] = sample.size }
         for asset in media where asset.kind == .image {
             if let w = asset.pixelWidth, let h = asset.pixelHeight { sizes[asset.id] = Size2(Double(w), Double(h)) }
         }

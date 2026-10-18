@@ -9,7 +9,8 @@ import Foundation
 /// into an ordinary frame in 3D of cards and actions.
 public struct TemplateSetup: Codable, Sendable, Equatable {
     public var kind: TemplateKind
-    /// The pictures, in order; nil is an empty slot, drawn as a plain card.
+    /// The pictures, in order; nil is an empty slot, which shows one of the
+    /// app's sample pictures (`TemplateSamples`).
     /// Templates with more cards than slots go round the slots again.
     public var slots: [UUID?]
     /// The template's own settings, by their keys; a setting not here is

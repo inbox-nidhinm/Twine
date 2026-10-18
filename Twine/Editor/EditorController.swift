@@ -18,7 +18,8 @@ final class EditorController {
     /// The document, for reading and storing imported files.
     weak var document: ProjectDocument?
     /// Pictures and video frames for the canvas.
-    private(set) lazy var media = MediaLibrary { [weak self] id in self?.document?.mediaURL(for: id) }
+    /// The project's media, and the samples empty template slots show.
+    private(set) lazy var media = MediaLibrary { [weak self] id in TemplateSampleFiles.url(for: id) ?? self?.document?.mediaURL(for: id) }
     /// Sounds' loudness, for the timeline's Play bars.
     let waveforms = Waveforms()
 
@@ -28,7 +29,8 @@ final class EditorController {
     /// changes settle (`ProjectDocument`), not on every step.
     func releaseUnusedMedia() {
         let used = Set(project.allLayers.flatMap(\.mediaIDs))
-        media.keep(only: used)
+        // The samples are the app's own, and cheap to keep.
+        media.keep(only: used.union(TemplateSampleFiles.ids))
         waveforms.keep(only: used)
         Thumbnail.videos.keep(only: used)
     }
@@ -650,7 +652,11 @@ final class EditorController {
     func dropOnTemplate(_ id: UUID, card: UUID, urls: [URL]) {
         guard let setup = project.layer(withID: id)?.template else { return }
         let shown = scene.layers.lazy.filter { $0.id == card || $0.parentID == card }.compactMap(Self.media(of:)).first
-        let slot = shown.flatMap { m in setup.slots.firstIndex(of: m) }
+        // A card showing a sample is an empty slot: the first that shows that sample.
+        let sampled = shown.flatMap { m in
+            setup.slots.indices.first { setup.slots[$0] == nil && TemplateSamples.sample(for: $0).id == m }
+        }
+        let slot = sampled ?? shown.flatMap { m in setup.slots.firstIndex(of: m) }
             ?? setup.slots.firstIndex(of: nil) ?? setup.slots.count
         setTemplateMedia(id, from: slot, urls: urls)
     }

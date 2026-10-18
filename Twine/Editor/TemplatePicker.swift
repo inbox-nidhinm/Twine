@@ -183,11 +183,16 @@ enum TemplatePosters {
     private nonisolated final class Drawing: @unchecked Sendable {
         private let queue = DispatchQueue(label: "Twine.TemplatePosters")
         private var renderers: [Style: OffscreenRenderer] = [:]
+        /// The samples empty slots show; only ever read on the queue.
+        private let samples = MediaLibrary { TemplateSampleFiles.url(for: $0) }
 
         func image(_ kind: TemplateKind, phase: Double, style: Style) async -> CGImage? {
             await withCheckedContinuation { done in
                 queue.async { [self] in
-                    if renderers[style] == nil { renderers[style] = OffscreenRenderer(pixelWidth: style.width, pixelHeight: style.height) }
+                    if renderers[style] == nil {
+                        renderers[style] = OffscreenRenderer(pixelWidth: style.width, pixelHeight: style.height)
+                        renderers[style]?.media = samples
+                    }
                     var composition = Composition(width: style.width, height: style.height)
                     composition.background = Background(isTransparent: !style.ground)
                     var frame = Templates.frame(kind, filling: composition)
