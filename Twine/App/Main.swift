@@ -7,6 +7,8 @@ import AppKit
 @main
 enum TwineMain {
     static func main() {
+        // Started by an AI app to reach Twine: a bridge, with no windows.
+        if CommandLine.arguments.contains(AgentBridge.argument) { AgentBridge.run() }
         let app = NSApplication.shared
         // The first document controller created becomes the shared one, so
         // this has to exist before anything asks for `NSDocumentController.shared`.

@@ -15,6 +15,7 @@ let package = Package(
         .library(name: "MotionRendering", targets: ["MotionRendering"]),
         .library(name: "MotionExport", targets: ["MotionExport"]),
         .library(name: "MotionImport", targets: ["MotionImport"]),
+        .library(name: "MotionAgent", targets: ["MotionAgent"]),
         .library(name: "Theme", targets: ["Theme"]),
     ],
     targets: [
@@ -37,6 +38,10 @@ let package = Package(
         // make editable (text, mostly) as pictures, with the system's own SVG
         // drawing, which is why it alone may use AppKit.
         .target(name: "MotionImport", dependencies: ["MotionModel", "MotionEvaluation", "MotionEditing"]),
+        // Twine's tools for AI apps, through the Model Context Protocol:
+        // reading the project, changing it by commands, and the protocol's
+        // messages. The app hosts it on a private socket.
+        .target(name: "MotionAgent", dependencies: ["MotionModel", "MotionEvaluation", "MotionEditing", "MotionExport"]),
         // Tokens from the Flip Design System in Figma, the grain, the fonts,
         // and the icon set. Copied rather than processed, because any
         // re-encoding of the grain would undo how it was packed.
@@ -47,6 +52,7 @@ let package = Package(
         .testTarget(name: "MotionEvaluationTests", dependencies: ["MotionEvaluation"]),
         .testTarget(name: "MotionRenderingTests", dependencies: ["MotionRendering"]),
         .testTarget(name: "MotionExportTests", dependencies: ["MotionExport", "MotionRendering"]),
+        .testTarget(name: "MotionAgentTests", dependencies: ["MotionAgent", "MotionEditing", "MotionEvaluation"]),
         .testTarget(name: "MotionImportTests", dependencies: ["MotionImport", "MotionEditing", "MotionRendering"]),
     ]
 )

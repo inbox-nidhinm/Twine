@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // AI apps reach Twine through its socket, while Settings allows it.
+        AgentService.shared.update()
         // A project double-clicked in the Finder arrives around now. Waiting a
         // turn lets it open first, so the home screen only shows if nothing did.
         DispatchQueue.main.async {
@@ -30,6 +32,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        AgentService.shared.stop()
+    }
 
     @objc func showHome(_ sender: Any?) {
         HomeWindowController.shared.showWindow(nil)

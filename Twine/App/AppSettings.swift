@@ -33,6 +33,14 @@ final class AppSettings {
     }
     /// Whether a finished export is shown in the Finder.
     var revealsExports: Bool { didSet { defaults.set(revealsExports, forKey: Keys.revealsExports) } }
+    /// Whether AI apps (Claude and others speaking MCP) may read and change
+    /// the open project, through `AgentService`'s private socket.
+    var allowsAgents: Bool {
+        didSet {
+            defaults.set(allowsAgents, forKey: Keys.allowsAgents)
+            AgentService.shared.update()
+        }
+    }
 
     /// The values a fresh install starts from, which a project made before
     /// Settings existed had too.
@@ -51,6 +59,7 @@ final class AppSettings {
         static let playsSound = "playsSound"
         static let exportFolder = "exportFolder"
         static let revealsExports = "revealsExports"
+        static let allowsAgents = "allowsAgents"
     }
 
     private init() {
@@ -65,6 +74,7 @@ final class AppSettings {
         playsSound = d.object(forKey: Keys.playsSound) as? Bool ?? true
         exportFolder = d.string(forKey: Keys.exportFolder).map { URL(fileURLWithPath: $0, isDirectory: true) }
         revealsExports = d.bool(forKey: Keys.revealsExports)
+        allowsAgents = d.object(forKey: Keys.allowsAgents) as? Bool ?? true
     }
 
     /// The easing a new action takes, at the strength every preset is used at.

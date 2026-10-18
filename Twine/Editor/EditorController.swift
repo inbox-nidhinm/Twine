@@ -377,8 +377,10 @@ final class EditorController {
 
     /// The import itself, done once every file is in or skipped. `label`
     /// names what is imported in the notice (the file's name, or the count).
-    private func importFiles(_ urls: [URL], at point: Vec2?, label: String? = nil, undoName: String? = nil) async {
-        guard let document else { return }
+    /// Gives the new layers, which AI tools wait for.
+    @discardableResult
+    func importFiles(_ urls: [URL], at point: Vec2?, label: String? = nil, undoName: String? = nil) async -> [UUID] {
+        guard let document else { return [] }
         // A notice follows the import once it takes a moment, a WebM's
         // conversion at once, and says when it is done.
         let label = label ?? (urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files")
@@ -435,10 +437,11 @@ final class EditorController {
         defer { if !oversized.isEmpty { editor.showNotice(MediaImport.oversizedNotice(oversized)) } }
         guard !commands.isEmpty, perform(.batch(commands, name: undoName ?? (added.count == 1 ? "Import" : "Import Files"))) else {
             editor.finishWork(work, done: nil)
-            return
+            return []
         }
         select(added)
         editor.finishWork(work, done: "Imported \(added.count == urls.count ? label : "\(added.count) of \(urls.count) files")")
+        return added
     }
 
     // MARK: Pictures and video
@@ -614,8 +617,9 @@ final class EditorController {
 
     /// Pictures or videos into template `id`'s slots, the first into
     /// `slot` and the rest after it, adding slots past the end. Files that
-    /// are neither are left out with a beep.
-    func setTemplateMedia(_ id: UUID, from slot: Int, urls: [URL]) {
+    /// are neither are left out with a beep. The work, for those who wait.
+    @discardableResult
+    func setTemplateMedia(_ id: UUID, from slot: Int, urls: [URL]) -> Task<Void, Never> {
         Task { @MainActor in
             var assets: [MediaAsset] = []
             var added: [MediaAsset] = []
@@ -694,14 +698,15 @@ final class EditorController {
     /// An SVG file as editable layers in a frame, centred on `point` (or the
     /// composition), shrunk to fit the composition if it is larger. Its
     /// pictures, embedded or drawn from its text, come into the project too.
-    /// One undo step.
-    func importSVG(_ url: URL, at point: Vec2? = nil) {
-        guard let document else { return }
+    /// One undo step. The work gives the new frame, for those who wait.
+    @discardableResult
+    func importSVG(_ url: URL, at point: Vec2? = nil) -> Task<UUID?, Never>? {
+        guard let document else { return nil }
         let composition = project.composition
         let center = point ?? Vec2(Double(composition.width) / 2, Double(composition.height) / 2)
         let name = url.deletingPathExtension().lastPathComponent
         let fitting = composition.size
-        Task { @MainActor in
+        return Task { @MainActor in
             // Read on a worker thread: a large drawing takes a while, and the
             // app should not freeze meanwhile.
             let reading = Task.detached(priority: .userInitiated) { () -> SVGImport.Result? in
@@ -710,15 +715,17 @@ final class EditorController {
                       let data = try? Data(contentsOf: url) else { return nil }
                 return try? SVGImport.read(data, name: name, center: center, fitting: fitting)
             }
-            guard let read = await reading.value else { return NSSound.beep() }
+            guard let read = await reading.value else { NSSound.beep(); return nil }
             let result = read.reusing(project.media)
             var commands: [EditorCommand] = []
             for item in result.media {
-                do { try await document.stage(item.data, as: item.asset.fileName) } catch { return NSSound.beep() }
+                do { try await document.stage(item.data, as: item.asset.fileName) } catch { NSSound.beep(); return nil }
                 commands.append(.addMedia(item.asset))
             }
             commands.append(.insertLayers([result.layer], parentID: nil, index: nil))
-            if perform(.batch(commands, name: "Import SVG")) { select([result.layer.id]) }
+            guard perform(.batch(commands, name: "Import SVG")) else { return nil }
+            select([result.layer.id])
+            return result.layer.id
         }
     }
 

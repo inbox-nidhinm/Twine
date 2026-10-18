@@ -18,6 +18,8 @@ struct SettingsPage: View {
     @Bindable private var settings = AppSettings.shared
     /// Read again after the projects folder is changed.
     @State private var projectsFolder = Creations.folder
+    /// The Claude Code command was just copied.
+    @State private var copiedCommand = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -42,6 +44,7 @@ struct SettingsPage: View {
                     timeline
                     sound
                     export
+                    agents
                 }
                 .padding(margin)
             }
@@ -211,6 +214,25 @@ struct SettingsPage: View {
             toggle(.eye, "Show in Finder when done", isOn: settings.revealsExports,
                    help: "Each finished export is shown in the Finder") {
                 settings.revealsExports.toggle()
+            }
+        }
+    }
+
+    private var agents: some View {
+        card("AI apps") {
+            toggle(.link, "Let AI apps use Twine", isOn: settings.allowsAgents,
+                   help: "Claude, Cursor and other apps that speak MCP can read and change the open project, draw its frames and export it. Every change they make undoes like your own.") {
+                settings.allowsAgents.toggle()
+            }
+            dashes
+            row(.presets, "Claude Code", help: "Copies the command that adds Twine to Claude Code. Run it once in a terminal.") {
+                PanelButton(title: copiedCommand ? "Copied" : "Copy Command") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(AgentBridge.claudeCommand, forType: .string)
+                    copiedCommand = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copiedCommand = false }
+                }
+                .frame(width: Theme.settingsButton)
             }
         }
     }

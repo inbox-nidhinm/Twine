@@ -1,6 +1,7 @@
 import Foundation
 import MotionModel
 import MotionEditing
+import MotionExport
 
 /// What the tools need from the app: the open project and the editor
 /// around it, and the things only the app can do (open projects, draw
@@ -17,6 +18,10 @@ public protocol AgentHost: AnyObject {
     var playhead: Double { get set }
     var selectedLayers: Set<UUID> { get set }
     var selectedActions: Set<UUID> { get set }
+    /// What a new project starts as, from Settings.
+    var newComposition: Composition { get }
+    /// The length and easing a new action takes, from Settings.
+    var newAction: (duration: Double, easing: Easing) { get }
 
     /// Runs a command as one undo step, so the person can undo it as their
     /// own, and the editor shows it at once.
@@ -60,9 +65,7 @@ public struct AgentProject: Sendable, Equatable {
 
 /// An export as the tool asks for it.
 public struct AgentExport: Sendable, Equatable {
-    /// `mp4`, `hevc`, `prores`, `prores4444`, `gif`, `webm` or `png`, as
-    /// `ExportFormat`'s raw values are mapped by the app.
-    public var format: String
+    public var format: ExportFormat
     /// Where to write; nil puts it beside the project's other exports.
     public var url: URL?
     public var scale: Double
@@ -72,7 +75,7 @@ public struct AgentExport: Sendable, Equatable {
     /// A still's moment; nil is the design.
     public var time: Double?
 
-    public init(format: String, url: URL?, scale: Double, frameRate: Int?, range: ClosedRange<Double>?, time: Double?) {
+    public init(format: ExportFormat, url: URL?, scale: Double, frameRate: Int?, range: ClosedRange<Double>?, time: Double?) {
         self.format = format
         self.url = url
         self.scale = scale

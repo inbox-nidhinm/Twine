@@ -14,6 +14,7 @@
 		E0000000000000000000001C /* MotionRendering in Frameworks */ = {isa = PBXBuildFile; productRef = E0000000000000000000001D /* MotionRendering */; };
 		E0000000000000000000001E /* MotionExport in Frameworks */ = {isa = PBXBuildFile; productRef = E0000000000000000000001F /* MotionExport */; };
 		E00000000000000000000020 /* MotionImport in Frameworks */ = {isa = PBXBuildFile; productRef = E00000000000000000000021 /* MotionImport */; };
+		E00000000000000000000022 /* MotionAgent in Frameworks */ = {isa = PBXBuildFile; productRef = E00000000000000000000023 /* MotionAgent */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,6 +38,7 @@
 			files = (
 				E0000000000000000000001E /* MotionExport in Frameworks */,
 				E00000000000000000000020 /* MotionImport in Frameworks */,
+				E00000000000000000000022 /* MotionAgent in Frameworks */,
 				E0000000000000000000001C /* MotionRendering in Frameworks */,
 				E0000000000000000000001A /* MotionEvaluation in Frameworks */,
 				E00000000000000000000001 /* MotionModel in Frameworks */,
@@ -96,6 +98,7 @@
 			packageProductDependencies = (
 				E0000000000000000000001F /* MotionExport */,
 				E00000000000000000000021 /* MotionImport */,
+				E00000000000000000000023 /* MotionAgent */,
 				E0000000000000000000001D /* MotionRendering */,
 				E0000000000000000000001B /* MotionEvaluation */,
 				E00000000000000000000002 /* MotionModel */,
@@ -352,6 +355,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E00000000000000000000007 /* XCLocalSwiftPackageReference "Packages/MotionKit" */;
 			productName = MotionImport;
+		};
+		E00000000000000000000023 /* MotionAgent */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E00000000000000000000007 /* XCLocalSwiftPackageReference "Packages/MotionKit" */;
+			productName = MotionAgent;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
