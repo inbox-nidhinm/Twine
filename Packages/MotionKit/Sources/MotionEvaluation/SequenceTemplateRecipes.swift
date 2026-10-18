@@ -419,7 +419,8 @@ extension TemplateRecipes {
     /// dives into another.
     private static func diveIn(_ s: Settings, _ p: Double, _ k: Kit) -> TemplateScene {
         let columns = 6, rows = 4, n = columns * rows
-        let width = s.f("cardSize") * k.w * 1.2 * s.f("zoom")
+        // Wide enough that the wall fills the frame either way up.
+        let width = s.f("cardSize") * max(k.w, k.h * 1.6) * 1.2 * s.f("zoom")
         let d = Deck(n: n, base: width)
         let gap = width * s.f("gap")
         func wall(_ turn: Double) -> Shot {

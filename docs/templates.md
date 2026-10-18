@@ -141,7 +141,7 @@ Each ends with the usual gate: a clean `./make-app.sh`, `./test.sh` passing, the
    | Pop Parade | Parade | Spread Rows | Unfold Rows |
    | Triple Scene | Three Acts | Spread Columns | Unfold Columns |
    | Collage Reel | Collage | | |
-8. **Keyframed settings and New from Template on Home.**
+8. **Keyframed settings and New from Template on Home.** Done (18 October 2026): the Template Setting action (`TemplateSettingAction`, file format 8) moves one setting (any of the recipe's numbers, or the cards' Radius) over its own bar, each setting its own track; Split into Layers follows them, making every card that ever shows (hidden while it is not there), with Resize and Corner Radius where cards change size or rounding. Home's New from Template button opens the picker on a card, four across; picking makes a project named after the template, at the new-project size, 16 s long for the Sequences and 12 s for the rest, holding only the template and its bar.
 
 Milestones 2 to 4 are worth having on their own: they give Twine real 3D whether or not templates follow.
 

@@ -583,6 +583,7 @@ private struct ValueFields: View {
             case .depth(let d): depth(d)
             case .bend(let b): bend(b)
             case .template(let t): loops(t)
+            case .templateSetting(let t): templateSetting(t)
             case .camera(let c): camera(c)
             default: StyleValueFields(controller: controller, action: action, inherited: inherited)
             }
@@ -797,6 +798,65 @@ private struct ValueFields: View {
             }
         }
         .help("How many times the template goes round in its bar. Stretching the bar slows it; it always ends where it began.")
+    }
+
+    // MARK: Template setting
+
+    /// The settings the template can move, the one chosen, and its range.
+    private var settingControls: [TemplateControl] {
+        controller.project.layer(withID: action.targetLayerID)?.template.map { TemplateRecipes.animatable($0.kind) } ?? []
+    }
+
+    @ViewBuilder private func templateSetting(_ t: TemplateSettingAction) -> some View {
+        let controls = settingControls
+        let control = controls.first { $0.key == t.key }
+        let (lo, hi, unit) = Self.range(of: control)
+        let decimals = unit == .plain ? 2 : 0
+        let suffix = unit == .percent ? "%" : unit == .degrees ? "°" : ""
+        StackedRow(label: "Setting") {
+            MenuLabel(title: control?.name ?? t.key, entries: controls.map { c in
+                .item(c.name, checked: c.key == t.key) {
+                    guard c.key != t.key else { return }
+                    controller.editActions("Setting") { a in
+                        guard case .templateSetting(var s) = a.spec, let state = controller.inheritedState(for: a) else { return }
+                        let (lo, hi, _) = Self.range(of: c)
+                        let now = state.template.settings[c.key] ?? lo
+                        s.key = c.key
+                        s.initial = nil
+                        s.end = now < (lo + hi) / 2 ? min(now + (hi - lo) * 0.3, hi) : max(now - (hi - lo) * 0.3, lo)
+                        a.spec = .templateSetting(s)
+                    }
+                }
+            })
+        }
+        .help("Which of the template's settings it moves.")
+        StackedRow(label: "From", accessory: { clearButton(t.initial != nil) { editSetting("Starting Value") { $0.initial = nil } } }) {
+            OptionalField(value: t.initial, placeholder: inherited?.template.settings[t.key] ?? lo, decimals: decimals, suffix: suffix,
+                          accepts: { $0 >= lo && $0 <= hi }) { v in
+                editSetting("Starting Value") { $0.initial = v }
+            }
+        }
+        .help("Where the setting starts. Empty starts from wherever it is when the action begins.")
+        StackedRow(label: "To", swap: swap) {
+            UnitField(value: t.end, decimals: decimals, suffix: suffix, accepts: { $0 >= lo && $0 <= hi }) { v in
+                editSetting(control?.name ?? "Setting") { $0.end = v }
+            }
+        }
+        .help(control?.help ?? "Where the setting ends.")
+    }
+
+    /// A setting's range and unit, from its control.
+    private static func range(of control: TemplateControl?) -> (Double, Double, TemplateUnit) {
+        if case .number(let lo, let hi, _, let unit)? = control?.kind { return (lo, hi, unit) }
+        return (0, 100, .percent)
+    }
+
+    private func editSetting(_ name: String, _ change: @escaping (inout TemplateSettingAction) -> Void) {
+        controller.editActions(name) { a in
+            guard case .templateSetting(var t) = a.spec else { return }
+            change(&t)
+            a.spec = .templateSetting(t)
+        }
     }
 
     // MARK: Bend

@@ -63,10 +63,10 @@ enum Creations {
     /// Writes a fresh project package, at the size, rate, length and
     /// background Settings give new projects, and returns where it went.
     @MainActor
-    static func makeProject(named base: String = "Untitled", in directory: URL? = nil) throws -> URL {
+    static func makeProject(named base: String = "Untitled", in directory: URL? = nil, project: Project? = nil) throws -> URL {
         try ensureFolder()
         let url = uniqueURL(for: base, in: directory ?? folder)
-        try write(Project(composition: AppSettings.shared.newProject), to: url)
+        try write(project ?? Project(composition: AppSettings.shared.newProject), to: url)
         return url
     }
 

@@ -161,6 +161,27 @@ public struct TemplatePlay: Codable, Sendable, Equatable {
     }
 }
 
+/// One of a template frame's settings moving over its bar, as any action
+/// moves a property: `key` names the setting (one of its recipe's numbers,
+/// or `TemplateSettingAction.cornerRadius`, the cards' rounding), in the
+/// units the inspector shows. An empty `initial` starts from wherever the
+/// setting is when the bar starts. Values past a setting's range are held
+/// to it when the template is drawn.
+public struct TemplateSettingAction: Codable, Sendable, Equatable {
+    /// The key for the cards' corner radius, in percent of their shorter side.
+    public static let cornerRadius = "cornerRadius"
+
+    public var key: String
+    public var initial: Double?
+    public var end: Double
+
+    public init(key: String, initial: Double? = nil, end: Double) {
+        self.key = key
+        self.initial = initial
+        self.end = end
+    }
+}
+
 extension Layer {
     /// A template frame's setup, or nil for anything else. Setting it on
     /// anything but a frame does nothing.

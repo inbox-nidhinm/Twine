@@ -68,6 +68,12 @@ struct HomeView: View {
             }
         }
         .overlay {
+            if library.pickingTemplate {
+                TemplateGalleryCard(library: library)
+                    .transition(.opacity)
+            }
+        }
+        .overlay {
             if let search = library.search {
                 SearchCard(source: search) { [library] in
                     library.search = nil
@@ -89,6 +95,7 @@ struct HomeView: View {
         }
         .animation(.easeOut(duration: 0.14), value: library.showVersionHistory)
         .animation(.easeOut(duration: 0.14), value: library.info?.url)
+        .animation(.easeOut(duration: 0.14), value: library.pickingTemplate)
         .animation(.easeOut(duration: 0.12), value: library.search != nil)
         .animation(.easeOut(duration: 0.2), value: OnboardingState.shared.isShowing)
         .ignoresSafeArea()
@@ -289,6 +296,9 @@ struct HomeView: View {
                     .displayTitle(21)
                     .foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 0)
+                PanelButton(title: "New from Template", icon: .template) { library.pickingTemplate = true }
+                    .fixedSize()
+                    .help("A new project holding a template, as long as one loop of it")
                 PanelButton(title: "New Project", icon: .plus) { library.newProject() }
                     .fixedSize()
                     .help("New Project (⌘N)")

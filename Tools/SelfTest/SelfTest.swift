@@ -643,6 +643,14 @@ enum SelfTest {
                 if let item = lib.items.first(where: { $0.name == parts[1] }) {
                     lib.move(item.url, to: parts[2] == "-" ? nil : lib.folders.first { $0.name == parts[2] }?.url)
                 } else { log("no project \(parts[1])") }
+            case "templategallery":
+                // Raises Home's New from Template card, as its button does.
+                HomeWindowController.shared.library.pickingTemplate = true
+            case "newfromtemplate":
+                // A project from a template by its id, as picking it on Home's card does.
+                if let kind = TemplateKind(rawValue: parts[1]) {
+                    HomeWindowController.shared.library.newProject(from: kind)
+                } else { log("unknown template \(parts[1])") }
             case "showfolder":
                 let lib = HomeWindowController.shared.library
                 lib.selectedFolder = parts[1] == "-" ? nil : lib.folders.first { $0.name == parts[1] }?.url

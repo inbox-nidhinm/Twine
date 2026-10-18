@@ -297,6 +297,9 @@ public enum Theme {
     /// The home screen's Info card on a project: its width, which its
     /// thumbnail spans.
     public static let infoCardWidth: CGFloat = 340
+    /// Home's New from Template card: four tiles across.
+    public static let templateGalleryWidth: CGFloat = 760
+    public static let templateGalleryHeight: CGFloat = 560
     /// The Settings page's cards: the narrowest a column of them may be
     /// (three side by side when the window has room, else two), a row's
     /// height, the icon tile at a row's left, the width of a menu or number

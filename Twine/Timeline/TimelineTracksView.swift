@@ -1093,6 +1093,7 @@ extension ActionKind {
         case .bend: return .bend
         case .camera: return .camera
         case .template: return .template
+        case .templateSetting: return .template
         case .preset: return .preset
         }
     }

@@ -33,7 +33,9 @@ import MotionEvaluation
         let star = LayerFactory.shape(.star, in: Box(minX: 0, minY: 0, maxX: 100, maxY: 100), name: "S")
         let video = Layer(name: "V", content: .video(VideoContent(mediaID: UUID())), size: Size2(10, 10), position: .zero)
         let pen = PathEditing.reshaped(star, to: PathEditing.path(of: star)!).layer
-        let layers = [stroked, text, ellipse, star, video, pen]
+        // A template, which takes Template Setting.
+        let template = Templates.frame(.ringStream, filling: Composition(width: 400, height: 300))
+        let layers = [stroked, text, ellipse, star, video, pen, template]
         // A card in a frame in 3D, which takes Depth, and the frame Camera.
         var card = square
         card.transform.position = Vec2(200, 150)

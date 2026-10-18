@@ -142,6 +142,25 @@ public enum Templates {
         return (.batch(commands, name: "Add Template"), frame.id)
     }
 
+    /// How long a project made from `kind` (New from Template) runs: one
+    /// loop at an easy pace, longer for the sequences, which have several
+    /// layouts to go through.
+    public static func length(of kind: TemplateKind) -> Double {
+        library.first { $0.kind == kind }?.group == .sequence ? 16 : 12
+    }
+
+    /// A new project holding only a template of `kind`: `composition`'s
+    /// size and frame rate, as long as the template's `length`, the frame
+    /// filling it and its bar across the whole.
+    public static func project(_ kind: TemplateKind, composition: Composition) -> Project {
+        var composition = composition
+        composition.duration = length(of: kind)
+        let frame = frame(kind, filling: composition)
+        let bar = Action(target: frame.id, start: 0, duration: composition.duration, easing: .linear,
+                         name: name(of: kind), rowOrder: 0, spec: .template(TemplatePlay()))
+        return Project(composition: composition, layers: [frame], actions: [bar])
+    }
+
     /// How many steps a loop is cut into when a template is split into
     /// ordinary actions: each step a straight run to where the cards are
     /// next.
@@ -151,6 +170,12 @@ public enum Templates {
     /// little after each other between layouts, so they take twice as many.
     public static func splitSteps(for kind: TemplateKind) -> Int {
         Templates.library.first { $0.kind == kind }?.group == .sequence ? splitSteps * 2 : splitSteps
+    }
+
+    /// A card's corners, as the Corner Radius action sets them.
+    private static func radii(of card: Layer) -> CornerRadii? {
+        if case .rectangle(let radii)? = card.look?.geometry { return radii }
+        return nil
     }
 
     /// `angle` turned by whole turns to lie nearest `near`, so a card
@@ -168,7 +193,40 @@ public enum Templates {
     public static func split(_ id: UUID, in project: Project) -> EditorCommand? {
         guard let frame = project.layer(withID: id), let setup = frame.template else { return nil }
         let pictures = project.pictureSizes
-        let rest = TemplateCards.make(frame, setup, phase: setup.pose, size: frame.size, pictures: pictures)
+        let bar = project.actions.first { $0.targetLayerID == id && $0.spec.kind == .template }
+        let play: TemplatePlay? = if let bar, case .template(let p) = bar.spec, bar.duration > 0 { p } else { nil }
+        let steps = play.map { max(Int((Double(splitSteps(for: setup.kind)) * $0.loops).rounded(.up)), 1) } ?? 0
+        // Every step's cards, from where it rests, with its settings as its
+        // Template Setting actions have them then.
+        let tracks = ActionTracks(project.actions)
+        var moments = [TemplateCards.make(frame, setup, phase: setup.pose, size: frame.size, pictures: pictures)]
+        if let bar, let play {
+            for k in stride(from: 1, through: steps, by: 1) {
+                let time = bar.start + bar.duration * Double(k) / Double(steps)
+                let tuned = setup.tuned(tracks.state(of: frame, at: time).template.settings)
+                moments.append(TemplateCards.make(frame, tuned, phase: setup.pose + play.loops * Double(k) / Double(steps),
+                                                  size: frame.size, pictures: pictures))
+            }
+        }
+        // A moving Cards setting can show more cards at one step than at
+        // another: every card that ever shows is made, unseen while it is
+        // not there, so each step has them all.
+        let count = moments.map(\.cards.count).max() ?? 0
+        for i in 0..<count {
+            guard let first = moments.firstIndex(where: { i < $0.cards.count }) else { continue }
+            var last = moments[first].cards[i]
+            last.opacity = 0
+            for m in moments.indices where i >= moments[m].cards.count {
+                if m < first {
+                    moments[m].cards.append(last)
+                } else {
+                    var gone = moments[m - 1].cards[i]
+                    gone.opacity = 0
+                    moments[m].cards.append(gone)
+                }
+            }
+        }
+        let rest = moments[0]
         // Real cards, with ids of their own.
         let cards = rest.cards.map { $0.duplicated() }
         let ids = cards.map(\.id)
@@ -177,21 +235,17 @@ public enum Templates {
         flat.space3D = rest.space
         flat.children = cards
         var commands: [EditorCommand] = [.updateLayers([flat])]
-        let bar = project.actions.first { $0.targetLayerID == id && $0.spec.kind == .template }
         var made: [Action] = []
-        if let bar, case .template(let play) = bar.spec, bar.duration > 0 {
+        if let bar, play != nil {
             var row = ActionFactory.nextRowOrder(in: project)
             func add(_ target: UUID, _ start: Double, _ duration: Double, _ spec: ActionSpec) {
                 made.append(Action(target: target, start: start, duration: duration, easing: .linear, rowOrder: row, spec: spec))
                 row += 1
             }
-            let steps = max(Int((Double(splitSteps(for: setup.kind)) * play.loops).rounded(.up)), 1)
-            var before = rest
             // The turns each card was last given, unwound past whole turns.
             var turns = rest.cards.map { ($0.transform.rotation, $0.transform.tilt) }
-            for k in 1...steps {
-                let phase = setup.pose + play.loops * Double(k) / Double(steps)
-                let now = TemplateCards.make(frame, setup, phase: phase, size: frame.size, pictures: pictures)
+            for k in stride(from: 1, through: steps, by: 1) {
+                let before = moments[k - 1], now = moments[k]
                 let t0 = bar.start + bar.duration * Double(k - 1) / Double(steps)
                 let length = bar.duration / Double(steps)
                 // Worked out as the step's own start is, so a card that goes
@@ -205,25 +259,28 @@ public enum Templates {
                     if ta.position != tb.position { add(ids[i], start, duration, .move(MoveAction(mode: .to, end: tb.position))) }
                     if ta.z != tb.z { add(ids[i], start, duration, .depth(DepthAction(mode: .to, end: tb.z))) }
                     var tilt = tb.tilt
-                    if i < turns.count {
-                        tilt.x = nearest(tilt.x, to: turns[i].1.x)
-                        tilt.y = nearest(tilt.y, to: turns[i].1.y)
-                    }
-                    let rotation = i < turns.count ? nearest(tb.rotation, to: turns[i].0) : tb.rotation
-                    if i < turns.count, tilt != turns[i].1 { add(ids[i], start, duration, .tilt(TiltAction(mode: .to, end: tilt))) }
-                    if i < turns.count, rotation != turns[i].0 { add(ids[i], start, duration, .rotate(RotateAction(mode: .to, end: rotation))) }
-                    if i < turns.count { turns[i] = (rotation, tilt) }
+                    tilt.x = nearest(tilt.x, to: turns[i].1.x)
+                    tilt.y = nearest(tilt.y, to: turns[i].1.y)
+                    let rotation = nearest(tb.rotation, to: turns[i].0)
+                    if tilt != turns[i].1 { add(ids[i], start, duration, .tilt(TiltAction(mode: .to, end: tilt))) }
+                    if rotation != turns[i].0 { add(ids[i], start, duration, .rotate(RotateAction(mode: .to, end: rotation))) }
+                    turns[i] = (rotation, tilt)
                     if ta.scale != tb.scale { add(ids[i], start, duration, .scale(ScaleAction(mode: .to, end: tb.scale))) }
                     if ta.bend != tb.bend { add(ids[i], start, duration, .bend(BendAction(mode: .to, end: tb.bend))) }
+                    if a.size != b.size { add(ids[i], start, duration, .resize(ResizeAction(end: b.size))) }
+                    if let ra = radii(of: a), let rb = radii(of: b), ra != rb {
+                        add(ids[i], start, duration, .cornerRadius(CornerRadiusAction(end: rb)))
+                    }
                     if a.opacity != b.opacity { add(ids[i], start, duration, .opacity(OpacityAction(end: b.opacity))) }
                 }
-                before = now
             }
-            commands.append(.deleteActions([bar.id]))
-            if !made.isEmpty {
-                commands.append(.insertActions(made))
-                commands.append(.setScenes(project.scenes + [TimelineScene(name: frame.name, actionIDs: made.map(\.id))]))
-            }
+        }
+        // The bar and the settings it moved, which an ordinary frame has not.
+        let gone = project.actions.filter { $0.targetLayerID == id && ($0.spec.kind == .template || $0.spec.kind == .templateSetting) }.map(\.id)
+        if !gone.isEmpty { commands.append(.deleteActions(Set(gone))) }
+        if !made.isEmpty {
+            commands.append(.insertActions(made))
+            commands.append(.setScenes(project.scenes + [TimelineScene(name: frame.name, actionIDs: made.map(\.id))]))
         }
         return .batch(commands, name: "Split into Layers")
     }

@@ -17,6 +17,8 @@ public enum Channel: String, Hashable, Sendable, CaseIterable {
     case camera
     /// How far a template frame has played round its loop.
     case template
+    /// A template frame's settings, each key a track of its own.
+    case templateSetting
     /// A clip of the layer's own box, which only the Mask presets drive.
     case reveal
     /// A page curl, which only the Page Curl presets drive.
@@ -57,6 +59,7 @@ extension ActionKind {
         case .bend: return .bend
         case .camera: return .camera
         case .template: return .template
+        case .templateSetting: return .templateSetting
         // A preset reaches several; `ActionTracks` asks its recipe which.
         case .preset: return .position
         }
@@ -191,7 +194,7 @@ public struct LayerState: Sendable, Equatable {
         rotation = layer.transform.rotation
         warp = Warp(skew: layer.transform.skew, tilt: layer.transform.tilt, z: layer.transform.z, bend: layer.transform.bend)
         if let space = layer.space3D { camera = .space(space) }
-        if let setup = layer.template { template = .at(setup.pose) }
+        if let setup = layer.template { template = .at(setup.pose, settings: TemplateRecipes.designSettings(setup)) }
         opacity = layer.opacity
         size = layer.size
         isShown = true
@@ -289,15 +292,21 @@ public enum Warp: Sendable, Equatable {
     }
 }
 
-/// How far a template frame has played, kept out of line as `Warp` is:
-/// only templates have one.
+/// How far a template frame has played, and its settings as its Template
+/// Setting actions have moved them (by key, only those any action moves),
+/// kept out of line as `Warp` is: only templates have one.
 public enum TemplateState: Sendable, Equatable {
     case none
-    indirect case at(Double)
+    indirect case at(Double, settings: [String: Double] = [:])
 
     public var loops: Double? {
-        if case .at(let v) = self { return v }
+        if case .at(let v, _) = self { return v }
         return nil
+    }
+
+    public var settings: [String: Double] {
+        if case .at(_, let settings) = self { return settings }
+        return [:]
     }
 
     /// Where in its loop it is, 0 up to 1.
@@ -527,7 +536,21 @@ public struct ActionTracks: Sendable {
             case .bend: state.bend = walk(state.bend, steps(list, Self.bendStep, Self.bendPart), at: time)
             // A template's bar adds its loops to wherever it rests.
             case .template:
-                if let loops = state.template.loops { state.template = .at(walk(loops, list.compactMap(Self.templateStep), at: time)) }
+                if let loops = state.template.loops {
+                    state.template = .at(walk(loops, list.compactMap(Self.templateStep), at: time), settings: state.template.settings)
+                }
+            // Each setting walks its own actions, from the frame's own value.
+            case .templateSetting:
+                if let loops = state.template.loops, let setup = layer.template {
+                    var settings = state.template.settings
+                    var keys: [String] = []
+                    for a in list { if case .templateSetting(let t) = a.spec, !keys.contains(t.key) { keys.append(t.key) } }
+                    for key in keys {
+                        let own = list.filter { if case .templateSetting(let t) = $0.spec { return t.key == key } else { return false } }
+                        settings[key] = walk(settings[key] ?? TemplateRecipes.value(of: key, in: setup), own.compactMap(Self.templateSettingStep), at: time)
+                    }
+                    state.template = .at(loops, settings: settings)
+                }
             // Only a frame in 3D has a camera to move.
             case .camera:
                 if let space = state.camera.space { state.camera = .space(walk(space, list.compactMap(Self.cameraStep), at: time)) }
@@ -781,6 +804,11 @@ public struct ActionTracks: Sendable {
     private static func templateStep(_ a: Action) -> Step<Double>? {
         guard case .template(let t) = a.spec else { return nil }
         return Step(a, initial: nil, target: { $0 + t.loops })
+    }
+
+    private static func templateSettingStep(_ a: Action) -> Step<Double>? {
+        guard case .templateSetting(let t) = a.spec else { return nil }
+        return Step(a, initial: t.initial, target: { _ in t.end })
     }
 
     private static func bendStep(_ a: Action) -> Step<Vec2>? {

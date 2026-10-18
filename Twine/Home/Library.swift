@@ -42,6 +42,8 @@ final class Library {
     var showVersionHistory = false
     /// The project whose Info card is up.
     var info: Item?
+    /// The New from Template card is up.
+    var pickingTemplate = false
     /// The ⌘K search card is up, with what it offers.
     var search: SearchSource?
 
@@ -183,6 +185,12 @@ final class Library {
     /// Into the folder showing, if one is.
     func newProject() {
         (NSDocumentController.shared as? DocumentController)?.createAndOpenProject(in: selectedFolder)
+    }
+
+    /// New from Template: a project named after the template, holding it.
+    func newProject(from kind: TemplateKind) {
+        pickingTemplate = false
+        (NSDocumentController.shared as? DocumentController)?.createAndOpenProject(in: selectedFolder, template: kind)
     }
 
     /// An open project renames through its document, so its window follows.

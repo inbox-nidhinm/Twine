@@ -41,6 +41,8 @@ public enum ActionFactory {
             kinds += [.cornerRadius, .shadow, .innerShadow, .layerBlur, .backgroundBlur]
             // A frame in 3D has a camera to move.
             if frame.space != nil { kinds.append(.camera) }
+            // A template has its settings to move.
+            if group.template != nil { kinds.append(.templateSetting) }
             return kinds
         case .shape(let shape):
             var kinds = transform
@@ -209,6 +211,17 @@ public enum ActionFactory {
             // Fades the sound out, or in to its own level when it is silent.
             let level = state.volume ?? 1
             spec = .volume(VolumeAction(end: level > 0.01 ? 0 : 1))
+        case .templateSetting:
+            // Its first setting, a good way towards the further end of its
+            // range, so the change shows.
+            let control = layer.template.flatMap { TemplateRecipes.animatable($0.kind).first }
+            let key = control?.key ?? TemplateSettingAction.cornerRadius
+            let now = state.template.settings[key] ?? layer.template.map { TemplateRecipes.value(of: key, in: $0) } ?? 0
+            var end = now
+            if case .number(let lo, let hi, _, _)? = control?.kind {
+                end = now < (lo + hi) / 2 ? min(now + (hi - lo) * 0.3, hi) : max(now - (hi - lo) * 0.3, lo)
+            }
+            spec = .templateSetting(TemplateSettingAction(key: key, end: end))
         case .template:
             // Templates come with their frame (`Templates`); this is only for completeness.
             spec = .template(TemplatePlay())

@@ -250,6 +250,34 @@ public enum TemplateRecipes {
         }
     }
 
+    /// The cards' rounding, as a setting a Template Setting action can move.
+    static let radius = TemplateControl.number(TemplateSettingAction.cornerRadius, "Radius", 6, 0, 50, .percent,
+                                               "How round the cards' corners are, as a share of their shorter side.")
+
+    /// The settings a Template Setting action can move: the recipe's
+    /// numbers, then the cards' rounding.
+    public static func animatable(_ kind: TemplateKind) -> [TemplateControl] {
+        controls(kind).filter { if case .number = $0.kind { return true } else { return false } } + [radius]
+    }
+
+    /// Every setting a Template Setting action can move, as `setup` has it.
+    public static func designSettings(_ setup: TemplateSetup) -> [String: Double] {
+        var out: [String: Double] = [:]
+        for c in animatable(setup.kind) { out[c.key] = value(of: c.key, in: setup) }
+        return out
+    }
+
+    /// Setting `key` of `setup` as the inspector shows it: its own value,
+    /// or the recipe's default.
+    public static func value(of key: String, in setup: TemplateSetup) -> Double {
+        if key == TemplateSettingAction.cornerRadius { return setup.cornerRadius * 100 }
+        if let v = setup.settings[key]?.number { return v }
+        for c in controls(setup.kind) where c.key == key {
+            if case .number(_, _, let standard, _) = c.kind { return standard }
+        }
+        return 0
+    }
+
     /// The settings read with their defaults.
     struct Settings {
         let values: [String: TemplateValue]
@@ -750,5 +778,22 @@ public enum TemplateRecipes {
             }
         }
         return TemplateScene(space: k.camera(0.4, backs: 0.5), cards: cards)
+    }
+}
+
+extension TemplateSetup {
+    /// With `settings` (as Template Setting actions give them) in place of
+    /// its own, each held to its range; itself when there are none.
+    public func tuned(_ settings: [String: Double]) -> TemplateSetup {
+        guard !settings.isEmpty else { return self }
+        var setup = self
+        for (key, v) in settings where v.isFinite {
+            if key == TemplateSettingAction.cornerRadius {
+                setup.cornerRadius = min(max(v, 0), 50) / 100
+            } else {
+                setup.settings[key] = .number(v)
+            }
+        }
+        return setup
     }
 }

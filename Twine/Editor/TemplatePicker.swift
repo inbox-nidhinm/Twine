@@ -11,8 +11,11 @@ import Theme
 struct TemplatePicker: View {
     let pick: (TemplateInfo) -> Void
     let close: () -> Void
+    /// Tiles across: two in the inspector, more on Home's card.
+    var across = 2
+    var closeHelp = "Back to actions"
 
-    private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
+    private var columns: [GridItem] { Array(repeating: GridItem(.flexible(), spacing: 8), count: max(across, 1)) }
 
     @State private var search = ""
     @FocusState private var searching: Bool
@@ -27,7 +30,7 @@ struct TemplatePicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HeaderRow(title: "Templates") {
-                IconButton(icon: .close, help: "Back to actions") { close() }
+                IconButton(icon: .close, help: closeHelp) { close() }
             }
             VStack(alignment: .leading, spacing: Theme.panelPad) {
                 TextField("Search", text: $search)

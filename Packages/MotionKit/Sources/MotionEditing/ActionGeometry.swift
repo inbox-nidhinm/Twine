@@ -176,6 +176,10 @@ public enum ActionGeometry {
             b.initial = final
             b.end = b.mode == .to ? base : base - final
             a.spec = .bend(b)
+        case .templateSetting(var t):
+            guard let start = t.initial ?? state.template.settings[t.key] else { return nil }
+            (t.initial, t.end) = (t.end, start)
+            a.spec = .templateSetting(t)
         case .camera(var c):
             guard let start = c.initial ?? state.camera.space else { return nil }
             (c.initial, c.end) = (c.end, start)

@@ -1,4 +1,6 @@
 import AppKit
+import MotionModel
+import MotionEditing
 
 /// Makes File > New write a real project into `Twine Creations` straight
 /// away, instead of opening an untitled document that asks where to save it
@@ -11,9 +13,12 @@ final class DocumentController: NSDocumentController {
 
     /// A new project in `folder`, or loose in the creations folder.
     @MainActor
-    func createAndOpenProject(in folder: URL? = nil) {
+    func createAndOpenProject(in folder: URL? = nil, template: TemplateKind? = nil) {
         do {
-            let url = try Creations.makeProject(in: folder)
+            let url = try template.map {
+                try Creations.makeProject(named: Templates.name(of: $0), in: folder,
+                                          project: Templates.project($0, composition: AppSettings.shared.newProject))
+            } ?? Creations.makeProject(in: folder)
             openDocument(withContentsOf: url, display: true) { _, _, error in
                 if let error { NSApp.presentError(error) }
             }

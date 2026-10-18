@@ -258,6 +258,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
             // and a template's place in its loop.
             var camera = layer.space3D
             var loop = layer.template?.pose ?? 0
+            var tuned: [String: Double] = [:]
             if let cache, tracks.isStill(layer.id) {
                 made = cache.resolved(layer, parent: parent) {
                     resolve(layer, state: LayerState(design: layer), parent: parent, pictures: pictures,
@@ -269,6 +270,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
                 guard state.isShown else { continue }
                 camera = state.camera.space
                 loop = state.template.phase ?? loop
+                tuned = state.template.settings
                 made = resolve(layer, state: state, parent: parent, pictures: pictures,
                                animation: tracks.textAnimation(of: layer, at: time), time: time, blur: blur)
             }
@@ -287,7 +289,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
             out.append(resolved)
             if let setup = layer.template {
                 // A template's cards, made for this moment, in its camera.
-                let made = TemplateCards.make(layer, setup, phase: loop, size: resolved.size, pictures: pictures)
+                let made = TemplateCards.make(layer, setup.tuned(tuned), phase: loop, size: resolved.size, pictures: pictures)
                 walk(made.cards, parent: layer.id, soloedAbove: soloed, space: SpaceContext(made.space, size: resolved.size))
             } else if layer.isGroup {
                 walk(layer.children, parent: layer.id, soloedAbove: soloed,
