@@ -240,6 +240,12 @@ public struct BentMesh: Sendable, Equatable {
     public var columns: Int
     public var rows: Int
     public var points: [Vec2]
+    /// Each point's depth, towards the viewer, in the frame's pixels. Seen
+    /// nearly edge-on, a bent layer wraps round its own outline and its
+    /// mesh folds over itself; without depths the window server drew the
+    /// fold as a large slab (exports drew it right), and with them it
+    /// draws the near side over the far, as it is.
+    public var depths: [Double] = []
 
     /// Cells across a bent direction, and along a straight one, which
     /// still needs a few to follow perspective: Core Animation stretches
@@ -248,23 +254,6 @@ public struct BentMesh: Sendable, Equatable {
     static let straightCells = 4
     static let doubleCells = 8
 
-    /// Whether, as projected, some cells face one way and some the other:
-    /// the layer is seen wrapping round its own outline.
-    public var folds: Bool {
-        var facing = 0.0
-        for j in 0..<rows {
-            for i in 0..<columns {
-                let a = points[j * (columns + 1) + i], b = points[j * (columns + 1) + i + 1]
-                let c = points[(j + 1) * (columns + 1) + i + 1], d = points[(j + 1) * (columns + 1) + i]
-                // Twice the cell's signed area, from its diagonals.
-                let area = (c.x - a.x) * (d.y - b.y) - (c.y - a.y) * (d.x - b.x)
-                // Cells too thin to have a side are left out.
-                guard abs(area) > 1e-3 else { continue }
-                if facing == 0 { facing = area } else if (area > 0) != (facing > 0) { return true }
-            }
-        }
-        return false
-    }
 }
 
 /// A curve on a layer: its own point (u, v) moved off its flat plane onto
@@ -390,15 +379,19 @@ struct SpaceContext {
             let columns = bend.x != 0 ? cells : BentMesh.straightCells
             let rows = bend.y != 0 ? cells : BentMesh.straightCells
             var points: [Vec2] = []
+            var depths: [Double] = []
             points.reserveCapacity((rows + 1) * (columns + 1))
+            depths.reserveCapacity((rows + 1) * (columns + 1))
             for j in 0...rows {
                 for i in 0...columns {
                     let u = size.width * Double(i) / Double(columns), v = size.height * Double(j) / Double(rows)
-                    guard let p = camera.project(pose.apply(curve.point(u, v))), Self.inFront(pose.apply(curve.point(u, v)), camera) else {
+                    let at = pose.apply(curve.point(u, v))
+                    guard let p = camera.project(at), Self.inFront(at, camera) else {
                         layer.opacity = 0
                         return
                     }
                     points.append(p)
+                    depths.append(at.z)
                 }
             }
             let corners = [points[0], points[columns], points[points.count - 1], points[points.count - 1 - columns]]
@@ -406,14 +399,9 @@ struct SpaceContext {
                 layer.opacity = 0
                 return
             }
-            let mesh = BentMesh(columns: columns, rows: rows, points: points)
-            // Seen nearly edge-on, a curved layer wraps round its own
-            // outline and its mesh folds over, some cells facing one way and
-            // the rest the other. The window server draws a folded mesh as
-            // a large slab (exports drew it right), so for those moments,
-            // when it is a sliver anyway, it is drawn flat through its corners.
-            layer.placed = mesh.folds ? .placed(projection: projection, depth: depth)
-                : .bent(projection: projection, depth: depth, mesh: mesh)
+            var mesh = BentMesh(columns: columns, rows: rows, points: points)
+            mesh.depths = depths
+            layer.placed = .bent(projection: projection, depth: depth, mesh: mesh)
             layer.motion = .none
         } else {
             let projection = camera.projection(of: pose)

@@ -45,9 +45,12 @@ enum MeshWarp {
         vertices.reserveCapacity(mesh.points.count)
         for j in 0...mesh.rows {
             for i in 0...mesh.columns {
-                let p = mesh.points[j * (mesh.columns + 1) + i]
+                let k = j * (mesh.columns + 1) + i
+                let p = mesh.points[k]
+                // Depth in the layer's widths, as `width` normalisation reads it.
+                let z = k < mesh.depths.count ? mesh.depths[k] / size.width : 0
                 vertices.append(Vertex(from: CGPoint(x: Double(i) / Double(mesh.columns), y: Double(j) / Double(mesh.rows)),
-                                       to: (CGFloat(p.x / size.width), CGFloat(p.y / size.height), 0)))
+                                       to: (CGFloat(p.x / size.width), CGFloat(p.y / size.height), CGFloat(z))))
             }
         }
         var faces: [Face] = []
@@ -61,7 +64,7 @@ enum MeshWarp {
         }
         return vertices.withUnsafeBytes { v in
             faces.withUnsafeBytes { f in
-                make(kind, selector, UInt(vertices.count), v.baseAddress!, UInt(faces.count), f.baseAddress!, "none")
+                make(kind, selector, UInt(vertices.count), v.baseAddress!, UInt(faces.count), f.baseAddress!, "width")
             }
         }
     }
