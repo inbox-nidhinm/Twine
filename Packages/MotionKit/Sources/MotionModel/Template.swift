@@ -145,6 +145,10 @@ public enum TemplateKind: String, Codable, Sendable, CaseIterable {
     case angledWipe = "angled-wipe", stripes, split, tileWipe = "tile-wipe"
     // Stack & Scatter
     case slideStack = "slide-stack", dropStack = "drop-stack", fannedDeck = "fanned-deck", trail, burst, toss, shuffle
+    // Sequences
+    case ringBelt = "ring-belt", lensRow = "lens-row", staircase, diveIn = "dive-in", parade, threeActs = "three-acts"
+    case collage, fanWall = "fan-wall", rowRing = "row-ring", dial, zoomStrip = "zoom-strip"
+    case unfoldRows = "unfold-rows", unfoldColumns = "unfold-columns"
 }
 
 /// When a template plays: its bar holds `loops` turns of the template's

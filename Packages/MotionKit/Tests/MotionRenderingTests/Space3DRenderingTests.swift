@@ -598,7 +598,7 @@ import MotionModel
         print("SPIKE BENCH ring of 24 flat cards: evaluate and place \(ms(place)), layer tree \(ms(update)), 1080p export frame \(ms(draw))")
 
         // Templates, which make their cards afresh every frame.
-        for kind in [TemplateKind.ringStream, .globe, .tunnel, .curvedWall] {
+        for kind in [TemplateKind.ringStream, .globe, .tunnel, .curvedWall, .diveIn, .fanWall, .threeActs] {
             let setup = TemplateSetup(kind: kind, slots: Array(repeating: nil, count: TemplateRecipes.slotCount(kind)))
             let frame = Layer(name: "T", content: .group(GroupContent(clipsContent: true, frame: FrameStyle(), template: setup)),
                               size: Size2(1920, 1080), position: Vec2(960, 540))

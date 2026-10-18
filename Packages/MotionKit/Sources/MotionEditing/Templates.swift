@@ -4,11 +4,12 @@ import MotionEvaluation
 
 /// The headed groups the template picker shows, in order.
 public enum TemplateGroup: String, Sendable, CaseIterable {
-    case perspective, isometric, orbit, flow, grid, spotlight, reveal, stack
+    case perspective, sequence, isometric, orbit, flow, grid, spotlight, reveal, stack
 
     public var title: String {
         switch self {
         case .perspective: "3D & Perspective"
+        case .sequence: "Sequences"
         case .isometric: "Isometric"
         case .orbit: "Orbit"
         case .flow: "Carousel & Flow"
@@ -45,6 +46,19 @@ public enum Templates {
         TemplateInfo(kind: .depthStack, name: "Depth Stack", group: .perspective),
         TemplateInfo(kind: .carouselRing, name: "Carousel Ring", group: .perspective),
         TemplateInfo(kind: .verticalRing, name: "Vertical Ring", group: .perspective),
+        TemplateInfo(kind: .ringBelt, name: "Ring to Belt", group: .sequence),
+        TemplateInfo(kind: .lensRow, name: "Lens Row", group: .sequence),
+        TemplateInfo(kind: .staircase, name: "Staircase", group: .sequence),
+        TemplateInfo(kind: .diveIn, name: "Dive In", group: .sequence),
+        TemplateInfo(kind: .parade, name: "Parade", group: .sequence),
+        TemplateInfo(kind: .threeActs, name: "Three Acts", group: .sequence),
+        TemplateInfo(kind: .collage, name: "Collage", group: .sequence),
+        TemplateInfo(kind: .fanWall, name: "Fan to Wall", group: .sequence),
+        TemplateInfo(kind: .rowRing, name: "Row to Ring", group: .sequence),
+        TemplateInfo(kind: .dial, name: "Dial", group: .sequence),
+        TemplateInfo(kind: .zoomStrip, name: "Zoom Strip", group: .sequence),
+        TemplateInfo(kind: .unfoldRows, name: "Unfold Rows", group: .sequence),
+        TemplateInfo(kind: .unfoldColumns, name: "Unfold Columns", group: .sequence),
         TemplateInfo(kind: .isoStream, name: "Iso Stream", group: .isometric),
         TemplateInfo(kind: .isoSpotlight, name: "Iso Spotlight", group: .isometric),
         TemplateInfo(kind: .isoSwing, name: "Iso Swing", group: .isometric),
@@ -133,6 +147,18 @@ public enum Templates {
     /// next.
     public static let splitSteps = 24
 
+    /// Steps a loop of `kind` is cut into: sequences move many cards a
+    /// little after each other between layouts, so they take twice as many.
+    public static func splitSteps(for kind: TemplateKind) -> Int {
+        Templates.library.first { $0.kind == kind }?.group == .sequence ? splitSteps * 2 : splitSteps
+    }
+
+    /// `angle` turned by whole turns to lie nearest `near`, so a card
+    /// going round keeps going the same way rather than spinning back.
+    static func nearest(_ angle: Double, to near: Double) -> Double {
+        angle + 360 * ((near - angle) / 360).rounded()
+    }
+
     /// The template frame `id` as an ordinary frame in 3D: its cards made
     /// real layers where they rest, and its motion, across its bar, made
     /// To actions from step to step, gathered in a scene named after it.
@@ -159,22 +185,34 @@ public enum Templates {
                 made.append(Action(target: target, start: start, duration: duration, easing: .linear, rowOrder: row, spec: spec))
                 row += 1
             }
-            let steps = max(Int((Double(splitSteps) * play.loops).rounded(.up)), 1)
+            let steps = max(Int((Double(splitSteps(for: setup.kind)) * play.loops).rounded(.up)), 1)
             var before = rest
+            // The turns each card was last given, unwound past whole turns.
+            var turns = rest.cards.map { ($0.transform.rotation, $0.transform.tilt) }
             for k in 1...steps {
                 let phase = setup.pose + play.loops * Double(k) / Double(steps)
                 let now = TemplateCards.make(frame, setup, phase: phase, size: frame.size, pictures: pictures)
                 let t0 = bar.start + bar.duration * Double(k - 1) / Double(steps)
                 let length = bar.duration / Double(steps)
+                // Worked out as the step's own start is, so a card that goes
+                // at once goes exactly as the next step starts.
+                let t1 = bar.start + bar.duration * Double(k) / Double(steps)
                 if now.space != before.space { add(id, t0, length, .camera(CameraAction(end: now.space))) }
                 for (i, (a, b)) in zip(before.cards, now.cards).enumerated() {
                     let hidden = a.opacity < 0.02 && b.opacity < 0.02
-                    let (start, duration) = hidden ? (t0 + length, 0.0) : (t0, length)
+                    let (start, duration) = hidden ? (t1, 0.0) : (t0, length)
                     let ta = a.transform, tb = b.transform
                     if ta.position != tb.position { add(ids[i], start, duration, .move(MoveAction(mode: .to, end: tb.position))) }
                     if ta.z != tb.z { add(ids[i], start, duration, .depth(DepthAction(mode: .to, end: tb.z))) }
-                    if ta.tilt != tb.tilt { add(ids[i], start, duration, .tilt(TiltAction(mode: .to, end: tb.tilt))) }
-                    if ta.rotation != tb.rotation { add(ids[i], start, duration, .rotate(RotateAction(mode: .to, end: tb.rotation))) }
+                    var tilt = tb.tilt
+                    if i < turns.count {
+                        tilt.x = nearest(tilt.x, to: turns[i].1.x)
+                        tilt.y = nearest(tilt.y, to: turns[i].1.y)
+                    }
+                    let rotation = i < turns.count ? nearest(tb.rotation, to: turns[i].0) : tb.rotation
+                    if i < turns.count, tilt != turns[i].1 { add(ids[i], start, duration, .tilt(TiltAction(mode: .to, end: tilt))) }
+                    if i < turns.count, rotation != turns[i].0 { add(ids[i], start, duration, .rotate(RotateAction(mode: .to, end: rotation))) }
+                    if i < turns.count { turns[i] = (rotation, tilt) }
                     if ta.scale != tb.scale { add(ids[i], start, duration, .scale(ScaleAction(mode: .to, end: tb.scale))) }
                     if ta.bend != tb.bend { add(ids[i], start, duration, .bend(BendAction(mode: .to, end: tb.bend))) }
                     if a.opacity != b.opacity { add(ids[i], start, duration, .opacity(OpacityAction(end: b.opacity))) }

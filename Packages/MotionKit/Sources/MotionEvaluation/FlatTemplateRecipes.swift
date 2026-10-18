@@ -18,7 +18,7 @@ extension TemplateRecipes {
         case .gridBuild, .gridZoom, .railFocus, .peelDeck, .split, .tileWipe, .slideStack, .dropStack, .burst: 4
         case .ticker, .tiltedTicker, .driftColumns, .feed, .trail: 12
         case .stage, .slowZoom, .angledWipe, .stripes: 3
-        default: 8
+        default: sequenceSlotCount(kind)
         }
     }
 
@@ -120,7 +120,7 @@ extension TemplateRecipes {
             [size(26), .number("height", "Throw height", 75, 10, 100, .percent, "How high the cards are thrown."),
              .number("spin", "Spin", 12, 0, 90, .degrees, "How far the cards turn as they fly.")]
         case .shuffle: [size(28), gapControl(10)]
-        default: []
+        default: sequenceControls(kind)
         }
     }
 
@@ -162,7 +162,7 @@ extension TemplateRecipes {
         case .burst: return burst(s, p, k, n)
         case .toss: return toss(s, p, k, n)
         case .shuffle: return shuffle(s, p, k, n)
-        default: return TemplateScene(space: Space3D(), cards: [])
+        default: return sequenceScene(kind, s, p, k, slots: slots)
         }
     }
 

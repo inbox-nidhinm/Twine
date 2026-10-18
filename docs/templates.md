@@ -130,7 +130,17 @@ Each ends with the usual gate: a clean `./make-app.sh`, `./test.sh` passing, the
    | Ticker Loop | Ticker | Position Dance | Shuffle |
    | Ticker Tilt | Tilted Ticker | Column Drift | Drift Columns |
    | Feed Scroll | Feed | | |
-7. **Multiscene (13).** The hardest: each moves through several layouts with camera moves between them.
+7. **Multiscene (13).** Done (18 October 2026), as the Sequences group: each is a list of layouts (a ring, a row, a grid, a pile, one card up close) played round, every card moving to its place in the next a little after the one before (Stagger, Hold, Easing, and on the first five a Flip), the camera zooming onto a card or a strip and turning between them. Every card keeps one cell and changes size by its scale, so Split into Layers keeps it; sequences split into 48 steps a loop, twice the others, and split turns are unwound so a card turning round never spins back. Our names, by Animos's:
+
+   | Animos | Twine | Animos | Twine |
+   |---|---|---|---|
+   | Bloom Belt | Ring to Belt | Fan Shuffle | Fan to Wall |
+   | Lens Orbit | Lens Row | Sweep Ring | Row to Ring |
+   | Stairway | Staircase | Scatter Dial | Dial |
+   | Grid Dive | Dive In | Grid Zoom Strip | Zoom Strip |
+   | Pop Parade | Parade | Spread Rows | Unfold Rows |
+   | Triple Scene | Three Acts | Spread Columns | Unfold Columns |
+   | Collage Reel | Collage | | |
 8. **Keyframed settings and New from Template on Home.**
 
 Milestones 2 to 4 are worth having on their own: they give Twine real 3D whether or not templates follow.

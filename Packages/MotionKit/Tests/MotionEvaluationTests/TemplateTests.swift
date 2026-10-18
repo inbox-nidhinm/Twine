@@ -139,4 +139,30 @@ import MotionModel
         #expect(back.template == frame.template)
         #expect(back.mediaIDs == frame.template!.mediaIDs)
     }
+
+    /// A sequence keeps the same cards through every layout, rests in each
+    /// for its hold, and its camera brings the strip it looks at close.
+    @Test func sequencesRestThenMoveOn() {
+        let sequences: [TemplateKind] = [.ringBelt, .lensRow, .staircase, .diveIn, .parade, .threeActs, .collage, .fanWall,
+                                         .rowRing, .dial, .zoomStrip, .unfoldRows, .unfoldColumns]
+        for kind in sequences {
+            let setup = Self.frame(kind).template!
+            let counts = Set(stride(from: 0.0, to: 1, by: 0.01).map { TemplateRecipes.scene(setup, phase: $0, size: Self.size).cards.count })
+            #expect(counts.count == 1, "\(kind) keeps its cards")
+            let cells = Set(TemplateRecipes.scene(setup, phase: 0.6, size: Self.size).cards.map { "\($0.cell)" })
+            #expect(cells.count == 1, "\(kind) gives every card one cell")
+        }
+        // A hero rests: Ring to Belt's second shot, one card up close, is
+        // still through its hold.
+        var setup = Self.frame(.ringBelt).template!
+        setup.settings["stagger"] = .number(0)
+        let a = TemplateRecipes.scene(setup, phase: 0.26, size: Self.size)
+        let b = TemplateRecipes.scene(setup, phase: 0.33, size: Self.size)
+        #expect(a == b)
+        #expect(a.cards.filter { $0.opacity > 0.5 }.count == 1)
+        // Zoom Strip's first shot is the grid at twice the size.
+        let strip = TemplateRecipes.scene(Self.frame(.zoomStrip).template!, phase: 0.01, size: Self.size)
+        let grid = TemplateRecipes.scene(Self.frame(.zoomStrip).template!, phase: 0.8, size: Self.size)
+        #expect(abs(strip.cards[0].scale - grid.cards[0].scale * 2) < 1e-6)
+    }
 }
