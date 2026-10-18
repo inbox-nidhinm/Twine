@@ -70,9 +70,10 @@ struct TemplatePicker: View {
     }
 }
 
-/// A template on a tile, its name under it. Its picture is drawn after the
-/// view is built, never while it is: drawing flushes Core Animation, which
-/// made SwiftUI build the tile again mid-way and stopped the app.
+/// A template on a tile, its name under it. Its picture is drawn away from
+/// the main thread (`TemplatePosters`), never while the view is built:
+/// drawing flushes Core Animation, which made SwiftUI build the tile again
+/// mid-way and stopped the app.
 private struct TemplateChoice: View {
     let info: TemplateInfo
     let action: () -> Void
@@ -105,12 +106,14 @@ private struct TemplateChoice: View {
         // The still, then, under the pointer, the loop playing until it leaves.
         .task(id: hovering) {
             guard hovering else {
-                image = TemplatePosters.poster(info.kind)
+                image = await TemplatePosters.poster(info.kind)
                 return
             }
             let started = Date()
             while !Task.isCancelled {
-                image = TemplatePosters.image(info.kind, phase: Date().timeIntervalSince(started) / TemplatePosters.period)
+                if let frame = await TemplatePosters.image(info.kind, phase: Date().timeIntervalSince(started) / TemplatePosters.period) {
+                    image = frame
+                }
                 try? await Task.sleep(for: .milliseconds(33))
             }
         }
@@ -121,6 +124,12 @@ private struct TemplateChoice: View {
 /// The tiles' pictures: each template drawn with plain cards through the
 /// same renderer exports use, small. Stills are kept; a playing tile is
 /// drawn afresh each frame.
+///
+/// Drawn on a queue of its own, as exports are. Drawn on the main thread
+/// they came out empty while the picker was still appearing (what Core
+/// Animation had been given was not yet handed on to be drawn), and those
+/// empty stills were kept: the first tiles showed nothing. A still that
+/// comes out empty all the same is drawn again rather than kept.
 @MainActor
 enum TemplatePosters {
     static let width = 320
@@ -130,21 +139,55 @@ enum TemplatePosters {
     /// Where in its loop a still shows it, a little way in.
     static let rest = 0.12
 
-    private static let renderer = OffscreenRenderer(pixelWidth: width, pixelHeight: height)
+    private static let drawing = Drawing()
     private static var stills: [TemplateKind: CGImage] = [:]
 
-    static func poster(_ kind: TemplateKind) -> CGImage? {
+    static func poster(_ kind: TemplateKind) async -> CGImage? {
         if let known = stills[kind] { return known }
-        let made = image(kind, phase: rest)
-        stills[kind] = made
-        return made
+        for attempt in 0..<4 {
+            if let made = await image(kind, phase: rest), !Drawing.isBlank(made) {
+                stills[kind] = made
+                return made
+            }
+            try? await Task.sleep(for: .milliseconds(100 * (attempt + 1)))
+            if Task.isCancelled { return nil }
+        }
+        return nil
     }
 
-    static func image(_ kind: TemplateKind, phase: Double) -> CGImage? {
-        let composition = Composition(width: width, height: height)
-        var frame = Templates.frame(kind, filling: composition)
-        frame.look = ShapeContent(geometry: .rectangle(cornerRadii: .zero), fills: [Fill(paint: .color(RGBA(0.1, 0.1, 0.11)))])
-        frame.template?.pose = phase - phase.rounded(.down)
-        return renderer?.image(of: evaluateDesign(Project(composition: composition, layers: [frame])))
+    static func image(_ kind: TemplateKind, phase: Double) async -> CGImage? {
+        await drawing.image(kind, phase: phase, width: width, height: height)
+    }
+
+    /// One renderer, used on one queue only.
+    private nonisolated final class Drawing: @unchecked Sendable {
+        private let queue = DispatchQueue(label: "Twine.TemplatePosters")
+        private var renderer: OffscreenRenderer?
+
+        func image(_ kind: TemplateKind, phase: Double, width: Int, height: Int) async -> CGImage? {
+            await withCheckedContinuation { done in
+                queue.async { [self] in
+                    if renderer == nil { renderer = OffscreenRenderer(pixelWidth: width, pixelHeight: height) }
+                    let composition = Composition(width: width, height: height)
+                    var frame = Templates.frame(kind, filling: composition)
+                    frame.look = ShapeContent(geometry: .rectangle(cornerRadii: .zero), fills: [Fill(paint: .color(RGBA(0.1, 0.1, 0.11)))])
+                    frame.template?.pose = phase - phase.rounded(.down)
+                    done.resume(returning: renderer?.image(of: evaluateDesign(Project(composition: composition, layers: [frame]))))
+                }
+            }
+        }
+
+        /// Whether nothing was drawn: every poster has a solid ground, so
+        /// a see-through middle means the drawing came out empty.
+        static func isBlank(_ image: CGImage) -> Bool {
+            guard let data = image.dataProvider?.data, let bytes = CFDataGetBytePtr(data) else { return true }
+            let row = image.bytesPerRow, length = CFDataGetLength(data)
+            // Alpha is the last byte of each BGRA pixel; look at a few.
+            for (x, y) in [(image.width / 2, image.height / 2), (2, 2), (image.width - 3, image.height - 3)] {
+                let i = y * row + x * 4 + 3
+                if i < length, bytes[i] > 0 { return false }
+            }
+            return true
+        }
     }
 }
