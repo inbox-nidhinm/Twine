@@ -70,11 +70,17 @@ struct AnimationInspector: View {
                         PanelDivider()
                     }
                     VStack(alignment: .leading, spacing: 8) {
-                        HeaderRow(title: "Actions") {}
+                        HeaderRow(title: "Add to Layer") {}
                         ActionTiles(newActions: actionEntries(controller.availableActions),
                                     hasPresets: !controller.availablePresets.isEmpty,
-                                    pickPreset: { pickingPreset = true },
-                                    pickTemplate: { pickingTemplate = true })
+                                    pickPreset: { pickingPreset = true })
+                            .padding(.horizontal, Theme.panelPad)
+                    }
+                    .padding(.bottom, Theme.panelPad)
+                    PanelDivider()
+                    VStack(alignment: .leading, spacing: 8) {
+                        HeaderRow(title: "Templates") {}
+                        TemplateTile { pickingTemplate = true }
                             .padding(.horizontal, Theme.panelPad)
                     }
                     .padding(.bottom, Theme.panelPad)

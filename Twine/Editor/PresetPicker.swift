@@ -7,12 +7,12 @@ import CoreImage
 import Theme
 
 /// The two ways to start animating the selection, as big tiles: a new action
-/// from the menu, or a preset from the picker.
+/// from the menu, or a preset from the picker. Three to a row, as the
+/// Templates tile under them is, so every tile is one size.
 struct ActionTiles: View {
     let newActions: [MenuEntry]
     let hasPresets: Bool
     let pickPreset: () -> Void
-    var pickTemplate: (() -> Void)? = nil
 
     @Environment(MenuHost.self) private var menus
     @State private var newFrame: CGRect = .zero
@@ -26,22 +26,20 @@ struct ActionTiles: View {
             .help("Adds an action at the playhead, half a second long.")
             BigTile(icon: .presets, title: "Select Preset", disabled: !hasPresets, action: pickPreset)
                 .help("Picks a ready-made animation to add at the playhead, as one bar you can adjust.")
-            if let pickTemplate {
-                BigTile(icon: .template, title: "Templates", action: pickTemplate)
-                    .help("Picks a whole scene of cards, a ring, a globe or a tunnel, with the selected pictures in it.")
-            }
+            Color.clear.frame(maxWidth: .infinity)
         }
     }
 }
 
-/// The Templates tile on its own, for when nothing is selected.
+/// The Templates tile, in a section of its own under Add to Layer, or alone
+/// when nothing is selected.
 struct TemplateTile: View {
     let action: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
             BigTile(icon: .template, title: "Templates", action: action)
-                .help("Picks a whole scene of cards, a ring, a globe or a tunnel, to fill with your pictures.")
+                .help("Picks a whole scene of cards, a ring, a globe or a tunnel, to fill with your pictures; selected pictures and videos go into its slots.")
             Color.clear.frame(maxWidth: .infinity)
             Color.clear.frame(maxWidth: .infinity)
         }
