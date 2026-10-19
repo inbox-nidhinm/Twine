@@ -22,7 +22,7 @@ public enum ActionFactory {
     /// nothing to move or fade; a group's size is its children's, so it
     /// scales rather than resizes. Style acts on what a shape has: Colour
     /// on its first fill, Stroke and Trim on its first stroke, Corner Radius
-    /// on a rectangle. Background blur and inner shadows follow a shape's
+    /// on a rectangle. Background blur, glass and inner shadows follow a shape's
     /// outline, and a text with a stroke takes Stroke too. Volume is
     /// for layers with sound: always a sound, and a video when `hasSound`
     /// says its file has a sound track (see `kinds(for:in:)`).
@@ -38,7 +38,7 @@ public enum ActionFactory {
             var kinds = transform
             if let top = frame.fills.last, !top.paint.isImage { kinds.append(.color) }
             if !frame.strokes.isEmpty { kinds.append(.stroke) }
-            kinds += [.cornerRadius, .shadow, .innerShadow, .layerBlur, .backgroundBlur]
+            kinds += [.cornerRadius, .shadow, .innerShadow, .layerBlur, .backgroundBlur, .glass]
             // A frame in 3D has a camera to move.
             if frame.space != nil { kinds.append(.camera) }
             // A template has its settings to move.
@@ -57,7 +57,7 @@ public enum ActionFactory {
             case .rectangle, .polygon: kinds.append(.cornerRadius)
             default: break
             }
-            kinds += [.shadow, .innerShadow, .layerBlur, .backgroundBlur]
+            kinds += [.shadow, .innerShadow, .layerBlur, .backgroundBlur, .glass]
             if case .ellipse = shape.geometry { kinds.append(.arc) }
             if case .star = shape.geometry { kinds.append(.star) }
             if case .path = shape.geometry { kinds.append(.path) }
@@ -180,6 +180,9 @@ public enum ActionFactory {
             spec = .layerBlur(LayerBlurAction(end: state.layerBlur > 0 ? 0 : 12))
         case .backgroundBlur:
             spec = .backgroundBlur(BackgroundBlurAction(end: BackgroundBlur(radius: state.backgroundBlur.radius > 0 ? 0 : 24)))
+        case .glass:
+            // Figma's new glass in from nothing, or the designed one away.
+            spec = .glass(GlassAction(end: state.glass == .none ? Glass() : .noGlass))
         case .letterSpacing:
             let current = state.letterSpacing ?? 0
             spec = .letterSpacing(LetterSpacingAction(end: current > 0 ? 0 : (fontSize(of: layer) * 0.2).rounded()))

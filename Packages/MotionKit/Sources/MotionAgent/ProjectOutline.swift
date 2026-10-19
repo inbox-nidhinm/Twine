@@ -141,6 +141,7 @@ extension EffectKind {
         case .innerShadow: return "innerShadow"
         case .layerBlur: return "layerBlur"
         case .backgroundBlur: return "backgroundBlur"
+        case .glass: return "glass"
         }
     }
 }

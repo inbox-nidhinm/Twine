@@ -74,6 +74,8 @@ public enum ActionSpec: Sendable, Equatable {
     case innerShadow(ShadowAction)
     case layerBlur(LayerBlurAction)
     case backgroundBlur(BackgroundBlurAction)
+    /// The first glass, shapes and frames only.
+    case glass(GlassAction)
     case letterSpacing(LetterSpacingAction)
     case lineHeight(LineHeightAction)
     case counter(CounterAction)
@@ -115,6 +117,7 @@ public enum ActionSpec: Sendable, Equatable {
         case .innerShadow: return .innerShadow
         case .layerBlur: return .layerBlur
         case .backgroundBlur: return .backgroundBlur
+        case .glass: return .glass
         case .letterSpacing: return .letterSpacing
         case .lineHeight: return .lineHeight
         case .counter: return .counter
@@ -140,7 +143,7 @@ public enum ActionSpec: Sendable, Equatable {
 public enum ActionKind: String, Codable, Sendable, CaseIterable {
     case move, scale, rotate, opacity, resize, visibility
     case color, stroke, trim, dash, cornerRadius, shadow, innerShadow
-    case layerBlur, backgroundBlur
+    case layerBlur, backgroundBlur, glass
     case letterSpacing, lineHeight, counter, changeText
     case arc, star, path
     case play, volume
@@ -170,6 +173,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .innerShadow: return "Inner Shadow"
         case .layerBlur: return "Layer Blur"
         case .backgroundBlur: return "Background Blur"
+        case .glass: return "Glass"
         case .letterSpacing: return "Letter Spacing"
         case .lineHeight: return "Line Height"
         case .counter: return "Counter"
@@ -196,7 +200,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .move, .scale, .rotate, .opacity, .resize, .visibility, .skew, .tilt, .depth, .bend: return .transform
         case .camera, .template, .templateSetting: return .space
         case .color, .stroke, .trim, .dash, .cornerRadius, .shadow, .innerShadow: return .style
-        case .layerBlur, .backgroundBlur: return .blur
+        case .layerBlur, .backgroundBlur, .glass: return .blur
         case .letterSpacing, .lineHeight, .counter, .changeText: return .text
         case .arc, .star, .path: return .shape
         case .play, .volume: return .media
@@ -570,6 +574,17 @@ public struct BackgroundBlurAction: Codable, Sendable, Equatable {
     }
 }
 
+/// The first glass. A layer designed without one starts from none.
+public struct GlassAction: Codable, Sendable, Equatable {
+    public var initial: Glass?
+    public var end: Glass
+
+    public init(initial: Glass? = nil, end: Glass) {
+        self.initial = initial
+        self.end = end
+    }
+}
+
 /// Extra space between letters, in pixels.
 public struct LetterSpacingAction: Codable, Sendable, Equatable {
     public var initial: Double?
@@ -928,7 +943,7 @@ public enum PresetCorner: String, Codable, Sendable, CaseIterable {
 extension ActionSpec: Codable {
     private enum CodingKeys: String, CodingKey {
         case type, move, scale, rotate, opacity, resize, visibility
-        case color, stroke, trim, dash, cornerRadius, shadow, innerShadow, layerBlur, backgroundBlur
+        case color, stroke, trim, dash, cornerRadius, shadow, innerShadow, layerBlur, backgroundBlur, glass
         case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume, skew, tilt, depth, bend, camera, template, templateSetting, preset
     }
 
@@ -950,6 +965,7 @@ extension ActionSpec: Codable {
         case .innerShadow: self = .innerShadow(try c.decode(ShadowAction.self, forKey: .innerShadow))
         case .layerBlur: self = .layerBlur(try c.decode(LayerBlurAction.self, forKey: .layerBlur))
         case .backgroundBlur: self = .backgroundBlur(try c.decode(BackgroundBlurAction.self, forKey: .backgroundBlur))
+        case .glass: self = .glass(try c.decode(GlassAction.self, forKey: .glass))
         case .letterSpacing: self = .letterSpacing(try c.decode(LetterSpacingAction.self, forKey: .letterSpacing))
         case .lineHeight: self = .lineHeight(try c.decode(LineHeightAction.self, forKey: .lineHeight))
         case .counter: self = .counter(try c.decode(CounterAction.self, forKey: .counter))
@@ -989,6 +1005,7 @@ extension ActionSpec: Codable {
         case .innerShadow(let v): try c.encode(v, forKey: .innerShadow)
         case .layerBlur(let v): try c.encode(v, forKey: .layerBlur)
         case .backgroundBlur(let v): try c.encode(v, forKey: .backgroundBlur)
+        case .glass(let v): try c.encode(v, forKey: .glass)
         case .letterSpacing(let v): try c.encode(v, forKey: .letterSpacing)
         case .lineHeight(let v): try c.encode(v, forKey: .lineHeight)
         case .counter(let v): try c.encode(v, forKey: .counter)

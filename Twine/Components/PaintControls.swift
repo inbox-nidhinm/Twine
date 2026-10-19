@@ -113,6 +113,71 @@ struct ShadowControls: View {
     }
 }
 
+/// Twine's Glass effect (MotionModel's), not SwiftUI's material of the same
+/// name, wherever the app says Glass.
+typealias Glass = MotionModel.Glass
+
+/// Figma's Glass settings in its panel's order: the light's angle and
+/// strength, then Refraction, Depth, Dispersion, Frost and Splay. `button`
+/// sits in the button column beside the light, as an effect's eye does.
+struct GlassControls<Button: View>: View {
+    let glass: Glass
+    let edit: EditCallbacks<Glass>
+    @ViewBuilder var button: () -> Button
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            LabeledRow(label: "Light") {
+                HStack(spacing: 8) {
+                    UnitField(value: glass.lightAngle, decimals: 0, suffix: "°") { v in edit.commit(with { $0.lightAngle = v }) }
+                        .help("Where the light comes from: 0° is the top, -45° the top left")
+                    UnitField(value: glass.lightIntensity * 100, decimals: 0, suffix: "%", accepts: Self.percent) { v in
+                        edit.commit(with { $0.lightIntensity = v / 100 })
+                    }
+                    .help("How brightly the rim catches the light")
+                }
+            }
+            .rowButton(button)
+            percent("Refraction", glass.refraction, help: "How strongly the edge bends what is behind it") { $0.refraction = $1 }
+            pixels("Depth", glass.depth, decimals: 0, help: "How far in from the edge the bend reaches") { $0.depth = $1 }
+            percent("Dispersion", glass.dispersion, help: "How far the bent edge splits into colours") { $0.dispersion = $1 }
+            pixels("Frost", glass.frost, decimals: 1, help: "How much what is behind it is blurred") { $0.frost = $1 }
+            percent("Splay", glass.splay, help: "How far the bend spreads towards the middle") { $0.splay = $1 }
+        }
+    }
+
+    private static func percent(_ v: Double) -> Bool { v >= 0 && v <= 100 }
+
+    private func percent(_ label: String, _ value: Double, help: String, _ set: @escaping (inout Glass, Double) -> Void) -> some View {
+        LabeledRow(label: label) {
+            UnitField(value: value * 100, decimals: 0, suffix: "%", accepts: Self.percent) { v in edit.commit(with { set(&$0, v / 100) }) }
+        }
+        .help(help)
+    }
+
+    private func pixels(_ label: String, _ value: Double, decimals: Int, help: String,
+                        _ set: @escaping (inout Glass, Double) -> Void) -> some View {
+        LabeledRow(label: label) {
+            UnitField(value: value, decimals: decimals, suffix: "px", accepts: { $0 >= 0 && $0 <= 1000 }) { v in
+                edit.commit(with { set(&$0, v) })
+            }
+        }
+        .help(help)
+    }
+
+    private func with(_ change: (inout Glass) -> Void) -> Glass {
+        var g = glass
+        change(&g)
+        return g
+    }
+}
+
+extension GlassControls where Button == EmptyView {
+    init(glass: Glass, edit: EditCallbacks<Glass>) {
+        self.init(glass: glass, edit: edit) { EmptyView() }
+    }
+}
+
 /// A small picture of a paint, over the transparency pattern.
 struct PaintSwatch: View {
     let paint: Paint

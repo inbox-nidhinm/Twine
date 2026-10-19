@@ -21,7 +21,9 @@ func kitchenSinkProject() -> Project {
     rect.blendMode = .colorDodge
     rect.effects = [Effect(kind: .dropShadow(DropShadow(spread: 3))), Effect(isEnabled: false, kind: .layerBlur(LayerBlur(radius: 12))),
                     Effect(kind: .innerShadow(DropShadow(color: .white, offset: Vec2(0, -2), blur: 3, opacity: 0.4, spread: 1))),
-                    Effect(kind: .backgroundBlur(BackgroundBlur(radius: 20, blend: 0.6)))]
+                    Effect(kind: .backgroundBlur(BackgroundBlur(radius: 20, blend: 0.6))),
+                    Effect(kind: .glass(Glass(lightAngle: 30, lightIntensity: 0.5, refraction: 0.7, depth: 12, dispersion: 0.2,
+                                              frost: 3, splay: 0.4)))]
 
     let ellipse = Layer(name: "Ellipse", content: .shape(ShapeContent(
         geometry: .ellipse(arc: EllipseArc(start: -90, end: 180, innerRadius: 0.6)),
@@ -109,6 +111,7 @@ func kitchenSinkProject() -> Project {
         Action(target: star.id, start: 1, duration: 1, spec: .star(StarAction(end: StarShape(points: 7, innerRadius: 0.5, cornerRadius: 2)))),
         Action(target: video.id, start: 0.5, duration: 2, spec: .play(PlayAction(trimStart: 1.25))),
         Action(target: rect.id, start: 1, duration: 1, spec: .backgroundBlur(BackgroundBlurAction(end: BackgroundBlur(radius: 4, blend: 0.5)))),
+        Action(target: rect.id, start: 2, duration: 1, spec: .glass(GlassAction(initial: .noGlass, end: Glass(depth: 30)))),
     ]
 
     return Project(

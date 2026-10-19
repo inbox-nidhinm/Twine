@@ -157,6 +157,9 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
     public var warp: Warp = .none
     /// A clip of the layer's own box from a Mask preset, or `.none`.
     public var reveal: Reveal = .none
+    /// Shapes and frames only: the glass that bends what is behind the
+    /// layer, held to its ranges, or `.none`.
+    public var glass: GlassState = .none
     /// A page curl, or `.none`; never curled right off, which `resolve`
     /// makes a fade to nothing.
     public var curl: Curl = .none
@@ -211,6 +214,10 @@ public struct ResolvedShape: Sendable, Equatable {
     /// Only the fills that are switched on, bottom first.
     public var fills: [ResolvedPaint]
     public var strokes: [ResolvedStroke]
+    /// The corner radius when the outline is the whole box with every
+    /// corner rounded alike (a rectangle, or a circle filling a square),
+    /// which glass draws without tracing the outline; nil otherwise.
+    public var roundedBox: Double? = nil
 }
 
 public enum ResolvedPaint: Sendable, Equatable {

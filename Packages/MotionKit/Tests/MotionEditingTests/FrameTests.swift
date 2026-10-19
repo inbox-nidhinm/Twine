@@ -68,7 +68,7 @@ import MotionEvaluation
     @Test func aFrameOffersWhatARectangleDoes() {
         let frame = LayerFactory.frame(in: Box(origin: .zero, size: Size2(10, 10)), name: "F")
         let kinds = ActionFactory.kinds(for: frame, hasSound: false)
-        for kind: ActionKind in [.resize, .color, .cornerRadius, .shadow, .innerShadow, .backgroundBlur] { #expect(kinds.contains(kind)) }
+        for kind: ActionKind in [.resize, .color, .cornerRadius, .shadow, .innerShadow, .backgroundBlur, .glass] { #expect(kinds.contains(kind)) }
         let group = LayerFactory.group(in: Box(origin: .zero, size: Size2(10, 10)), children: [], name: "G")
         #expect(!ActionFactory.kinds(for: group, hasSound: false).contains(.resize))
         // A plain group has no outline for an inner shadow to fall inside.

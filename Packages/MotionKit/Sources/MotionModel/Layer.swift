@@ -581,11 +581,14 @@ public enum EffectKind: Sendable, Equatable {
     case innerShadow(DropShadow)
     case layerBlur(LayerBlur)
     case backgroundBlur(BackgroundBlur)
+    /// Figma's Glass: what is behind bends at the shape's edge. Shapes and
+    /// frames only.
+    case glass(Glass)
 }
 
 extension EffectKind: Codable {
-    private enum Kind: String, Codable { case dropShadow, innerShadow, layerBlur, backgroundBlur }
-    private enum CodingKeys: String, CodingKey { case type, shadow, blur }
+    private enum Kind: String, Codable { case dropShadow, innerShadow, layerBlur, backgroundBlur, glass }
+    private enum CodingKeys: String, CodingKey { case type, shadow, blur, glass }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -594,6 +597,7 @@ extension EffectKind: Codable {
         case .innerShadow: self = .innerShadow(try c.decode(DropShadow.self, forKey: .shadow))
         case .layerBlur: self = .layerBlur(try c.decode(LayerBlur.self, forKey: .blur))
         case .backgroundBlur: self = .backgroundBlur(try c.decode(BackgroundBlur.self, forKey: .blur))
+        case .glass: self = .glass(try c.decode(Glass.self, forKey: .glass))
         }
     }
 
@@ -604,6 +608,7 @@ extension EffectKind: Codable {
         case .innerShadow(let v): try c.encode(Kind.innerShadow, forKey: .type); try c.encode(v, forKey: .shadow)
         case .layerBlur(let v): try c.encode(Kind.layerBlur, forKey: .type); try c.encode(v, forKey: .blur)
         case .backgroundBlur(let v): try c.encode(Kind.backgroundBlur, forKey: .type); try c.encode(v, forKey: .blur)
+        case .glass(let v): try c.encode(Kind.glass, forKey: .type); try c.encode(v, forKey: .glass)
         }
     }
 }
@@ -674,6 +679,59 @@ public struct BackgroundBlur: AnimatableValue {
     /// No blur, which is what a Background Blur action on a layer designed
     /// without one starts from.
     public static let noBlur = BackgroundBlur(radius: 0, blend: 1)
+}
+
+/// Figma's Glass effect, with its panel's settings: what is behind the
+/// shape bends near its edge as through a lens, splits into colours there,
+/// is frosted, and the rim catches a light.
+public struct Glass: AnimatableValue {
+    /// Where the light comes from, in degrees as Figma's dial gives it: 0 is
+    /// the top, -45 the top left, 90 the right.
+    public var lightAngle: Double
+    /// 0 to 1: how bright the rim is.
+    public var lightIntensity: Double
+    /// 0 to 1: how strongly the edge bends what is behind it.
+    public var refraction: Double
+    /// Pixels: how far in from the edge the bend reaches.
+    public var depth: Double
+    /// 0 to 1: how far the bent edge splits into colours.
+    public var dispersion: Double
+    /// Pixels of blur, as Figma measures blur.
+    public var frost: Double
+    /// 0 to 1: how far the bend spreads towards the middle.
+    public var splay: Double
+
+    /// Figma's own starting values for a new Glass effect.
+    public init(lightAngle: Double = -45, lightIntensity: Double = 0.8, refraction: Double = 0.8, depth: Double = 20,
+                dispersion: Double = 0.5, frost: Double = 4, splay: Double = 0) {
+        self.lightAngle = lightAngle
+        self.lightIntensity = lightIntensity
+        self.refraction = refraction
+        self.depth = depth
+        self.dispersion = dispersion
+        self.frost = frost
+        self.splay = splay
+    }
+
+    /// No glass at all, which is what a Glass action on a layer designed
+    /// without one starts from. Its depth and light stay where a new one's
+    /// are, so turning it up alone brings glass back.
+    public static let noGlass = Glass(lightIntensity: 0, refraction: 0, dispersion: 0, frost: 0)
+
+    /// Whether it changes anything drawn.
+    public var isVisible: Bool {
+        depth > 0 && (refraction > 0 || dispersion > 0) || frost > 0 || lightIntensity > 0
+    }
+
+    /// Every setting held to what Figma's panel allows.
+    public var held: Glass {
+        func unit(_ v: Double) -> Double { v.isFinite ? min(max(v, 0), 1) : 0 }
+        func pixels(_ v: Double) -> Double { v.isFinite ? min(max(v, 0), 1000) : 0 }
+        var angle = lightAngle.isFinite ? lightAngle.truncatingRemainder(dividingBy: 360) : -45
+        if angle > 180 { angle -= 360 } else if angle < -180 { angle += 360 }
+        return Glass(lightAngle: angle, lightIntensity: unit(lightIntensity), refraction: unit(refraction), depth: pixels(depth),
+                     dispersion: unit(dispersion), frost: pixels(frost), splay: unit(splay))
+    }
 }
 
 extension Layer {

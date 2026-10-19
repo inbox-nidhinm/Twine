@@ -468,9 +468,15 @@ function paints(list, context) {
 function effectsOf(node) {
   if (!("effects" in node)) return {};
   const effects = node.effects.filter(function (e) {
-    return ["DROP_SHADOW", "INNER_SHADOW", "LAYER_BLUR", "BACKGROUND_BLUR"].indexOf(e.type) >= 0;
+    return ["DROP_SHADOW", "INNER_SHADOW", "LAYER_BLUR", "BACKGROUND_BLUR", "GLASS"].indexOf(e.type) >= 0;
   }).map(function (e) {
     const out = { type: e.type, visible: e.visible !== false, radius: e.radius };
+    if (e.type === "GLASS") {
+      // Glass's frost is its radius; the rest are its own (Splay once the API has it).
+      ["lightIntensity", "lightAngle", "refraction", "depth", "dispersion", "splay"].forEach(function (key) {
+        if (typeof e[key] === "number") out[key] = e[key];
+      });
+    }
     if (e.color) out.color = { r: e.color.r, g: e.color.g, b: e.color.b, a: e.color.a };
     if (e.offset) out.offset = { x: e.offset.x, y: e.offset.y };
     if (e.spread !== undefined) out.spread = e.spread;

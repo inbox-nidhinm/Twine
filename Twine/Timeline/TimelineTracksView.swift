@@ -1078,6 +1078,7 @@ extension ActionKind {
         case .innerShadow: return .innerShadow
         case .layerBlur: return .layerBlur
         case .backgroundBlur: return .backgroundBlur
+        case .glass: return .glass
         case .letterSpacing: return .letterSpacing
         case .lineHeight: return .lineHeight
         case .counter: return .counter

@@ -31,8 +31,10 @@ public enum ProjectFormat {
     /// Template Setting action (October 2026), which an older Twine cannot
     /// read; nothing older needs changing. 9 made a template's slots its
     /// frame's children (October 2026): older slot lists are read and
-    /// turned into children as the project opens.
-    public static let currentVersion = 9
+    /// turned into children as the project opens. 10 added the Glass effect
+    /// and action (October 2026), which an older Twine cannot read; nothing
+    /// older needs changing.
+    public static let currentVersion = 10
     /// Files older than this are refused with a plain message rather than
     /// migrated: nothing made before actions carries over meaningfully.
     public static let oldestReadableVersion = 2
@@ -130,7 +132,7 @@ public struct FormatMigrator: Sendable {
     }
 
     /// Version 2 is the oldest format still read.
-    public static let standard = FormatMigrator(steps: [2: PictureMigration.step, 3: { _ in }, 4: { _ in }, 5: { _ in }, 6: { _ in }, 7: { _ in }, 8: { _ in }])
+    public static let standard = FormatMigrator(steps: [2: PictureMigration.step, 3: { _ in }, 4: { _ in }, 5: { _ in }, 6: { _ in }, 7: { _ in }, 8: { _ in }, 9: { _ in }])
 
     public func migrate(_ data: Data, from old: Int, to new: Int) throws -> Data {
         guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {

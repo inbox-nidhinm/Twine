@@ -219,6 +219,9 @@ public enum ActionGeometry {
         case .backgroundBlur(var b):
             (b.initial, b.end) = (b.end, b.initial ?? state.backgroundBlur)
             a.spec = .backgroundBlur(b)
+        case .glass(var g):
+            (g.initial, g.end) = (g.end, g.initial ?? state.glass.glass)
+            a.spec = .glass(g)
         case .letterSpacing(var v):
             guard let start = v.initial ?? state.letterSpacing else { return nil }
             (v.initial, v.end) = (v.end, start)

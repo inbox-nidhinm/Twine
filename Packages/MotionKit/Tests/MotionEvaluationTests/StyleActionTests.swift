@@ -220,6 +220,36 @@ private func gradient(_ colors: [RGBA], radial: Bool = false) -> Paint {
         #expect(evaluate(Project(layers: [group]), at: 0).layers[0].backgroundBlur == nil)
     }
 
+    @Test func glassIsForShapesAndFramesAndBlendsEverySetting() {
+        let layer = card()
+        let a = action(layer, .glass(GlassAction(end: Glass(lightAngle: 170, lightIntensity: 1, refraction: 1, depth: 40,
+                                                            dispersion: 1, frost: 10, splay: 1))))
+        #expect(resolved(layer, [a], at: 0).glass == .none, "a card designed without glass has none until it starts")
+        let half = resolved(layer, [a], at: 2).glass.glass
+        #expect(half.refraction == 0.5 && half.dispersion == 0.5 && half.frost == 5 && half.splay == 0.5)
+        #expect(half.lightIntensity == 0.5)
+        // From none, depth and light start where a new glass's are: the
+        // light turns the shorter way, from -45 back past -180 to 170.
+        #expect(half.depth == 30)
+        #expect(abs(half.lightAngle - -117.5) < 1e-9)
+
+        var designed = card()
+        designed.effects = [Effect(kind: .glass(Glass(refraction: 2, depth: -5, dispersion: .nan)))]
+        let held = resolved(designed, [], at: 0).glass.glass
+        #expect(held.refraction == 1 && held.depth == 0 && held.dispersion == 0, "a file's numbers are held to the panel's ranges")
+
+        var switchedOff = card()
+        switchedOff.effects = [Effect(isEnabled: false, kind: .glass(Glass()))]
+        #expect(resolved(switchedOff, [], at: 0).glass == .none)
+
+        var group = Layer(name: "G", content: .group(GroupContent()), size: Size2(10, 10), position: .zero)
+        group.effects = [Effect(kind: .glass(Glass()))]
+        #expect(evaluate(Project(layers: [group]), at: 0).layers[0].glass == .none)
+        var frame = Layer(name: "F", content: .group(GroupContent(frame: FrameStyle())), size: Size2(10, 10), position: .zero)
+        frame.effects = [Effect(kind: .glass(Glass()))]
+        #expect(evaluate(Project(layers: [frame]), at: 0).layers[0].glass == .glass(Glass()))
+    }
+
     @Test func overshootNeverMakesAColourOrBlurInvalid() {
         let layer = card()
         var a = action(layer, .layerBlur(LayerBlurAction(initial: 4, end: 0)))

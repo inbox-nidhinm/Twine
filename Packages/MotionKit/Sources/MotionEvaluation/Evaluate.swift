@@ -522,7 +522,7 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
         case .innerShadow(let s):
             if layer.look != nil { shown(drivenInner ? s : state.innerShadow.shadow).map { innerShadows.append($0) } }
             drivenInner = true
-        case .layerBlur, .backgroundBlur:
+        case .layerBlur, .backgroundBlur, .glass:
             break
         }
     }
@@ -556,6 +556,11 @@ private func resolve(_ layer: Layer, state: LayerState, parent: UUID?, pictures:
                          // mask can sit anywhere in the tree.
                          mask: nil, warp: state.warp)
     resolved.reveal = state.reveal
+    // The first glass counts, as the first background blur does.
+    if layer.look != nil, case .glass(let g) = state.glass {
+        let held = g.held
+        if held.isVisible { resolved.glass = .glass(held) }
+    }
     if state.curl.isGone { resolved.opacity = 0 } else { resolved.curl = state.curl }
     return resolved
 }
@@ -677,7 +682,15 @@ private func resolve(_ shape: ShapeContent, size: Size2, state: LayerState, pict
                               dashPattern: pattern, dashOffset: phase,
                               trimmed: trimmed?.path, dashStarts: trimmed?.starts ?? [])
     }
-    return ResolvedShape(path: path, isClosed: closed, fillRule: shape.fillRule, fills: fills, strokes: strokes)
+    var resolved = ResolvedShape(path: path, isClosed: closed, fillRule: shape.fillRule, fills: fills, strokes: strokes)
+    switch shape.geometry {
+    case .rectangle(let radii) where radii.isUniform:
+        resolved.roundedBox = min(max(radii.topLeft, 0), max(min(size.width, size.height), 0) / 2)
+    case .ellipse(let arc) where arc.isWhole && arc.innerRadius <= 0 && size.width == size.height:
+        resolved.roundedBox = max(size.width, 0) / 2
+    default: break
+    }
+    return resolved
 }
 
 private func resolve(_ paint: Paint, size: Size2, pictures: [UUID: Size2]) -> ResolvedPaint {

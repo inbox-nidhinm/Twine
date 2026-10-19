@@ -44,6 +44,18 @@ private func near(_ a: Double, _ b: Double, _ e: Double = 1e-6) -> Bool { abs(a 
         #expect(r.bounds == Box(minX: 100, minY: 50, maxX: 300, maxY: 170))
     }
 
+    @Test func glassComesInWithFigmasSettings() throws {
+        let json = payload(##"""
+        {"kind": "rectangle", "name": "Pill", "transform": [1, 0, 0, 1, 0, 0], "width": 120, "height": 40, "radii": [20, 20, 20, 20],
+         "effects": [{"type": "GLASS", "visible": true, "radius": 6, "lightIntensity": 0.7, "lightAngle": -60,
+                      "refraction": 0.9, "depth": 18, "dispersion": 0.4}]}
+        """##)
+        let layer = try #require(try FigmaImport.read(json).layers.first)
+        // Splay, which Figma's plugins cannot read yet, is a new glass's.
+        #expect(layer.effects.map(\.kind) == [.glass(Glass(lightAngle: -60, lightIntensity: 0.7, refraction: 0.9, depth: 18,
+                                                            dispersion: 0.4, frost: 6, splay: 0))])
+    }
+
     @Test func figmasTurnTurnsTheOtherWay() throws {
         // Figma's 30 degrees turn anticlockwise: its matrix has b = -sin.
         let a = 30 * Double.pi / 180

@@ -213,6 +213,19 @@ extension StarShape: Interpolatable {
     }
 }
 
+extension Glass: Interpolatable {
+    /// Every setting blends; the light takes the shorter way round.
+    public static func interpolate(_ a: Glass, _ b: Glass, _ t: Double) -> Glass {
+        var turn = (b.lightAngle - a.lightAngle).truncatingRemainder(dividingBy: 360)
+        if turn > 180 { turn -= 360 } else if turn < -180 { turn += 360 }
+        func unit(_ x: Double, _ y: Double) -> Double { min(max(lerp(x, y, t), 0), 1) }
+        return Glass(lightAngle: a.lightAngle + turn * t, lightIntensity: unit(a.lightIntensity, b.lightIntensity),
+                     refraction: unit(a.refraction, b.refraction), depth: max(0, lerp(a.depth, b.depth, t)),
+                     dispersion: unit(a.dispersion, b.dispersion), frost: max(0, lerp(a.frost, b.frost, t)),
+                     splay: unit(a.splay, b.splay))
+    }
+}
+
 extension BackgroundBlur: Interpolatable {
     public static func interpolate(_ a: BackgroundBlur, _ b: BackgroundBlur, _ t: Double) -> BackgroundBlur {
         BackgroundBlur(radius: max(0, lerp(a.radius, b.radius, t)), blend: min(max(lerp(a.blend, b.blend, t), 0), 1))

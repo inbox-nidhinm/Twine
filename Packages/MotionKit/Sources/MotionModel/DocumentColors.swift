@@ -29,7 +29,7 @@ extension Project {
             for effect in effects {
                 switch effect.kind {
                 case .dropShadow(let s), .innerShadow(let s): add(s.color)
-                case .layerBlur, .backgroundBlur: break
+                case .layerBlur, .backgroundBlur, .glass: break
                 }
             }
         }

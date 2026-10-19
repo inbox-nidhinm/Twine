@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 234
+    static let pushes = 235
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -55,6 +55,8 @@ enum VersionHistory {
             "Videos in templates: a slot can hold a video as well as a picture. It plays in its cards, muted, rounded like the rest, going round for as long as the scene runs; in the wiping and tiled templates each piece shows its part of it. Split into Layers keeps them playing, with Play bars one after another.",
             "Drop pictures and videos onto a template: on a slot well in Design to fill that slot (several files fill the slots after it too), beside the wells to add them at the end, or straight onto a card on the canvas to replace the picture that card shows (an empty card fills the first empty slot). Clicking a slot now offers videos too.",
             "AI apps can work in Twine. Claude, Cursor and any other app that speaks MCP (the Model Context Protocol) can read the open project, add and change layers, actions, presets and templates, change the composition, select things and move the playhead, draw any frame to check its work, bring files in and export, and open or make projects. Every change shows at once and is one step of undo, the same as your own. Settings has a new AI apps card: a switch to let AI apps use Twine (on unless you turn it off) and a button that copies the command adding Twine to Claude Code. The AI app starts Twine in the background if it is not open, and again if it is closed between requests.",
+            "Glass, a new effect for shapes and frames, as Figma's: what is behind the layer bends near its edge as through a lens, splits into rainbow colours there, can be frosted, and its rim catches a light. Add it from the Effects + menu and set Figma's own settings: Light (where it comes from, 0° the top, and how bright), Refraction, Depth (how far in the bend reaches), Dispersion, Frost and Splay (how far the bend spreads towards the middle). Rounded rectangles, circles, ovals, stars, polygons and pen paths all bend along their own outline, the same on the canvas and in exports. Glass copied from Figma with the Twine plugin comes in with its settings. Projects with glass need this Twine to open.",
+            "A Glass action (under Blur): every glass setting from where it is to where you set it, with its own starting value, easing and the swap button, so glass can bend into view, sharpen, frost over or have its light swing round. On a layer without glass it brings Figma's new glass in from nothing; on one with glass it takes it away.",
         ], fixes: [
             "Curved cards no longer turn into a large grey slab on the canvas and in the export preview as they pass edge-on (Ring Stream's cards at the ring's sides, for one), and they stay curved all the way round. Seen edge-on, a curved card wraps round its own outline; the screen now knows how deep each part of it is, so it draws the near side over the far. Exported movies never had the slab.",
             "Curved cards have two faces: as one turns away, the part still facing you stays at full strength and only the part facing away fades to the back fade, smoothly, and neither shows through the other. The whole card used to dim at once as its middle passed edge-on.",

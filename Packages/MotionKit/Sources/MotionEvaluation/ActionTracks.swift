@@ -6,7 +6,7 @@ import MotionModel
 /// the same channel of the same layer interact (see `walk`).
 public enum Channel: String, Hashable, Sendable, CaseIterable {
     case position, scale, rotation, opacity, size, visibility
-    case fill, stroke, trim, cornerRadius, shadow, innerShadow, layerBlur, backgroundBlur
+    case fill, stroke, trim, cornerRadius, shadow, innerShadow, layerBlur, backgroundBlur, glass
     case letterSpacing, lineHeight, text, arc, star, path
     case media, volume
     case skew, tilt
@@ -45,6 +45,7 @@ extension ActionKind {
         case .innerShadow: return .innerShadow
         case .layerBlur: return .layerBlur
         case .backgroundBlur: return .backgroundBlur
+        case .glass: return .glass
         case .letterSpacing: return .letterSpacing
         case .lineHeight: return .lineHeight
         case .counter, .changeText: return .text
@@ -165,6 +166,8 @@ public struct LayerState: Sendable, Equatable {
     public var layerBlur: Double
     /// The first background blur that is switched on, or `.noBlur`.
     public var backgroundBlur: BackgroundBlur
+    /// The first glass that is switched on, boxed (see `GlassState`).
+    public var glass: GlassState = .none
     /// Text layers only: letter spacing, line height (the font's own when the
     /// design leaves it empty) and the words.
     public var letterSpacing: Double?
@@ -236,6 +239,7 @@ public struct LayerState: Sendable, Equatable {
             case .innerShadow(let s): innerShadow = InnerShadow(s)
             case .layerBlur(let b): layerBlur = b.radius
             case .backgroundBlur(let b): backgroundBlur = b
+            case .glass(let g): glass = GlassState(g)
             }
         }
     }
@@ -256,6 +260,23 @@ public enum InnerShadow: Sendable, Equatable {
     public var shadow: DropShadow {
         if case .shadow(let s) = self { return s }
         return .noShadow
+    }
+}
+
+/// A layer's first glass, kept out of line as `InnerShadow` is: most layers
+/// have none. `.none` is no glass, which a Glass action animates in from as
+/// `Glass.noGlass`.
+public enum GlassState: Sendable, Equatable {
+    case none
+    indirect case glass(Glass)
+
+    public init(_ glass: Glass) {
+        self = glass == .noGlass ? .none : .glass(glass)
+    }
+
+    public var glass: Glass {
+        if case .glass(let g) = self { return g }
+        return .noGlass
     }
 }
 
@@ -573,6 +594,7 @@ public struct ActionTracks: Sendable {
             case .layerBlur: state.layerBlur = walk(state.layerBlur, steps(list, Self.layerBlurStep, Self.layerBlurPart), at: time)
             case .backgroundBlur:
                 state.backgroundBlur = walk(state.backgroundBlur, list.compactMap(Self.backgroundBlurStep), at: time)
+            case .glass: state.glass = GlassState(walk(state.glass.glass, list.compactMap(Self.glassStep), at: time))
             case .letterSpacing:
                 if let spacing = state.letterSpacing { state.letterSpacing = walk(spacing, list.compactMap(Self.letterSpacingStep), at: time) }
             case .lineHeight:
@@ -878,6 +900,11 @@ public struct ActionTracks: Sendable {
     private static func backgroundBlurStep(_ a: Action) -> Step<BackgroundBlur>? {
         guard case .backgroundBlur(let b) = a.spec else { return nil }
         return Step(a, initial: b.initial, target: { _ in b.end })
+    }
+
+    private static func glassStep(_ a: Action) -> Step<Glass>? {
+        guard case .glass(let g) = a.spec else { return nil }
+        return Step(a, initial: g.initial, target: { _ in g.end })
     }
 
     private static func letterSpacingStep(_ a: Action) -> Step<Double>? {

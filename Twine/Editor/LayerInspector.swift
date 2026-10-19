@@ -1225,7 +1225,7 @@ private struct EffectsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HeaderRow(title: "Effects") {
-                IconButton(icon: .plus, help: "Add a shadow, a blur, a skew, a tilt or a bend") {
+                IconButton(icon: .plus, help: "Add a shadow, a blur, glass, a skew, a tilt or a bend") {
                     var entries: [MenuEntry] = [.item("Drop Shadow", icon: .shadow) { add(.dropShadow(DropShadow())) }]
                     // These follow a shape's outline, so only shapes and
                     // frames have them.
@@ -1235,6 +1235,7 @@ private struct EffectsSection: View {
                     entries.append(.item("Layer Blur", icon: .layerBlur) { add(.layerBlur(LayerBlur())) })
                     if layer.look != nil {
                         entries.append(.item("Background Blur", icon: .backgroundBlur) { add(.backgroundBlur(BackgroundBlur())) })
+                        entries.append(.item("Glass", icon: .glass) { add(.glass(Glass())) })
                     }
                     if canWarp && !(showsSkew && showsTilt && showsBend) {
                         entries.append(.separator)
@@ -1393,6 +1394,26 @@ private struct EffectsSection: View {
                     .help("Blend: how much of the blurred background shows over the sharp one.")
                 }
                 .rowButton { eyeButton(effect, index) }
+            case .glass(let g):
+                glassRows(g, effect: effect, index: index)
+            }
+        }
+    }
+
+    private func glassRows(_ g: Glass, effect: Effect, index: Int) -> some View {
+        GlassControls(glass: g, edit: EditCallbacks(
+            commit: { v in editGlass(index) { $0 = v } },
+            live: { v in editGlass(index) { $0 = v } },
+            begin: {}, end: {})) {
+            eyeButton(effect, index)
+        }
+    }
+
+    private func editGlass(_ index: Int, _ change: @escaping (inout Glass) -> Void) {
+        edit(index) { e in
+            if case .glass(var glass) = e.kind {
+                change(&glass)
+                e.kind = .glass(glass)
             }
         }
     }
@@ -1450,6 +1471,7 @@ extension Effect {
         case .innerShadow: return "Inner Shadow"
         case .layerBlur: return "Layer Blur"
         case .backgroundBlur: return "Background Blur"
+        case .glass: return "Glass"
         }
     }
 
@@ -1460,6 +1482,7 @@ extension Effect {
         case .innerShadow: return .innerShadow
         case .layerBlur: return .layerBlur
         case .backgroundBlur: return .backgroundBlur
+        case .glass: return .glass
         }
     }
 }

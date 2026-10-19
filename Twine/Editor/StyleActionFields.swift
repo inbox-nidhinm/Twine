@@ -23,6 +23,7 @@ struct StyleValueFields: View {
         case .innerShadow(let s): shadow(s, inner: true)
         case .layerBlur(let b): layerBlur(b)
         case .backgroundBlur(let b): backgroundBlur(b)
+        case .glass(let g): glass(g)
         case .letterSpacing(let v): letterSpacing(v)
         case .lineHeight(let v): lineHeight(v)
         case .counter(let c): counter(c)
@@ -285,6 +286,28 @@ struct StyleValueFields: View {
             }
             .help("Blend: how much of the blurred background shows over the sharp one.")
         }
+    }
+
+    // MARK: Glass
+
+    @ViewBuilder private func glass(_ g: GlassAction) -> some View {
+        optionalStart(isSet: g.initial != nil, preview: IconView(.glass).foregroundStyle(Theme.textSecondary),
+                      set: { editing("Starting Glass", Self.glass { a, st in
+                          // From no glass, it starts from the end at nothing,
+                          // so only the strengths need raising.
+                          let from = st?.glass.glass ?? .noGlass
+                          a.initial = from != .noGlass ? from
+                              : Glass(lightAngle: a.end.lightAngle, lightIntensity: 0, refraction: 0, depth: a.end.depth,
+                                      dispersion: 0, frost: 0, splay: a.end.splay)
+                      }) },
+                      clear: { editing("Starting Glass", Self.glass { a, _ in a.initial = nil }) }) {
+            if let initial = g.initial {
+                GlassControls(glass: initial, edit: callbacks("Starting Glass", Self.glass) { $0.initial = $1 })
+            }
+        }
+        .help("The glass it starts from. Empty starts from the layer's glass when the action begins, or from none.")
+        sectionLabel("To", swap: swap)
+        GlassControls(glass: g.end, edit: callbacks("Glass", Self.glass) { $0.end = $1 })
     }
 
     // MARK: Text
@@ -559,6 +582,9 @@ struct StyleValueFields: View {
     }
     private static func backgroundBlur(_ change: @escaping Change<BackgroundBlurAction>) -> (inout Action, LayerState?) -> Void {
         { a, st in if case .backgroundBlur(var v) = a.spec { change(&v, st); a.spec = .backgroundBlur(v) } }
+    }
+    private static func glass(_ change: @escaping Change<GlassAction>) -> (inout Action, LayerState?) -> Void {
+        { a, st in if case .glass(var v) = a.spec { change(&v, st); a.spec = .glass(v) } }
     }
     private static func letterSpacing(_ change: @escaping Change<LetterSpacingAction>) -> (inout Action, LayerState?) -> Void {
         { a, st in if case .letterSpacing(var v) = a.spec { change(&v, st); a.spec = .letterSpacing(v) } }

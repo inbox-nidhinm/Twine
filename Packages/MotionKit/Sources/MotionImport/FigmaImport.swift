@@ -104,6 +104,13 @@ public struct FigmaPayload: Codable, Sendable {
         public var offset: Offset?
         public var radius: Double?
         public var spread: Double?
+        /// Glass only: Figma's own numbers, its frost being `radius`.
+        public var lightIntensity: Double?
+        public var lightAngle: Double?
+        public var refraction: Double?
+        public var depth: Double?
+        public var dispersion: Double?
+        public var splay: Double?
     }
 
     public struct Offset: Codable, Sendable {
@@ -494,6 +501,14 @@ private struct FigmaBuilder {
         case "INNER_SHADOW": kind = .innerShadow(shadow)
         case "LAYER_BLUR": kind = .layerBlur(LayerBlur(radius: e.radius ?? 0))
         case "BACKGROUND_BLUR": kind = .backgroundBlur(BackgroundBlur(radius: e.radius ?? 0))
+        case "GLASS":
+            // Figma's numbers are its panel's (its dial's angle included),
+            // fractions where the panel shows a percentage.
+            let standard = Glass()
+            kind = .glass(Glass(lightAngle: e.lightAngle ?? standard.lightAngle, lightIntensity: e.lightIntensity ?? standard.lightIntensity,
+                                refraction: e.refraction ?? standard.refraction, depth: e.depth ?? standard.depth,
+                                dispersion: e.dispersion ?? standard.dispersion, frost: e.radius ?? standard.frost,
+                                splay: e.splay ?? standard.splay).held)
         default: return nil
         }
         return Effect(isEnabled: e.visible ?? true, kind: kind)

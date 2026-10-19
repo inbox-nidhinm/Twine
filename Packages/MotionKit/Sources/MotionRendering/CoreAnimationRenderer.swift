@@ -266,6 +266,10 @@ final class Node {
     private let backdropMask = CAShapeLayer()
     private var backdropRadius = 0.0
     private var backdropShown = false
+    /// Figma's Glass: what is behind bent under the fills, the rim lit over
+    /// them (see `GlassLayers`). Made when a layer first needs it.
+    private var glass: GlassLayers?
+    private var glassShown = false
     /// A shape's or frame's drop shadows, each a layer that draws only its
     /// shadow, from the outline, with the shape itself cut out of it; and
     /// its inner shadows, over its fills.
@@ -454,6 +458,7 @@ final class Node {
         case .shape(let shape):
             updateShape(shape, size: layer.size, media: media)
             updateBackdrop(layer.backgroundBlur, shape: shape, size: layer.size)
+            updateGlass(layer.glass, shape: shape, size: layer.size)
             updateInnerShadows(layer.innerShadows, shape: shape, strength: layer.innerShadows.isEmpty ? 1 : Self.strength(shape),
                                size: layer.size)
             arrange(fills: shape.fills.count, middle: nil)
@@ -461,12 +466,14 @@ final class Node {
             if let frame = layer.frame {
                 updateShape(frame, size: layer.size, media: media)
                 updateBackdrop(layer.backgroundBlur, shape: frame, size: layer.size)
+                updateGlass(layer.glass, shape: frame, size: layer.size)
                 updateInnerShadows(layer.innerShadows, shape: frame, strength: layer.innerShadows.isEmpty ? 1 : Self.strength(frame),
                                    size: layer.size)
                 arrange(fills: frame.fills.count, middle: children)
             } else {
                 if !signature.isEmpty { clearPaint() }
                 backdropShown = false
+                glassShown = false
                 updateInnerShadows([], shape: nil, strength: 1, size: layer.size)
                 arrange(fills: 0, middle: children)
             }
@@ -488,20 +495,23 @@ final class Node {
     }
 
     /// The layer's own sublayers in drawing order: drop shadows, the
-    /// frosted backdrop, fills, inner shadows, a frame's children, strokes.
+    /// frosted backdrop, the glass, fills, inner shadows, the glass's light,
+    /// a frame's children, strokes.
     /// Only touches the tree when that order changed.
     private func arrange(fills: Int, middle: CALayer?) {
         // What is built, in counts: when none of it changed since the last
         // time, neither did the order, which is most frames.
         let shape = [paintLayers.count, fills, shadowLayers.count, innerShadowLayers.count, backdropShown ? 1 : 0,
-                     middle == nil ? 0 : 1, rebuilds]
+                     glassShown ? 1 : 0, middle == nil ? 0 : 1, rebuilds]
         if shape == arrangedShape { return }
         arrangedShape = shape
         let roots = paintLayers.map(\.root)
         var wanted: [CALayer] = shadowLayers.map(\.layer)
         if backdropShown, let backdrop { wanted.append(backdrop) }
+        if glassShown, let glass { wanted += glass.backdrops }
         wanted += roots.prefix(fills)
         wanted += innerShadowLayers.map(\.holder)
+        if glassShown, let glass { wanted += glass.lights }
         if let middle { wanted.append(middle) }
         wanted += roots.dropFirst(fills)
         // Compared with what was last set rather than read back, which
@@ -599,6 +609,16 @@ final class Node {
             backdropRadius = blur.radius
             backdrop.filters = [Blur.filter(amount: blur.radius)]
         }
+    }
+
+    private func updateGlass(_ state: GlassState, shape: ResolvedShape, size: Size2) {
+        glassShown = false
+        // A mask draws only its alpha, which a backdrop would muddy.
+        guard case .glass(let look) = state, shape.isClosed, !ignoresBlend else { return }
+        if glass == nil { glass = GlassLayers() }
+        guard let glass else { return }
+        glassShown = true
+        glass.update(look, shape: shape, area: area(of: shape), size: size, flips: flipsContents)
     }
 
     /// The frame covering the layer's box or fitting inside it, centred, or
