@@ -7,7 +7,7 @@ import CoreImage
 import Theme
 
 /// The two ways to start animating the selection, as big tiles: a new action
-/// from the menu, or a preset from the picker. Three to a row, as the
+/// from the menu, or a preset from the picker, each half the row, as the
 /// Templates tile under them is, so every tile is one size.
 struct ActionTiles: View {
     let newActions: [MenuEntry]
@@ -26,7 +26,6 @@ struct ActionTiles: View {
             .help("Adds an action at the playhead, half a second long.")
             BigTile(icon: .presets, title: "Select Preset", disabled: !hasPresets, action: pickPreset)
                 .help("Picks a ready-made animation to add at the playhead, as one bar you can adjust.")
-            Color.clear.frame(maxWidth: .infinity)
         }
     }
 }
@@ -40,7 +39,6 @@ struct TemplateTile: View {
         HStack(spacing: 8) {
             BigTile(icon: .template, title: "Templates", action: action)
                 .help("Picks a whole scene of cards, a ring, a globe or a tunnel, to fill with your pictures; selected pictures and videos go into its slots.")
-            Color.clear.frame(maxWidth: .infinity)
             Color.clear.frame(maxWidth: .infinity)
         }
     }
