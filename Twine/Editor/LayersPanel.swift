@@ -64,10 +64,10 @@ struct LayersPanel: View {
     /// The tree flattened in the order the panel shows it: front at the top.
     private var rows: [LayerRowItem] {
         var out: [LayerRowItem] = []
-        func walk(_ layers: [Layer], depth: Int) {
+        func walk(_ layers: [Layer], depth: Int, inTemplate: Bool = false) {
             for layer in layers.reversed() {
-                out.append(LayerRowItem(layer: layer, depth: depth))
-                if layer.isGroup, expanded.contains(layer.id) { walk(layer.children, depth: depth + 1) }
+                out.append(LayerRowItem(layer: layer, depth: depth, isSlot: inTemplate))
+                if layer.isGroup, expanded.contains(layer.id) { walk(layer.children, depth: depth + 1, inTemplate: layer.isTemplate) }
             }
         }
         walk(store.project.layers, depth: 0)
@@ -157,6 +157,8 @@ struct LayersPanel: View {
 struct LayerRowItem: Identifiable {
     let layer: Layer
     let depth: Int
+    /// One of a template's slots.
+    var isSlot = false
     var id: UUID { layer.id }
 }
 
@@ -201,7 +203,9 @@ private struct LayerRow: View {
             } else {
                 Color.clear.frame(width: Theme.disclosure, height: Theme.hairline)
             }
-            IconView(isMask ? .mask : layer.icon, size: 15)
+            // An empty slot reads as a picture still to come.
+            IconView(isMask ? .mask : row.isSlot && layer.slotMedia == nil ? .image : layer.icon, size: 15)
+                .opacity(row.isSlot && layer.slotMedia == nil ? 0.45 : 1)
                 .foregroundStyle(selected ? Theme.textPrimary : Theme.textTertiary)
                 .help(isMask ? "A mask: the layers in front of it in its group show only where it draws" : "")
             name

@@ -33,12 +33,16 @@ import MotionEvaluation
         let a = UUID(), b = UUID()
         let pa = picture(a), pb = picture(b)
         let text = LayerFactory.text(at: .zero, name: "T")
-        let store = store(Project(composition: Composition(width: 1280, height: 720, duration: 6), layers: [pa, pb, text]))
+        let files = [a, b].map { MediaAsset(id: $0, kind: .image, fileName: "\($0).png", originalName: "p.png", contentHash: "\($0)",
+                                            pixelWidth: 400, pixelHeight: 300) }
+        let store = store(Project(composition: Composition(width: 1280, height: 720, duration: 6), layers: [pa, pb, text], media: files))
         let (command, id) = Templates.adding(.ringStream, to: store.project, replacing: [pa, pb, text])
         try store.perform(command)
         let frame = try #require(store.project.layer(withID: id))
-        #expect(frame.template?.slots.prefix(2) == [a, b])
-        #expect(frame.template?.slots.count == 12)
+        #expect(frame.templateSlots.prefix(2) == [a, b])
+        #expect(frame.templateSlots.count == 12)
+        // Slots are the frame's children, slot 1 the last (the top of the layers panel).
+        #expect(frame.children.count == 12 && frame.children.last?.slotMedia == a)
         #expect(frame.size == Size2(1280, 720))
         // The pictures went in; the text stays.
         #expect(store.project.layer(withID: pa.id) == nil && store.project.layer(withID: pb.id) == nil)
@@ -215,8 +219,8 @@ import MotionEvaluation
 
     @Test func aVideoInASlotPlaysRoundInARoundedCard() throws {
         let video = clip(seconds: 3)
-        var frame = Templates.frame(.slideCarousel, filling: Composition(width: 1280, height: 720), pictures: [video.id])
-        frame.template?.slots = [video.id]
+        var frame = Templates.frame(.slideCarousel, filling: Composition(width: 1280, height: 720), pictures: [video])
+        frame.templateSlotLayers = [TemplateSlots.layer(video, in: frame.size)]
         let bar = Action(target: frame.id, start: 0, duration: 8, easing: .linear, rowOrder: 0, spec: .template(TemplatePlay()))
         let project = Project(composition: Composition(width: 1280, height: 720, duration: 8), layers: [frame], actions: [bar],
                               media: [video])
@@ -240,5 +244,63 @@ import MotionEvaluation
         if case .video(let content) = child.content { #expect(content.isMuted) } else { Issue.record("no video") }
         let plays = store.project.actions.filter { $0.targetLayerID == child.id && $0.spec.kind == .play }.sorted { $0.start < $1.start }
         #expect(plays.map(\.start) == [0, 3, 6] && plays.last?.duration == 2)
+    }
+
+    // MARK: Slots as layers
+
+    /// A project saved before slots were layers reads its slot list into
+    /// slot children, in order, a video as a video and a missing file empty.
+    @Test func olderSlotListsBecomeChildren() throws {
+        let picture = MediaAsset(kind: .image, fileName: "a.png", originalName: "Sunset.png", contentHash: "a", pixelWidth: 400, pixelHeight: 200)
+        let video = clip(seconds: 2)
+        let frame = Templates.frame(.ringStream, filling: Composition(width: 1280, height: 720))
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(frame)) as! [String: Any]
+        var content = json["content"] as! [String: Any]
+        var group = content["group"] as! [String: Any]
+        var template = group["template"] as! [String: Any]
+        template["slots"] = [picture.id.uuidString, NSNull(), video.id.uuidString, UUID().uuidString]
+        group["template"] = template
+        group["children"] = []
+        content["group"] = group
+        json["content"] = content
+        let old = try JSONDecoder().decode(Layer.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(old.template?.legacySlots?.count == 4 && old.children.isEmpty)
+        let project = TemplateSlots.converted(Project(layers: [old], media: [picture, video]))
+        let converted = try #require(project.layers.first)
+        #expect(converted.template?.legacySlots == nil)
+        #expect(converted.templateSlots == [picture.id, nil, video.id, nil])
+        #expect(converted.templateSlotLayers[0].name == "Sunset")
+        if case .video(let v) = converted.templateSlotLayers[2].content { #expect(v.isMuted) } else { Issue.record("not a video") }
+        // Nothing to convert leaves the project as it is.
+        #expect(TemplateSlots.converted(project) == project)
+    }
+
+    /// A slot is never drawn, played or animated itself.
+    @Test func slotsTakeNoActionsOrPlayBars() throws {
+        let video = clip(seconds: 2)
+        var frame = Templates.frame(.ringStream, filling: Composition(width: 1280, height: 720))
+        frame.templateSlotLayers[0] = TemplateSlots.layer(video, in: frame.size)
+        let project = MediaPlays.withPlayBars(Project(layers: [frame], media: [video]))
+        #expect(project.actions.isEmpty)
+        let slot = frame.templateSlotLayers[0]
+        #expect(project.templateSlotIDs.contains(slot.id) && project.templateSlotIDs.count == 12)
+        #expect(ActionFactory.kinds(for: slot, in: project).isEmpty)
+        #expect(!ActionFactory.kinds(for: frame, in: project).isEmpty)
+        #expect(audioClips(project).isEmpty)
+        // The slots are not drawn: only the cards are.
+        let drawn = evaluate(project, at: 0).layers.map(\.id)
+        #expect(!drawn.contains(slot.id))
+    }
+
+    /// A double-click on a card goes in to the slot it shows.
+    @Test func aCardKnowsItsSlot() throws {
+        var frame = Templates.frame(.carouselRing, filling: Composition(width: 1280, height: 720))
+        frame.templateSlotLayers = Array(frame.templateSlotLayers.prefix(5))
+        let setup = try #require(frame.template)
+        for index in 0..<5 {
+            let card = TemplateCards.id(of: index, in: frame.id)
+            #expect(TemplateCards.slot(of: card, in: frame, setup: setup, phase: setup.pose) == index)
+        }
+        #expect(TemplateCards.slot(of: UUID(), in: frame, setup: setup, phase: 0) == nil)
     }
 }

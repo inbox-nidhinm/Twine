@@ -12,7 +12,7 @@ import MotionEvaluation
     @Test(arguments: TemplateKind.allCases)
     func everyTemplateDraws(_ kind: TemplateKind) throws {
         let size = Size2(640, 360)
-        let setup = TemplateSetup(kind: kind, slots: Array(repeating: nil, count: TemplateRecipes.slotCount(kind)),
+        let setup = TemplateSetup(kind: kind,
                                   pose: TemplateRecipes.restingPose(kind))
         let frame = Layer(name: "T", content: .group(GroupContent(clipsContent: true, frame: FrameStyle(fills: [Fill(paint: .color(RGBA(0.08, 0.08, 0.09)))]),
                                                                   template: setup)),

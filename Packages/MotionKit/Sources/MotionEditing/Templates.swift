@@ -109,35 +109,38 @@ public enum Templates {
         library.first { $0.kind == kind }?.name ?? kind.rawValue
     }
 
-    /// The pictures in `layers`, in order, for a template's slots: each
-    /// layer's picture fill.
-    public static func pictures(in layers: [Layer]) -> [UUID] {
-        layers.compactMap { $0.picture?.paint.mediaID }
+    /// The pictures and videos in `layers`, in order, for a template's
+    /// slots: each picture layer's picture, each video layer's clip.
+    public static func pictures(in layers: [Layer], of project: Project) -> [MediaAsset] {
+        let assets = Dictionary(project.media.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        return layers.compactMap { $0.slotMedia.flatMap { assets[$0] } }
     }
 
-    /// A new template frame of `kind` filling `composition`, its slots the
-    /// pictures given and empty ones after, as many as the template has, or
-    /// more when more pictures are given. It clips, with no fill of its own.
-    public static func frame(_ kind: TemplateKind, filling composition: Composition, pictures: [UUID] = []) -> Layer {
+    /// A new template frame of `kind` filling `composition`, its slots (its
+    /// children) the pictures and videos given and empty ones after, as many
+    /// as the template has, or more when more are given. It clips, with no
+    /// fill of its own.
+    public static func frame(_ kind: TemplateKind, filling composition: Composition, pictures: [MediaAsset] = []) -> Layer {
         let count = max(TemplateRecipes.slotCount(kind), pictures.count)
-        let slots: [UUID?] = pictures + Array(repeating: nil, count: count - pictures.count)
         let size = Size2(Double(composition.width), Double(composition.height))
-        return Layer(name: name(of: kind), content: .group(GroupContent(clipsContent: true, frame: FrameStyle(),
-                                                                       template: TemplateSetup(kind: kind, slots: slots,
+        let slots = pictures.map { TemplateSlots.layer($0, in: size) }
+            + (0..<(count - pictures.count)).map { _ in TemplateSlots.layer(nil, in: size) }
+        return Layer(name: name(of: kind), content: .group(GroupContent(children: slots.reversed(), clipsContent: true, frame: FrameStyle(),
+                                                                       template: TemplateSetup(kind: kind,
                                                                                                pose: TemplateRecipes.restingPose(kind)))),
                      size: size, position: Vec2(size.width / 2, size.height / 2))
     }
 
     /// Adding a template of `kind` to `project` in front of everything, as
     /// one undo step: its frame, its bar from the start of the scene to its
-    /// end, and in place of `replacing`, the picture layers whose pictures
-    /// went into its slots (as Use as Mask takes the layers it is given).
+    /// end, and in place of `replacing`, the picture and video layers whose
+    /// files went into its slots (as Use as Mask takes the layers it is given).
     public static func adding(_ kind: TemplateKind, to project: Project, replacing: [Layer] = []) -> (command: EditorCommand, frameID: UUID) {
-        let frame = frame(kind, filling: project.composition, pictures: pictures(in: replacing))
+        let frame = frame(kind, filling: project.composition, pictures: pictures(in: replacing, of: project))
         let bar = Action(target: frame.id, start: 0, duration: max(project.composition.duration, 0.1), easing: .linear,
                          name: name(of: kind), rowOrder: ActionFactory.nextRowOrder(in: project), spec: .template(TemplatePlay()))
         var commands: [EditorCommand] = [.insertLayers([frame], parentID: nil, index: nil), .insertActions([bar])]
-        let taken = Set(replacing.filter { $0.picture != nil }.map(\.id))
+        let taken = Set(replacing.filter { $0.slotMedia != nil }.map(\.id))
         if !taken.isEmpty { commands.insert(.deleteLayers(taken), at: 0) }
         return (.batch(commands, name: "Add Template"), frame.id)
     }

@@ -223,8 +223,8 @@ enum SelfTest {
                 // Adds a template by its id (`ring-stream`, `globe`...), as the picker does, and logs it.
                 if let kind = TemplateKind(rawValue: parts[1]) {
                     controller.addTemplate(kind)
-                    if let id = controller.selection.first, let t = controller.project.layer(withID: id)?.template {
-                        log("TEMPLATE \(t.kind.rawValue) slots=\(t.slots.count) filled=\(t.mediaIDs.count) cards=\(controller.scene.layers.filter { $0.parentID == id }.count) bar=\(controller.project.actions.contains { $0.targetLayerID == id && $0.spec.kind == .template })")
+                    if let id = controller.selection.first, let frame = controller.project.layer(withID: id), let t = frame.template {
+                        log("TEMPLATE \(t.kind.rawValue) slots=\(frame.templateSlots.count) filled=\(frame.templateSlots.compactMap { $0 }.count) cards=\(controller.scene.layers.filter { $0.parentID == id }.count) bar=\(controller.project.actions.contains { $0.targetLayerID == id && $0.spec.kind == .template })")
                     }
                 } else { log("unknown template \(parts[1])") }
             case "tslot":
@@ -244,10 +244,20 @@ enum SelfTest {
                         controller.importMedia([url], at: Vec2(x, y))
                     }
                 }
+            case "tcard":
+                // Logs the template card at composition point X Y and the slot a double-click there goes in to.
+                if let x = Double(parts[1]), let y = Double(parts[2]) {
+                    if let card = controller.canvas?.templateCard(at: Vec2(x, y)) {
+                        let slot = controller.templateSlotLayer(showing: card.card, in: card.template)
+                        let name = slot.flatMap { controller.project.layer(withID: $0)?.name } ?? "-"
+                        let deep = controller.canvas?.layer(at: Vec2(x, y), deep: true).flatMap { controller.project.layer(withID: $0)?.name } ?? "-"
+                        log("TCARD slot=\(name) deep=\(deep)")
+                    } else { log("TCARD none") }
+                }
             case "tslots":
                 // Logs the selected template's slots: p for a picture, v for a video, - for empty.
-                if let id = controller.selection.first, let t = controller.project.layer(withID: id)?.template {
-                    let kinds = t.slots.map { m in m.flatMap { m in controller.project.media.first { $0.id == m } }.map { $0.kind == .video ? "v" : "p" } ?? "-" }
+                if let id = controller.selection.first, let frame = controller.project.layer(withID: id), frame.isTemplate {
+                    let kinds = frame.templateSlots.map { m in m.flatMap { m in controller.project.media.first { $0.id == m } }.map { $0.kind == .video ? "v" : "p" } ?? "-" }
                     log("TSLOTS \(kinds.joined())")
                 }
             case "tsplit":

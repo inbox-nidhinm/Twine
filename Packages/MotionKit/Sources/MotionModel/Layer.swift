@@ -64,7 +64,7 @@ public struct Layer: Codable, Sendable, Equatable, Identifiable {
 
     /// The layer whole under another id: every property carried, so one
     /// added later is carried too, which copying field by field forgot.
-    func withID(_ id: UUID) -> Layer {
+    public func withID(_ id: UUID) -> Layer {
         var copy = self
         copy.id = id
         return copy
@@ -688,7 +688,7 @@ extension Layer {
     public var mediaIDs: [UUID] {
         switch content {
         case .shape, .group:
-            return (look?.fills.compactMap { $0.paint.imagePaint?.mediaID } ?? []) + (template?.mediaIDs ?? [])
+            return look?.fills.compactMap { $0.paint.imagePaint?.mediaID } ?? []
         case .video(let v): return [v.mediaID]
         case .audio(let a): return [a.mediaID]
         case .text: return []

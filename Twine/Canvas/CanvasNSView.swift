@@ -483,7 +483,10 @@ final class CanvasNSView: NSView {
         let layers = scene.layers
         // A template's cards are made as it plays, not kept: a click on
         // one, or on the video inside one, picks the template.
-        if let card = templateCard(of: i, in: scene) { return deep ? card.template : inContext(card.template) }
+        // A double-click (deep) goes in to the slot the card shows.
+        if let card = templateCard(of: i, in: scene) {
+            return deep ? controller.templateSlotLayer(showing: card.card, in: card.template) ?? card.template : inContext(card.template)
+        }
         // The back of a curved layer partly turned away is that layer.
         let id = layers[i].placed.backOf ?? layers[i].id
         return deep ? id : inContext(id)
@@ -766,7 +769,9 @@ final class CanvasNSView: NSView {
                 // And on a shape, it shows its points.
                 return beginPathEditing(hit)
             }
-            var moving = controller.topmost(controller.selectedLayers).filter { !controller.isLocked($0.id) }
+            // A template's slots are never drawn, so there is nothing to move.
+            let slots = controller.project.templateSlotIDs
+            var moving = controller.topmost(controller.selectedLayers).filter { !controller.isLocked($0.id) && !slots.contains($0.id) }
             let sources = Set(moving.map(\.id))
             let boxes = moving.compactMap { scene.bounds(of: $0.id) }
             snapBox = boxes.dropFirst().reduce(boxes.first) { $0?.union($1) }

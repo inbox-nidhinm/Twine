@@ -15,8 +15,10 @@ public enum TemplateCards {
     /// clipping the video, muted, which `evaluate` keeps playing round.
     public static func make(_ frame: Layer, _ setup: TemplateSetup, phase: Double, size: Size2,
                             pictures: [UUID: Size2], videos: [UUID: VideoClip] = [:]) -> (space: Space3D, cards: [Layer]) {
-        let scene = TemplateRecipes.scene(setup, phase: phase, size: size)
-        let slots = setup.slots.isEmpty ? [nil] : Array(setup.slots.prefix(maxSlots))
+        let listed = frame.templateSlots
+        // A frame with no slots at all draws as a new one of its kind would.
+        let scene = TemplateRecipes.scene(setup, phase: phase, size: size, slots: listed.isEmpty ? nil : min(listed.count, maxSlots))
+        let slots = listed.isEmpty ? [nil] : Array(listed.prefix(maxSlots))
         let cards = scene.cards.map { card -> Layer in
             let slot = (card.slot ?? card.index) % slots.count
             // An empty slot shows one of the app's own sample pictures.
@@ -124,6 +126,19 @@ public enum TemplateCards {
         u.14 ^= UInt8(truncatingIfNeeded: index)
         u.15 ^= UInt8(truncatingIfNeeded: index >> 8)
         return UUID(uuid: u)
+    }
+
+    /// Which slot card `card` of template `frame` shows at `phase`, in slot
+    /// order: worked out again from its recipe, as cards are never kept.
+    public static func slot(of card: UUID, in frame: Layer, setup: TemplateSetup, phase: Double) -> Int? {
+        guard isCard(card, of: frame.id) else { return nil }
+        let a = card.uuid, f = frame.id.uuid
+        let index = Int(a.14 ^ f.14) | Int(a.15 ^ f.15) << 8
+        let count = min(frame.templateSlots.count, maxSlots)
+        guard count > 0 else { return nil }
+        let scene = TemplateRecipes.scene(setup, phase: phase, size: frame.size, slots: count)
+        guard let made = scene.cards.first(where: { $0.index == index }) else { return nil }
+        return (((made.slot ?? made.index) % count) + count) % count
     }
 
     /// Whether `id` is one of a template frame's cards, made by `id(of:in:)`.

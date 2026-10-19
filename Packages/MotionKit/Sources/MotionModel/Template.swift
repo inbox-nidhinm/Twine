@@ -2,17 +2,20 @@ import Foundation
 
 /// A whole scene of cards from a list of pictures: a ring that turns, a
 /// globe, a tunnel. A template lives on a frame (`GroupContent.template`):
-/// the frame holds its slots and settings, and its cards are worked out
+/// the frame's children are its slots (a picture layer, a video layer, or
+/// an empty one: `Layer.templateSlots`), never drawn themselves, its setup
+/// holds its settings, and its cards are worked out
 /// each moment from the template's recipe (`TemplateRecipes`, in
 /// MotionEvaluation), so every setting stays live. Its bar on the timeline
 /// (`ActionSpec.template`) says when it plays. Split into Layers turns it
 /// into an ordinary frame in 3D of cards and actions.
 public struct TemplateSetup: Codable, Sendable, Equatable {
     public var kind: TemplateKind
-    /// The pictures, in order; nil is an empty slot, which shows one of the
-    /// app's sample pictures (`TemplateSamples`).
-    /// Templates with more cards than slots go round the slots again.
-    public var slots: [UUID?]
+    /// Before slots were the frame's children (file format 9), the slots'
+    /// pictures, in order, nil for an empty one: read from older files and
+    /// turned into children as the project opens (`TemplateSlots.converted`,
+    /// MotionEditing); never written.
+    public var legacySlots: [UUID?]?
     /// The template's own settings, by their keys; a setting not here is
     /// the recipe's default.
     public var settings: [String: TemplateValue]
@@ -26,10 +29,9 @@ public struct TemplateSetup: Codable, Sendable, Equatable {
     /// shows before and after its bar.
     public var pose: Double
 
-    public init(kind: TemplateKind, slots: [UUID?], settings: [String: TemplateValue] = [:], ratio: CardRatio = .auto,
+    public init(kind: TemplateKind, settings: [String: TemplateValue] = [:], ratio: CardRatio = .auto,
                 cornerRadius: Double = 0.06, shadow: Bool = false, pose: Double = 0) {
         self.kind = kind
-        self.slots = slots
         self.settings = settings
         self.ratio = ratio
         self.cornerRadius = cornerRadius
@@ -42,7 +44,7 @@ public struct TemplateSetup: Codable, Sendable, Equatable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         kind = try c.decode(TemplateKind.self, forKey: .kind)
-        slots = try c.decodeIfPresent([UUID?].self, forKey: .slots) ?? []
+        legacySlots = try c.decodeIfPresent([UUID?].self, forKey: .slots)
         settings = try c.decodeIfPresent([String: TemplateValue].self, forKey: .settings) ?? [:]
         ratio = try c.decodeIfPresent(CardRatio.self, forKey: .ratio) ?? .auto
         cornerRadius = try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? 0.06
@@ -53,16 +55,12 @@ public struct TemplateSetup: Codable, Sendable, Equatable {
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(kind, forKey: .kind)
-        try c.encode(slots, forKey: .slots)
         if !settings.isEmpty { try c.encode(settings, forKey: .settings) }
         if ratio != .auto { try c.encode(ratio, forKey: .ratio) }
         try c.encode(cornerRadius, forKey: .cornerRadius)
         if shadow { try c.encode(shadow, forKey: .shadow) }
         if pose != 0 { try c.encode(pose, forKey: .pose) }
     }
-
-    /// Every picture the template shows.
-    public var mediaIDs: [UUID] { slots.compactMap { $0 } }
 }
 
 /// A setting's value: a number, or one of a choice's options by its key.
@@ -199,4 +197,39 @@ extension Layer {
     }
 
     public var isTemplate: Bool { template != nil }
+
+    /// A template's slot layers in slot order. Children are kept back to
+    /// front and the layers panel lists them front first, so slot 1 is the
+    /// last child, at the top of the list, and dragging rows reorders slots
+    /// as it reads.
+    public var templateSlotLayers: [Layer] {
+        get { children.reversed() }
+        set { children = newValue.reversed() }
+    }
+
+    /// A template's slots in order: each one's picture or video, nil for an
+    /// empty one (anything else is empty too).
+    public var templateSlots: [UUID?] { templateSlotLayers.map(\.slotMedia) }
+
+    /// What a template's slot layer shows: its picture fill's or its
+    /// video's file.
+    public var slotMedia: UUID? {
+        if case .video(let v) = content { return v.mediaID }
+        return picture?.paint.mediaID
+    }
+}
+
+extension Project {
+    /// The template frames' slot layers, by id: never drawn, played or
+    /// animated themselves; the template draws its cards from them.
+    public var templateSlotIDs: Set<UUID> {
+        var ids = Set<UUID>()
+        func walk(_ layers: [Layer]) {
+            for layer in layers {
+                if layer.isTemplate { ids.formUnion(layer.children.map(\.id)) } else if layer.isGroup { walk(layer.children) }
+            }
+        }
+        walk(layers)
+        return ids
+    }
 }

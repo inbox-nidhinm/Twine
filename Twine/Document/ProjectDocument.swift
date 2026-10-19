@@ -45,7 +45,10 @@ final class ProjectDocument: NSDocument {
         // in the timeline, and an older Typewriter types rather than fades;
         // the file changes only when next saved.
         // Masks kept the old way become mask groups (`MaskConversion`).
-        let project = MaskConversion.converted(Presets.withTypewriters(MediaPlays.withPlayBars(try ProjectFormat.decode(data))))
+        // Older templates' slot lists become their frames' children first, so
+        // no Play bar is given to a slot's video.
+        let project = MaskConversion.converted(Presets.withTypewriters(MediaPlays.withPlayBars(
+            TemplateSlots.converted(try ProjectFormat.decode(data)))))
         // Anything in the media folder that is not an ordinary file with a
         // plain name (a link could lead anywhere on the Mac) is let go, so
         // no save carries it on.

@@ -49,6 +49,7 @@ Separate steps with `;`. Prefix a mouse or key step with held keys: `shift+`, `c
 | `library` | Logs the home screen's folders (with counts), which is showing, and every project with its folder |
 | `onboarding [PAGE]` | Raises the onboarding card, as Help > Show Onboarding does (the test copy never shows it by itself), at a page if given (0 to 2); the state line's `onb=` is its page and feature |
 | `folderchosen` | Counts a different folder as chosen on the onboarding, which plays the folder page's video again, without the panel (`onboarding 1` plays it once, as landing on the page does) |
+| `tcard X Y` | Logs `TCARD` with the template card at composition point X Y: the slot a double-click there goes in to, and what a deep pick finds |
 | `tslot N PATH`, `tdrop X Y PATH`, `tslots` | Puts a picture or video file into slot N of the selected template, as choosing it does; drops a file at composition point X Y as the Finder does, logging `TDROP` with whether a template card took it; logs `TSLOTS`, each slot p (picture), v (video) or - (empty). Files are brought in on a task, so `wait 1` after them |
 | `templategallery`, `newfromtemplate KIND` | Raises Home's New from Template card; makes and opens a project holding template KIND (its id, `dive-in`...) in the folder chosen on Home, as picking it there does |
 | `home`, `openfile PATH` | Turns the window to the home screen, as the Home button does; opens a project in the window, as the Finder does (never point it at a real project) |

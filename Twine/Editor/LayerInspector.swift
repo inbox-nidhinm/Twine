@@ -14,6 +14,15 @@ struct LayerInspector: View {
     @State private var perCorner = false
 
     var body: some View {
+        // A template's slot shows what it holds, and nothing else.
+        if let slot = controller.templateSlot(layer.id) {
+            TemplateSlotSection(slot: layer, template: slot.template, index: slot.index, controller: controller)
+        } else {
+            sections
+        }
+    }
+
+    private var sections: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Sound has nowhere to be and nothing to show.
             if case .audio = layer.content {} else {

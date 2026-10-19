@@ -60,6 +60,9 @@ struct AnimationInspector: View {
                                 swapPreset: controller.selectedPresetBars.isEmpty ? nil : { swappingPreset = true },
                                 sound: actions.allSatisfy { $0.spec.kind == .play } ? sound : nil)
                     .id(actions.map(\.id))
+            } else if layers.count == 1, let slot = controller.templateSlot(layers[0].id) {
+                // A slot has nothing to animate; what it holds is set here too.
+                TemplateSlotSection(slot: layers[0], template: slot.template, index: slot.index, controller: controller)
             } else if !layers.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
                     if let sound {

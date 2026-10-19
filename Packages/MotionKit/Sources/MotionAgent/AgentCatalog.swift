@@ -131,7 +131,7 @@ enum AgentCatalog {
 
     static var templates: JSONValue {
         let notes: [JSONValue] = [
-            "A template is a frame of picture cards moving in 3D, filling the composition, with a bar that loops it. Give it pictures (file paths) to fill its slots; empty slots show samples.",
+            "A template is a frame of picture cards moving in 3D, filling the composition, with a bar that loops it. Give it pictures (file paths) to fill its slots; empty slots show samples. Its slots are its child layers, slot 1 the last child: a picture layer, a video layer, or an empty one named Empty slot. They are never drawn themselves; the cards show them.",
             "settings are by key: numbers within their range, or an option's key for a choice. corner_radius (a share of the card's shorter side) and shadow (true or false) suit every template.",
         ]
         return ["notes": .array(notes), "templates": .array(Templates.library.map { info in

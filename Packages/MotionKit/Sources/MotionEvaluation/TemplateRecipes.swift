@@ -309,8 +309,10 @@ public enum TemplateRecipes {
 
     // MARK: The scenes
 
-    /// The template at `phase` in a frame of `size`.
-    public static func scene(_ setup: TemplateSetup, phase: Double, size: Size2) -> TemplateScene {
+    /// The template at `phase` in a frame of `size`, with `slots` slots
+    /// (its frame's children; a new template's count when not given).
+    public static func scene(_ setup: TemplateSetup, phase: Double, size: Size2, slots: Int? = nil) -> TemplateScene {
+        let slotCount = max(slots ?? slotCount(setup.kind), 0)
         let s = Settings(values: setup.settings, controls: controls(setup.kind))
         let p = phase - phase.rounded(.down)
         let k = Kit(size: size)
@@ -324,10 +326,10 @@ public enum TemplateRecipes {
         case .tunnel: return tunnel(s, p, k)
         case .spiral: return spiral(s, p, k)
         case .depthStack: return depthStack(s, p, k)
-        case .carouselRing: return carousel(s, p, k, vertical: false, slots: max(setup.slots.count, 3))
-        case .verticalRing: return carousel(s, p, k, vertical: true, slots: max(setup.slots.count, 3))
-        case .isoStream: return isoStream(s, p, k, slots: max(setup.slots.count, 3))
-        case .isoSpotlight: return isoSpotlight(s, p, k, slots: max(setup.slots.count, 3))
+        case .carouselRing: return carousel(s, p, k, vertical: false, slots: max(slotCount, 3))
+        case .verticalRing: return carousel(s, p, k, vertical: true, slots: max(slotCount, 3))
+        case .isoStream: return isoStream(s, p, k, slots: max(slotCount, 3))
+        case .isoSpotlight: return isoSpotlight(s, p, k, slots: max(slotCount, 3))
         case .isoSwing: return isoSwing(s, p, k)
         case .orbit, .halo: return orbit(s, p, k, halo: setup.kind == .halo)
         case .quadOrbit: return quadOrbit(s, p, k)
@@ -335,7 +337,7 @@ public enum TemplateRecipes {
         case .zoomOrbit: return zoomOrbit(s, p, k)
         case .vortex: return vortex(s, p, k)
         case .wheel, .halfWheel: return wheel(s, p, k, half: setup.kind == .halfWheel)
-        default: return flatScene(setup.kind, s, p, k, slots: max(setup.slots.count, 1))
+        default: return flatScene(setup.kind, s, p, k, slots: max(slotCount, 1))
         }
     }
 

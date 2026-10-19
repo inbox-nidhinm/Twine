@@ -4,24 +4,21 @@ import MotionEvaluation
 import MotionEditing
 import Theme
 
-/// A template frame's own section, in Design: its pictures, the cards'
-/// shape, where it rests, its recipe's settings, and Split into Layers.
+/// A template frame's own section, in Design: the cards' shape, where it
+/// rests, its recipe's settings, and Split into Layers. Its pictures are its
+/// slots, listed under it in the layers panel; files dropped here are added
+/// as slots after the last.
 struct TemplateSection: View {
     let layer: Layer
     let setup: TemplateSetup
     let controller: EditorController
 
-    private let wells = [GridItem(.adaptive(minimum: SlotWell.side, maximum: SlotWell.side), spacing: 6)]
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HeaderRow(title: Templates.name(of: setup.kind)) {
-                IconButton(icon: .plus, help: "Add a picture slot") {
-                    controller.editTemplate(layer.id) { $0.slots.append(nil) }
-                }
+                IconButton(icon: .plus, help: "Add a slot") { controller.addTemplateSlot(layer.id) }
             }
             VStack(alignment: .leading, spacing: 10) {
-                slots
                 cardRows
                 LabeledRow(label: "Rests at") {
                     UnitField(value: setup.pose * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
@@ -38,31 +35,8 @@ struct TemplateSection: View {
             .gridBody()
         }
         .sectionPadding()
-    }
-
-    // MARK: Pictures
-
-    /// A well for each slot: a click chooses its picture or video, files
-    /// dropped on one go into it and the slots after it, and a filled one
-    /// can be emptied; an empty slot shows a plain card. Files dropped
-    /// beside the wells go in after the last.
-    private var slots: some View {
-        LazyVGrid(columns: wells, alignment: .leading, spacing: 6) {
-            ForEach(Array(setup.slots.enumerated()), id: \.offset) { index, media in
-                SlotWell(image: media.flatMap(controller.preview(of:)), number: index + 1,
-                         isVideo: media.map { m in controller.project.media.contains { $0.id == m && $0.kind == .video } } ?? false,
-                         drop: { controller.setTemplateMedia(layer.id, from: index, urls: $0) },
-                         choose: { controller.chooseTemplatePicture(layer.id, slot: index) },
-                         remove: {
-                             controller.editTemplate(layer.id) { setup in
-                                 if setup.slots[index] != nil { setup.slots[index] = nil } else if setup.slots.count > 1 { setup.slots.remove(at: index) }
-                             }
-                         },
-                         filled: media != nil)
-            }
-        }
         .dropDestination(for: URL.self) { urls, _ in
-            controller.setTemplateMedia(layer.id, from: setup.slots.count, urls: urls)
+            controller.setTemplateMedia(layer.id, from: layer.templateSlots.count, urls: urls)
             return true
         }
     }
@@ -133,57 +107,56 @@ struct TemplateSection: View {
     }
 }
 
-/// One slot's picture, or its number on a plain well while empty. A click
-/// chooses a picture; the corner button empties a filled slot, or takes an
-/// empty one away.
-private struct SlotWell: View {
-    let image: CGImage?
-    let number: Int
-    let isVideo: Bool
-    let drop: ([URL]) -> Void
-    let choose: () -> Void
-    let remove: () -> Void
-    let filled: Bool
+/// A template's slot, selected in the layers panel: what it shows, a way
+/// to choose another picture or video (or drop one here), and to empty it.
+/// Shown in place of the layer's own sections, in both modes: a slot is
+/// never drawn itself, so it has no place, size or look to set.
+struct TemplateSlotSection: View {
+    let slot: Layer
+    let template: Layer
+    let index: Int
+    let controller: EditorController
 
-    @State private var hovering = false
     @State private var targeted = false
 
-    /// Small, so a dozen slots take a few rows rather than the panel.
-    static let side = Theme.control * 1.5
+    private var media: UUID? { slot.slotMedia }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Theme.radiusControl)
-        Button(action: choose) {
-            ZStack {
-                shape.fill(hovering || targeted ? Theme.panelHover : Theme.panelRaised)
-                if filled, let image {
-                    Image(decorative: image, scale: 1).resizable().aspectRatio(contentMode: .fill)
-                    if isVideo {
-                        IconView(.video, size: Self.side * 0.45)
-                            .foregroundStyle(Theme.textPrimary)
-                            .shadow(color: Theme.shadow, radius: 2)
+        let shape = RoundedRectangle(cornerRadius: Theme.radiusWell)
+        VStack(alignment: .leading, spacing: 8) {
+            HeaderRow(title: "Slot \(index + 1)") {}
+            VStack(alignment: .leading, spacing: 10) {
+                Button { controller.chooseTemplatePicture(template.id, slot: index) } label: {
+                    ZStack {
+                        shape.fill(targeted ? Theme.panelHover : Theme.panelRaised)
+                        if let media, let image = controller.preview(of: media) {
+                            Image(decorative: image, scale: 1).resizable().aspectRatio(contentMode: .fit)
+                        } else {
+                            Text(TemplateSlots.emptyName).font(ThemeFont.label).foregroundStyle(Theme.textTertiary)
+                        }
                     }
-                } else {
-                    Text("\(number)").font(ThemeFont.label).foregroundStyle(Theme.textTertiary)
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(4.0 / 3, contentMode: .fit)
+                    .clipShape(shape)
+                    .overlay(shape.strokeBorder(targeted ? Theme.textSecondary : Theme.edge, lineWidth: 1))
+                    .contentShape(shape)
+                }
+                .buttonStyle(.plain)
+                .help(media == nil ? "Choose a picture or video, or drop one here" : "Choose another picture or video, or drop one here")
+                PanelButton(title: media == nil ? "Choose Picture or Video" : "Replace", icon: .image) {
+                    controller.chooseTemplatePicture(template.id, slot: index)
+                }
+                if media != nil {
+                    PanelButton(title: "Empty Slot", icon: .close) { controller.emptyTemplateSlot(template.id, slot: index) }
+                        .help("Its cards show a sample picture again.")
                 }
             }
-            .frame(width: Self.side, height: Self.side)
-            .clipShape(shape)
-            .overlay(shape.strokeBorder(targeted ? Theme.textSecondary : Theme.edge, lineWidth: 1))
+            .gridBody()
         }
-        .buttonStyle(.plain)
+        .sectionPadding()
         .dropDestination(for: URL.self) { urls, _ in
-            drop(urls)
+            controller.setTemplateMedia(template.id, from: index, urls: urls)
             return true
         } isTargeted: { targeted = $0 }
-        .overlay(alignment: .topTrailing) {
-            if hovering {
-                IconButton(icon: .close, help: filled ? "Empty this slot" : "Remove this slot", action: remove)
-                    .scaleEffect(0.7)
-                    .offset(x: 6, y: -6)
-            }
-        }
-        .onHover { hovering = $0 }
-        .help(filled ? "Choose another picture or video, or drop files here" : "Choose a picture or video, or drop files here")
     }
 }

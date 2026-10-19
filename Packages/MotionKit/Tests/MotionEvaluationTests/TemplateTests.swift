@@ -8,9 +8,17 @@ import MotionModel
     static let size = Size2(1280, 720)
 
     static func frame(_ kind: TemplateKind, slots: Int? = nil) -> Layer {
-        let setup = TemplateSetup(kind: kind, slots: Array(repeating: nil, count: slots ?? TemplateRecipes.slotCount(kind)))
-        return Layer(name: "T", content: .group(GroupContent(frame: FrameStyle(), template: setup)), size: size,
-                     position: Vec2(size.width / 2, size.height / 2))
+        var frame = Layer(name: "T", content: .group(GroupContent(frame: FrameStyle(), template: TemplateSetup(kind: kind))), size: size,
+                          position: Vec2(size.width / 2, size.height / 2))
+        frame.templateSlotLayers = Array(repeating: nil, count: slots ?? TemplateRecipes.slotCount(kind)).map(slot)
+        return frame
+    }
+
+    /// A slot showing picture `media`, or an empty one.
+    static func slot(_ media: UUID?) -> Layer {
+        Layer(name: "S", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
+                                                      fills: media.map { [Fill(paint: .image(ImagePaint(mediaID: $0)))] } ?? [])),
+              size: Size2(100, 100), position: .zero)
     }
 
     private func finite(_ c: TemplateCard) -> Bool {
@@ -99,7 +107,7 @@ import MotionModel
     @Test func picturesFillTheirSlotsAndGoRoundAgain() throws {
         let a = UUID(), b = UUID()
         var frame = Self.frame(.globe)
-        frame.template?.slots = [a, b]
+        frame.templateSlotLayers = [Self.slot(a), Self.slot(b)]
         let project = Project(composition: Composition(width: 1280, height: 720), layers: [frame],
                               media: [MediaAsset(id: a, kind: .image, fileName: "a.png", originalName: "a.png", contentHash: "a",
                                                  pixelWidth: 400, pixelHeight: 200),
@@ -155,12 +163,15 @@ import MotionModel
 
     @Test func templatesKeepInFiles() throws {
         var frame = Self.frame(.wheel)
-        frame.template?.slots = [UUID(), nil]
+        frame.templateSlotLayers = [Self.slot(UUID()), Self.slot(nil)]
         frame.template?.settings = ["count": .number(10), "spin": .choice("flip")]
         frame.template?.shadow = true
         let back = try JSONDecoder().decode(Layer.self, from: JSONEncoder().encode(frame))
         #expect(back.template == frame.template)
-        #expect(back.mediaIDs == frame.template!.mediaIDs)
+        #expect(back.templateSlots == frame.templateSlots && back.templateSlots.count == 2)
+        // No slot list is written any more: slots are the children.
+        let json = String(decoding: try JSONEncoder().encode(frame.template!), as: UTF8.self)
+        #expect(!json.contains("slots"))
     }
 
     /// A sequence keeps the same cards through every layout, rests in each
@@ -228,10 +239,10 @@ import MotionModel
     /// Empty slots show the app's sample pictures, a different one each,
     /// in their own shapes; a filled slot shows its own picture.
     @Test func emptySlotsShowSamples() throws {
-        var setup = Self.frame(.carouselRing, slots: 4).template!
+        let setup = Self.frame(.carouselRing, slots: 4).template!
         let own = UUID()
-        setup.slots[1] = own
-        let frame = Self.frame(.carouselRing, slots: 4)
+        var frame = Self.frame(.carouselRing, slots: 4)
+        frame.templateSlotLayers[1] = Self.slot(own)
         let made = TemplateCards.make(frame, setup, phase: 0, size: Self.size, pictures: [own: Size2(400, 300)])
         func media(_ l: Layer) -> UUID? { l.look?.fills.first?.paint.imagePaint?.mediaID }
         let shown = made.cards.prefix(4).map(media)

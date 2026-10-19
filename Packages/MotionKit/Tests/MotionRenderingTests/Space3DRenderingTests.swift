@@ -599,7 +599,7 @@ import MotionModel
 
         // Templates, which make their cards afresh every frame.
         for kind in [TemplateKind.ringStream, .globe, .tunnel, .curvedWall, .diveIn, .fanWall, .threeActs] {
-            let setup = TemplateSetup(kind: kind, slots: Array(repeating: nil, count: TemplateRecipes.slotCount(kind)))
+            let setup = TemplateSetup(kind: kind)
             let frame = Layer(name: "T", content: .group(GroupContent(clipsContent: true, frame: FrameStyle(), template: setup)),
                               size: Size2(1920, 1080), position: Vec2(960, 540))
             let bar = Action(target: frame.id, start: 0, duration: 10, easing: .linear, spec: .template(TemplatePlay()))

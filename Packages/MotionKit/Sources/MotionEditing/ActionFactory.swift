@@ -75,7 +75,9 @@ public enum ActionFactory {
     /// The kinds for a layer in `project`, which knows whether a video's file
     /// has sound.
     public static func kinds(for layer: Layer, in project: Project) -> [ActionKind] {
-        kinds(for: layer, hasSound: project.hasSound(layer))
+        // A template's slot is never drawn itself: there is nothing to animate.
+        guard !project.templateSlotIDs.contains(layer.id) else { return [] }
+        return kinds(for: layer, hasSound: project.hasSound(layer))
     }
 
     /// Kinds offered for several layers at once: those every one of them takes.

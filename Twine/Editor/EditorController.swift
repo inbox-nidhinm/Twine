@@ -584,7 +584,8 @@ final class EditorController {
     /// bar across the scene, and selects it. The selected picture layers go
     /// into its slots in their place.
     func addTemplate(_ kind: TemplateKind) {
-        let pictures = selectedLayers.filter { $0.picture != nil }
+        // Selected pictures and videos go into its slots.
+        let pictures = selectedLayers.filter { $0.slotMedia != nil }
         let (command, id) = Templates.adding(kind, to: project, replacing: pictures)
         guard perform(command) else { return }
         editor.selectedActions = []
@@ -604,6 +605,42 @@ final class EditorController {
             change(&setup)
             layer.template = setup
         }
+    }
+
+    /// The template a slot layer belongs to, and which slot it is.
+    func templateSlot(_ id: UUID) -> (template: Layer, index: Int)? {
+        guard let parent = project.location(of: id)?.parentID, let frame = project.layer(withID: parent), frame.isTemplate,
+              let index = frame.templateSlotLayers.firstIndex(where: { $0.id == id }) else { return nil }
+        return (frame, index)
+    }
+
+    /// Adds an empty slot after the last of template `id`'s.
+    func addTemplateSlot(_ id: UUID) {
+        edit(id) { layer in
+            guard layer.isTemplate, layer.children.count < TemplateCards.maxSlots else { return }
+            layer.templateSlotLayers.append(TemplateSlots.layer(nil, in: layer.size))
+        }
+    }
+
+    /// Empties slot `slot` of template `id`: its cards show a sample again.
+    func emptyTemplateSlot(_ id: UUID, slot: Int) {
+        edit(id) { layer in
+            var slots = layer.templateSlotLayers
+            guard slots.indices.contains(slot) else { return }
+            slots[slot] = TemplateSlots.layer(nil, in: layer.size).withID(slots[slot].id)
+            layer.templateSlotLayers = slots
+        }
+    }
+
+    /// The slot layer a card of template `id` shows: for a double-click on
+    /// the card, which goes in to it.
+    func templateSlotLayer(showing card: UUID, in id: UUID) -> UUID? {
+        guard let frame = project.layer(withID: id), let setup = frame.template else { return nil }
+        let state = ActionTracks(project.actions).state(of: frame, at: editor.mode == .design ? 0 : editor.time)
+        let phase = editor.mode == .design ? setup.pose : state.template.phase ?? setup.pose
+        guard let slot = TemplateCards.slot(of: card, in: frame, setup: setup.tuned(state.template.settings), phase: phase) else { return nil }
+        let slots = frame.templateSlotLayers
+        return slots.indices.contains(slot) ? slots[slot].id : nil
     }
 
     /// Puts a picture chosen in a panel into slot `slot` of template `id`.
@@ -628,13 +665,16 @@ final class EditorController {
                 assets.append(asset)
                 if isNew, !added.contains(where: { $0.id == asset.id }) { added.append(asset) }
             }
-            guard !assets.isEmpty, var layer = project.layer(withID: id), var setup = layer.template else { return }
+            guard !assets.isEmpty, var layer = project.layer(withID: id), layer.isTemplate else { return }
+            var slots = layer.templateSlotLayers
             for (k, asset) in assets.enumerated() {
                 let i = max(slot, 0) + k
                 guard i < TemplateCards.maxSlots else { break }
-                if i < setup.slots.count { setup.slots[i] = asset.id } else { setup.slots.append(asset.id) }
+                let made = TemplateSlots.layer(asset, in: layer.size)
+                // A slot filled again stays the same layer, so it stays selected.
+                if i < slots.count { slots[i] = made.withID(slots[i].id) } else { slots.append(made) }
             }
-            layer.template = setup
+            layer.templateSlotLayers = slots
             perform(.batch(added.map { .addMedia($0) } + [.updateLayers([layer])],
                            name: assets.count == 1 ? "Template Picture" : "Template Pictures"))
         }
@@ -643,14 +683,14 @@ final class EditorController {
     /// Files dropped on one of template `id`'s cards on the canvas go into
     /// the slot that card shows, or, on an empty card, the first empty slot.
     func dropOnTemplate(_ id: UUID, card: UUID, urls: [URL]) {
-        guard let setup = project.layer(withID: id)?.template else { return }
+        guard let slots = project.layer(withID: id)?.templateSlots else { return }
         let shown = scene.layers.lazy.filter { $0.id == card || $0.parentID == card }.compactMap(Self.media(of:)).first
         // A card showing a sample is an empty slot: the first that shows that sample.
         let sampled = shown.flatMap { m in
-            setup.slots.indices.first { setup.slots[$0] == nil && TemplateSamples.sample(for: $0).id == m }
+            slots.indices.first { slots[$0] == nil && TemplateSamples.sample(for: $0).id == m }
         }
-        let slot = sampled ?? shown.flatMap { m in setup.slots.firstIndex(of: m) }
-            ?? setup.slots.firstIndex(of: nil) ?? setup.slots.count
+        let slot = sampled ?? shown.flatMap { m in slots.firstIndex(of: m) }
+            ?? slots.firstIndex(of: nil) ?? slots.count
         setTemplateMedia(id, from: slot, urls: urls)
     }
 

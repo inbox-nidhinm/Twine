@@ -33,7 +33,9 @@ public enum MediaPlays {
     /// as an import makes one.
     public static func withPlayBars(_ project: Project) -> Project {
         let playing = Set(project.actions.filter(\.isPlay).map(\.targetLayerID))
-        let missing = project.allLayers.filter { plays($0) && !playing.contains($0.id) }
+        // A template's slots play in its cards, never on their own.
+        let slots = project.templateSlotIDs
+        let missing = project.allLayers.filter { plays($0) && !playing.contains($0.id) && !slots.contains($0.id) }
         guard !missing.isEmpty else { return project }
         let rate = project.composition.frameRate
         var row = ActionFactory.nextRowOrder(in: project)
