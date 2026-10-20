@@ -15,7 +15,7 @@ The test copy's home screen lists `$OUTROOT/Creations` (or `$TWINE_TEST_CREATION
 
 `run.sh PROJECT NAME "steps"` copies the project first (from `Projects/`, or any `.twine` path, which is never changed), opens it in the test copy in the background, runs the steps, and prints the state after each one: selection with positions, actions, mode, tool, time, export, menu, hover, first responder. Screenshots from `shot X` go to `$TWINE_TEST_OUT/NAME/X.png` (default a folder in `$TMPDIR`), the log to `NAME.log`. Screenshots come out at 1× or 2×; scale to 1440 wide (`ffmpeg -vf "scale=1440:-1,crop=w:h:x:y"`) to read coordinates, which are window points from the top-left.
 
-Projects: `Actions` (two layers with Move, Rotate, Opacity, Scale, Hide), `Blank`, `Mask` (stripes and a spot), `Style` (bars, card, blob, ring with style and blur actions), `Text`. The heavy performance scene is made by the benchmark: `cd Packages/MotionKit && TWINE_BENCH=1 TWINE_BENCH_OUT=/path/document.json swift test -c release --filter PerformanceTests`, then put that `document.json` in a `Name.twine` folder.
+Projects: `Actions` (two layers with Move, Rotate, Opacity, Scale, Hide), `Blank`, `Mask` (stripes and a spot), `Style` (bars, card, blob, ring with style and blur actions), `Text`. `python3 Tools/SelfTest/make-glass-projects.py FOLDER` writes the glass projects (`Glass`, `Mid`, `User`, `Edge`; see `docs/glass.md`). The heavy performance scene is made by the benchmark: `cd Packages/MotionKit && TWINE_BENCH=1 TWINE_BENCH_OUT=/path/document.json swift test -c release --filter PerformanceTests`, then put that `document.json` in a `Name.twine` folder.
 
 ## Steps
 
