@@ -114,8 +114,8 @@ final class GlassLayers {
     private let bendStage: GlassStage
     private let splitStage: GlassStage
     private var lightElements: [CALayer] = []
-    private var drawn: (glass: Glass, shape: ResolvedShape, size: Size2, flips: Bool)?
-    private var picture: (path: CGPath, size: CGSize, range: Double, flips: Bool, image: CGImage?)?
+    private var drawn: (glass: Glass, shape: ResolvedShape, size: Size2, flips: Bool, texels: Double)?
+    private var picture: (path: CGPath, size: CGSize, range: Double, flips: Bool, texels: Double, image: CGImage?)?
 
     /// Nil when the system has no backdrop layer.
     init?() {
@@ -138,10 +138,16 @@ final class GlassLayers {
     }
 
     /// Draws `glass` on `shape` (in a box of `size`), whose plain area is
-    /// `area`. Does nothing when nothing changed.
-    func update(_ glass: Glass, shape: ResolvedShape, area: CGPath, size: Size2, flips: Bool) {
-        if let drawn, drawn.glass == glass, drawn.shape == shape, drawn.size == size, drawn.flips == flips { return }
-        drawn = (glass, shape, size, flips)
+    /// `area`, shown at `pixelScale` pixels a point (the canvas's zoom
+    /// included). Does nothing when nothing changed.
+    func update(_ glass: Glass, shape: ResolvedShape, area: CGPath, size: Size2, flips: Bool, pixelScale: CGFloat) {
+        // Rounded up to a power of two, so a pinch draws the field picture
+        // again only as the zoom doubles, not every frame; a rounded box
+        // needs no picture, so the zoom never touches it.
+        let texels = shape.roundedBox != nil ? 1 : pow(2, log2(Double(max(pixelScale, 1))).rounded(.up))
+        if let drawn, drawn.glass == glass, drawn.shape == shape, drawn.size == size, drawn.flips == flips,
+           drawn.texels == texels { return }
+        drawn = (glass, shape, size, flips, texels)
         let m = GlassKit.margin(glass)
         let box = CGRect(x: 0, y: 0, width: max(size.width, 0), height: max(size.height, 0))
         let whole = box.insetBy(dx: -m, dy: -m)
@@ -166,7 +172,7 @@ final class GlassLayers {
                 e.cornerRadius = radius
             }
         } else {
-            let image = fieldPicture(outline, size: whole.size, range: range, flips: flips)
+            let image = fieldPicture(outline, size: whole.size, range: range, flips: flips, texels: texels)
             for e in elements {
                 e.setValue("contents", forKey: "mode")
                 e.cornerRadius = 0
@@ -212,12 +218,13 @@ final class GlassLayers {
         }
     }
 
-    private func fieldPicture(_ path: CGPath, size: CGSize, range: Double, flips: Bool) -> CGImage? {
-        if let picture, picture.path == path, picture.size == size, picture.range == range, picture.flips == flips {
+    private func fieldPicture(_ path: CGPath, size: CGSize, range: Double, flips: Bool, texels: Double) -> CGImage? {
+        if let picture, picture.path == path, picture.size == size, picture.range == range, picture.flips == flips,
+           picture.texels == texels {
             return picture.image
         }
-        let image = GlassField.picture(of: path, size: size, range: range, flips: flips)
-        picture = (path, size, range, flips, image)
+        let image = GlassField.picture(of: path, size: size, range: range, flips: flips, texelsPerPoint: texels)
+        picture = (path, size, range, flips, texels, image)
         return image
     }
 }
@@ -227,13 +234,16 @@ final class GlassLayers {
 enum GlassField {
     /// The longest side a field picture is worked out at; bigger outlines
     /// are worked out coarser, which a distance field takes well.
-    static let largestSide = 1024
+    static let largestSide = 2048
 
     /// `path` (in points, y down, inside `size`) as signed distances held to
-    /// `range` either way, negative inside, and the way to the edge.
-    static func picture(of path: CGPath, size: CGSize, range: Double, flips: Bool) -> CGImage? {
+    /// `range` either way, negative inside, and the way to the edge, with
+    /// `texelsPerPoint` across each point it shows at: stretched, a coarse
+    /// field bends in blotches, which the canvas zoomed in on a small star
+    /// showed.
+    static func picture(of path: CGPath, size: CGSize, range: Double, flips: Bool, texelsPerPoint: Double = 1) -> CGImage? {
         guard size.width >= 1, size.height >= 1, range > 0 else { return nil }
-        let step = max(1, Double(max(size.width, size.height)) / Double(largestSide))
+        let step = max(1 / max(texelsPerPoint, 1), Double(max(size.width, size.height)) / Double(largestSide))
         let w = Int((Double(size.width) / step).rounded(.up)), h = Int((Double(size.height) / step).rounded(.up))
         var toTexels = CGAffineTransform(scaleX: 1 / step, y: 1 / step)
         guard let scaled = path.copy(using: &toTexels) else { return nil }

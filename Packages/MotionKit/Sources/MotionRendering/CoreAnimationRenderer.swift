@@ -43,6 +43,18 @@ public final class CoreAnimationRenderer: SceneRenderer {
         }
     }
 
+    /// On screen, whether glass and background blur may only see the
+    /// composition. A backdrop on screen shows what the window server has
+    /// drawn there, which, wherever glass bends it in from past the window's
+    /// edge, is the desktop, the Dock or the menu bar. While any layer has a
+    /// backdrop, the root draws as a group of its own (an unchanging colour
+    /// matrix as its filter), and a backdrop sees only what is drawn inside
+    /// its group. Off screen there is nothing else to see.
+    public var isolatesBackdrops = false
+    private var isolated = false
+    /// A filter that changes nothing but makes its layer a group of its own.
+    nonisolated(unsafe) private static let isolation: NSObject? = PrivateFilter.make("colorMatrix")
+
     /// Where image and video layers get their pictures. Without one they draw
     /// as a grey box, as they do when a file is missing.
     public var media: MediaProvider?
@@ -76,6 +88,17 @@ public final class CoreAnimationRenderer: SceneRenderer {
             contentLayer.frame = bounds
         }
         contentLayer.backgroundColor = scene.background?.cgColor
+        if isolatesBackdrops {
+            var backdrops = false
+            for i in scene.layers.indices where scene.layers[i].glass != .none || scene.layers[i].backgroundBlur != nil {
+                backdrops = true
+                break
+            }
+            if backdrops != isolated {
+                isolated = backdrops
+                rootLayer.filters = backdrops ? Self.isolation.map { [$0] } : nil
+            }
+        }
 
         // Layers are read in place, by index: `for in` copied every one,
         // which in a large project cost as much as comparing it.
@@ -618,7 +641,7 @@ final class Node {
         if glass == nil { glass = GlassLayers() }
         guard let glass else { return }
         glassShown = true
-        glass.update(look, shape: shape, area: area(of: shape), size: size, flips: flipsContents)
+        glass.update(look, shape: shape, area: area(of: shape), size: size, flips: flipsContents, pixelScale: scale)
     }
 
     /// The frame covering the layer's box or fitting inside it, centred, or

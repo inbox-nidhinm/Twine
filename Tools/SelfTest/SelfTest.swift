@@ -365,6 +365,18 @@ enum SelfTest {
                     rowsOut.append(line)
                 }
                 for r in rowsOut { log("SCAN " + r) }
+            case "zoom":
+                // Zooms the canvas by n[0] about its middle, as View > Zoom In does.
+                controller.canvas?.zoom(by: n.first ?? 2)
+                log("ZOOM by \(n.first ?? 2)")
+            case "pan":
+                // Pans the canvas by DX DY points, as a trackpad's two-finger scroll does.
+                if let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2,
+                                    wheel1: Int32(n[1]), wheel2: Int32(n[0]), wheel3: 0),
+                   let e = NSEvent(cgEvent: cg) {
+                    controller.canvas?.scrollWheel(with: e)
+                }
+                log("PAN \(n[0]) \(n[1])")
             case "menukey":
                 let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: ProcessInfo.processInfo.systemUptime,
                                          windowNumber: window.windowNumber, context: nil, characters: parts[1], charactersIgnoringModifiers: parts[1],

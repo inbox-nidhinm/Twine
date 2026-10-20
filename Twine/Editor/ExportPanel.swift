@@ -515,6 +515,7 @@ final class ExportPreviewView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        renderer.isolatesBackdrops = true
         wantsLayer = true
         layerUsesCoreImageFilters = true
         layer?.masksToBounds = true

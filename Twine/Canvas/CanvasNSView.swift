@@ -103,6 +103,8 @@ final class CanvasNSView: NSView {
         frameEdge.fillColor = nil
         frameEdge.strokeColor = NSColor(Theme.edge).cgColor
         frameEdge.lineWidth = 1
+        // Glass sees only the composition, never the desktop past the window.
+        renderer.isolatesBackdrops = true
         world.addSublayer(renderer.rootLayer)
         layer?.addSublayer(checker)
         layer?.addSublayer(world)
