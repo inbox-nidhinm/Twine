@@ -43,13 +43,14 @@ import MotionEvaluation
     /// A 200 by 150 card with no fill in the middle of the scene, with
     /// `glass` (none when nil), over the stripes or the dark ground.
     private func scene(_ glass: Glass?, geometry: ShapeGeometry = .rectangle(cornerRadii: CornerRadii(all: 40)),
-                       dark: Bool = false, name: String) throws -> CGImage {
+                       dark: Bool = false, visible: CGRect? = nil, name: String) throws -> CGImage {
         var card = Layer(name: "Card", content: .shape(ShapeContent(geometry: geometry, fills: [])),
                          size: Size2(200, 150), position: Vec2(200, 150))
         if let glass { card.effects = [Effect(kind: .glass(glass))] }
         let project = Project(composition: Composition(width: 400, height: 300, background: Background(color: .white)),
                               layers: ground(dark: dark) + [card])
         let renderer = try #require(OffscreenRenderer(pixelWidth: 400, pixelHeight: 300))
+        renderer.renderer.visibleArea = visible
         let image = try #require(renderer.image(of: evaluate(project, at: 0)))
         if let folder = ProcessInfo.processInfo.environment["TWINE_GLASS_OUT"],
            let destination = CGImageDestinationCreateWithURL(URL(fileURLWithPath: folder).appendingPathComponent(name + ".png") as CFURL,
@@ -125,6 +126,21 @@ import MotionEvaluation
         #expect(differences(ovalBare, oval, y: 150, from: 160, to: 240) == 0)
     }
 
+    @Test func glassLooksOnlyAtWhatTheCanvasShows() throws {
+        // The canvas shows x 150 to 400 of the scene: the card's left edge
+        // (x 100) is off it, so glass there looks at nothing, where on
+        // screen it would bend in whatever lies past the canvas (the menu
+        // bar, the Dock); the right edge bends as before.
+        guard GlassKit.bends else { return }
+        let glass = Glass(lightIntensity: 0, refraction: 1, depth: 24, dispersion: 0, frost: 0)
+        let bare = try scene(nil, name: "bare")
+        let open = try scene(glass, name: "bent")
+        let cut = try scene(glass, visible: CGRect(x: 150, y: 0, width: 250, height: 300), name: "cut")
+        #expect(differences(bare, cut, y: 150, from: 101, to: 124) == 0)
+        #expect(differences(open, cut, y: 150, from: 277, to: 299) == 0)
+        #expect(differences(bare, cut, y: 150, from: 277, to: 299) > 4)
+    }
+
     @Test func depthStopsAtTheMiddleOfTheShape() throws {
         // On the 200 by 150 card, any depth past 75 draws as 75 does: deeper,
         // the bend turned the middle inside out and, on screen, pulled in
@@ -133,8 +149,9 @@ import MotionEvaluation
         let half = try scene(Glass(lightIntensity: 0, refraction: 1, depth: 75, dispersion: 0.5, frost: 0), name: "half")
         let deep = try scene(Glass(lightIntensity: 0, refraction: 1, depth: 639, dispersion: 0.5, frost: 0), name: "deep")
         for y in [80, 120, 150, 200] { #expect(differences(half, deep, y: y, from: 0, to: 400) == 0) }
-        #expect(GlassKit.fitted(Glass(depth: 639), to: Size2(248, 300)).depth == 124)
-        #expect(GlassKit.margin(GlassKit.fitted(Glass(depth: 639, frost: 1000), to: Size2(248, 300))) == 196)
+        #expect(GlassKit.fitted(Glass(depth: 90), to: Size2(120, 300)).depth == 60)
+        #expect(Glass(depth: 639).held.depth == Glass.maxDepth, "and never past 100")
+        #expect(GlassKit.margin(GlassKit.fitted(Glass(depth: 100, frost: 1000), to: Size2(248, 300))) == 172)
     }
 
     @Test func aFieldPictureFollowsTheZoom() throws {

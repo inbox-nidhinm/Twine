@@ -197,6 +197,15 @@ final class CanvasNSView: NSView {
         CATransaction.setDisableActions(true)
         let o = origin
         world.transform = CATransform3DConcat(CATransform3DMakeScale(zoom, zoom, 1), CATransform3DMakeTranslation(o.x, o.y, 0))
+        // Glass looks only at the part of the composition in this view: on
+        // screen it would otherwise bend in whatever is on the screen past
+        // the window, the menu bar and the Dock included. The whole view,
+        // not just between the panels, or it stops bending in a hard line
+        // where the canvas still shows round the tool bar.
+        let area = bounds
+        renderer.visibleArea = CGRect(x: (area.minX - o.x) / zoom, y: (area.minY - o.y) / zoom,
+                                      width: area.width / zoom, height: area.height / zoom)
+            .intersection(CGRect(origin: .zero, size: size.cg))
         let frame = CGRect(x: o.x, y: o.y, width: size.width * zoom, height: size.height * zoom)
         checker.frame = frame
         frameEdge.frame = bounds

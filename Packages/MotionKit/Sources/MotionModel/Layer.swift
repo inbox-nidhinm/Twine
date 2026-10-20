@@ -692,7 +692,7 @@ public struct Glass: AnimatableValue {
     public var lightIntensity: Double
     /// 0 to 1: how strongly the edge bends what is behind it.
     public var refraction: Double
-    /// Pixels: how far in from the edge the bend reaches.
+    /// Pixels: how far in from the edge the bend reaches, 0 to `maxDepth`.
     public var depth: Double
     /// 0 to 1: how far the bent edge splits into colours.
     public var dispersion: Double
@@ -700,6 +700,9 @@ public struct Glass: AnimatableValue {
     public var frost: Double
     /// 0 to 1: how far the bend spreads towards the middle.
     public var splay: Double
+
+    /// The deepest a glass bends, as the user asked (20 October 2026).
+    public static let maxDepth = 100.0
 
     /// Figma's own starting values for a new Glass effect.
     public init(lightAngle: Double = -45, lightIntensity: Double = 0.8, refraction: Double = 0.8, depth: Double = 20,
@@ -729,7 +732,8 @@ public struct Glass: AnimatableValue {
         func pixels(_ v: Double) -> Double { v.isFinite ? min(max(v, 0), 1000) : 0 }
         var angle = lightAngle.isFinite ? lightAngle.truncatingRemainder(dividingBy: 360) : -45
         if angle > 180 { angle -= 360 } else if angle < -180 { angle += 360 }
-        return Glass(lightAngle: angle, lightIntensity: unit(lightIntensity), refraction: unit(refraction), depth: pixels(depth),
+        return Glass(lightAngle: angle, lightIntensity: unit(lightIntensity), refraction: unit(refraction),
+                     depth: depth.isFinite ? min(max(depth, 0), Self.maxDepth) : 0,
                      dispersion: unit(dispersion), frost: pixels(frost), splay: unit(splay))
     }
 }

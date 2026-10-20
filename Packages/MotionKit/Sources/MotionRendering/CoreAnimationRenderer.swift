@@ -43,6 +43,37 @@ public final class CoreAnimationRenderer: SceneRenderer {
         }
     }
 
+    /// On screen, the part of the composition the canvas shows, in its
+    /// points: glass looks no further (see `GlassLayers.clip(to:)`). Nil
+    /// off screen, where there is nothing else to see.
+    public var visibleArea: CGRect? {
+        didSet { if visibleArea != oldValue { clipGlass() } }
+    }
+    /// The layers with glass, and the scene they were last drawn in.
+    private var glassLayers: [UUID] = []
+    private var glassScene: ResolvedScene?
+
+    /// Keeps each glass to `visibleArea`, carried into the layer's own
+    /// points through everything that places it (turns, groups, 3D). A
+    /// corner the layer's plane cannot reach leaves that glass unclipped.
+    private func clipGlass() {
+        guard let scene = glassScene else { return }
+        for id in glassLayers {
+            guard let node = nodes[id] else { continue }
+            var local: CGRect?
+            if let visible = visibleArea, let inverse = scene.worldProjection(of: id)?.inverted {
+                let corners = [Vec2(visible.minX, visible.minY), Vec2(visible.maxX, visible.minY),
+                               Vec2(visible.maxX, visible.maxY), Vec2(visible.minX, visible.maxY)].compactMap(inverse.apply)
+                if corners.count == 4 {
+                    let xs = corners.map(\.x), ys = corners.map(\.y)
+                    local = CGRect(x: xs.min()!, y: ys.min()!, width: xs.max()! - xs.min()!, height: ys.max()! - ys.min()!)
+                        .insetBy(dx: -1, dy: -1)
+                }
+            }
+            node.clipGlass(to: local)
+        }
+    }
+
     /// Where image and video layers get their pictures. Without one they draw
     /// as a grey box, as they do when a file is missing.
     public var media: MediaProvider?
@@ -84,6 +115,7 @@ public final class CoreAnimationRenderer: SceneRenderer {
         // parent, the tree's shape is as it was and only the layers
         // themselves need looking at.
         var sameTree = layers.count == drawn.count
+        var glass: [UUID] = []
         for i in layers.indices {
             let id = layers[i].id
             let node: Node
@@ -101,7 +133,11 @@ public final class CoreAnimationRenderer: SceneRenderer {
             if case .text = layers[i].content { node.setTextZoom(Self.textZoom(of: layers[i], in: scene, scale: contentsScale)) }
             if case .spread = layers[i].motion { node.setMotionZoom(Self.stretch(of: layers[i], in: scene)) }
             node.update(layers[i], media: media)
+            if layers[i].glass != .none { glass.append(id) }
         }
+        glassLayers = glass
+        glassScene = glass.isEmpty ? nil : scene
+        clipGlass()
 
         if !sameTree {
             var seen = Set<UUID>(minimumCapacity: layers.count)
@@ -610,6 +646,8 @@ final class Node {
             backdrop.filters = [Blur.filter(amount: blur.radius)]
         }
     }
+
+    func clipGlass(to visible: CGRect?) { glass?.clip(to: visible) }
 
     private func updateGlass(_ state: GlassState, shape: ResolvedShape, size: Size2) {
         glassShown = false

@@ -139,7 +139,7 @@ struct GlassControls<Button: View>: View {
             }
             .rowButton(button)
             percent("Refraction", glass.refraction, help: "How strongly the edge bends what is behind it") { $0.refraction = $1 }
-            pixels("Depth", glass.depth, decimals: 0, help: "How far in from the edge the bend reaches") { $0.depth = $1 }
+            pixels("Depth", glass.depth, decimals: 0, most: Glass.maxDepth, help: "How far in from the edge the bend reaches, up to 100 px") { $0.depth = $1 }
             percent("Dispersion", glass.dispersion, help: "How far the bent edge splits into colours") { $0.dispersion = $1 }
             pixels("Frost", glass.frost, decimals: 1, help: "How much what is behind it is blurred") { $0.frost = $1 }
             percent("Splay", glass.splay, help: "How far the bend spreads towards the middle") { $0.splay = $1 }
@@ -155,11 +155,12 @@ struct GlassControls<Button: View>: View {
         .help(help)
     }
 
-    private func pixels(_ label: String, _ value: Double, decimals: Int, help: String,
+    /// A number of pixels from 0; one typed past `most` is taken as `most`.
+    private func pixels(_ label: String, _ value: Double, decimals: Int, most: Double = 1000, help: String,
                         _ set: @escaping (inout Glass, Double) -> Void) -> some View {
         LabeledRow(label: label) {
-            UnitField(value: value, decimals: decimals, suffix: "px", accepts: { $0 >= 0 && $0 <= 1000 }) { v in
-                edit.commit(with { set(&$0, v) })
+            UnitField(value: value, decimals: decimals, suffix: "px", accepts: { $0 >= 0 }) { v in
+                edit.commit(with { set(&$0, min(v, most)) })
             }
         }
         .help(help)

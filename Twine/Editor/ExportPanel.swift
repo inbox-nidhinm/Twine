@@ -535,6 +535,8 @@ final class ExportPreviewView: NSView {
     func show(_ scene: ResolvedScene) {
         size = scene.size
         backdrop.backgroundColor = scene.background?.cgColor ?? CanvasNSView.checkerColor
+        // The whole composition shows; glass looks no further than it.
+        renderer.visibleArea = CGRect(origin: .zero, size: scene.size.cg)
         renderer.render(scene)
         place()
     }

@@ -109,16 +109,25 @@ private final class GlassStage {
         }
     }
 
-    /// Placed over `whole`, clipped to `outline`, filtering by `filters`;
-    /// shown only when it has any, its field only when one reads it.
-    func set(whole: CGRect, outline: CGPath, filters: [Any], readsField: Bool) {
-        backdrop.isHidden = filters.isEmpty
-        backdrop.frame = whole
-        mask.frame = backdrop.bounds
-        mask.path = outline
+    /// Filtering by `filters`, shown only when it has any, its field only
+    /// when one reads it.
+    func set(filters: [Any], readsField: Bool) {
+        hasFilters = !filters.isEmpty
         backdrop.filters = filters
-        field?.frame = backdrop.bounds
         field?.isHidden = !readsField
+    }
+    private var hasFilters = false
+
+    /// Looking at `area` (in the layer's points), clipped to `outline`, its
+    /// field covering `whole`; hidden where there is nothing to look at.
+    func place(area: CGRect, whole: CGRect, outline: CGPath) {
+        backdrop.isHidden = !hasFilters || area.isEmpty
+        guard !area.isEmpty else { return }
+        backdrop.frame = area
+        mask.frame = backdrop.bounds
+        var shift = CGAffineTransform(translationX: -area.minX, y: -area.minY)
+        mask.path = outline.copy(using: &shift)
+        field?.frame = whole.offsetBy(dx: -area.minX, dy: -area.minY)
     }
 }
 
@@ -131,6 +140,12 @@ final class GlassLayers {
     private let splitStage: GlassStage
     private var lightElements: [CALayer] = []
     private var drawn: (glass: Glass, shape: ResolvedShape, size: Size2, flips: Bool, texels: Double)?
+    /// Where the glass works, in the layer's points, and its outline there.
+    private var whole: CGRect = .zero
+    private var outline: CGPath?
+    /// The part of the layer the canvas shows, in the layer's points; nil
+    /// off screen, where there is nothing past the composition to see.
+    private var visible: CGRect?
     private var picture: (path: CGPath, size: CGSize, range: Double, flips: Bool, texels: Double, image: CGImage?)?
 
     /// Nil when the system has no backdrop layer.
@@ -168,13 +183,17 @@ final class GlassLayers {
         let m = GlassKit.margin(glass)
         let box = CGRect(x: 0, y: 0, width: max(size.width, 0), height: max(size.height, 0))
         let whole = box.insetBy(dx: -m, dy: -m)
+        self.whole = whole
+        self.outline = area
+        // The outline in the field's own points, which start at `whole`.
         var shift = CGAffineTransform(translationX: m, y: m)
         let outline = area.copy(using: &shift) ?? area
         let frost: [Any] = glass.frost > 0 ? [Blur.filter(amount: glass.frost)] : []
+        defer { placeBackdrops() }
         guard GlassKit.bends, let bendKind = GlassKit.bend, let lightKind = GlassKit.light,
               let bendElement = bendStage.element, let splitElement = splitStage.element else {
-            bendStage.set(whole: whole, outline: outline, filters: [], readsField: false)
-            splitStage.set(whole: whole, outline: outline, filters: frost, readsField: false)
+            bendStage.set(filters: [], readsField: false)
+            splitStage.set(filters: frost, readsField: false)
             return
         }
 
@@ -210,14 +229,13 @@ final class GlassLayers {
         let refraction = bends ? PrivateFilter.make("displacementMap") : nil
         refraction?.setValue(GlassKit.fieldName, forKey: "inputSourceSublayerName")
         refraction?.setValue(glass.refraction * glass.depth * GlassKit.refractionPerDepth, forKey: "inputAmount")
-        bendStage.set(whole: whole, outline: outline, filters: refraction.map { [$0] } ?? [], readsField: refraction != nil)
+        bendStage.set(filters: refraction.map { [$0] } ?? [], readsField: refraction != nil)
 
         let splits = glass.depth > 0 && glass.dispersion > 0
         let dispersion = splits ? PrivateFilter.make("chromaticAberrationMap") : nil
         dispersion?.setValue(GlassKit.fieldName, forKey: "inputSourceSublayerName")
         dispersion?.setValue(glass.dispersion * glass.depth * GlassKit.dispersionPerDepth, forKey: "inputAmount")
-        splitStage.set(whole: whole, outline: outline, filters: (dispersion.map { [$0] } ?? []) + frost,
-                       readsField: dispersion != nil)
+        splitStage.set(filters: (dispersion.map { [$0] } ?? []) + frost, readsField: dispersion != nil)
 
         // Figma's dial: 0 at the top, -45 the top left, the same on the
         // canvas and off screen.
@@ -233,6 +251,27 @@ final class GlassLayers {
             light.setValue(effect, forKey: "effect")
             light.isHidden = glass.lightIntensity <= 0
         }
+    }
+
+    /// Keeps what the glass looks at to `visible`, the part of the layer
+    /// the canvas shows (in the layer's points), or lets it look all round
+    /// with nil. On screen a backdrop shows whatever is on the screen where
+    /// it lies: zoomed in, glass near the window's edge bent in the menu
+    /// bar and the Dock, live (the user's report, 20 October 2026), and
+    /// nothing around the canvas, no group, filter or rasterising, stops
+    /// it. Cut where the canvas ends, it shows only the canvas.
+    func clip(to visible: CGRect?) {
+        guard visible != self.visible else { return }
+        self.visible = visible
+        placeBackdrops()
+    }
+
+    private func placeBackdrops() {
+        guard let outline else { return }
+        var area = whole
+        if let visible { area = whole.intersection(visible) }
+        if area.isNull { area = .zero }
+        for stage in [bendStage, splitStage] { stage.place(area: area, whole: whole, outline: outline) }
     }
 
     private func fieldPicture(_ path: CGPath, size: CGSize, range: Double, flips: Bool, texels: Double) -> CGImage? {
