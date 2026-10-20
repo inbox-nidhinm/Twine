@@ -21,7 +21,7 @@ public final class OffscreenRenderer {
     private let texture: MTLTexture
     private let caRenderer: CARenderer
     private let root = CALayer()
-    let renderer = CoreAnimationRenderer()
+    private let renderer = CoreAnimationRenderer()
 
     /// Where image and video layers get their pictures.
     public var media: MediaProvider? {

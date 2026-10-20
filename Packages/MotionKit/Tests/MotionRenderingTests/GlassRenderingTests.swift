@@ -43,14 +43,13 @@ import MotionEvaluation
     /// A 200 by 150 card with no fill in the middle of the scene, with
     /// `glass` (none when nil), over the stripes or the dark ground.
     private func scene(_ glass: Glass?, geometry: ShapeGeometry = .rectangle(cornerRadii: CornerRadii(all: 40)),
-                       dark: Bool = false, isolated: Bool = false, name: String) throws -> CGImage {
+                       dark: Bool = false, name: String) throws -> CGImage {
         var card = Layer(name: "Card", content: .shape(ShapeContent(geometry: geometry, fills: [])),
                          size: Size2(200, 150), position: Vec2(200, 150))
         if let glass { card.effects = [Effect(kind: .glass(glass))] }
         let project = Project(composition: Composition(width: 400, height: 300, background: Background(color: .white)),
                               layers: ground(dark: dark) + [card])
         let renderer = try #require(OffscreenRenderer(pixelWidth: 400, pixelHeight: 300))
-        renderer.renderer.isolatesBackdrops = isolated
         let image = try #require(renderer.image(of: evaluate(project, at: 0)))
         if let folder = ProcessInfo.processInfo.environment["TWINE_GLASS_OUT"],
            let destination = CGImageDestinationCreateWithURL(URL(fileURLWithPath: folder).appendingPathComponent(name + ".png") as CFURL,
@@ -126,14 +125,16 @@ import MotionEvaluation
         #expect(differences(ovalBare, oval, y: 150, from: 160, to: 240) == 0)
     }
 
-    @Test func keepingGlassToTheCompositionChangesNothingDrawn() throws {
-        // The canvas draws the composition as a group of its own while it
-        // has glass, so glass never bends in the desktop past the window.
+    @Test func depthStopsAtTheMiddleOfTheShape() throws {
+        // On the 200 by 150 card, any depth past 75 draws as 75 does: deeper,
+        // the bend turned the middle inside out and, on screen, pulled in
+        // whatever was hundreds of points away, past the window too.
         guard GlassKit.bends else { return }
-        let glass = Glass(depth: 24)
-        let open = try scene(glass, name: "open"), kept = try scene(glass, isolated: true, name: "kept")
-        #expect(differences(open, kept, y: 150, from: 0, to: 400) == 0)
-        #expect(differences(open, kept, y: 80, from: 0, to: 400) == 0)
+        let half = try scene(Glass(lightIntensity: 0, refraction: 1, depth: 75, dispersion: 0.5, frost: 0), name: "half")
+        let deep = try scene(Glass(lightIntensity: 0, refraction: 1, depth: 639, dispersion: 0.5, frost: 0), name: "deep")
+        for y in [80, 120, 150, 200] { #expect(differences(half, deep, y: y, from: 0, to: 400) == 0) }
+        #expect(GlassKit.fitted(Glass(depth: 639), to: Size2(248, 300)).depth == 124)
+        #expect(GlassKit.margin(GlassKit.fitted(Glass(depth: 639, frost: 1000), to: Size2(248, 300))) == 196)
     }
 
     @Test func aFieldPictureFollowsTheZoom() throws {

@@ -50,9 +50,25 @@ enum GlassKit {
     /// The name the backdrops' filters find their field by.
     static let fieldName = "glassField"
 
-    /// How far past the box the glass works, for a glass of `depth` and `frost`.
+    /// How far past the box the glass works, for a glass of `depth` and
+    /// `frost` (already `fitted`): the field reaches a little past the bend,
+    /// and the frost blurs in from at most 64 points out. On screen a
+    /// backdrop shows whatever is on the screen where it lies, the desktop,
+    /// the Dock and the menu bar included, so it is kept no bigger than
+    /// the glass needs.
     static func margin(_ glass: Glass) -> CGFloat {
-        CGFloat(min((glass.depth * 2 + glass.frost + 8).rounded(.up), 600))
+        CGFloat((glass.depth + min(glass.frost * 1.5, 64) + 8).rounded(.up))
+    }
+
+    /// `glass` on a box of `size`: its depth reaches at most to the middle
+    /// of the shorter side, as a lens that size could. Deeper, the bend
+    /// pulled what was hundreds of points away into the shape, past the
+    /// window too (Depth 639 on a 248 point circle, 20 October 2026: the
+    /// middle turned inside out and the screen around Twine showed in it).
+    static func fitted(_ glass: Glass, to size: Size2) -> Glass {
+        var g = glass
+        g.depth = min(g.depth, max(min(size.width, size.height), 0) / 2)
+        return g
     }
 
     /// Pixels the edge moves what is behind it at full refraction, and the
@@ -148,6 +164,7 @@ final class GlassLayers {
         if let drawn, drawn.glass == glass, drawn.shape == shape, drawn.size == size, drawn.flips == flips,
            drawn.texels == texels { return }
         drawn = (glass, shape, size, flips, texels)
+        let glass = GlassKit.fitted(glass, to: size)
         let m = GlassKit.margin(glass)
         let box = CGRect(x: 0, y: 0, width: max(size.width, 0), height: max(size.height, 0))
         let whole = box.insetBy(dx: -m, dy: -m)
