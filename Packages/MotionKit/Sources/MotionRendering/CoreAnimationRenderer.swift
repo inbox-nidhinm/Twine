@@ -1,6 +1,7 @@
 import Foundation
 import QuartzCore
 import CoreImage
+import IOSurface
 import MotionModel
 import MotionEvaluation
 
@@ -52,6 +53,24 @@ public final class CoreAnimationRenderer: SceneRenderer {
     /// The layers with glass, and the scene they were last drawn in.
     private var glassLayers: [UUID] = []
     private var glassScene: ResolvedScene?
+    /// Where each glass layer is in the scene's `layers`, in the same order.
+    private var glassIndices: [Int] = []
+
+    /// Whether glass draws what is behind it itself (`GlassBehind`) rather
+    /// than through backdrops. On screen it must: a backdrop there shows
+    /// whatever the window server has where it lies, other windows and the
+    /// Dock included, and under the title bar what is behind the window.
+    /// With it on, `render` draws the pictures after its own transaction, so
+    /// it must not be called inside an explicit `CATransaction`, which would
+    /// hold back what the pictures' renderers need flushed.
+    public var drawsGlassBehind = false {
+        didSet {
+            guard drawsGlassBehind != oldValue else { return }
+            for node in nodes.values { node.drawsGlassBehind = drawsGlassBehind }
+            if !drawsGlassBehind { behinds = [:] }
+        }
+    }
+    private var behinds: [UUID: GlassBehind] = [:]
 
     /// Keeps each glass to `visibleArea`, carried into the layer's own
     /// points through everything that places it (turns, groups, 3D). A
@@ -97,6 +116,86 @@ public final class CoreAnimationRenderer: SceneRenderer {
     }
 
     public func render(_ scene: ResolvedScene) {
+        renderTree(scene)
+        if drawsGlassBehind, !glassIndices.isEmpty { drawGlassBehind(scene) } else if !behinds.isEmpty { behinds = [:] }
+    }
+
+    /// Draws, for each glass, a picture of the glass over the layers drawn
+    /// before it (everything behind it: what is before it in its group and
+    /// its groups' own fills), upright over the part of the composition the
+    /// glass works in, at the canvas's pixels a point, and hands it over.
+    /// Time is left out, so a still background is not drawn again.
+    private func drawGlassBehind(_ scene: ResolvedScene) {
+        var kept: [UUID: GlassBehind] = [:]
+        var shown: [(Node, IOSurface?, CGRect, Projective)] = []
+        let composition = CGRect(origin: .zero, size: scene.size.cg)
+        for i in glassIndices where i < scene.layers.count {
+            let id = scene.layers[i].id
+            guard let node = nodes[id], let whole = node.glassBehindArea,
+                  let world = scene.worldProjection(of: id), let toLocal = world.inverted else { continue }
+            let corners = [Vec2(whole.minX, whole.minY), Vec2(whole.maxX, whole.minY),
+                           Vec2(whole.maxX, whole.maxY), Vec2(whole.minX, whole.maxY)].compactMap(world.apply)
+            guard corners.count == 4, let around = Box(around: corners) else { continue }
+            // Whole pixels, so the picture's lie on the composition's.
+            let texels = min(Double(node.pixelScale), Double(GlassBehind.largestSide) / max(around.width, around.height, 1))
+            let area = CGRect(x: floor(around.minX * texels) / texels, y: floor(around.minY * texels) / texels,
+                              width: 0, height: 0)
+                .union(CGRect(x: ceil(around.maxX * texels) / texels, y: ceil(around.maxY * texels) / texels, width: 0, height: 0))
+                .intersection(composition)
+            guard !area.isNull, area.width > 0, area.height > 0 else { continue }
+            let width = Int((area.width * texels).rounded()), height = Int((area.height * texels).rounded())
+            let toPicture = Projective(.translation(Vec2(-area.minX, -area.minY))).then(Projective(.scale(Vec2(texels, texels))))
+            let behind = ResolvedScene(time: 0, size: scene.size, background: scene.background,
+                                       layers: Array(scene.layers[..<i]) + [Self.glassOnly(scene.layers[i])],
+                                       masks: scene.masks)
+            let drawer = behinds[id] ?? GlassBehind()
+            kept[id] = drawer
+            let surface = drawer.draw(behind, transform: toPicture, width: width, height: height,
+                                      contentsScale: CGFloat(texels), media: media)
+            shown.append((node, surface, area, toLocal))
+        }
+        behinds = kept
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for (node, surface, area, toLocal) in shown { node.showGlassBehind(surface, area: area, toLocal: toLocal) }
+        CATransaction.commit()
+    }
+
+    /// `layer` as only its glass: no fills, strokes, shadows, blurs, mask,
+    /// fade or blend, and no light, which the layer itself draws over its
+    /// fills. Drawn last over what is behind it by a picture's renderer,
+    /// whose backdrops bend, split and frost exactly as an export's do;
+    /// filtering that picture again on the canvas instead read the colour
+    /// split's map out of place (a cyan band along the top and bottom).
+    static func glassOnly(_ layer: ResolvedLayer) -> ResolvedLayer {
+        var bare = layer
+        switch bare.content {
+        case .shape(var shape):
+            shape.fills = []
+            shape.strokes = []
+            bare.content = .shape(shape)
+        default:
+            bare.frame?.fills = []
+            bare.frame?.strokes = []
+        }
+        if case .glass(var glass) = bare.glass {
+            glass.lightIntensity = 0
+            bare.glass = .glass(glass)
+        }
+        bare.shadows = []
+        bare.innerShadows = []
+        bare.blur = 0
+        bare.backgroundBlur = nil
+        bare.opacity = 1
+        bare.blendMode = .normal
+        bare.mask = nil
+        bare.reveal = .none
+        bare.curl = .none
+        bare.motion = .none
+        return bare
+    }
+
+    private func renderTree(_ scene: ResolvedScene) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
@@ -116,6 +215,7 @@ public final class CoreAnimationRenderer: SceneRenderer {
         // themselves need looking at.
         var sameTree = layers.count == drawn.count
         var glass: [UUID] = []
+        var glassAt: [Int] = []
         for i in layers.indices {
             let id = layers[i].id
             let node: Node
@@ -126,6 +226,7 @@ public final class CoreAnimationRenderer: SceneRenderer {
                 node = nodes[id] ?? {
                     let made = Node(scale: contentsScale)
                     made.flipsContents = flipsContents
+                    made.drawsGlassBehind = drawsGlassBehind
                     nodes[id] = made
                     return made
                 }()
@@ -133,9 +234,13 @@ public final class CoreAnimationRenderer: SceneRenderer {
             if case .text = layers[i].content { node.setTextZoom(Self.textZoom(of: layers[i], in: scene, scale: contentsScale)) }
             if case .spread = layers[i].motion { node.setMotionZoom(Self.stretch(of: layers[i], in: scene)) }
             node.update(layers[i], media: media)
-            if layers[i].glass != .none { glass.append(id) }
+            if layers[i].glass != .none {
+                glass.append(id)
+                glassAt.append(i)
+            }
         }
         glassLayers = glass
+        glassIndices = glassAt
         glassScene = glass.isEmpty ? nil : scene
         clipGlass()
 
@@ -280,6 +385,16 @@ final class Node {
             last = nil
             // Picture fills are built the right way up for one or the other.
             if !signature.isEmpty { clearPaint() }
+        }
+    }
+    /// Whether glass shows a picture the renderer draws of what is behind it
+    /// (`GlassBehind`) rather than looking through a backdrop.
+    var drawsGlassBehind = false {
+        didSet {
+            guard drawsGlassBehind != oldValue else { return }
+            last = nil
+            glass = nil
+            arrangedShape = []
         }
     }
     /// The layer as it was last drawn. A frame where it has not changed
@@ -544,7 +659,7 @@ final class Node {
         let roots = paintLayers.map(\.root)
         var wanted: [CALayer] = shadowLayers.map(\.layer)
         if backdropShown, let backdrop { wanted.append(backdrop) }
-        if glassShown, let glass { wanted += glass.backdrops }
+        if glassShown, let glass { wanted += glass.underFills }
         wanted += roots.prefix(fills)
         wanted += innerShadowLayers.map(\.holder)
         if glassShown, let glass { wanted += glass.lights }
@@ -649,11 +764,25 @@ final class Node {
 
     func clipGlass(to visible: CGRect?) { glass?.clip(to: visible) }
 
+    /// Where the glass works, in the layer's points, while it shows and
+    /// draws what is behind it itself.
+    var glassBehindArea: CGRect? {
+        guard glassShown, let glass, glass.drawsBehind, !glass.whole.isEmpty else { return nil }
+        return glass.whole
+    }
+
+    /// How finely the layer is drawn, in pixels a point of its own.
+    var pixelScale: CGFloat { scale }
+
+    func showGlassBehind(_ surface: IOSurface?, area: CGRect, toLocal: Projective) {
+        glass?.show(surface, area: area, toLocal: toLocal)
+    }
+
     private func updateGlass(_ state: GlassState, shape: ResolvedShape, size: Size2) {
         glassShown = false
         // A mask draws only its alpha, which a backdrop would muddy.
         guard case .glass(let look) = state, shape.isClosed, !ignoresBlend else { return }
-        if glass == nil { glass = GlassLayers() }
+        if glass == nil { glass = GlassLayers(drawsBehind: drawsGlassBehind) }
         guard let glass else { return }
         glassShown = true
         glass.update(look, shape: shape, area: area(of: shape), size: size, flips: flipsContents, pixelScale: scale)

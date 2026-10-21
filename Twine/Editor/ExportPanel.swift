@@ -522,6 +522,8 @@ final class ExportPreviewView: NSView {
             l.anchorPoint = .zero
             l.actions = ["transform": NSNull(), "position": NSNull(), "bounds": NSNull(), "backgroundColor": NSNull()]
         }
+        // As on the canvas, glass draws what is behind it itself.
+        renderer.drawsGlassBehind = true
         world.addSublayer(renderer.rootLayer)
         layer?.addSublayer(backdrop)
         layer?.addSublayer(world)

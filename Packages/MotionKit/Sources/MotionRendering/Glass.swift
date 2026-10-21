@@ -1,6 +1,7 @@
 import Foundation
 import QuartzCore
 import CoreGraphics
+import IOSurface
 import MotionModel
 import MotionEvaluation
 
@@ -81,79 +82,111 @@ enum GlassKit {
     static let lightSpread = Double.pi * 2 / 3
 }
 
-/// One backdrop of a glass, clipped to the outline, with its field.
+/// One stage of a glass, clipped to the outline, with its field: a backdrop
+/// that filters what is behind it on the screen, or, when the glass draws
+/// what is behind it itself (`GlassBehind`), a plain holder that filters
+/// what it holds.
 private final class GlassStage {
-    let backdrop: CALayer
+    let holder: CALayer
     let mask = CAShapeLayer()
     let field: CALayer?
     let element: CALayer?
+    private let isBackdrop: Bool
 
-    init(_ kind: CALayer.Type, bends: Bool) {
-        backdrop = kind.init()
-        backdrop.mask = mask
+    init(_ kind: CALayer.Type, bends: Bool, isBackdrop: Bool) {
+        self.isBackdrop = isBackdrop
+        holder = kind.init()
+        holder.mask = mask
         mask.fillColor = CGColor(gray: 0, alpha: 1)
         if bends, let fieldKind = GlassKit.field, let elementKind = GlassKit.element {
             let field = fieldKind.init(), element = elementKind.init()
             field.name = GlassKit.fieldName
             field.addSublayer(element)
-            backdrop.addSublayer(field)
+            holder.addSublayer(field)
             self.field = field
             self.element = element
         } else {
             field = nil
             element = nil
         }
-        for l in [backdrop, mask, field, element].compactMap({ $0 }) {
+        for l in [holder, mask, field, element].compactMap({ $0 }) {
             l.anchorPoint = .zero
             l.actions = Node.noActions
         }
     }
 
-    /// Filtering by `filters`, shown only when it has any, its field only
-    /// when one reads it.
+    /// Filtering by `filters`, its field shown only when one reads it.
     func set(filters: [Any], readsField: Bool) {
         hasFilters = !filters.isEmpty
-        backdrop.filters = filters
+        holder.filters = filters
         field?.isHidden = !readsField
     }
     private var hasFilters = false
 
-    /// Looking at `area` (in the layer's points), clipped to `outline`, its
-    /// field covering `whole`; hidden where there is nothing to look at.
+    /// Looking at `area` (in its superlayer's points), clipped to `outline`,
+    /// its field covering `whole`; hidden where there is nothing to look at,
+    /// and a backdrop with no filters too, which would only repeat what is
+    /// behind it.
     func place(area: CGRect, whole: CGRect, outline: CGPath) {
-        backdrop.isHidden = !hasFilters || area.isEmpty
+        holder.isHidden = area.isEmpty || (isBackdrop && !hasFilters)
         guard !area.isEmpty else { return }
-        backdrop.frame = area
-        mask.frame = backdrop.bounds
+        holder.frame = area
+        mask.frame = holder.bounds
         var shift = CGAffineTransform(translationX: -area.minX, y: -area.minY)
         mask.path = outline.copy(using: &shift)
         field?.frame = whole.offsetBy(dx: -area.minX, dy: -area.minY)
     }
 }
 
-/// The layers a shape's or frame's glass is drawn with: `backdrops` under
+/// The layers a shape's or frame's glass is drawn with: `underFills` under
 /// the fills, `lights` over them (and over the inner shadows).
+///
+/// Two ways of seeing what is behind: backdrops, which off screen see the
+/// layers drawn before them, as exports always have; or, with
+/// `drawsBehind`, a picture of the glass already bent, split and frosted
+/// over those layers, which `CoreAnimationRenderer` draws through backdrops
+/// of its own (`GlassBehind`) and hands over with `show(_:area:toLocal:)`,
+/// held by one plain holder clipped to the outline. On screen only the
+/// second can be trusted: a backdrop there sees the screen.
 final class GlassLayers {
-    let backdrops: [CALayer]
+    let drawsBehind: Bool
+    let underFills: [CALayer]
     private(set) var lights: [CALayer] = []
     private let bendStage: GlassStage
     private let splitStage: GlassStage
+    /// What is behind the glass, drawn by Twine, while `drawsBehind`.
+    private let behind = CALayer()
     private var lightElements: [CALayer] = []
     private var drawn: (glass: Glass, shape: ResolvedShape, size: Size2, flips: Bool, texels: Double)?
     /// Where the glass works, in the layer's points, and its outline there.
-    private var whole: CGRect = .zero
+    private(set) var whole: CGRect = .zero
     private var outline: CGPath?
     /// The part of the layer the canvas shows, in the layer's points; nil
     /// off screen, where there is nothing past the composition to see.
     private var visible: CGRect?
     private var picture: (path: CGPath, size: CGSize, range: Double, flips: Bool, texels: Double, image: CGImage?)?
 
-    /// Nil when the system has no backdrop layer.
-    init?() {
-        guard let kind = GlassKit.backdrop else { return nil }
-        bendStage = GlassStage(kind, bends: GlassKit.bends)
-        splitStage = GlassStage(kind, bends: GlassKit.bends)
-        backdrops = [bendStage.backdrop, splitStage.backdrop]
+    /// Nil when backdrops are wanted and the system has no backdrop layer.
+    init?(drawsBehind: Bool) {
+        let kind: CALayer.Type
+        if drawsBehind {
+            kind = CALayer.self
+        } else {
+            guard let backdrop = GlassKit.backdrop else { return nil }
+            kind = backdrop
+        }
+        self.drawsBehind = drawsBehind
+        bendStage = GlassStage(kind, bends: GlassKit.bends, isBackdrop: !drawsBehind)
+        splitStage = GlassStage(kind, bends: GlassKit.bends, isBackdrop: !drawsBehind)
+        if drawsBehind {
+            behind.anchorPoint = .zero
+            behind.actions = Node.noActions
+            bendStage.mask.strokeColor = CGColor(gray: 0, alpha: 1)
+            bendStage.holder.insertSublayer(behind, at: 0)
+            underFills = [bendStage.holder]
+        } else {
+            underFills = [bendStage.holder, splitStage.holder]
+        }
         guard GlassKit.bends, let fieldKind = GlassKit.field, let elementKind = GlassKit.element else { return }
         for _ in 0..<2 {
             let light = fieldKind.init()
@@ -172,6 +205,12 @@ final class GlassLayers {
     /// `area`, shown at `pixelScale` pixels a point (the canvas's zoom
     /// included). Does nothing when nothing changed.
     func update(_ glass: Glass, shape: ResolvedShape, area: CGPath, size: Size2, flips: Bool, pixelScale: CGFloat) {
+        if drawsBehind {
+            // The picture's own edge is smoothed already: kept a pixel past
+            // the outline, it is not smoothed a second time.
+            let edge = 2 / max(pixelScale, 1)
+            if bendStage.mask.lineWidth != edge { bendStage.mask.lineWidth = edge }
+        }
         // Rounded up to a power of two, so a pinch draws the field picture
         // again only as the zoom doubles, not every frame; a rounded box
         // needs no picture, so the zoom never touches it.
@@ -261,18 +300,44 @@ final class GlassLayers {
     /// nothing around the canvas, no group, filter or rasterising, stops
     /// it. Cut where the canvas ends, it shows only the canvas.
     func clip(to visible: CGRect?) {
-        guard visible != self.visible else { return }
+        guard !drawsBehind, visible != self.visible else { return }
         self.visible = visible
         placeBackdrops()
     }
 
+    /// Shows `surface`, a picture of the glass over what is behind it,
+    /// covering `area` of the composition, upright as the composition is so
+    /// its pixels meet the screen's; `toLocal` takes composition points to
+    /// the layer's own. Turned over off screen, as other pictures are.
+    func show(_ surface: IOSurface?, area: CGRect, toLocal: Projective) {
+        guard drawsBehind else { return }
+        if (behind.contents as AnyObject?) !== surface { behind.contents = surface }
+        var place = Projective(.translation(Vec2(area.minX, area.minY)))
+            .then(toLocal)
+            .then(Projective(.translation(Vec2(-whole.minX, -whole.minY))))
+        if drawnFlips { place = Projective(Affine(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: area.height)).then(place) }
+        let bounds = CGRect(origin: .zero, size: area.size)
+        if behind.bounds != bounds { behind.bounds = bounds }
+        let transform = place.caTransform
+        if !CATransform3DEqualToTransform(behind.transform, transform) { behind.transform = transform }
+    }
+
     private func placeBackdrops() {
         guard let outline else { return }
+        if drawsBehind {
+            // The picture is the glass already bent, split and frosted (see
+            // `CoreAnimationRenderer.drawGlassBehind`): shown as it is,
+            // inside the outline.
+            bendStage.set(filters: [], readsField: false)
+            bendStage.place(area: whole, whole: whole, outline: outline)
+            return
+        }
         var area = whole
         if let visible { area = whole.intersection(visible) }
         if area.isNull { area = .zero }
         for stage in [bendStage, splitStage] { stage.place(area: area, whole: whole, outline: outline) }
     }
+    private var drawnFlips: Bool { drawn?.flips ?? false }
 
     private func fieldPicture(_ path: CGPath, size: CGSize, range: Double, flips: Bool, texels: Double) -> CGImage? {
         if let picture, picture.path == path, picture.size == size, picture.range == range, picture.flips == flips,

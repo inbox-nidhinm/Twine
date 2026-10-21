@@ -127,14 +127,16 @@ public final class OffscreenRenderer {
     }
 
     private func draw(_ scene: ResolvedScene) {
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        renderer.render(scene)
         let sx = scene.size.width > 0 ? Double(pixelWidth) / scene.size.width : 1
         let sy = scene.size.height > 0 ? Double(pixelHeight) / scene.size.height : 1
-        renderer.contentsScale = max(sx, sy)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        if renderer.contentsScale != max(sx, sy) { renderer.contentsScale = max(sx, sy) }
         renderer.rootLayer.transform = CATransform3DMakeScale(sx, sy, 1)
         CATransaction.commit()
+        // Outside any transaction of ours: glass that draws what is behind
+        // it flushes its own renderers.
+        renderer.render(scene)
         // Off the main thread nothing flushes transactions on its own, and
         // CARenderer only sees what has been flushed.
         CATransaction.flush()

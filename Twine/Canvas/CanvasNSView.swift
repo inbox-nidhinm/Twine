@@ -103,6 +103,9 @@ final class CanvasNSView: NSView {
         frameEdge.fillColor = nil
         frameEdge.strokeColor = NSColor(Theme.edge).cgColor
         frameEdge.lineWidth = 1
+        // Glass draws what is behind it itself: a backdrop here would show
+        // whatever the screen has, other windows and the Dock included.
+        renderer.drawsGlassBehind = true
         world.addSublayer(renderer.rootLayer)
         layer?.addSublayer(checker)
         layer?.addSublayer(world)
@@ -201,12 +204,8 @@ final class CanvasNSView: NSView {
         // screen it would otherwise bend in whatever is on the screen past
         // the window, the menu bar and the Dock included. The whole view,
         // not just between the panels, or it stops bending in a hard line
-        // where the canvas still shows round the tool bar. Not under the
-        // title bar, though: there a backdrop sees what is behind the
-        // window, not the canvas (Chrome's tab strip bent into glass at the
-        // window's top, 20 October 2026), so the glass stops at its edge.
-        var area = bounds
-        if let window { area = area.intersection(convert(window.contentLayoutRect, from: nil)) }
+        // where the canvas still shows round the tool bar.
+        let area = bounds
         renderer.visibleArea = CGRect(x: (area.minX - o.x) / zoom, y: (area.minY - o.y) / zoom,
                                       width: area.width / zoom, height: area.height / zoom)
             .intersection(CGRect(origin: .zero, size: size.cg))

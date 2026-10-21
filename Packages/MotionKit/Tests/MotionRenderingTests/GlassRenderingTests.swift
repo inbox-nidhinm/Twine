@@ -41,16 +41,25 @@ import MotionEvaluation
     }
 
     /// A 200 by 150 card with no fill in the middle of the scene, with
-    /// `glass` (none when nil), over the stripes or the dark ground.
+    /// `glass` (none when nil), over the stripes or the dark ground, turned
+    /// by `turn` degrees, and with a green bar over its left side when
+    /// `front`. `drawn` draws what is behind the glass as the canvas does
+    /// (`GlassBehind`) rather than through backdrops, as exports do.
     private func scene(_ glass: Glass?, geometry: ShapeGeometry = .rectangle(cornerRadii: CornerRadii(all: 40)),
-                       dark: Bool = false, visible: CGRect? = nil, name: String) throws -> CGImage {
+                       dark: Bool = false, visible: CGRect? = nil, drawn: Bool = false, turn: Double = 0,
+                       front: Bool = false, name: String) throws -> CGImage {
         var card = Layer(name: "Card", content: .shape(ShapeContent(geometry: geometry, fills: [])),
                          size: Size2(200, 150), position: Vec2(200, 150))
+        card.transform.rotation = turn
         if let glass { card.effects = [Effect(kind: .glass(glass))] }
+        let bar = Layer(name: "Bar", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
+                                                                  fills: [Fill(paint: .color(RGBA(0.1, 0.8, 0.2)))])),
+                        size: Size2(12, 300), position: Vec2(140, 150))
         let project = Project(composition: Composition(width: 400, height: 300, background: Background(color: .white)),
-                              layers: ground(dark: dark) + [card])
+                              layers: ground(dark: dark) + [card] + (front ? [bar] : []))
         let renderer = try #require(OffscreenRenderer(pixelWidth: 400, pixelHeight: 300))
         renderer.renderer.visibleArea = visible
+        renderer.renderer.drawsGlassBehind = drawn
         let image = try #require(renderer.image(of: evaluate(project, at: 0)))
         if let folder = ProcessInfo.processInfo.environment["TWINE_GLASS_OUT"],
            let destination = CGImageDestinationCreateWithURL(URL(fileURLWithPath: folder).appendingPathComponent(name + ".png") as CFURL,
@@ -152,6 +161,71 @@ import MotionEvaluation
         #expect(GlassKit.fitted(Glass(depth: 90), to: Size2(120, 300)).depth == 60)
         #expect(Glass(depth: 639).held.depth == Glass.maxDepth, "and never past 100")
         #expect(GlassKit.margin(GlassKit.fitted(Glass(depth: 100, frost: 1000), to: Size2(248, 300))) == 172)
+    }
+
+    /// How many pixels of the two pictures differ by more than `tolerance`
+    /// in any channel.
+    private func pixelsApart(_ a: CGImage, _ b: CGImage, tolerance: Int = 12) -> Int {
+        func bytes(_ image: CGImage) -> [UInt8] {
+            var data = [UInt8](repeating: 0, count: image.width * image.height * 4)
+            let context = CGContext(data: &data, width: image.width, height: image.height, bitsPerComponent: 8,
+                                    bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            return data
+        }
+        let x = bytes(a), y = bytes(b)
+        return stride(from: 0, to: x.count, by: 4).filter { o in
+            (0..<3).contains { abs(Int(x[o + $0]) - Int(y[o + $0])) > tolerance }
+        }.count
+    }
+
+    @Test func glassDrawingWhatIsBehindItMatchesTheBackdrops() throws {
+        // The canvas draws what is behind glass itself; exports see it
+        // through backdrops. The two must look the same: bend, colours,
+        // frost, light, outlines that are not boxes, and turned layers.
+        guard GlassKit.bends else { return }
+        let looks: [(String, Glass, ShapeGeometry, Double)] = [
+            ("bend", Glass(lightIntensity: 0, refraction: 1, depth: 24, dispersion: 0, frost: 0), .rectangle(cornerRadii: CornerRadii(all: 40)), 0),
+            ("figma", Glass(), .rectangle(cornerRadii: CornerRadii(all: 40)), 0),
+            ("split", Glass(lightIntensity: 0, refraction: 1, depth: 24, dispersion: 1, frost: 0), .rectangle(cornerRadii: CornerRadii(all: 40)), 0),
+            ("frost", Glass(lightIntensity: 0, refraction: 0.5, depth: 20, dispersion: 0, frost: 12), .rectangle(cornerRadii: CornerRadii(all: 40)), 0),
+            ("star", Glass(lightIntensity: 0, refraction: 1, depth: 16, dispersion: 0, frost: 0), .star(points: 5, innerRadius: 0.5, cornerRadius: 0), 0),
+            ("turned", Glass(lightIntensity: 0, refraction: 1, depth: 24, dispersion: 0.3, frost: 0), .rectangle(cornerRadii: CornerRadii(all: 40)), 30),
+        ]
+        for (name, glass, geometry, turn) in looks {
+            let seen = try scene(glass, geometry: geometry, turn: turn, name: "match-\(name)-backdrop")
+            let drawn = try scene(glass, geometry: geometry, drawn: true, turn: turn, name: "match-\(name)-drawn")
+            let bare = try scene(nil, geometry: geometry, turn: turn, name: "match-\(name)-bare")
+            let changed = pixelsApart(bare, seen)
+            #expect(changed > 200, "\(name): the glass does something")
+            let apart = pixelsApart(seen, drawn)
+            #expect(apart < max(changed / 20, 40), "\(name): drawn as the backdrops see it, \(apart) apart of \(changed)")
+        }
+    }
+
+    @Test func glassDrawingWhatIsBehindItNeverSeesWhatIsInFront() throws {
+        // A green bar in front of the glass's left side: drawn over the
+        // glass, never bent into it, so beside the bar the glass is as it
+        // is without one.
+        guard GlassKit.bends else { return }
+        let glass = Glass(lightIntensity: 0, refraction: 1, depth: 24, dispersion: 0, frost: 0)
+        let with = try scene(glass, drawn: true, front: true, name: "front-drawn")
+        let without = try scene(glass, drawn: true, name: "front-none")
+        // The bar covers x 134 to 146.
+        #expect(differences(with, without, y: 150, from: 101, to: 131) == 0)
+        #expect(differences(with, without, y: 150, from: 149, to: 299) == 0)
+        #expect(pixel(with, 140, 150) == pixel(with, 140, 40), "the bar is the same over the glass as away from it")
+    }
+
+    @Test func aPictureOfWhatIsBehindTakesAnyWidth() throws {
+        // Widths whose rows are not whole steps of 16 bytes (2,254 pixels,
+        // zoomed in on the user's circle) stopped the app.
+        let scene = ResolvedScene(time: 0, size: Size2(400, 300), background: RGBA(1, 1, 1), layers: [])
+        for width in [255, 2254, 1] {
+            let surface = GlassBehind().draw(scene, transform: .identity, width: width, height: 101, contentsScale: 1, media: nil)
+            #expect(surface?.width == width, "\(width) wide")
+        }
     }
 
     @Test func aFieldPictureFollowsTheZoom() throws {
