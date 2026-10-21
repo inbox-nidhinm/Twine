@@ -1,6 +1,6 @@
 # Glass: handoff notes
 
-19 to 21 October 2026, v0.2.35 to v0.2.41. Figma's Glass effect, built in Twine as an effect and an action. These notes are for whoever carries the work on: what is built, how it works, every problem met on the way and why it happened, what is still open, and how to test it. The short version of the design is in `CLAUDE.md` under **Glass**; this is the long one.
+19 to 21 October 2026, v0.2.35 to v0.2.42. Figma's Glass effect, built in Twine as an effect and an action. These notes are for whoever carries the work on: what is built, how it works, every problem met on the way and why it happened, what is still open, and how to test it. The short version of the design is in `CLAUDE.md` under **Glass**; this is the long one.
 
 ## What the user asked for
 
@@ -51,6 +51,7 @@ So on screen the glass can only ever show the composition, the same at every zoo
 - **`render` must not be called inside an explicit `CATransaction`** with `drawsGlassBehind` on, or the canvas's changes it depends on are not committed. `OffscreenRenderer.draw` sets its scale and transform in a transaction of its own and calls `render` outside it.
 - **Filtering the picture again on the canvas does not work.** A bend holder inside a colour split's holder read the split's map out of place (the old cyan band) and turned cards came out wrong; clipping the inner holder to the outline made the frost and split blur in nothing from past the edge. Hence the picture carries the finished glass.
 - **Turning a picture over off screen** with a −1 vertical scale needs the turn about its middle, or it swings out of view (the first drawn glass showed nothing at all). The placement now folds the turn into one transform.
+- **A zoom must draw again** (v0.2.42, the user's report: "zooming in and out and clicking on the object changes the view"). Zooming changes the canvas's pixels a point (`contentsScale`) but nothing in the project, so nothing called `render`, and the glass showed its picture from before the zoom, stretched and soft, until a click drew the scene again. `CanvasNSView.updateContentsScale` (zoom, fit, a move to another screen) and the export preview's `place` now draw once more a turn later (`redrawSoon`), so a pinch draws at most once a frame and never inside a SwiftUI update. The kit check: zoom in steps with no playing between, then `selectlayer`; the circle's pixels must not change but for the selection's outline. `glassLooksTheSameAtEveryScale` checks the bend and light reach as far at 1 and 2 pixels a point.
 - **An `IOSurface`'s rows must be whole steps of 16 bytes for Metal.** A 2,254 pixel picture (the user's circle at 4×) stopped the app; rows are rounded up to 64 bytes (`aPictureOfWhatIsBehindTakesAnyWidth`).
 
 ## Issues met, and how each was fixed

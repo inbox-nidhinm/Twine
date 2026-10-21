@@ -282,8 +282,27 @@ final class CanvasNSView: NSView {
     private func updateContentsScale() {
         let backing = window?.backingScaleFactor ?? 2
         let wanted = backing * min(max(zoom, 1), 8)
-        if abs(renderer.contentsScale - wanted) > 0.01 { renderer.contentsScale = wanted }
+        guard abs(renderer.contentsScale - wanted) > 0.01 else { return }
+        renderer.contentsScale = wanted
+        redrawSoon()
     }
+
+    /// Draws the scene again at the new scale, once, a turn later: a zoom
+    /// changes nothing in the project, so nothing else redraws, and glass
+    /// went on showing its picture from before the zoom, too coarse or
+    /// stretched, until a click redrew it (the user's report, 21 October
+    /// 2026). A turn later, so a pinch's many steps draw once a frame, and
+    /// never inside a SwiftUI update.
+    private func redrawSoon() {
+        guard !redrawPending else { return }
+        redrawPending = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            redrawPending = false
+            if let scene { renderer.render(scene) }
+        }
+    }
+    private var redrawPending = false
 
     override func magnify(with event: NSEvent) {
         zoom(to: zoom * (1 + event.magnification), around: convert(event.locationInWindow, from: nil))

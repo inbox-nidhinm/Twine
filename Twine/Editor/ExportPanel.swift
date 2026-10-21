@@ -508,9 +508,23 @@ final class ExportPreviewView: NSView {
     private let world = CALayer()
     private let backdrop = CALayer()
     private var size = Size2(1, 1)
+    private var scene: ResolvedScene?
+    private var redrawPending = false
 
     var media: MediaProvider? {
         didSet { renderer.media = media }
+    }
+
+    /// Draws the scene again at a new scale, a turn later, as the canvas
+    /// does: glass otherwise kept its picture from the scale before.
+    private func redrawSoon() {
+        guard !redrawPending else { return }
+        redrawPending = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            redrawPending = false
+            if let scene { renderer.render(scene) }
+        }
     }
 
     override init(frame: NSRect) {
@@ -535,6 +549,7 @@ final class ExportPreviewView: NSView {
     override var isFlipped: Bool { true }
 
     func show(_ scene: ResolvedScene) {
+        self.scene = scene
         size = scene.size
         backdrop.backgroundColor = scene.background?.cgColor ?? CanvasNSView.checkerColor
         // The whole composition shows; glass looks no further than it.
@@ -553,7 +568,10 @@ final class ExportPreviewView: NSView {
         guard size.width > 0, size.height > 0, bounds.width > 0 else { return }
         let scale = min(bounds.width / size.width, bounds.height / size.height)
         let wanted = (window?.backingScaleFactor ?? 2) * max(scale, 0.25)
-        if abs(renderer.contentsScale - wanted) > 0.01 { renderer.contentsScale = wanted }
+        if abs(renderer.contentsScale - wanted) > 0.01 {
+            renderer.contentsScale = wanted
+            redrawSoon()
+        }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         world.transform = CATransform3DMakeScale(scale, scale, 1)

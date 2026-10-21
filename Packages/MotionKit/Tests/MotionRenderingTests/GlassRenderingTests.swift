@@ -218,6 +218,38 @@ import MotionEvaluation
         #expect(pixel(with, 140, 150) == pixel(with, 140, 40), "the bar is the same over the glass as away from it")
     }
 
+    /// How far in from the card's left edge (x 100) the bend and light
+    /// reach along the middle row, in the scene's points, drawn at `scale`
+    /// pixels a point.
+    private func reach(_ glass: Glass, scale: Int, dark: Bool = false) throws -> Double {
+        var card = Layer(name: "Card", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: CornerRadii(all: 40)), fills: [])),
+                         size: Size2(200, 150), position: Vec2(200, 150))
+        card.effects = [Effect(kind: .glass(glass))]
+        let bareProject = Project(composition: Composition(width: 400, height: 300, background: Background(color: .white)),
+                                  layers: ground(dark: dark))
+        var project = bareProject
+        project.layers.append(card)
+        let renderer = try #require(OffscreenRenderer(pixelWidth: 400 * scale, pixelHeight: 300 * scale))
+        let bent = try #require(renderer.image(of: evaluate(project, at: 0)))
+        let bare = try #require(renderer.image(of: evaluate(bareProject, at: 0)))
+        let y = 150 * scale
+        let changed = (100 * scale..<200 * scale).filter { pixel(bent, $0, y) != pixel(bare, $0, y) }
+        return Double((changed.max() ?? 100 * scale) - 100 * scale) / Double(scale)
+    }
+
+    @Test func glassLooksTheSameAtEveryScale() throws {
+        // A 4K export is the 1080p one drawn finer, and the canvas zoomed in
+        // the same glass bigger: the bend and the light reach as far into the
+        // card, in its own points, at 1 and 2 pixels a point.
+        guard GlassKit.bends else { return }
+        let bend = Glass(lightIntensity: 0, refraction: 1, depth: 24, dispersion: 0, frost: 0)
+        let one = try reach(bend, scale: 1), two = try reach(bend, scale: 2)
+        #expect(abs(one - two) <= 2, "the bend reaches \(one) points in at 1x, \(two) at 2x")
+        let light = Glass(lightAngle: -90, lightIntensity: 1, refraction: 0, depth: 24, dispersion: 0, frost: 0)
+        let lit1 = try reach(light, scale: 1, dark: true), lit2 = try reach(light, scale: 2, dark: true)
+        #expect(abs(lit1 - lit2) <= 1.5, "the light reaches \(lit1) points in at 1x, \(lit2) at 2x")
+    }
+
     @Test func aPictureOfWhatIsBehindTakesAnyWidth() throws {
         // Widths whose rows are not whole steps of 16 bytes (2,254 pixels,
         // zoomed in on the user's circle) stopped the app.
