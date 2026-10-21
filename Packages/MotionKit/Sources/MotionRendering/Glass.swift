@@ -53,22 +53,25 @@ enum GlassKit {
 
     /// How far past the box the glass works, for a glass of `depth` and
     /// `frost` (already `fitted`): the field reaches a little past the bend,
-    /// and the frost blurs in from at most 64 points out. On screen a
-    /// backdrop shows whatever is on the screen where it lies, the desktop,
-    /// the Dock and the menu bar included, so it is kept no bigger than
-    /// the glass needs.
+    /// and the frost blurs in from as far as its blur reaches (three of its
+    /// Gaussian's deviations, half the frost each), at most `frostReach`.
+    /// Until 21 October 2026 the frost stopped at 64 points, kept small for
+    /// backdrops on screen, so heavy frost missed what lay further out.
     static func margin(_ glass: Glass) -> CGFloat {
-        CGFloat((glass.depth + min(glass.frost * 1.5, 64) + 8).rounded(.up))
+        CGFloat((glass.depth + min(glass.frost * 1.5, frostReach) + 8).rounded(.up))
     }
+    static let frostReach = 600.0
 
     /// `glass` on a box of `size`: its depth reaches at most to the middle
-    /// of the shorter side, as a lens that size could. Deeper, the bend
-    /// pulled what was hundreds of points away into the shape, past the
-    /// window too (Depth 639 on a 248 point circle, 20 October 2026: the
-    /// middle turned inside out and the screen around Twine showed in it).
-    static func fitted(_ glass: Glass, to size: Size2) -> Glass {
+    /// of the shorter side, as a lens that size could, or, given the
+    /// outline's `thickness` (`GlassField.thickness`, how far in its
+    /// deepest point lies), to that. Deeper, the bend pulled in what lay
+    /// across the shape and beyond, turning the middle inside out: Depth 639
+    /// on a 248 point circle (20 October 2026), and a star's thin points at
+    /// Depth 100 in a box that allowed 75 (21 October 2026).
+    static func fitted(_ glass: Glass, to size: Size2, thickness: Double? = nil) -> Glass {
         var g = glass
-        g.depth = min(g.depth, max(min(size.width, size.height), 0) / 2)
+        g.depth = min(g.depth, thickness ?? max(min(size.width, size.height), 0) / 2)
         return g
     }
 
@@ -161,10 +164,9 @@ final class GlassLayers {
     /// Where the glass works, in the layer's points, and its outline there.
     private(set) var whole: CGRect = .zero
     private var outline: CGPath?
-    /// The part of the layer the canvas shows, in the layer's points; nil
-    /// off screen, where there is nothing past the composition to see.
-    private var visible: CGRect?
     private var picture: (path: CGPath, size: CGSize, range: Double, flips: Bool, texels: Double, image: CGImage?)?
+    /// The outline's thickness, kept while the outline stays.
+    private var thickness: (path: CGPath, value: Double)?
 
     /// Nil when backdrops are wanted and the system has no backdrop layer.
     init?(drawsBehind: Bool) {
@@ -218,7 +220,18 @@ final class GlassLayers {
         if let drawn, drawn.glass == glass, drawn.shape == shape, drawn.size == size, drawn.flips == flips,
            drawn.texels == texels { return }
         drawn = (glass, shape, size, flips, texels)
-        let glass = GlassKit.fitted(glass, to: size)
+        // A box with every corner alike is thickest in its middle; any other
+        // outline is measured (a star's points are far thinner than its box).
+        var deepest: Double?
+        if shape.roundedBox == nil {
+            if let thickness, thickness.path == area {
+                deepest = thickness.value
+            } else {
+                deepest = GlassField.thickness(of: area)
+                thickness = (area, deepest!)
+            }
+        }
+        let glass = GlassKit.fitted(glass, to: size, thickness: deepest)
         let m = GlassKit.margin(glass)
         let box = CGRect(x: 0, y: 0, width: max(size.width, 0), height: max(size.height, 0))
         let whole = box.insetBy(dx: -m, dy: -m)
@@ -292,19 +305,6 @@ final class GlassLayers {
         }
     }
 
-    /// Keeps what the glass looks at to `visible`, the part of the layer
-    /// the canvas shows (in the layer's points), or lets it look all round
-    /// with nil. On screen a backdrop shows whatever is on the screen where
-    /// it lies: zoomed in, glass near the window's edge bent in the menu
-    /// bar and the Dock, live (the user's report, 20 October 2026), and
-    /// nothing around the canvas, no group, filter or rasterising, stops
-    /// it. Cut where the canvas ends, it shows only the canvas.
-    func clip(to visible: CGRect?) {
-        guard !drawsBehind, visible != self.visible else { return }
-        self.visible = visible
-        placeBackdrops()
-    }
-
     /// Shows `surface`, a picture of the glass over what is behind it,
     /// covering `area` of the composition, upright as the composition is so
     /// its pixels meet the screen's; `toLocal` takes composition points to
@@ -332,10 +332,7 @@ final class GlassLayers {
             bendStage.place(area: whole, whole: whole, outline: outline)
             return
         }
-        var area = whole
-        if let visible { area = whole.intersection(visible) }
-        if area.isNull { area = .zero }
-        for stage in [bendStage, splitStage] { stage.place(area: area, whole: whole, outline: outline) }
+        for stage in [bendStage, splitStage] { stage.place(area: whole, whole: whole, outline: outline) }
     }
     private var drawnFlips: Bool { drawn?.flips ?? false }
 
@@ -430,6 +427,34 @@ enum GlassField {
         return CGImage(width: w, height: h, bitsPerComponent: 16, bitsPerPixel: 64, bytesPerRow: w * 8, space: srgb,
                        bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder16Little.rawValue),
                        provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+    }
+
+    /// How far in from its outline the deepest point of `path` lies, in its
+    /// own points: the most a glass on it can bend before reaching across
+    /// it. Worked out on a 48 by 48 grid over its bounds, so a point or
+    /// two short of exact, which keeps the bend just shy of the middle.
+    static func thickness(of path: CGPath) -> Double {
+        let bounds = path.boundingBoxOfPath
+        let segments = Self.segments(of: path)
+        guard bounds.width > 0, bounds.height > 0, !segments.isEmpty else { return 0 }
+        let steps = 48
+        var deepest = 0.0
+        for j in 0..<steps {
+            for i in 0..<steps {
+                let x = Double(bounds.minX) + (Double(i) + 0.5) / Double(steps) * Double(bounds.width)
+                let y = Double(bounds.minY) + (Double(j) + 0.5) / Double(steps) * Double(bounds.height)
+                guard path.contains(CGPoint(x: x, y: y)) else { continue }
+                var nearest = Double.infinity
+                for s in segments {
+                    let dx = s.b.x - s.a.x, dy = s.b.y - s.a.y, length2 = dx * dx + dy * dy
+                    let t = length2 > 0 ? min(max(((x - s.a.x) * dx + (y - s.a.y) * dy) / length2, 0), 1) : 0
+                    let ex = x - (s.a.x + t * dx), ey = y - (s.a.y + t * dy)
+                    nearest = min(nearest, ex * ex + ey * ey)
+                }
+                deepest = max(deepest, nearest)
+            }
+        }
+        return deepest.squareRoot()
     }
 
     struct Segment { var a: (x: Double, y: Double); var b: (x: Double, y: Double) }

@@ -2,6 +2,8 @@ import Foundation
 import Testing
 import CoreGraphics
 import ImageIO
+import IOSurface
+import QuartzCore
 import UniformTypeIdentifiers
 import MotionModel
 import MotionEvaluation
@@ -43,10 +45,11 @@ import MotionEvaluation
     /// A 200 by 150 card with no fill in the middle of the scene, with
     /// `glass` (none when nil), over the stripes or the dark ground, turned
     /// by `turn` degrees, and with a green bar over its left side when
-    /// `front`. `drawn` draws what is behind the glass as the canvas does
-    /// (`GlassBehind`) rather than through backdrops, as exports do.
+    /// `front`. `drawn` (the default) draws what is behind the glass as the
+    /// canvas and exports do (`GlassBehind`); without it, glass sees through
+    /// backdrops, as exports did until 21 October 2026.
     private func scene(_ glass: Glass?, geometry: ShapeGeometry = .rectangle(cornerRadii: CornerRadii(all: 40)),
-                       dark: Bool = false, visible: CGRect? = nil, drawn: Bool = false, turn: Double = 0,
+                       dark: Bool = false, visible: CGRect? = nil, drawn: Bool = true, turn: Double = 0,
                        front: Bool = false, name: String) throws -> CGImage {
         var card = Layer(name: "Card", content: .shape(ShapeContent(geometry: geometry, fills: [])),
                          size: Size2(200, 150), position: Vec2(200, 150))
@@ -135,19 +138,24 @@ import MotionEvaluation
         #expect(differences(ovalBare, oval, y: 150, from: 160, to: 240) == 0)
     }
 
-    @Test func glassLooksOnlyAtWhatTheCanvasShows() throws {
-        // The canvas shows x 150 to 400 of the scene: the card's left edge
-        // (x 100) is off it, so glass there looks at nothing, where on
-        // screen it would bend in whatever lies past the canvas (the menu
-        // bar, the Dock); the right edge bends as before.
+    @Test func glassDrawsOnlyWhatTheCanvasShowsAndLooksTheSame() throws {
+        // Zoomed in, the canvas shows a part of the scene (here x 150 to
+        // 400): the glass's picture covers only that and its reach, so it
+        // costs no more than the screen, and where it shows it is the glass
+        // drawn whole.
         guard GlassKit.bends else { return }
-        let glass = Glass(lightIntensity: 0, refraction: 1, depth: 24, dispersion: 0, frost: 0)
-        let bare = try scene(nil, name: "bare")
-        let open = try scene(glass, name: "bent")
-        let cut = try scene(glass, visible: CGRect(x: 150, y: 0, width: 250, height: 300), name: "cut")
-        #expect(differences(bare, cut, y: 150, from: 101, to: 124) == 0)
-        #expect(differences(open, cut, y: 150, from: 277, to: 299) == 0)
-        #expect(differences(bare, cut, y: 150, from: 277, to: 299) > 4)
+        let glass = Glass(lightIntensity: 0, refraction: 1, depth: 24, dispersion: 0.5, frost: 3)
+        let whole = try scene(glass, name: "bent")
+        let part = try scene(glass, visible: CGRect(x: 150, y: 0, width: 250, height: 300), name: "cut")
+        // A step of 255 apart at most: the picture starts elsewhere, which
+        // moves the GPU's rounding.
+        for y in [80, 120, 150, 200, 220] {
+            let apart = (150..<400).filter { x in
+                let a = pixel(whole, x, y), b = pixel(part, x, y)
+                return abs(a.r - b.r) > 2 || abs(a.g - b.g) > 2 || abs(a.b - b.b) > 2
+            }
+            #expect(apart.isEmpty, "row \(y): \(apart)")
+        }
     }
 
     @Test func depthStopsAtTheMiddleOfTheShape() throws {
@@ -160,7 +168,7 @@ import MotionEvaluation
         for y in [80, 120, 150, 200] { #expect(differences(half, deep, y: y, from: 0, to: 400) == 0) }
         #expect(GlassKit.fitted(Glass(depth: 90), to: Size2(120, 300)).depth == 60)
         #expect(Glass(depth: 639).held.depth == Glass.maxDepth, "and never past 100")
-        #expect(GlassKit.margin(GlassKit.fitted(Glass(depth: 100, frost: 1000), to: Size2(248, 300))) == 172)
+        #expect(GlassKit.margin(GlassKit.fitted(Glass(depth: 100, frost: 1000), to: Size2(248, 300))) == 708, "and the frost reaches as far as its blur")
     }
 
     /// How many pixels of the two pictures differ by more than `tolerance`
@@ -194,7 +202,7 @@ import MotionEvaluation
             ("turned", Glass(lightIntensity: 0, refraction: 1, depth: 24, dispersion: 0.3, frost: 0), .rectangle(cornerRadii: CornerRadii(all: 40)), 30),
         ]
         for (name, glass, geometry, turn) in looks {
-            let seen = try scene(glass, geometry: geometry, turn: turn, name: "match-\(name)-backdrop")
+            let seen = try scene(glass, geometry: geometry, drawn: false, turn: turn, name: "match-\(name)-backdrop")
             let drawn = try scene(glass, geometry: geometry, drawn: true, turn: turn, name: "match-\(name)-drawn")
             let bare = try scene(nil, geometry: geometry, turn: turn, name: "match-\(name)-bare")
             let changed = pixelsApart(bare, seen)
@@ -248,6 +256,117 @@ import MotionEvaluation
         let light = Glass(lightAngle: -90, lightIntensity: 1, refraction: 0, depth: 24, dispersion: 0, frost: 0)
         let lit1 = try reach(light, scale: 1, dark: true), lit2 = try reach(light, scale: 2, dark: true)
         #expect(abs(lit1 - lit2) <= 1.5, "the light reaches \(lit1) points in at 1x, \(lit2) at 2x")
+    }
+
+    @Test func thinShapesNeverTurnInsideOut() throws {
+        // A star's points are far thinner than its box: at Depth 100 the
+        // bend reached across them and scrambled its middle. Depth now stops
+        // at the outline's own thickness, so any depth past it draws as it.
+        guard GlassKit.bends else { return }
+        let star = ShapeGeometry.star(points: 5, innerRadius: 0.5, cornerRadius: 0)
+        let path = star.bezierPath(size: Size2(200, 150)).cgPath
+        let thickness = GlassField.thickness(of: path)
+        #expect(thickness > 15 && thickness < 50, "a 200 by 150 star is \(thickness) thick")
+        let deep = try scene(Glass(lightIntensity: 0, refraction: 1, depth: 100, dispersion: 0, frost: 0), geometry: star, name: "star-deep")
+        let held = try scene(Glass(lightIntensity: 0, refraction: 1, depth: thickness, dispersion: 0, frost: 0), geometry: star, name: "star-held")
+        for y in [100, 130, 150, 180] { #expect(differences(deep, held, y: y, from: 90, to: 310) == 0) }
+        // A rectangle is half its shorter side thick.
+        #expect(abs(GlassField.thickness(of: CGPath(rect: CGRect(x: 0, y: 0, width: 100, height: 60), transform: nil)) - 30) < 1.5)
+    }
+
+    @Test func glassInAFadedGroupStillSeesWhatIsBehind() throws {
+        // In a group at 50%, the glass is half there: halfway between the
+        // glass at full strength and no glass. Through a backdrop it saw
+        // nothing behind it, its group drawn on its own, and came out white.
+        guard GlassKit.bends else { return }
+        let glass = Glass(lightIntensity: 0, refraction: 1, depth: 24, dispersion: 0.4, frost: 2)
+        var card = Layer(name: "Card", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: CornerRadii(all: 40)), fills: [])),
+                         size: Size2(200, 150), position: Vec2(200, 150))
+        card.effects = [Effect(kind: .glass(glass))]
+        var group = Layer(name: "Group", content: .group(GroupContent(children: [card])), size: Size2(400, 300), position: Vec2(200, 150))
+        group.opacity = 0.5
+        let project = Project(composition: Composition(width: 400, height: 300, background: Background(color: .white)),
+                              layers: ground(dark: false) + [group])
+        let renderer = try #require(OffscreenRenderer(pixelWidth: 400, pixelHeight: 300))
+        let faded = try #require(renderer.image(of: evaluate(project, at: 0)))
+        let full = try scene(glass, name: "group-full"), bare = try scene(nil, name: "group-bare")
+        for x in stride(from: 101, to: 299, by: 3) {
+            let f = pixel(full, x, 150), b = pixel(bare, x, 150), h = pixel(faded, x, 150)
+            #expect(abs(h.r - (f.r + b.r) / 2) <= 3 && abs(h.g - (f.g + b.g) / 2) <= 3 && abs(h.b - (f.b + b.b) / 2) <= 3,
+                    "at \(x): \(h) is not halfway between \(f) and \(b)")
+        }
+    }
+
+    @Test func glassSeesOnlyWhatIsBehindItInDepth() throws {
+        // In a 3D frame the nearer layer is drawn in front, whatever the
+        // list says: a bar listed before the glass but nearer the camera
+        // lies over the glass and is never bent into it.
+        guard GlassKit.bends else { return }
+        let glass = Glass(lightIntensity: 0, refraction: 1, depth: 24, dispersion: 0, frost: 0)
+        func frame(bar: Bool) throws -> CGImage {
+            var card = Layer(name: "Card", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: CornerRadii(all: 40)), fills: [])),
+                             size: Size2(200, 150), position: Vec2(200, 150))
+            card.effects = [Effect(kind: .glass(glass))]
+            var near = Layer(name: "Bar", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero),
+                                                                       fills: [Fill(paint: .color(RGBA(0.1, 0.8, 0.2)))])),
+                             size: Size2(8, 300), position: Vec2(112, 150))
+            near.transform.z = 60
+            let children = ground(dark: false) + (bar ? [near] : []) + [card]
+            let frame = Layer(name: "F", content: .group(GroupContent(children: children, frame: FrameStyle(space: Space3D()))),
+                              size: Size2(400, 300), position: Vec2(200, 150))
+            let project = Project(composition: Composition(width: 400, height: 300, background: Background(color: .white)), layers: [frame])
+            let renderer = try #require(OffscreenRenderer(pixelWidth: 400, pixelHeight: 300))
+            return try #require(renderer.image(of: evaluate(project, at: 0)))
+        }
+        let with = try frame(bar: true), without = try frame(bar: false)
+        // Where the two differ is the bar itself, green, and nothing else:
+        // bent into the glass, green came out beside it too.
+        let apart = (90..<140).filter { pixel(with, $0, 150) != pixel(without, $0, 150) }
+        #expect(!apart.isEmpty)
+        #expect((apart.max() ?? 0) - (apart.min() ?? 0) <= 14, "the bar and nothing more differs: \(apart)")
+        for x in apart { let p = pixel(with, x, 150); #expect(p.g > p.r && p.g > p.b, "at \(x): \(p) is not the bar") }
+    }
+
+    @Test func fadingGlassKeepsItsLight() throws {
+        // To no glass and back, the light fades where it is rather than
+        // swinging round to no glass's -45°, and the depth stays.
+        let mine = Glass(lightAngle: 262, lightIntensity: 0.3, refraction: 1, depth: 100, dispersion: 0.04, frost: 0)
+        for t in [0.25, 0.5, 0.75] {
+            let out = Glass.interpolate(mine, .noGlass, t), into = Glass.interpolate(.noGlass, mine, t)
+            #expect(out.lightAngle == 262 && into.lightAngle == 262)
+            #expect(out.depth == 100 && into.depth == 100)
+        }
+        // Two lit ends still turn the shorter way round.
+        #expect(Glass.interpolate(Glass(lightAngle: 170), Glass(lightAngle: -170), 0.5).lightAngle == 180)
+    }
+
+    @Test func aPictureOfWhatIsBehindRedrawnLargerIsWhole() throws {
+        // Zoomed in, the picture is drawn again larger: drawn by the
+        // renderer that drew it smaller, it filled only its old size,
+        // magnified, with the rest black (21 October 2026).
+        let project = Project(composition: Composition(width: 400, height: 300, background: Background(color: .white)),
+                              layers: ground(dark: false))
+        let scene = evaluate(project, at: 0)
+        func bytes(_ surface: IOSurface) -> [UInt8] {
+            surface.lock(options: .readOnly, seed: nil)
+            defer { surface.unlock(options: .readOnly, seed: nil) }
+            var out: [UInt8] = []
+            for y in stride(from: 0, to: surface.height, by: 37) {
+                let row = surface.baseAddress.advanced(by: y * surface.bytesPerRow).assumingMemoryBound(to: UInt8.self)
+                for x in stride(from: 0, to: surface.width * 4, by: 52) { out.append(row[x]) }
+            }
+            return out
+        }
+        let reused = GlassBehind()
+        _ = reused.draw(scene, transform: .identity, width: 200, height: 150, contentsScale: 1, media: nil)
+        let big = Projective(.scale(Vec2(2, 2)))
+        // Inside a transaction, as a pan redraws the glass from the canvas's
+        // layout: a flush there on this thread commits nothing.
+        CATransaction.begin()
+        let again = try #require(reused.draw(scene, transform: big, width: 800, height: 600, contentsScale: 2, media: nil))
+        CATransaction.commit()
+        let fresh = try #require(GlassBehind().draw(scene, transform: big, width: 800, height: 600, contentsScale: 2, media: nil))
+        #expect(bytes(again) == bytes(fresh))
     }
 
     @Test func aPictureOfWhatIsBehindTakesAnyWidth() throws {

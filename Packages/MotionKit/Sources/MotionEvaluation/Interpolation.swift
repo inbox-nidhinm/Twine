@@ -214,8 +214,21 @@ extension StarShape: Interpolatable {
 }
 
 extension Glass: Interpolatable {
-    /// Every setting blends; the light takes the shorter way round.
+    /// Every setting blends; the light takes the shorter way round. A
+    /// setting that shows nothing at one end takes the other end's: a light
+    /// that is off has no angle, and glass that bends nothing no depth or
+    /// splay, so fading glass in or out only fades it. Faded out to no glass
+    /// (whose light is at -45°), the user's light at 262° turned 53° as it
+    /// went (21 October 2026).
     public static func interpolate(_ a: Glass, _ b: Glass, _ t: Double) -> Glass {
+        var a = a, b = b
+        if a.lightIntensity <= 0 { a.lightAngle = b.lightAngle } else if b.lightIntensity <= 0 { b.lightAngle = a.lightAngle }
+        let aBends = a.refraction > 0 || a.dispersion > 0, bBends = b.refraction > 0 || b.dispersion > 0
+        if !aBends {
+            (a.depth, a.splay) = (b.depth, b.splay)
+        } else if !bBends {
+            (b.depth, b.splay) = (a.depth, a.splay)
+        }
         var turn = (b.lightAngle - a.lightAngle).truncatingRemainder(dividingBy: 360)
         if turn > 180 { turn -= 360 } else if turn < -180 { turn += 360 }
         func unit(_ x: Double, _ y: Double) -> Double { min(max(lerp(x, y, t), 0), 1) }

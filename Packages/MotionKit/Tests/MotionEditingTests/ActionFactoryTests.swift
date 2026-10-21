@@ -92,6 +92,9 @@ import MotionEvaluation
         #expect(ActionFactory.kinds(for: square) == [.move, .scale, .rotate, .skew, .tilt, .depth, .bend, .opacity, .resize, .visibility,
                                                      .color, .cornerRadius, .shadow, .innerShadow, .layerBlur, .backgroundBlur, .glass])
         #expect(!ActionFactory.kinds(for: group).contains(.resize))
+        // Glass bends within an outline: an open line has none to bend in.
+        let line = Layer(name: "L", content: .shape(ShapeContent(geometry: .line, fills: [])), size: Size2(100, 0), position: .zero)
+        #expect(!ActionFactory.kinds(for: line).contains(.glass))
         #expect(ActionFactory.kinds(for: audio) == [.play, .volume])
         let project = Project(layers: [square, group])
         #expect(ActionFactory.kinds(for: [square, group], in: project) == ActionFactory.kinds(for: group))

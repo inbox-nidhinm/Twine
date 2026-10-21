@@ -46,14 +46,34 @@ final class GlassBehind {
     /// and text in it are drawn. Nil without a GPU.
     func draw(_ scene: ResolvedScene, transform: Projective, width: Int, height: Int, contentsScale: CGFloat,
               media: MediaProvider?) -> IOSurface? {
-        // On a queue of its own, which the caller waits for: Core Animation's
-        // transactions are the thread's, so flushing for CARenderer there
-        // never flushes the canvas's, which SwiftUI may be in the middle of
-        // (flushing during a view update once stopped the app).
-        Self.work.sync { drawHere(scene, transform: transform, width: width, height: height,
-                                  contentsScale: contentsScale, media: media) }
+        // On a thread of its own, which the caller waits for: Core
+        // Animation's transactions are the thread's, so flushing for
+        // CARenderer there never touches the caller's, which may be open
+        // (the canvas's layout) or SwiftUI's mid-update (flushing during a
+        // view update once stopped the app). Never `sync`, which runs the
+        // work on the calling thread: a pan's redraw, inside the canvas's
+        // layout transaction, flushed nothing, and the picture came out
+        // drawn at its old size, magnified, the rest black (21 October 2026).
+        let job = Job { self.drawHere(scene, transform: transform, width: width, height: height,
+                                      contentsScale: contentsScale, media: media) }
+        let done = DispatchSemaphore(value: 0)
+        Self.work.async {
+            job.result = job.run()
+            done.signal()
+        }
+        done.wait()
+        return job.result
     }
-    private static let work = DispatchQueue(label: "Twine.GlassBehind")
+    private static let work = DispatchQueue(label: "Twine.GlassBehind", qos: .userInteractive)
+
+    /// The drawing and its picture, carried to the queue and back. The
+    /// caller waits while the queue runs it, so only one of them ever
+    /// touches it, or anything it holds, at a time.
+    private final class Job: @unchecked Sendable {
+        let run: () -> IOSurface?
+        var result: IOSurface?
+        init(_ run: @escaping () -> IOSurface?) { self.run = run }
+    }
 
     private func drawHere(_ scene: ResolvedScene, transform: Projective, width: Int, height: Int, contentsScale: CGFloat,
                           media: MediaProvider?) -> IOSurface? {
@@ -62,9 +82,9 @@ final class GlassBehind {
            last.scale == contentsScale, !surfaces.isEmpty {
             return surfaces[shown].surface
         }
-        guard let queue = Self.queue, prepare(width: width, height: height) else { return nil }
+        guard let queue = Self.queue, prepare(width: width, height: height),
+              let next = freeSurface(width: width, height: height) else { return nil }
         last = (scene, transform, width, height, contentsScale)
-        let next = (shown + 1) % surfaces.count
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -101,44 +121,68 @@ final class GlassBehind {
         return surfaces[shown].surface
     }
 
-    /// Makes the pictures and the renderer for a size, keeping them while
-    /// the size stays.
-    private func prepare(width: Int, height: Int) -> Bool {
-        if let first = surfaces.first, first.texture.width == width, first.texture.height == height, caRenderer != nil {
-            return true
+    /// The most pictures kept: one on the screen, one being drawn, and the
+    /// screen still letting go of a third or fourth.
+    static let mostSurfaces = 4
+
+    /// A picture to draw into that the screen is not showing: never the one
+    /// handed over last, nor one the window server still holds (`isInUse`),
+    /// or two quick redraws in one frame drew into the picture on screen,
+    /// which could flicker. One more is made while there is room; with
+    /// none, the oldest is taken.
+    private func freeSurface(width: Int, height: Int) -> Int? {
+        if let free = surfaces.indices.first(where: { $0 != shown && !surfaces[$0].surface.isInUse }) { return free }
+        if surfaces.count < Self.mostSurfaces, let made = Self.makeSurface(width: width, height: height) {
+            surfaces.append(made)
+            return surfaces.count - 1
         }
-        guard let device = Self.device, let queue = Self.queue else { return false }
-        var made: [(IOSurface, MTLTexture)] = []
+        return surfaces.isEmpty ? nil : (shown + 1) % surfaces.count
+    }
+
+    private static func makeSurface(width: Int, height: Int) -> (surface: IOSurface, texture: MTLTexture)? {
+        guard let device else { return nil }
         // Metal takes a surface's rows only on whole steps of 16 bytes (a
         // 2,254 pixel wide picture, zoomed in, stopped the app); 64 suits
         // the GPU better still.
         let rowBytes = (width * 4 + 63) / 64 * 64
-        for _ in 0..<2 {
-            guard let surface = IOSurface(properties: [
-                .width: width, .height: height, .bytesPerElement: 4, .bytesPerRow: rowBytes,
-                .pixelFormat: kCVPixelFormatType_32BGRA,
-            ]) else { return false }
-            // Tagged, so the screen reads its colours as sRGB, as everything
-            // else Twine draws.
-            if let srgb = CGColorSpace(name: CGColorSpace.sRGB), let list = srgb.copyPropertyList() {
-                IOSurfaceSetValue(surface, kIOSurfaceColorSpace, list)
-            }
-            let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: width,
-                                                                      height: height, mipmapped: false)
-            // CARenderer draws nothing at all without `.shaderWrite`.
-            descriptor.usage = [.renderTarget, .shaderRead, .shaderWrite]
-            descriptor.storageMode = .shared
-            guard let texture = device.makeTexture(descriptor: descriptor, iosurface: surface, plane: 0) else { return false }
-            made.append((surface, texture))
+        guard let surface = IOSurface(properties: [
+            .width: width, .height: height, .bytesPerElement: 4, .bytesPerRow: rowBytes,
+            .pixelFormat: kCVPixelFormatType_32BGRA,
+        ]) else { return nil }
+        // Tagged, so the screen reads its colours as sRGB, as everything
+        // else Twine draws.
+        if let srgb = CGColorSpace(name: CGColorSpace.sRGB), let list = srgb.copyPropertyList() {
+            IOSurfaceSetValue(surface, kIOSurfaceColorSpace, list)
         }
-        surfaces = made.map { (surface: $0.0, texture: $0.1) }
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: width,
+                                                                  height: height, mipmapped: false)
+        // CARenderer draws nothing at all without `.shaderWrite`.
+        descriptor.usage = [.renderTarget, .shaderRead, .shaderWrite]
+        descriptor.storageMode = .shared
+        guard let texture = device.makeTexture(descriptor: descriptor, iosurface: surface, plane: 0) else { return nil }
+        return (surface, texture)
+    }
+
+    /// Makes the first pictures and the renderer for a size, keeping them
+    /// while the size stays.
+    private func prepare(width: Int, height: Int) -> Bool {
+        if let first = surfaces.first, first.texture.width == width, first.texture.height == height, caRenderer != nil {
+            return true
+        }
+        guard let queue = Self.queue else { return false }
+        var made: [(surface: IOSurface, texture: MTLTexture)] = []
+        for _ in 0..<2 {
+            guard let surface = Self.makeSurface(width: width, height: height) else { return false }
+            made.append(surface)
+        }
+        surfaces = made
         shown = 0
         last = nil
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         root.frame = CGRect(x: 0, y: 0, width: width, height: height)
         CATransaction.commit()
-        let caRenderer = self.caRenderer ?? CARenderer(mtlTexture: made[0].1, options: [
+        let caRenderer = self.caRenderer ?? CARenderer(mtlTexture: made[0].texture, options: [
             kCARendererMetalCommandQueue as String: queue,
             kCARendererColorSpace as String: CGColorSpace(name: CGColorSpace.sRGB)!,
         ])

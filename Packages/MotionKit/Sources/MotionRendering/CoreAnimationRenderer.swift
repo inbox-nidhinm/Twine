@@ -45,13 +45,16 @@ public final class CoreAnimationRenderer: SceneRenderer {
     }
 
     /// On screen, the part of the composition the canvas shows, in its
-    /// points: glass looks no further (see `GlassLayers.clip(to:)`). Nil
-    /// off screen, where there is nothing else to see.
+    /// points: glass pictures cover no more of it than that and the reach
+    /// of their bend, so glass zoomed far in costs no more than the screen.
+    /// Nil off screen, where the whole composition is drawn.
     public var visibleArea: CGRect? {
-        didSet { if visibleArea != oldValue { clipGlass() } }
+        didSet {
+            guard visibleArea != oldValue, drawsGlassBehind, let glassScene else { return }
+            drawGlassBehind(glassScene)
+        }
     }
-    /// The layers with glass, and the scene they were last drawn in.
-    private var glassLayers: [UUID] = []
+    /// The scene glass was last drawn in.
     private var glassScene: ResolvedScene?
     /// Where each glass layer is in the scene's `layers`, in the same order.
     private var glassIndices: [Int] = []
@@ -71,27 +74,6 @@ public final class CoreAnimationRenderer: SceneRenderer {
         }
     }
     private var behinds: [UUID: GlassBehind] = [:]
-
-    /// Keeps each glass to `visibleArea`, carried into the layer's own
-    /// points through everything that places it (turns, groups, 3D). A
-    /// corner the layer's plane cannot reach leaves that glass unclipped.
-    private func clipGlass() {
-        guard let scene = glassScene else { return }
-        for id in glassLayers {
-            guard let node = nodes[id] else { continue }
-            var local: CGRect?
-            if let visible = visibleArea, let inverse = scene.worldProjection(of: id)?.inverted {
-                let corners = [Vec2(visible.minX, visible.minY), Vec2(visible.maxX, visible.minY),
-                               Vec2(visible.maxX, visible.maxY), Vec2(visible.minX, visible.maxY)].compactMap(inverse.apply)
-                if corners.count == 4 {
-                    let xs = corners.map(\.x), ys = corners.map(\.y)
-                    local = CGRect(x: xs.min()!, y: ys.min()!, width: xs.max()! - xs.min()!, height: ys.max()! - ys.min()!)
-                        .insetBy(dx: -1, dy: -1)
-                }
-            }
-            node.clipGlass(to: local)
-        }
-    }
 
     /// Where image and video layers get their pictures. Without one they draw
     /// as a grey box, as they do when a file is missing.
@@ -121,21 +103,39 @@ public final class CoreAnimationRenderer: SceneRenderer {
     }
 
     /// Draws, for each glass, a picture of the glass over the layers drawn
-    /// before it (everything behind it: what is before it in its group and
-    /// its groups' own fills), upright over the part of the composition the
-    /// glass works in, at the canvas's pixels a point, and hands it over.
-    /// Time is left out, so a still background is not drawn again.
+    /// before it (everything behind it, in the order the screen draws, so
+    /// in a 3D frame by depth: what is before it in its group, its groups'
+    /// own fills, and all before them), upright over the part of the
+    /// composition the glass works in that can be seen, at the canvas's
+    /// pixels a point, and hands it over. Time is left out, so a still
+    /// background is not drawn again.
     private func drawGlassBehind(_ scene: ResolvedScene) {
         var kept: [UUID: GlassBehind] = [:]
         var shown: [(Node, IOSurface?, CGRect, Projective)] = []
         let composition = CGRect(origin: .zero, size: scene.size.cg)
+        let order = scene.drawingOrder()
+        var rank = [Int](repeating: 0, count: scene.layers.count)
+        for (place, index) in order.enumerated() { rank[index] = place }
         for i in glassIndices where i < scene.layers.count {
             let id = scene.layers[i].id
             guard let node = nodes[id], let whole = node.glassBehindArea,
                   let world = scene.worldProjection(of: id), let toLocal = world.inverted else { continue }
             let corners = [Vec2(whole.minX, whole.minY), Vec2(whole.maxX, whole.minY),
                            Vec2(whole.maxX, whole.maxY), Vec2(whole.minX, whole.maxY)].compactMap(world.apply)
-            guard corners.count == 4, let around = Box(around: corners) else { continue }
+            guard corners.count == 4, var around = Box(around: corners) else { continue }
+            if let visible = visibleArea {
+                // What can be seen, and as far again as the bend and frost
+                // reach, so the seen part bends in what lies just past it;
+                // snapped out to quarters of the view, so a small pan draws
+                // nothing again.
+                let reach = Double(-whole.minX) * Double(Self.stretch(of: scene.layers[i], in: scene))
+                let step = max(Double(max(visible.width, visible.height)) / 4, 1)
+                let seen = Box(minX: (Double(visible.minX) - reach) / step, minY: (Double(visible.minY) - reach) / step,
+                               maxX: (Double(visible.maxX) + reach) / step, maxY: (Double(visible.maxY) + reach) / step)
+                around = Box(minX: max(around.minX, seen.minX.rounded(.down) * step), minY: max(around.minY, seen.minY.rounded(.down) * step),
+                             maxX: min(around.maxX, seen.maxX.rounded(.up) * step), maxY: min(around.maxY, seen.maxY.rounded(.up) * step))
+                guard around.width > 0, around.height > 0 else { continue }
+            }
             // Whole pixels, so the picture's lie on the composition's.
             let texels = min(Double(node.pixelScale), Double(GlassBehind.largestSide) / max(around.width, around.height, 1))
             let area = CGRect(x: floor(around.minX * texels) / texels, y: floor(around.minY * texels) / texels,
@@ -145,9 +145,19 @@ public final class CoreAnimationRenderer: SceneRenderer {
             guard !area.isNull, area.width > 0, area.height > 0 else { continue }
             let width = Int((area.width * texels).rounded()), height = Int((area.height * texels).rounded())
             let toPicture = Projective(.translation(Vec2(-area.minX, -area.minY))).then(Projective(.scale(Vec2(texels, texels))))
-            let behind = ResolvedScene(time: 0, size: scene.size, background: scene.background,
-                                       layers: Array(scene.layers[..<i]) + [Self.glassOnly(scene.layers[i])],
-                                       masks: scene.masks)
+            // The groups holding the glass at full strength: what they do to
+            // the glass (fade, blend, blur, mask) they do to its picture on
+            // the canvas, and done in the picture too, it came out twice,
+            // or, through backdrops in a faded group, saw nothing behind.
+            var holders = Set<UUID>()
+            var up = scene.parentID(of: id)
+            while let parent = up, holders.insert(parent).inserted { up = scene.parentID(of: parent) }
+            var layers: [ResolvedLayer] = []
+            for j in scene.layers.indices where rank[j] < rank[i] {
+                layers.append(holders.contains(scene.layers[j].id) ? Self.atFullStrength(scene.layers[j]) : scene.layers[j])
+            }
+            layers.append(Self.glassOnly(scene.layers[i]))
+            let behind = ResolvedScene(time: 0, size: scene.size, background: scene.background, layers: layers, masks: scene.masks)
             let drawer = behinds[id] ?? GlassBehind()
             kept[id] = drawer
             let surface = drawer.draw(behind, transform: toPicture, width: width, height: height,
@@ -167,6 +177,20 @@ public final class CoreAnimationRenderer: SceneRenderer {
     /// whose backdrops bend, split and frost exactly as an export's do;
     /// filtering that picture again on the canvas instead read the colour
     /// split's map out of place (a cyan band along the top and bottom).
+    static func atFullStrength(_ group: ResolvedLayer) -> ResolvedLayer {
+        var full = group
+        full.opacity = 1
+        full.blendMode = .normal
+        full.blur = 0
+        full.mask = nil
+        full.reveal = .none
+        full.curl = .none
+        full.motion = .none
+        // A frame's strokes lie over its children, the glass among them.
+        full.frame?.strokes = []
+        return full
+    }
+
     static func glassOnly(_ layer: ResolvedLayer) -> ResolvedLayer {
         var bare = layer
         switch bare.content {
@@ -214,7 +238,6 @@ public final class CoreAnimationRenderer: SceneRenderer {
         // parent, the tree's shape is as it was and only the layers
         // themselves need looking at.
         var sameTree = layers.count == drawn.count
-        var glass: [UUID] = []
         var glassAt: [Int] = []
         for i in layers.indices {
             let id = layers[i].id
@@ -234,15 +257,10 @@ public final class CoreAnimationRenderer: SceneRenderer {
             if case .text = layers[i].content { node.setTextZoom(Self.textZoom(of: layers[i], in: scene, scale: contentsScale)) }
             if case .spread = layers[i].motion { node.setMotionZoom(Self.stretch(of: layers[i], in: scene)) }
             node.update(layers[i], media: media)
-            if layers[i].glass != .none {
-                glass.append(id)
-                glassAt.append(i)
-            }
+            if layers[i].glass != .none { glassAt.append(i) }
         }
-        glassLayers = glass
         glassIndices = glassAt
-        glassScene = glass.isEmpty ? nil : scene
-        clipGlass()
+        glassScene = glassAt.isEmpty ? nil : scene
 
         if !sameTree {
             var seen = Set<UUID>(minimumCapacity: layers.count)
@@ -761,8 +779,6 @@ final class Node {
             backdrop.filters = [Blur.filter(amount: blur.radius)]
         }
     }
-
-    func clipGlass(to visible: CGRect?) { glass?.clip(to: visible) }
 
     /// Where the glass works, in the layer's points, while it shows and
     /// draws what is behind it itself.

@@ -1235,6 +1235,9 @@ private struct EffectsSection: View {
                     entries.append(.item("Layer Blur", icon: .layerBlur) { add(.layerBlur(LayerBlur())) })
                     if layer.look != nil {
                         entries.append(.item("Background Blur", icon: .backgroundBlur) { add(.backgroundBlur(BackgroundBlur())) })
+                    }
+                    // Glass bends within an outline, so an open path has none.
+                    if layer.look?.geometry.isClosed == true {
                         entries.append(.item("Glass", icon: .glass) { add(.glass(Glass())) })
                     }
                     if canWarp && !(showsSkew && showsTilt && showsBend) {

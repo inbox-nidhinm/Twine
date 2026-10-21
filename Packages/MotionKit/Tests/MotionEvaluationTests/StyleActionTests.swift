@@ -226,12 +226,13 @@ private func gradient(_ colors: [RGBA], radial: Bool = false) -> Paint {
                                                             dispersion: 1, frost: 10, splay: 1))))
         #expect(resolved(layer, [a], at: 0).glass == .none, "a card designed without glass has none until it starts")
         let half = resolved(layer, [a], at: 2).glass.glass
-        #expect(half.refraction == 0.5 && half.dispersion == 0.5 && half.frost == 5 && half.splay == 0.5)
+        #expect(half.refraction == 0.5 && half.dispersion == 0.5 && half.frost == 5)
         #expect(half.lightIntensity == 0.5)
-        // From none, depth and light start where a new glass's are: the
-        // light turns the shorter way, from -45 back past -180 to 170.
-        #expect(half.depth == 30)
-        #expect(abs(half.lightAngle - -117.5) < 1e-9)
+        // From none, which bends nothing and is unlit, the glass fades in as
+        // it is: its depth, splay and light's angle from the start, never
+        // growing from a new glass's or turning from -45 (21 October 2026).
+        #expect(half.depth == 40 && half.splay == 1)
+        #expect(half.lightAngle == 170)
 
         var designed = card()
         designed.effects = [Effect(kind: .glass(Glass(refraction: 2, depth: -5, dispersion: .nan)))]

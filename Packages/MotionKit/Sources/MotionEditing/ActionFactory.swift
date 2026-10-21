@@ -57,7 +57,9 @@ public enum ActionFactory {
             case .rectangle, .polygon: kinds.append(.cornerRadius)
             default: break
             }
-            kinds += [.shadow, .innerShadow, .layerBlur, .backgroundBlur, .glass]
+            kinds += [.shadow, .innerShadow, .layerBlur, .backgroundBlur]
+            // Glass bends within an outline, so an open path has none.
+            if shape.geometry.isClosed { kinds.append(.glass) }
             if case .ellipse = shape.geometry { kinds.append(.arc) }
             if case .star = shape.geometry { kinds.append(.star) }
             if case .path = shape.geometry { kinds.append(.path) }

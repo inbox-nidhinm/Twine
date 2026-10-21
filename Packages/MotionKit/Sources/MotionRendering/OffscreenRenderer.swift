@@ -61,6 +61,10 @@ public final class OffscreenRenderer {
         root.addSublayer(renderer.rootLayer)
         renderer.contentsScale = 1
         renderer.flipsContents = true
+        // Glass as the canvas draws it, so an export is the canvas exactly
+        // and glass in a faded group still sees what is behind it (a
+        // backdrop there sees only its own group).
+        renderer.drawsGlassBehind = true
         CATransaction.commit()
         caRenderer.layer = root
         caRenderer.bounds = root.bounds
