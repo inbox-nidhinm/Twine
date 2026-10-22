@@ -30,6 +30,9 @@ public struct FrameRate: Codable, Sendable, Hashable {
 
     private enum CodingKeys: String, CodingKey { case frames, seconds }
 
+    public static let fps12 = FrameRate(frames: 12)
+    public static let fps16 = FrameRate(frames: 16)
+    public static let fps18 = FrameRate(frames: 18)
     public static let fps24 = FrameRate(frames: 24)
     public static let fps25 = FrameRate(frames: 25)
     public static let fps30 = FrameRate(frames: 30)

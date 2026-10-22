@@ -255,12 +255,29 @@ private func pixel(_ buffer: CVPixelBuffer, _ x: Int, _ y: Int) -> (r: Int, g: I
                                                                 fills: [Fill(paint: .color(.white))])),
                         size: Size2(10, 10), position: Vec2(32, 32))
         let project = Project(composition: Composition(width: 64, height: 64, frameRate: .fps60, duration: 1), layers: [box])
-        try Exporter.export(project, settings: ExportSettings(format: .h264, frameRate: .fps24), to: url)
+        try Exporter.export(project, settings: ExportSettings(format: .h264, frameRate: .fps12), to: url)
         let track = try #require(try await AVURLAsset(url: url).loadTracks(withMediaType: .video).first)
         let rate = try await track.load(.nominalFrameRate)
-        #expect(abs(Double(rate) - 24) < 0.1)
+        #expect(abs(Double(rate) - 12) < 0.1)
         let duration = try await AVURLAsset(url: url).load(.duration).seconds
         #expect(abs(duration - 1) < 0.05)
+    }
+
+    /// A low rate takes fewer frames of the same scene: the movie keeps the
+    /// timeline's length, and each frame shows the moment it stands for.
+    @Test(arguments: [FrameRate.fps12, .fps16, .fps18])
+    func aLowRateKeepsTheLength(rate: FrameRate) {
+        let composition = Composition(width: 64, height: 64, frameRate: .fps60, duration: 3)
+        let exported = ExportSettings(format: .h264, frameRate: rate).exported(composition)
+        #expect(exported.duration == 3)
+        let timing = ExportTiming(exported)
+        #expect(timing.frameCount == rate.frames * 3)
+        #expect(timing.duration.seconds == 3)
+        #expect(abs(timing.time(ofFrame: rate.frames) - 1) < 1e-12)
+        // A range is counted at the export's rate too.
+        let part = ExportTiming(exported, frames: ExportTiming.frames(from: 0.5, to: 2, in: exported))
+        #expect(abs(part.startTime - 0.5) < 1e-12)
+        #expect(abs(part.duration.seconds - 1.5) < 1e-9)
     }
 
     @Test func aChosenRateIsRemembered() throws {

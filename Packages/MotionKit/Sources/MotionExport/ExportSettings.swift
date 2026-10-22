@@ -132,7 +132,9 @@ public struct ExportSettings: Codable, Sendable, Equatable {
     }
 
     /// The rates offered for export by name, besides the composition's own.
-    public static let frameRates: [FrameRate] = [.fps24, .fps25, .fps30, .fps50, .fps60]
+    /// The low ones (12, 16, 18) are for a hand-drawn, stepped look: the
+    /// scene is sampled less often, and the movie runs as long as ever.
+    public static let frameRates: [FrameRate] = [.fps12, .fps16, .fps18, .fps24, .fps25, .fps30, .fps50, .fps60]
 
     public init(format: ExportFormat = .h264, scale: Double = 1, quality: ExportQuality = .high, includesAudio: Bool = true,
                 frameRate: FrameRate? = nil) {
