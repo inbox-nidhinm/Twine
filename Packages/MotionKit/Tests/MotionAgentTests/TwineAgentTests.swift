@@ -314,6 +314,25 @@ struct MCPServerTests {
         #expect(garbage.flatMap { try? JSONValue.parse($0) }?["error"]?["code"]?.number == -32700)
     }
 
+    /// The bridge answers everything but tool calls without the project, so
+    /// an AI app saying hello never opens Twine.
+    @Test func theBridgeAnswersAllButToolCallsWithoutTwine() throws {
+        let listing = TwineAgent.listing(version: "1")
+        let hello: JSONValue = ["jsonrpc": "2.0", "id": 1, "method": "initialize", "params": ["protocolVersion": "2025-06-18"]]
+        guard case .answered(let reply) = listing.answer(try hello.data()) else { Issue.record("not answered"); return }
+        #expect(try JSONValue.parse(reply)["result"]?["serverInfo"]?["name"]?.string == "twine")
+        for method in ["tools/list", "ping", "resources/list", "prompts/list"] {
+            let message: JSONValue = ["jsonrpc": "2.0", "id": 2, "method": .string(method)]
+            guard case .answered = listing.answer(try message.data()) else { Issue.record("\(method) needed Twine"); continue }
+        }
+        let initialized: JSONValue = ["jsonrpc": "2.0", "method": "notifications/initialized"]
+        #expect(listing.answer(try initialized.data()) == .silent)
+        let unknown: JSONValue = ["jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": ["name": "fly"]]
+        guard case .answered = listing.answer(try unknown.data()) else { Issue.record("an unknown tool needed Twine"); return }
+        let call: JSONValue = ["jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": ["name": "get_status", "arguments": [:]]]
+        #expect(listing.answer(try call.data()) == .toolCall(id: 4, name: "get_status", arguments: [:]))
+    }
+
     @Test func picturesComeBackAsImages() async throws {
         let server = server()
         let reply = try await send(server, ["jsonrpc": "2.0", "id": 6, "method": "tools/call",

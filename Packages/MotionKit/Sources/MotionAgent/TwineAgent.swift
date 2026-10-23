@@ -22,6 +22,14 @@ public final class TwineAgent {
         }
     }
 
+    /// A server that knows the tools but has no project, for the bridge:
+    /// it answers the handshake and the tool list, and hands tool calls on.
+    public static func listing(version: String) -> MCPServer {
+        MCPServer(name: "twine", version: version, instructions: instructions, tools: tools) { _, _ in
+            .error("Tools are run by Twine itself.")
+        }
+    }
+
     public func call(_ name: String, _ arguments: JSONValue) async -> ToolOutput {
         do {
             return try await run(name, Arguments(arguments))

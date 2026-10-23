@@ -1,12 +1,17 @@
 import AppKit
+import MotionAgent
 
 /// `Twine --mcp`: what an AI app starts to reach Twine. It is Twine's own
 /// program run without its windows, passing the app's messages (lines of
 /// JSON on standard input) to the running Twine's socket and the replies
-/// back out. It opens Twine, in the background, when it is not running,
-/// and again if it quits between messages, so closing the window does not
-/// end the AI app's connection. A request Twine never answered because it
-/// quit gets an error reply, so the AI app is not left waiting.
+/// back out. It answers the handshake, the tool list and pings itself
+/// (`MCPServer.answer`), since every Claude session starts a bridge and
+/// says hello at once, whether or not it ever uses Twine: answered by
+/// Twine, that opened Twine with every new session and reopened it after
+/// every quit. A tool call opens Twine, in the background, when it is not
+/// running, and again if it quits between calls. A request Twine never
+/// answered because it quit gets an error reply, so the AI app is not
+/// left waiting.
 nonisolated enum AgentBridge {
     static let argument = "--mcp"
 
@@ -21,9 +26,14 @@ nonisolated enum AgentBridge {
     static func run() -> Never {
         signal(SIGPIPE, SIG_IGN)
         let link = Link()
+        let listing = MainActor.assumeIsolated { TwineAgent.listing(version: VersionHistory.version) }
         while let line = readLine(strippingNewline: true) {
             guard !line.allSatisfy(\.isWhitespace) else { continue }
-            link.send(line)
+            switch listing.answer(Data(line.utf8)) {
+            case .silent: continue
+            case .answered(let reply): link.write(reply)
+            case .toolCall: link.send(line)
+            }
         }
         exit(0)
     }
@@ -128,7 +138,7 @@ nonisolated enum AgentBridge {
 
         private let writing = NSLock()
 
-        private func write(_ data: Data) {
+        func write(_ data: Data) {
             writing.lock()
             output.write(data)
             writing.unlock()
