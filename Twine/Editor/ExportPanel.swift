@@ -657,14 +657,14 @@ private struct Figures: View {
     let size: CGFloat
 
     var body: some View {
-        let figures = ThemeFont.displayFigures(size, .thin)
+        let figures = ThemeFont.displayFigures(size, .extraLight)
         HStack(spacing: 0) {
             ForEach(Array(text.enumerated()), id: \.offset) { _, character in
                 Text(String(character))
-                    .font(ThemeFont.display(size, .thin))
+                    .font(ThemeFont.display(size, .extraLight))
                     .foregroundStyle(Theme.textPrimary)
                     .fixedSize()
-                    .frame(width: character.isNumber ? ThemeFont.displayDigitWidth(size, .thin) : nil)
+                    .frame(width: character.isNumber ? ThemeFont.displayDigitWidth(size, .extraLight) : nil)
             }
         }
         .offset(y: figures.nudge)

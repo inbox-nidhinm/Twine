@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 245
+    static let pushes = 246
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -69,6 +69,7 @@ enum VersionHistory {
             "In Animate, a selected layer's first section is Add to Layer (New Action and Select Preset, each half the panel wide, as they were), with Templates in a section of its own below it.",
             "Templates have their own icon in the layers panel, the designer's, in place of the frame icon.",
             "Every icon that was a stand-in of ours is now a Hugeicons icon, the set the designer's own come from, so they all share one hand: the actions' icons in the New Action menu, Effects and the timeline (Move, Scale, Resize, Opacity, Colour, Stroke, Trim, Dashes, Depth, Camera, Bend, Counter, Change Text, Letter Spacing, Line Height, Stagger and Template), the presets, the swap button, the angular gradient fill, the down arrow, and the folder, search, export and delete icons. In Settings, the AI apps card shows the MCP logo and Claude Code the Claude logo.",
+            "Titles are set in Newsreader in place of PP Kyoto: the home screen, Settings, onboarding, Version History, New from Template and the export panel's name in its Light weight, and the export's counting percentage in its lightest, Extra Light. Each size uses Newsreader's own cut for that size, finer at large sizes. The Figma plugin's copying percentage is Newsreader too.",
         ]),
         .init(date: "1 October 2026", title: "Large projects", features: [
             "Gradients take as many colour stops as you like, as in Figma. The Fill section shows the gradient as a bar with a marker for each stop: click the bar to add a stop in the colour already there, drag a marker to move it, and type its place beside the bar. Each stop has its own row with its colour, hex and opacity, and a button to remove it. Colour and Stroke actions edit their gradients the same way.",

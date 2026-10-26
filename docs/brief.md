@@ -7,7 +7,7 @@ The kickoff brief as written by Nidhin, followed by the decisions made while ans
 - Project at `Documents/Claude Code/Twine`, its own repository, pushed to private GitHub `inbox-nidhinm/Twine` after each milestone.
 - Xcode project plus `make-app.sh` for a double-clickable build. Bundle `com.nidhin.twine`, files `Name.twine`. Signed to run on this Mac only; no sandbox.
 - In-app Version History, as in Flip.
-- Design tokens from the "Flip Design System" page of Figma file `2XErpBfGuIGNU0DkL58Ute` (node 171:2055), with a light blue accent instead of Flip's green. Placeholder icons for now; do not reuse Flip's icons. Dark only. Placeholder app icon. PP Kyoto Light for display type.
+- Design tokens from the "Flip Design System" page of Figma file `2XErpBfGuIGNU0DkL58Ute` (node 171:2055), with a light blue accent instead of Flip's green. Placeholder icons for now; do not reuse Flip's icons. Dark only. Placeholder app icon. Newsreader Light for display type.
 - A home screen at launch.
 - Layout like Jitter: a layers panel for groupings, and a separate keyframe timeline. The right panel switches between Design mode (tools on the bottom bar, no timeline) and Animate mode (timeline, no tools). In Design mode an edit to a keyframed property shifts the whole animation; in Animate mode it keys at the playhead.
 - Inspector: one scrolling panel of collapsible sections. With nothing selected it shows composition settings and export.

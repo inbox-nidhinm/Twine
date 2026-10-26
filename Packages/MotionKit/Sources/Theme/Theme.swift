@@ -368,21 +368,24 @@ public enum ThemeFont {
     /// Tiny numbers on tiles and markers.
     public static let micro = Font.system(size: 8, weight: .medium)
 
-    /// PP Kyoto, for the home screen's titles and the export panel's name
-    /// (Light) and its counter (Thin).
-    public enum DisplayWeight: String, CaseIterable, Sendable {
-        case light = "PPKyoto-Light"
-        case thin = "PPKyoto-Thin"
+    /// Newsreader, for the home screen's titles and the export panel's name
+    /// (Light) and its counter (Extra Light, the face's lightest). The value
+    /// is the weight on the font's own axis.
+    public enum DisplayWeight: CGFloat, CaseIterable, Sendable {
+        case light = 300
+        case extraLight = 200
     }
 
-    /// The display face. Registered with the process at first use rather
-    /// than through the Info.plist, because the fonts ship inside this
-    /// package's resource bundle. If registration fails, `Font.custom` falls
-    /// back to the system face, which costs a different-looking title rather
-    /// than a crash.
+    /// The display face. Newsreader is one variable font, set here to the
+    /// weight and to the optical size matching the size it is drawn at, as a
+    /// browser does, so large titles get its finer display cut. It ships
+    /// inside this package's resource bundle and is registered with the
+    /// process at first use rather than through the Info.plist. If that
+    /// fails, the system's serif shows, which costs a different-looking title
+    /// rather than a crash.
     public static func display(_ size: CGFloat, _ weight: DisplayWeight = .light) -> Font {
-        _ = registered
-        return .custom(weight.rawValue, size: size)
+        guard let font = nsFont(size, weight) else { return .system(size: size, weight: .light, design: .serif) }
+        return Font(font as CTFont)
     }
 
     /// The widest digit of the display face at `size`, so a counter's
@@ -412,17 +415,25 @@ public enum ThemeFont {
         return max(0, size * 1.3 - natural)
     }
 
+    /// The display face at `size` and `weight`, or nil when it could not be
+    /// loaded.
     private static func nsFont(_ size: CGFloat, _ weight: DisplayWeight) -> NSFont? {
-        _ = registered
-        return NSFont(name: weight.rawValue, size: size)
+        guard let newsreader else { return nil }
+        // The axes by their four-letter tags, which Core Text keys by number.
+        let wght = 0x7767_6874, opsz = 0x6F70_737A
+        let variation = [wght: weight.rawValue, opsz: min(max(size, 6), 72)] as CFDictionary
+        let set = CTFontDescriptorCreateWithAttributes([kCTFontVariationAttribute: variation] as CFDictionary)
+        return CTFontCreateCopyWithAttributes(newsreader, size, nil, set) as NSFont
     }
 
-    private static let registered: Bool = {
-        DisplayWeight.allCases.map { weight in
-            guard let url = Bundle.module.url(forResource: weight.rawValue, withExtension: "otf", subdirectory: "Fonts")
-            else { return false }
-            return CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
-        }.allSatisfy { $0 }
+    /// Core Text fonts never change once made, so one is safe to share.
+    nonisolated(unsafe) private static let newsreader: CTFont? = {
+        guard let url = Bundle.module.url(forResource: "Newsreader", withExtension: "ttf", subdirectory: "Fonts"),
+              CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil),
+              let found = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor],
+              let first = found.first
+        else { return nil }
+        return CTFontCreateWithFontDescriptor(first, 12, nil)
     }()
 }
 

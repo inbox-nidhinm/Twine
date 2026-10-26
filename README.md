@@ -30,4 +30,4 @@ Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and sha
 
 ## License
 
-[MIT](LICENSE). The bundled PP Kyoto fonts are not covered and stay under their own licence.
+[MIT](LICENSE). The bundled Newsreader font is not covered: it is under the SIL Open Font License (`Packages/MotionKit/Sources/Theme/Resources/Fonts/Newsreader-OFL.txt`).

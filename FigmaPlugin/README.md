@@ -30,7 +30,7 @@ Select a frame or some layers, run the plugin, and press **Copy**. In Twine, pre
 ## Files
 
 - `code.js` reads the selection (Figma's plugin sandbox).
-- `ui.src.html` is the panel. After editing it, run `python3 build.py` here, which writes `ui.html` with PP Kyoto embedded (Figma wants the panel as one file). PP Kyoto is a paid font; keep this folder, like the rest of Twine, private.
+- `ui.src.html` is the panel. After editing it, run `python3 build.py` here, which writes `ui.html` with Newsreader embedded (Figma wants the panel as one file). Newsreader is under the SIL Open Font License, in `Packages/MotionKit/Sources/Theme/Resources/Fonts/Newsreader-OFL.txt`.
 - `icon.png` is the icon to give Figma when publishing.
 - `test/run.js` runs `code.js` against a stand-in for Figma and writes `test/sample-payload.json`, which Twine's tests read, so the two halves are checked against each other: `node FigmaPlugin/test/run.js`.
 
