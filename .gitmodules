@@ -1,0 +1,3 @@
+[submodule "Vendor/AA-Bridge"]
+	path = Vendor/AA-Bridge
+	url = https://github.com/inbox-nidhinm/AA-Bridge.git

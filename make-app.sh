@@ -29,6 +29,10 @@ elif [[ -e Twine/App/SelfTest.swift ]] || grep -q "SelfTest.run" Twine/Document/
     exit 1
 fi
 
+# The display face's files come from the AA-Bridge submodule when it is
+# checked out; otherwise the committed copies are used as they are.
+Tools/update-fonts.sh
+
 LOG=build/xcodebuild.log
 mkdir -p build
 if ! xcodebuild -project Twine.xcodeproj -scheme Twine -configuration "$CONFIG" \

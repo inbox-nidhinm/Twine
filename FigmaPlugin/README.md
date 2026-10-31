@@ -30,7 +30,7 @@ Select a frame or some layers, run the plugin, and press **Copy**. In Twine, pre
 ## Files
 
 - `code.js` reads the selection (Figma's plugin sandbox).
-- `ui.src.html` is the panel. After editing it, run `python3 build.py` here, which writes `ui.html` with `TrupeerSlab.woff2` embedded (Figma wants the panel as one file). It is the web copy of the app's display face, `Packages/MotionKit/Sources/Theme/Resources/Fonts/TrupeerSlab.ttf`, so replace both when the face changes. Trupeer Slab is under the SIL Open Font License, in `Packages/MotionKit/Sources/Theme/Resources/Fonts/TrupeerSlab-OFL.txt`.
+- `ui.src.html` is the panel. After editing it, run `python3 build.py` here, which writes `ui.html` with `AABridgeSlab.woff2` embedded (Figma wants the panel as one file). It is the web copy of the app's display face, `Packages/MotionKit/Sources/Theme/Resources/Fonts/AABridgeSlab.ttf`. Both come from the AA-Bridge repo (the submodule at `Vendor/AA-Bridge`): when it is checked out, `build.py` first refreshes them with `Tools/update-fonts.sh`; when it is not, the copies already here are used. AA Bridge Slab is under the SIL Open Font License, in `Packages/MotionKit/Sources/Theme/Resources/Fonts/AABridgeSlab-OFL.txt`.
 - `icon.png` is the icon to give Figma when publishing.
 - `test/run.js` runs `code.js` against a stand-in for Figma and writes `test/sample-payload.json`, which Twine's tests read, so the two halves are checked against each other: `node FigmaPlugin/test/run.js`.
 

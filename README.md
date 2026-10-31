@@ -11,6 +11,10 @@ open build/Twine.app
 
 `./make-app.sh debug` makes a debug build. `./test.sh` runs the unit tests. The project also opens in Xcode (`Twine.xcodeproj`), where Run works as usual.
 
+### The font
+
+Titles are set in AA Bridge Slab, a typeface of its own kept in a separate repo, [AA-Bridge](https://github.com/inbox-nidhinm/AA-Bridge), which Twine includes as a git submodule at `Vendor/AA-Bridge`. You do not need it to build: copies of the three files Twine uses (the variable font, its licence and the web font for the Figma plugin) are kept in this repo. If you have access to AA-Bridge, `git submodule update --init` fetches it, and from then on `./make-app.sh` refreshes those copies from it before each build (`Tools/update-fonts.sh` does the copying). Without it, the build uses the copies as they are.
+
 ## Where things are
 
 Projects live in `~/Documents/Twine Creations`. A new project is written there the moment it is made and saves itself about a second after every change, so nothing is ever unsaved and closing a window never asks a question. File > Revert To browses older versions.
@@ -30,4 +34,4 @@ Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and sha
 
 ## License
 
-[MIT](LICENSE). The bundled Trupeer Slab font (also embedded in the Figma plugin's panel) is not covered: it is under the SIL Open Font License (`Packages/MotionKit/Sources/Theme/Resources/Fonts/TrupeerSlab-OFL.txt`).
+[MIT](LICENSE). The bundled AA Bridge Slab font (also embedded in the Figma plugin's panel), built from Montagu Slab, is not covered: it is under the SIL Open Font License (`Packages/MotionKit/Sources/Theme/Resources/Fonts/AABridgeSlab-OFL.txt`).

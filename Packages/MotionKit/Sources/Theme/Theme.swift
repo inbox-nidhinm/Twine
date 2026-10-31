@@ -368,7 +368,7 @@ public enum ThemeFont {
     /// Tiny numbers on tiles and markers.
     public static let micro = Font.system(size: 8, weight: .medium)
 
-    /// Trupeer Slab, for the home screen's titles and the export panel's name
+    /// AA Bridge Slab, for the home screen's titles and the export panel's name
     /// (Light) and its counter (Extra Light). The value is the weight on the
     /// font's own axis, which runs from 100 (Thin) to 700 (Bold).
     public enum DisplayWeight: CGFloat, CaseIterable, Sendable {
@@ -376,13 +376,14 @@ public enum ThemeFont {
         case extraLight = 200
     }
 
-    /// The display face. Trupeer Slab is one variable font, set here to the
+    /// The display face. AA Bridge Slab is one variable font, set here to the
     /// weight and to the optical size matching the size it is drawn at, as a
     /// browser does, so large titles get its finer display cut. It ships
     /// inside this package's resource bundle and is registered with the
-    /// process at first use rather than through the Info.plist. If that
-    /// fails, the system's serif shows, which costs a different-looking title
-    /// rather than a crash.
+    /// process at first use rather than through the Info.plist, and is always
+    /// made from that file, never looked up by name, as the name of its
+    /// default instance is no weight Twine uses. If that fails, the system's
+    /// serif shows, which costs a different-looking title rather than a crash.
     public static func display(_ size: CGFloat, _ weight: DisplayWeight = .light) -> Font {
         guard let font = nsFont(size, weight) else { return .system(size: size, weight: .light, design: .serif) }
         return Font(font as CTFont)
@@ -429,7 +430,7 @@ public enum ThemeFont {
 
     /// Core Text fonts never change once made, so one is safe to share.
     nonisolated(unsafe) private static let face: CTFont? = {
-        guard let url = Bundle.module.url(forResource: "TrupeerSlab", withExtension: "ttf", subdirectory: "Fonts"),
+        guard let url = Bundle.module.url(forResource: "AABridgeSlab", withExtension: "ttf", subdirectory: "Fonts"),
               CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil),
               let found = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor],
               let first = found.first
