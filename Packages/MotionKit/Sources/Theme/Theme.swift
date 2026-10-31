@@ -368,15 +368,15 @@ public enum ThemeFont {
     /// Tiny numbers on tiles and markers.
     public static let micro = Font.system(size: 8, weight: .medium)
 
-    /// Newsreader, for the home screen's titles and the export panel's name
-    /// (Light) and its counter (Extra Light, the face's lightest). The value
-    /// is the weight on the font's own axis.
+    /// Trupeer Slab, for the home screen's titles and the export panel's name
+    /// (Light) and its counter (Extra Light). The value is the weight on the
+    /// font's own axis, which runs from 100 (Thin) to 700 (Bold).
     public enum DisplayWeight: CGFloat, CaseIterable, Sendable {
         case light = 300
         case extraLight = 200
     }
 
-    /// The display face. Newsreader is one variable font, set here to the
+    /// The display face. Trupeer Slab is one variable font, set here to the
     /// weight and to the optical size matching the size it is drawn at, as a
     /// browser does, so large titles get its finer display cut. It ships
     /// inside this package's resource bundle and is registered with the
@@ -418,17 +418,18 @@ public enum ThemeFont {
     /// The display face at `size` and `weight`, or nil when it could not be
     /// loaded.
     private static func nsFont(_ size: CGFloat, _ weight: DisplayWeight) -> NSFont? {
-        guard let newsreader else { return nil }
+        guard let face else { return nil }
         // The axes by their four-letter tags, which Core Text keys by number.
+        // The optical size axis runs from 16 to 144.
         let wght = 0x7767_6874, opsz = 0x6F70_737A
-        let variation = [wght: weight.rawValue, opsz: min(max(size, 6), 72)] as CFDictionary
+        let variation = [wght: weight.rawValue, opsz: min(max(size, 16), 144)] as CFDictionary
         let set = CTFontDescriptorCreateWithAttributes([kCTFontVariationAttribute: variation] as CFDictionary)
-        return CTFontCreateCopyWithAttributes(newsreader, size, nil, set) as NSFont
+        return CTFontCreateCopyWithAttributes(face, size, nil, set) as NSFont
     }
 
     /// Core Text fonts never change once made, so one is safe to share.
-    nonisolated(unsafe) private static let newsreader: CTFont? = {
-        guard let url = Bundle.module.url(forResource: "Newsreader", withExtension: "ttf", subdirectory: "Fonts"),
+    nonisolated(unsafe) private static let face: CTFont? = {
+        guard let url = Bundle.module.url(forResource: "TrupeerSlab", withExtension: "ttf", subdirectory: "Fonts"),
               CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil),
               let found = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor],
               let first = found.first

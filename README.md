@@ -30,4 +30,4 @@ Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and sha
 
 ## License
 
-[MIT](LICENSE). The bundled Newsreader font is not covered: it is under the SIL Open Font License (`Packages/MotionKit/Sources/Theme/Resources/Fonts/Newsreader-OFL.txt`).
+[MIT](LICENSE). The bundled Trupeer Slab font (also embedded in the Figma plugin's panel) is not covered: it is under the SIL Open Font License (`Packages/MotionKit/Sources/Theme/Resources/Fonts/TrupeerSlab-OFL.txt`).
