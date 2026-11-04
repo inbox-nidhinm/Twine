@@ -51,9 +51,9 @@ public struct Action: Codable, Sendable, Equatable, Identifiable {
 
     public var end: Double { start + duration }
 
-    /// Changes that happen at once, at their start: zero-length actions and
-    /// every Hide/Show.
-    public var isInstant: Bool { duration <= 0 || spec.kind == .visibility }
+    /// Changes that happen at once, at their start: zero-length actions,
+    /// every Hide/Show and every Z-Index.
+    public var isInstant: Bool { duration <= 0 || spec.kind.isAlwaysInstant }
 }
 
 /// What an action does, with the values of its own type. Each kind carries
@@ -65,6 +65,9 @@ public enum ActionSpec: Sendable, Equatable {
     case opacity(OpacityAction)
     case resize(ResizeAction)
     case visibility(VisibilityAction)
+    /// Where the layer is drawn among its siblings, over the layers panel's
+    /// order (see `ZIndexAction`).
+    case zIndex(ZIndexAction)
     case color(ColorAction)
     case stroke(StrokeAction)
     case trim(TrimAction)
@@ -109,6 +112,7 @@ public enum ActionSpec: Sendable, Equatable {
         case .opacity: return .opacity
         case .resize: return .resize
         case .visibility: return .visibility
+        case .zIndex: return .zIndex
         case .color: return .color
         case .stroke: return .stroke
         case .trim: return .trim
@@ -141,7 +145,7 @@ public enum ActionSpec: Sendable, Equatable {
 }
 
 public enum ActionKind: String, Codable, Sendable, CaseIterable {
-    case move, scale, rotate, opacity, resize, visibility
+    case move, scale, rotate, opacity, resize, visibility, zIndex
     case color, stroke, trim, dash, cornerRadius, shadow, innerShadow
     case layerBlur, backgroundBlur, glass
     case letterSpacing, lineHeight, counter, changeText
@@ -164,6 +168,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .opacity: return "Opacity"
         case .resize: return "Resize"
         case .visibility: return "Hide/Show"
+        case .zIndex: return "Z-Index"
         case .color: return "Colour"
         case .stroke: return "Stroke"
         case .trim: return "Trim"
@@ -197,7 +202,7 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
     /// The group it is listed under when adding an action.
     public var category: ActionCategory {
         switch self {
-        case .move, .scale, .rotate, .opacity, .resize, .visibility, .skew, .tilt, .depth, .bend: return .transform
+        case .move, .scale, .rotate, .opacity, .resize, .visibility, .zIndex, .skew, .tilt, .depth, .bend: return .transform
         case .camera, .template, .templateSetting: return .space
         case .color, .stroke, .trim, .dash, .cornerRadius, .shadow, .innerShadow: return .style
         case .layerBlur, .backgroundBlur, .glass: return .blur
@@ -208,6 +213,12 @@ public enum ActionKind: String, Codable, Sendable, CaseIterable {
         case .preset: return .transform
         }
     }
+}
+
+extension ActionKind {
+    /// Kinds that change at once, at their start, whatever their duration:
+    /// a layer is shown or not, and drawn in one place or another.
+    public var isAlwaysInstant: Bool { self == .visibility || self == .zIndex }
 }
 
 public enum ActionCategory: String, Sendable, CaseIterable {
@@ -354,6 +365,19 @@ public struct VisibilityAction: Codable, Sendable, Equatable {
 
     public init(isVisible: Bool) {
         self.isVisible = isVisible
+    }
+}
+
+/// Where the layer is drawn among the layers beside it in its group or
+/// frame, from the action's start: higher in front. Every layer is at 0
+/// until a Z-Index moves it, and layers at the same number keep the layers
+/// panel's order, which never changes. Only flat: in a frame in 3D, depth
+/// decides, and the number is not used.
+public struct ZIndexAction: Codable, Sendable, Equatable {
+    public var index: Int
+
+    public init(index: Int) {
+        self.index = index
     }
 }
 
@@ -942,7 +966,7 @@ public enum PresetCorner: String, Codable, Sendable, CaseIterable {
 
 extension ActionSpec: Codable {
     private enum CodingKeys: String, CodingKey {
-        case type, move, scale, rotate, opacity, resize, visibility
+        case type, move, scale, rotate, opacity, resize, visibility, zIndex
         case color, stroke, trim, dash, cornerRadius, shadow, innerShadow, layerBlur, backgroundBlur, glass
         case letterSpacing, lineHeight, counter, changeText, arc, star, path, play, volume, skew, tilt, depth, bend, camera, template, templateSetting, preset
     }
@@ -956,6 +980,7 @@ extension ActionSpec: Codable {
         case .opacity: self = .opacity(try c.decode(OpacityAction.self, forKey: .opacity))
         case .resize: self = .resize(try c.decode(ResizeAction.self, forKey: .resize))
         case .visibility: self = .visibility(try c.decode(VisibilityAction.self, forKey: .visibility))
+        case .zIndex: self = .zIndex(try c.decode(ZIndexAction.self, forKey: .zIndex))
         case .color: self = .color(try c.decode(ColorAction.self, forKey: .color))
         case .stroke: self = .stroke(try c.decode(StrokeAction.self, forKey: .stroke))
         case .trim: self = .trim(try c.decode(TrimAction.self, forKey: .trim))
@@ -996,6 +1021,7 @@ extension ActionSpec: Codable {
         case .opacity(let v): try c.encode(v, forKey: .opacity)
         case .resize(let v): try c.encode(v, forKey: .resize)
         case .visibility(let v): try c.encode(v, forKey: .visibility)
+        case .zIndex(let v): try c.encode(v, forKey: .zIndex)
         case .color(let v): try c.encode(v, forKey: .color)
         case .stroke(let v): try c.encode(v, forKey: .stroke)
         case .trim(let v): try c.encode(v, forKey: .trim)

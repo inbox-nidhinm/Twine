@@ -27,7 +27,7 @@ public enum ActionFactory {
     /// for layers with sound: always a sound, and a video when `hasSound`
     /// says its file has a sound track (see `kinds(for:in:)`).
     public static func kinds(for layer: Layer, hasSound: Bool = false) -> [ActionKind] {
-        let transform: [ActionKind] = [.move, .scale, .rotate, .skew, .tilt, .depth, .bend, .opacity, .resize, .visibility]
+        let transform: [ActionKind] = [.move, .scale, .rotate, .skew, .tilt, .depth, .bend, .opacity, .resize, .visibility, .zIndex]
         switch layer.content {
         case .audio:
             // Sound has nothing to move or fade; it plays, louder or softer.
@@ -79,7 +79,9 @@ public enum ActionFactory {
     public static func kinds(for layer: Layer, in project: Project) -> [ActionKind] {
         // A template's slot is never drawn itself: there is nothing to animate.
         guard !project.templateSlotIDs.contains(layer.id) else { return [] }
-        return kinds(for: layer, hasSound: project.hasSound(layer))
+        let kinds = kinds(for: layer, hasSound: project.hasSound(layer))
+        // In a frame in 3D depth decides what is in front.
+        return project.space3D(holding: layer.id) == nil ? kinds : kinds.filter { $0 != .zIndex }
     }
 
     /// Kinds offered for several layers at once: those every one of them takes.
@@ -144,6 +146,9 @@ public enum ActionFactory {
         case .visibility:
             spec = .visibility(VisibilityAction(isVisible: !state.isShown))
             name = state.isShown ? "Hide" : "Show"
+        case .zIndex:
+            // In front of every sibling still at 0.
+            spec = .zIndex(ZIndexAction(index: state.zIndex + 1))
         case .color:
             spec = .color(ColorAction(end: contrasting(state.fill ?? .solid(.white))))
         case .stroke:
@@ -238,7 +243,7 @@ public enum ActionFactory {
         }
         // Counting a hundred numbers in half a second is a blur; a counter
         // gets long enough to read.
-        let length = kind == .visibility ? 0 : counting ? frameRate.snapped(counterDuration)
+        let length = kind.isAlwaysInstant ? 0 : counting ? frameRate.snapped(counterDuration)
             : kind == .volume ? frameRate.snapped(fadeDuration)
             : playing ? max(frameRate.snapped(mediaLength ?? defaultDuration), frameRate.frameDuration) : duration
         return Action(target: layer.id, start: start, duration: length, easing: easing,

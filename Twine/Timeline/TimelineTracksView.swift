@@ -1069,6 +1069,7 @@ extension ActionKind {
         case .opacity: return .opacity
         case .resize: return .resize
         case .visibility: return .eye
+        case .zIndex: return .zIndex
         case .color: return .color
         case .stroke: return .stroke
         case .trim: return .trim

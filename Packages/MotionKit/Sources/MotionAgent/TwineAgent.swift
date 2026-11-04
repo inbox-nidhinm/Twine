@@ -539,7 +539,7 @@ public final class TwineAgent {
                 action.easing = .linear
                 action.duration = max(rate.snapped(p.composition.duration - action.start), action.duration)
             }
-            if let duration, action.duration != duration, kind != .visibility { action.duration = duration }
+            if let duration, action.duration != duration, !kind.isAlwaysInstant { action.duration = duration }
             action = try finished(action, a)
             made.append(action)
         }

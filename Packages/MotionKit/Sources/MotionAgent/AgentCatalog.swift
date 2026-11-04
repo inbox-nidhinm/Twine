@@ -83,6 +83,7 @@ enum AgentCatalog {
             "An action changes one property of one layer from its start, over its duration, with an easing. With no initial value it picks up from wherever the property is at its start, which is how actions chain.",
             "values is the action's own settings, as in each kind's example below. mode \"by\" adds to the value at the start (Scale By multiplies); \"to\" is an absolute end. initial, when given, is the value it starts from, and on the first action of a property it holds from 0 s (an entrance).",
             "A layer is shown until a visibility action hides it. On one property of one layer, actions take over from each other in start order.",
+            "zIndex: a whole number, every layer at 0 until one sets it. From its start, the layer is drawn in front of the layers beside it in its group or frame with a lower number, behind those with a higher one; the same number keeps the layers' own order, which it never changes. Instant, like visibility. Not offered in a frame in 3D, where Z decides.",
             "move: end is pixels (by) or the anchor's place in the parent (to). scale: 1 is 100%. rotate: degrees clockwise. opacity: 0 to 1. resize: pixels. color: a paint. layerBlur: Figma's blur units.",
         ]
         var list: [JSONValue] = []

@@ -574,10 +574,11 @@ final class Node {
             }
             container.transform = (layer.motion.placed ?? layer.projection).caTransform
         }
-        // Siblings in a shared 3D space are drawn far to near: Core
-        // Animation orders sublayers by `zPosition`, which moves nothing
-        // here, as the transform sends no depth to the divide.
-        let depth = CGFloat(layer.placed.depth)
+        // Siblings in a shared 3D space are drawn far to near, and flat
+        // ones by their Z-Index, low to high: Core Animation orders
+        // sublayers by `zPosition` (equal ones in list order), which moves
+        // nothing here, as the transform sends no depth to the divide.
+        let depth = CGFloat(layer.drawingKey)
         if container.zPosition != depth { container.zPosition = depth }
         container.opacity = Float(layer.opacity)
         updateMotion(layer.motion, size: layer.size)

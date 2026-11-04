@@ -127,8 +127,8 @@ public enum ActionGeometry {
     /// where it used to start, keeping its mode. An empty starting value is
     /// read from `from`, what the action inherits, so it is always set
     /// afterwards. A curved Move keeps its shape, run the other way. Nil for
-    /// an action with no start and end to swap (Show, Change Text, Play,
-    /// presets), or a start the layer does not have.
+    /// an action with no start and end to swap (Show, Z-Index, Change Text,
+    /// Play, presets), or a start the layer does not have.
     public static func swappingEnds(_ action: Action, from state: LayerState) -> Action? {
         var a = action
         switch action.spec {
@@ -257,7 +257,7 @@ public enum ActionGeometry {
             guard !d.followsTrim else { return nil }
             d.direction = d.direction == .forward ? .backward : .forward
             a.spec = .dash(d)
-        case .visibility, .changeText, .play, .preset, .template:
+        case .visibility, .zIndex, .changeText, .play, .preset, .template:
             return nil
         }
         return a

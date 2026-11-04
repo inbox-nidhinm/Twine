@@ -170,11 +170,20 @@ public struct ResolvedLayer: Sendable, Equatable, Identifiable {
     /// camera, or `.none` for a layer drawn flat in its parent (tilted or
     /// not), as every layer is today.
     public var placed: Placed3D = .none
+    /// Where it is drawn among its siblings, from a Z-Index action: higher
+    /// in front, and the same number in the list's order. Always 0 in a
+    /// frame in 3D, where depth decides.
+    public var zIndex: Int = 0
     /// Degrees each way (see `Transform.skew`).
     public var skew: Vec2 { warp.skew }
     /// A turn in depth (see `Tilt`), which `transform` leaves out and
     /// `projection` has.
     public var tilt: Tilt { warp.tilt }
+
+    /// What orders it among its siblings, lowest drawn first: its depth in
+    /// a frame in 3D, or its Z-Index anywhere else (each is 0 where the
+    /// other counts). The renderer's `zPosition`.
+    public var drawingKey: Double { placed.depth + Double(zIndex) }
 
     /// A shape's fills, strokes and outline, or a frame's.
     public var look: ResolvedShape? {
@@ -465,11 +474,13 @@ public struct ResolvedMask: Sendable, Equatable {
 extension ResolvedScene {
     /// Every layer's place in `layers`, back to front as drawn: the list's
     /// own order, except that layers placed in a 3D space are drawn far to
-    /// near among their siblings, each with everything inside it, as the
-    /// renderer orders them. Layers at the same depth keep their order.
-    /// For finding what a click lands on; nothing per frame asks it.
+    /// near among their siblings, and layers with a Z-Index low to high,
+    /// each with everything inside it, as the renderer orders them (by
+    /// `drawingKey`). Layers at the same depth and number keep their order.
+    /// For finding what a click lands on and what a glass sees behind it;
+    /// nothing per frame asks it.
     public func drawingOrder() -> [Int] {
-        guard layers.contains(where: { $0.placed != .none }) else { return Array(layers.indices) }
+        guard layers.contains(where: { $0.placed != .none || $0.zIndex != 0 }) else { return Array(layers.indices) }
         var children: [UUID?: [Int]] = [:]
         let ids = Set(layers.map(\.id))
         for i in layers.indices {
@@ -482,9 +493,9 @@ extension ResolvedScene {
         out.reserveCapacity(layers.count)
         func add(_ parent: UUID?) {
             guard var list = children[parent] else { return }
-            if list.contains(where: { layers[$0].placed != .none }) {
+            if list.contains(where: { layers[$0].placed != .none || layers[$0].zIndex != 0 }) {
                 list = list.enumerated().sorted { a, b in
-                    let da = layers[a.element].placed.depth, db = layers[b.element].placed.depth
+                    let da = layers[a.element].drawingKey, db = layers[b.element].drawingKey
                     return da != db ? da < db : a.offset < b.offset
                 }.map(\.element)
             }

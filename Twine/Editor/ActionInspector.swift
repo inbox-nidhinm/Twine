@@ -410,7 +410,7 @@ private struct TimingFields: View {
                 }
                 .help("When it starts, from the beginning of the animation.")
             }
-            if first.spec.kind != .visibility {
+            if !first.spec.kind.isAlwaysInstant {
                 named("Duration") {
                     UnitField(value: frames ? Double(rate.frame(at: first.duration)) : first.duration,
                               decimals: frames ? 0 : 2, suffix: frames ? "f" : "s", accepts: { $0 >= 0 }) { v in
@@ -578,6 +578,7 @@ private struct ValueFields: View {
             case .opacity(let o): opacity(o)
             case .resize(let r): resize(r)
             case .visibility(let v): visibility(v)
+            case .zIndex(let z): zIndex(z)
             case .skew(let k): skew(k)
             case .tilt(let t): tilt(t)
             case .depth(let d): depth(d)
@@ -1084,6 +1085,21 @@ private struct ValueFields: View {
             }
         }
         .help("Hides or shows the layer at the action's start. A Show brings back a layer that was hidden or faded out.")
+    }
+
+    // MARK: Z-Index
+
+    private func zIndex(_ z: ZIndexAction) -> some View {
+        StackedRow(label: "Z-Index") {
+            UnitField(value: Double(z.index), decimals: 0, step: 1) { v in
+                controller.editActions("Z-Index") { a in
+                    guard case .zIndex(var z) = a.spec else { return }
+                    z.index = Int(v.rounded())
+                    a.spec = .zIndex(z)
+                }
+            }
+        }
+        .help("From its start, the layer is drawn in front of the layers beside it with a lower number and behind those with a higher one. Every layer is at 0; the same number keeps the layers panel's order.")
     }
 
     // MARK: Shared

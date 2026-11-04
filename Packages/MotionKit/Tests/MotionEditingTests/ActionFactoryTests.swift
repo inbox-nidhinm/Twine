@@ -90,8 +90,17 @@ import MotionEvaluation
         let audio = Layer(name: "A", content: .audio(AudioContent(mediaID: UUID())), size: Size2(0, 0), position: .zero)
         // A filled rectangle with no stroke: everything but Stroke and Trim.
         #expect(ActionFactory.kinds(for: square) == [.move, .scale, .rotate, .skew, .tilt, .depth, .bend, .opacity, .resize, .visibility,
-                                                     .color, .cornerRadius, .shadow, .innerShadow, .layerBlur, .backgroundBlur, .glass])
+                                                     .zIndex, .color, .cornerRadius, .shadow, .innerShadow, .layerBlur, .backgroundBlur, .glass])
         #expect(!ActionFactory.kinds(for: group).contains(.resize))
+        // In a frame in 3D depth orders the layers, so Z-Index is not offered.
+        let deep = Layer(name: "F", content: .group(GroupContent(children: [square], frame: FrameStyle(space: Space3D()))),
+                         size: Size2(400, 300), position: Vec2(200, 150))
+        #expect(ActionFactory.kinds(for: square, in: Project(layers: [square])).contains(.zIndex))
+        #expect(!ActionFactory.kinds(for: square, in: Project(layers: [deep])).contains(.zIndex))
+        // A new one is instant, in front of the siblings still at 0.
+        let z = make(.zIndex)
+        #expect(z.duration == 0 && z.isInstant)
+        #expect(z.spec == .zIndex(ZIndexAction(index: 1)))
         // Glass bends within an outline: an open line has none to bend in.
         let line = Layer(name: "L", content: .shape(ShapeContent(geometry: .line, fills: [])), size: Size2(100, 0), position: .zero)
         #expect(!ActionFactory.kinds(for: line).contains(.glass))

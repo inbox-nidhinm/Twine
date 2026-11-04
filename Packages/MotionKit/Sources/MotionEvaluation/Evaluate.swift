@@ -261,6 +261,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
             var camera = layer.space3D
             var loop = layer.template?.pose ?? 0
             var tuned: [String: Double] = [:]
+            var zIndex = 0
             if let cache, tracks.isStill(layer.id) {
                 made = cache.resolved(layer, parent: parent) {
                     resolve(layer, state: LayerState(design: layer), parent: parent, pictures: pictures,
@@ -273,10 +274,14 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
                 camera = state.camera.space
                 loop = state.template.phase ?? loop
                 tuned = state.template.settings
+                zIndex = state.zIndex
                 made = resolve(layer, state: state, parent: parent, pictures: pictures,
                                animation: tracks.textAnimation(of: layer, at: time), time: time, blur: blur)
             }
             guard var resolved = made else { continue }
+            // In a frame in 3D depth orders the children, so a Z-Index
+            // counts only in flat groups and frames (and the top level).
+            if space == nil { resolved.zIndex = zIndex }
             if let blur {
                 resolved.motion = motion(of: layer, resolved, tracks: tracks, at: time, blur, space: space)
             }

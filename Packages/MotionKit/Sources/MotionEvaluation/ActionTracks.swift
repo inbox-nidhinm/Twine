@@ -6,6 +6,8 @@ import MotionModel
 /// the same channel of the same layer interact (see `walk`).
 public enum Channel: String, Hashable, Sendable, CaseIterable {
     case position, scale, rotation, opacity, size, visibility
+    /// Where the layer is drawn among its siblings.
+    case zIndex
     case fill, stroke, trim, cornerRadius, shadow, innerShadow, layerBlur, backgroundBlur, glass
     case letterSpacing, lineHeight, text, arc, star, path
     case media, volume
@@ -36,6 +38,7 @@ extension ActionKind {
         case .opacity: return .opacity
         case .resize: return .size
         case .visibility: return .visibility
+        case .zIndex: return .zIndex
         case .color: return .fill
         case .stroke: return .stroke
         case .trim: return .trim
@@ -149,6 +152,9 @@ public struct LayerState: Sendable, Equatable {
     public var opacity: Double
     public var size: Size2
     public var isShown: Bool
+    /// Where it is drawn among its siblings: higher in front, 0 as designed
+    /// (see `ZIndexAction`).
+    public var zIndex: Int = 0
     /// The first fill's paint, or nil for a layer with no fill: Colour acts
     /// on nothing then.
     public var fill: Paint?
@@ -582,6 +588,7 @@ public struct ActionTracks: Sendable {
             case .dash: state.dash = walk(state.dash, list.compactMap(Self.dashStep), at: time)
             case .size: state.size = walk(state.size, list.compactMap(Self.sizeStep), at: time)
             case .visibility: state.isShown = MotionEvaluation.walk(1, Self.visibilitySteps(list), at: time) > 0.5
+            case .zIndex: state.zIndex = Int(MotionEvaluation.walk(0, list.compactMap(Self.zIndexStep), at: time).rounded())
             // Only what the layer has: a Colour on a layer with no fill does nothing.
             case .fill: if let fill = state.fill { state.fill = walk(fill, list.compactMap(Self.fillStep), at: time) }
             case .stroke: if let stroke = state.stroke { state.stroke = walk(stroke, list.compactMap(Self.strokeStep), at: time) }
@@ -821,6 +828,13 @@ public struct ActionTracks: Sendable {
     private static func depthStep(_ a: Action) -> Step<Double>? {
         guard case .depth(let d) = a.spec else { return nil }
         return Step(a, initial: d.initial, target: d.mode == .to ? { _ in d.end } : { $0 + d.end })
+    }
+
+    /// Every step instant (`ActionKind.isAlwaysInstant`), each from its start.
+    private static func zIndexStep(_ a: Action) -> Step<Double>? {
+        guard case .zIndex(let z) = a.spec else { return nil }
+        let end = Double(z.index)
+        return Step(a, initial: nil, target: { _ in end })
     }
 
     private static func templateStep(_ a: Action) -> Step<Double>? {
