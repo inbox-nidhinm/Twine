@@ -363,6 +363,9 @@ struct UnitField: View {
     /// `ScrubSurface.step(for:)`.
     var step: Double? = nil
     var accepts: (Double) -> Bool = { _ in true }
+    /// Several layers with different values: reads `Mixed` until a number
+    /// is typed, nudged or dragged, which `value` starts from.
+    var mixed = false
     let commit: (Double) -> Void
 
     @State private var text = ""
@@ -389,10 +392,16 @@ struct UnitField: View {
                 .liftedFieldText()
                 .focused($focused)
                 .onSubmit(apply)
-                .onChange(of: focused) { _, now in if !now { apply() } }
-                .onAppear { text = format(value) }
+                .onChange(of: focused) { _, now in
+                    if now && mixed { text = "" }
+                    if !now { apply() }
+                }
+                .onAppear { text = shown(value) }
                 // Follows the value unless the field holds typing of its own.
-                .onChange(of: value) { old, now in if !focused || text == format(old) { text = format(now) } }
+                .onChange(of: value) { old, now in
+                    if !focused || text == format(old) || text == Self.mixedText { text = shown(now) }
+                }
+                .onChange(of: mixed) { if !focused { text = shown(value) } }
                 .onKeyPress(keys: [.upArrow, .downArrow], phases: [.down, .repeat]) { press in
                     nudge(by: ArrowNudge.amount(press, step: step, suffix: suffix))
                     return .handled
@@ -420,12 +429,17 @@ struct UnitField: View {
         decimals == 0 ? String(Int(v.rounded())) : Self.trimmed(v, decimals)
     }
 
+    static let mixedText = "Mixed"
+
+    /// What the field reads while nothing is typed in it.
+    private func shown(_ v: Double) -> String { mixed ? Self.mixedText : format(v) }
+
     /// Up or down arrow: from the number typed (or showing) by `delta`.
     private func nudge(by delta: Double) {
         let from = number(in: text) ?? value
         let v = ArrowNudge.rounded(from + delta, decimals: decimals)
         guard v.isFinite, accepts(v) else { NSSound.beep(); return }
-        if abs(v - value) > .ulpOfOne { commit(v) }
+        if mixed || abs(v - value) > .ulpOfOne { commit(v) }
         text = format(v)
     }
 
@@ -451,14 +465,14 @@ struct UnitField: View {
         var typed = text.trimmingCharacters(in: .whitespaces)
         if !suffix.isEmpty, typed.hasSuffix(suffix) { typed.removeLast(suffix.count) }
         typed = typed.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
-        if let v = Double(typed), v.isFinite, accepts(v), abs(v - value) > .ulpOfOne {
+        if let v = Double(typed), v.isFinite, accepts(v), mixed || abs(v - value) > .ulpOfOne {
             commit(v)
             // The new value, not `value`: that still holds the old one until
             // the view updates, and showing it would put the old number back
             // the moment the field lost focus.
             text = format(v)
         } else {
-            text = format(value)
+            text = shown(value)
         }
     }
 }
@@ -476,6 +490,9 @@ struct OptionalField: View {
     var suffix: String = ""
     var step: Double? = nil
     var accepts: (Double) -> Bool = { _ in true }
+    /// Several layers with different values: greyed `Mixed` in place of the
+    /// placeholder, with `value` nil.
+    var mixed = false
     /// Nil when the field is emptied.
     let commit: (Double?) -> Void
 
@@ -495,7 +512,7 @@ struct OptionalField: View {
                     .foregroundStyle(Theme.textTertiary)
                     .fixedSize()
             }
-            TextField("", text: $text, prompt: Text(format(placeholder)).foregroundStyle(Theme.textTertiary))
+            TextField("", text: $text, prompt: Text(mixed ? UnitField.mixedText : format(placeholder)).foregroundStyle(Theme.textTertiary))
                 .textFieldStyle(.plain)
                 .font(ThemeFont.label)
                 .monospacedDigit()

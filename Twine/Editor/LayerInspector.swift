@@ -62,9 +62,9 @@ struct LayerInspector: View {
             }
             if case .text(let text) = layer.content {
                 PanelDivider()
-                TextSection(layer: layer, text: text, controller: controller)
+                TextSection(layers: [layer], controller: controller)
                 PanelDivider()
-                TextFillSection(layer: layer, text: text, controller: controller)
+                TextFillSection(layers: [layer], controller: controller)
                 PanelDivider()
                 TextStrokeSection(layer: layer, text: text, controller: controller)
             }
@@ -598,7 +598,7 @@ private struct FillSection: View {
             } else {
                 PaintEditor(paint: fill.paint, isEnabled: fill.isEnabled, controller: controller, layer: layer,
                             title: "Fill", slot: .fill(i),
-                            change: { paint in editedShape { s in if s.fills.indices.contains(i) { s.fills[i].paint = paint } } },
+                            change: { paint in [editedShape { s in if s.fills.indices.contains(i) { s.fills[i].paint = paint } }] },
                             toggle: { editShape { s in if s.fills.indices.contains(i) { s.fills[i].isEnabled.toggle() } } })
             }
         }
@@ -772,7 +772,7 @@ private struct StrokeSection: View {
                                     var s = shape
                                     if s.strokes.indices.contains(i) { s.strokes[i].paint = paint }
                                     l.look = s
-                                    return l
+                                    return [l]
                                 },
                                 toggle: { editShape { s in if s.strokes.indices.contains(i) { s.strokes[i].isEnabled.toggle() } } },
                                 showsToggle: true)
@@ -951,8 +951,9 @@ struct PaintEditor: View {
     let title: String
     /// Which of the layer's paints this is, for its gradient's handles.
     var slot: PaintSlot? = nil
-    /// Builds the whole edited layer for a new paint.
-    let change: (Paint) -> Layer
+    /// Builds the whole edited layers for a new paint: the layer, or every
+    /// selected text when they are edited together.
+    let change: (Paint) -> [Layer]
     let toggle: () -> Void
     /// Puts show and hide on the first colour row, in the button column.
     var showsToggle = false
@@ -972,8 +973,8 @@ struct PaintEditor: View {
                     }
                 },
                 edit: GradientCallbacks(
-                    commit: { controller.perform(.updateLayers([change(paint.withGradient($0))])) },
-                    live: { controller.update([change(paint.withGradient($0))]) },
+                    commit: { controller.perform(.updateLayers(change(paint.withGradient($0)))) },
+                    live: { controller.update(change(paint.withGradient($0))) },
                     begin: { controller.begin($0) },
                     end: { controller.end() }),
                 barButton: {
@@ -1002,14 +1003,14 @@ struct PaintEditor: View {
     private func colorFields(_ color: RGBA, _ make: @escaping (RGBA) -> Paint) -> some View {
         HStack(spacing: 6) {
             ColorWell(color: color, size: Theme.control, title: title,
-                      onChange: { controller.update([change(make($0))]) },
+                      onChange: { controller.update(change(make($0))) },
                       onBegin: { controller.begin("Colour") },
                       onEnd: { controller.end() })
-            HexField(color: color) { controller.perform(.updateLayers([change(make($0))])) }
+            HexField(color: color) { controller.perform(.updateLayers(change(make($0)))) }
             UnitField(value: color.a * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
                 var c = color
                 c.a = v / 100
-                controller.perform(.updateLayers([change(make(c))]))
+                controller.perform(.updateLayers(change(make(c))))
             }
             .frame(width: 58)
             .help("Opacity of this colour")
