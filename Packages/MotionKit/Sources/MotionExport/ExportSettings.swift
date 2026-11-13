@@ -2,8 +2,8 @@ import Foundation
 import CoreMedia
 import MotionModel
 
-/// What an export writes: a movie in one of five codecs, or the frame under
-/// the playhead as a picture.
+/// What an export writes: a movie in one of five codecs, a GIF or WebM, a
+/// Lottie animation, or the frame under the playhead as a picture.
 public enum ExportFormat: String, Codable, Sendable, CaseIterable {
     case h264
     case hevc
@@ -16,6 +16,11 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
     /// VP9 in WebM, for the web, with Opus sound; made by the ffmpeg
     /// installed on the Mac.
     case webm
+    /// A Lottie animation as JSON, for the web and apps: vectors, played by
+    /// a Lottie player at any size.
+    case lottie
+    /// The same zipped with its pictures, as LottieFiles prefers.
+    case dotLottie
     case png
 
     public var title: String {
@@ -27,6 +32,8 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
         case .proRes4444: "MOV (ProRes 4444)"
         case .gif: "GIF (animated)"
         case .webm: "WebM (VP9)"
+        case .lottie: "Lottie (JSON)"
+        case .dotLottie: "dotLottie"
         case .png: "PNG (current frame)"
         }
     }
@@ -37,14 +44,22 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
         case .hevcAlpha, .proRes422, .proRes4444: "mov"
         case .gif: "gif"
         case .webm: "webm"
+        case .lottie: "json"
+        case .dotLottie: "lottie"
         case .png: "png"
         }
     }
 
+    /// Whether it holds the animation over time (its frame rate and range
+    /// apply), rather than one frame.
     public var isMovie: Bool { self != .png }
 
+    /// A Lottie, drawn as vectors at whatever size it is played, so it has
+    /// no size of its own to choose.
+    public var isLottie: Bool { self == .lottie || self == .dotLottie }
+
     /// Whether the file can carry the project's sound.
-    public var carriesSound: Bool { isMovie && self != .gif }
+    public var carriesSound: Bool { isMovie && self != .gif && !isLottie }
 
     /// Made by the ffmpeg installed on the Mac rather than by macOS.
     public var needsFFmpeg: Bool { self == .webm }
@@ -57,7 +72,7 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
     /// drawn over the background colour, which is kept for exactly this.
     public var keepsTransparency: Bool {
         switch self {
-        case .hevcAlpha, .proRes4444, .png, .gif, .webm: true
+        case .hevcAlpha, .proRes4444, .png, .gif, .webm, .lottie, .dotLottie: true
         case .h264, .hevc, .proRes422: false
         }
     }
@@ -67,7 +82,7 @@ public enum ExportFormat: String, Codable, Sendable, CaseIterable {
     public var hasQuality: Bool {
         switch self {
         case .h264, .hevc, .hevcAlpha: true
-        case .proRes422, .proRes4444, .png, .gif, .webm: false
+        case .proRes422, .proRes4444, .png, .gif, .webm, .lottie, .dotLottie: false
         }
     }
 }

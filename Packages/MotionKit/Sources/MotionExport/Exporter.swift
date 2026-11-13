@@ -58,6 +58,17 @@ public final class ExportJob: Sendable {
     public var isCancelled: Bool { cancelled.withLock { $0 } }
 }
 
+/// What an export could not hold, to tell the person.
+public struct ExportOutcome: Sendable, Equatable {
+    /// What a Lottie left out (shadows, blur, video), by name; empty for
+    /// every other format, which draws everything.
+    public var leftOut: [String] = []
+
+    public init(leftOut: [String] = []) {
+        self.leftOut = leftOut
+    }
+}
+
 /// Writes exports. Everything here blocks until the file is written, and is
 /// meant to run off the main thread. Frames are drawn one after another from
 /// `evaluate`, never from playback, so a slow machine takes longer but writes
@@ -74,10 +85,11 @@ public enum Exporter {
     /// from the exporting thread after each frame, from 0 to 1.
     /// `media` locates each imported file by its id, for pictures, video
     /// frames and sound. `ffmpeg` is the ffmpeg that makes WebM.
+    @discardableResult
     public static func export(_ project: Project, settings: ExportSettings, at time: Double = 0,
                               frames: Range<Int>? = nil, to url: URL,
                               media: [UUID: URL] = [:], ffmpeg: URL? = nil, job: ExportJob = ExportJob(),
-                              progress: (Double) -> Void = { _ in }) throws {
+                              progress: (Double) -> Void = { _ in }) throws -> ExportOutcome {
         var project = project
         project.composition = settings.exported(project.composition)
         if !settings.format.keepsTransparency {
@@ -90,7 +102,12 @@ public enum Exporter {
         let temporary = folder.appendingPathComponent(url.lastPathComponent)
 
         let library = MediaLibrary(locate: { media[$0] })
-        if settings.format == .gif {
+        var outcome = ExportOutcome()
+        if settings.format.isLottie {
+            outcome.leftOut = try writeLottie(project, settings: settings, frames: frames, library: library, media: media,
+                                              name: url.deletingPathExtension().lastPathComponent, to: temporary,
+                                              job: job, progress: progress)
+        } else if settings.format == .gif {
             try writeGIF(project, settings: settings, frames: frames, library: library, to: temporary, job: job,
                          progress: progress)
         } else if settings.format == .webm {
@@ -111,6 +128,31 @@ public enum Exporter {
         } else {
             try fileManager.moveItem(at: temporary, to: url)
         }
+        return outcome
+    }
+
+    // MARK: Lottie
+
+    /// A Lottie of the composition (or `frames` of it): JSON with its
+    /// pictures inside, or a dotLottie with them beside it. Returns what it
+    /// left out.
+    private static func writeLottie(_ project: Project, settings: ExportSettings, frames: Range<Int>?,
+                                    library: MediaLibrary, media: [UUID: URL], name: String, to url: URL,
+                                    job: ExportJob, progress: (Double) -> Void) throws -> [String] {
+        let timing = ExportTiming(project.composition, frames: frames)
+        let writer = LottieWriter(project: project, timing: timing, media: media, library: library,
+                                  embedsImages: settings.format == .lottie)
+        let animation = try writer.write(name: name, job: job, progress: progress).data
+        if job.isCancelled { throw ExportError.cancelled }
+        let file = settings.format == .lottie
+            ? animation
+            : DotLottie.archive(animation: animation, id: "animation", images: writer.images)
+        do {
+            try file.write(to: url)
+        } catch {
+            throw ExportError.failed("The file couldn't be saved.")
+        }
+        return writer.leftOut
     }
 
     // MARK: Still
@@ -452,7 +494,7 @@ public enum Exporter {
             output[AVVideoCodecKey] = AVVideoCodecType.proRes422
         case .proRes4444:
             output[AVVideoCodecKey] = AVVideoCodecType.proRes4444
-        case .png, .gif, .webm:
+        case .png, .gif, .webm, .lottie, .dotLottie:
             break
         }
         return output

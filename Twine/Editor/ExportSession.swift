@@ -29,6 +29,9 @@ final class ExportSession {
     /// The last file the export panel wrote, kept while the panel is up for
     /// Export Again and Show in Finder.
     private(set) var completed: URL?
+    /// What the last export left out (a Lottie's shadows, blur, video), by
+    /// name, while the panel shows it.
+    private(set) var leftOut: [String] = []
     /// The progress the last export reached, kept after it ends so the panel's
     /// counter can leave showing where it got to.
     private(set) var lastProgress: Double = 0
@@ -101,6 +104,7 @@ final class ExportSession {
     func forgetCompleted() {
         completed = nil
         finished = nil
+        leftOut = []
     }
 
     private func run(_ project: Project, settings: ExportSettings, time: Double, frames: Range<Int>?, to url: URL,
@@ -109,6 +113,7 @@ final class ExportSession {
         self.job = job
         finished = nil
         completed = nil
+        leftOut = []
         progress = 0
         let ffmpeg = WebMConversion.tool("ffmpeg")
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -129,15 +134,16 @@ final class ExportSession {
         }
     }
 
-    private func end(_ ended: ExportJob, result: Result<Void, Error>, url: URL) {
+    private func end(_ ended: ExportJob, result: Result<ExportOutcome, Error>, url: URL) {
         guard job === ended else { return }
         job = nil
         lastProgress = progress ?? 0
         progress = nil
         switch result {
-        case .success:
+        case .success(let outcome):
             lastProgress = 1
             completed = url
+            leftOut = outcome.leftOut
             if AppSettings.shared.revealsExports { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             finished = url
             finishedToken += 1
@@ -184,6 +190,8 @@ extension ExportFormat {
         case .proRes4444: "ProRes 4444"
         case .gif: "GIF"
         case .webm: "WebM"
+        case .lottie: "Lottie"
+        case .dotLottie: "dotLottie"
         case .png: "PNG frame"
         }
     }

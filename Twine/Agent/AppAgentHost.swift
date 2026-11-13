@@ -195,7 +195,7 @@ final class AppAgentHost: AgentHost {
         try await withCheckedThrowingContinuation { [project, settings, media] (done: CheckedContinuation<Void, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 done.resume(with: Result {
-                    try Exporter.export(project, settings: settings, at: time, frames: frames, to: url, media: media, ffmpeg: ffmpeg)
+                    _ = try Exporter.export(project, settings: settings, at: time, frames: frames, to: url, media: media, ffmpeg: ffmpeg)
                 })
             }
         }

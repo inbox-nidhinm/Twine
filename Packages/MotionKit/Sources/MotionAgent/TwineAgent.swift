@@ -794,9 +794,11 @@ public final class TwineAgent {
         let formats: [String: ExportFormat] = [
             "mp4": .h264, "h264": .h264, "hevc": .hevc, "hevc-alpha": .hevcAlpha, "hevcalpha": .hevcAlpha,
             "prores": .proRes422, "prores422": .proRes422, "prores4444": .proRes4444, "mov": .proRes422,
-            "gif": .gif, "webm": .webm, "png": .png,
+            "gif": .gif, "webm": .webm, "lottie": .lottie, "json": .lottie, "dotlottie": .dotLottie, "png": .png,
         ]
-        guard let format = formats[name] else { throw AgentError("format is one of mp4, hevc, hevc-alpha, prores, prores4444, gif, webm or png") }
+        guard let format = formats[name] else {
+            throw AgentError("format is one of mp4, hevc, hevc-alpha, prores, prores4444, gif, webm, lottie, dotlottie or png")
+        }
         let url = a.string("path").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
         let start = try a.number("start"), end = try a.number("end")
         var range: ClosedRange<Double>?

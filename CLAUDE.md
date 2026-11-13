@@ -47,7 +47,7 @@ Ad-hoc signed (`CODE_SIGN_IDENTITY = "-"`), no App Sandbox (ffmpeg and any chose
 | `Packages/MotionKit/Sources/MotionEditing` | `EditorCommand` (every allowed change, including actions), `ProjectStore` (applies commands, snapshot undo, continuous changes), `Arrangement` (group, ungroup, restack, carrying actions along), `LayerFactory`, `LayerEditing` | Foundation, MotionModel, MotionEvaluation |
 | `Packages/MotionKit/Sources/MotionEvaluation` | `evaluate(project, at:)`, `evaluateDesign(project)` and `ResolvedScene`: `ActionTracks` (the action rules), easing presets, springs, OKLab blending, shape paths, `Affine`, `TextLayout` (Core Text: fonts, fallback, line placement, measuring), `NumberFormat` (counters) | Foundation, CoreText, MotionModel |
 | `Packages/MotionKit/Sources/MotionRendering` | `SceneRenderer`, `CoreAnimationRenderer`, `OffscreenRenderer` (CARenderer into Metal, for thumbnails, stills and every exported frame), `MediaLibrary` (pictures and video frames) | QuartzCore, Metal, AVFoundation |
-| `Packages/MotionKit/Sources/MotionExport` | `ExportSettings` (format, scale, quality, audio), `ExportTiming` (frame times as exact fractions), `Exporter` (AVAssetWriter movies and PNG stills), `AudioComposition`/`AudioMixdown` (sound), `ExportJob` (cancel) | AVFoundation, VideoToolbox, ImageIO, Accelerate |
+| `Packages/MotionKit/Sources/MotionExport` | `ExportSettings` (format, scale, quality, audio), `ExportTiming` (frame times as exact fractions), `Exporter` (AVAssetWriter movies and PNG stills), `AudioComposition`/`AudioMixdown` (sound), `ExportJob` (cancel), `Lottie/` (`LottieWriter`, Lottie JSON and dotLottie) | AVFoundation, VideoToolbox, ImageIO, Accelerate, CoreText, Compression |
 | `Packages/MotionKit/Sources/MotionImport` | `SVGImport.read` (an SVG into a frame of layers, with the pictures it carries or that were drawn from it), its path data, style, transform and Figma filter readers, and `SVGPictures` (the system's own SVG drawing, for text) | Foundation, AppKit (SVG drawing only), CryptoKit, MotionModel, MotionEvaluation, MotionEditing |
 | `Packages/MotionKit/Sources/MotionAgent` | `TwineAgent` (the AI tools, every change an `EditorCommand`), `MCPServer` (MCP's JSON-RPC, one message a line, no state), `AgentHost` (what the app provides), `JSONValue` (merge patches), `AgentCatalog` (`describe`) | Foundation, MotionModel, MotionEvaluation, MotionEditing, MotionExport |
 | `Packages/MotionKit/Sources/Theme` | Tokens, type, grain, icons (`Icons.swift` is generated) | SwiftUI |
@@ -77,7 +77,7 @@ Everything else is in `docs/decisions/`, one file a topic. **Before working on a
 | `docs/decisions/inspector.md` | The layer inspector, The inspector's grid, Dragging numbers, Arrow keys in number fields, Fields, Colour picking |
 | `docs/decisions/app.md` | The window's size, One window, Home folders, Search, Settings, Onboarding, Opening card, The window chrome, Focus, Saving, Menus |
 | `docs/decisions/import-and-ai.md` | AI apps through MCP, The Figma plugin, SVG import |
-| `docs/decisions/media-and-export.md` | Media, GIF and WebM, Export |
+| `docs/decisions/media-and-export.md` | Media, GIF and WebM, Export, Lottie |
 | `docs/decisions/timeline.md` | Timeline |
 
 ## Performance

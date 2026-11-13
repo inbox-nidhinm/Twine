@@ -119,8 +119,10 @@ struct ExportPanel: View {
             Text("Export format")
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
-            MenuField(value: sizeTitle, entries: sizeEntries)
-            if typesSize {
+            if !settings.format.isLottie {
+                MenuField(value: sizeTitle, entries: sizeEntries)
+            }
+            if typesSize && !settings.format.isLottie {
                 UnitField(unit: "Scale", value: shownPercent, decimals: 1, suffix: "%",
                           accepts: { $0 >= ExportSettings.minScale * 100 && $0 <= largestPercent + 1e-9 }) { v in
                     session.settings.scale = v / 100
@@ -133,6 +135,8 @@ struct ExportPanel: View {
                     .help("H.264, HEVC and ProRes 422 have no transparency, so a transparent background "
                           + "exports as its colour. HEVC with alpha, ProRes 4444, WebM and PNG keep it; a GIF keeps it "
                           + "only fully or not at all, and has no sound. WebM is made by ffmpeg. "
+                          + "Lottie and dotLottie are vector animations for the web and apps, played at any size; "
+                          + "blur, shadows, glass, video and 3D are left out of them. "
                           + "A PNG is the frame under the playhead, or in Design, the layout as designed.")
                 if isMovie {
                     MenuField(value: "\(exportRate.label) fps", entries: rateEntries)
@@ -188,6 +192,14 @@ struct ExportPanel: View {
                 }
                 .buttonStyle(.plain)
                 .help(url.lastPathComponent)
+            }
+            if !session.leftOut.isEmpty, !session.isExporting {
+                Text("Left out: \(session.leftOut.joined(separator: ", "))")
+                    .font(ThemeFont.label)
+                    .foregroundStyle(Theme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .help("Lottie players can't draw these, so the file has everything else without them.")
             }
         }
         .padding(Theme.panelPad)
@@ -273,7 +285,8 @@ struct ExportPanel: View {
     private var largestPercent: Double { ExportSettings.largestScale(for: composition) * 100 }
 
     private func formatEntries() -> [MenuEntry] {
-        let groups: [[ExportFormat]] = [[.h264, .hevc], [.hevcAlpha, .proRes422, .proRes4444], [.gif, .webm], [.png]]
+        let groups: [[ExportFormat]] = [[.h264, .hevc], [.hevcAlpha, .proRes422, .proRes4444], [.gif, .webm],
+                                         [.lottie, .dotLottie], [.png]]
         // WebM is made by ffmpeg; without it, it is shown but not offered.
         let hasFFmpeg = WebMConversion.tool("ffmpeg") != nil
         return groups.enumerated().flatMap { index, formats in
