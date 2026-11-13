@@ -32,6 +32,15 @@ struct ExportPanel: View {
     @State private var showsCounter = false
     /// Whether the size is typed as a percentage rather than picked.
     @State private var typesSize = false
+    /// What a Lottie of this project leaves out, shown over the preview when
+    /// Lottie is chosen and after a Lottie export.
+    @State private var lottieNotice: Notice?
+    /// Which look at the project is the latest, so an older one finishing
+    /// late never shows.
+    @State private var lottieCheck = 0
+    /// Counts notices shown, so one going after its time never takes a
+    /// newer one with it.
+    @State private var lottieShown = 0
 
     private var settings: ExportSettings { session.settings }
     private var composition: Composition { controller.project.composition }
@@ -78,6 +87,10 @@ struct ExportPanel: View {
         }
         .onChange(of: session.settings) { _, _ in fitPlayer() }
         .onChange(of: session.range) { _, _ in fitPlayer() }
+        .onChange(of: session.settings.format) { _, _ in checkLottie() }
+        .onChange(of: session.completed) { _, url in
+            if url != nil, settings.format.isLottie { showLottieNotice(session.leftOut) }
+        }
     }
 
     // MARK: Settings
@@ -193,14 +206,7 @@ struct ExportPanel: View {
                 .buttonStyle(.plain)
                 .help(url.lastPathComponent)
             }
-            if !session.leftOut.isEmpty, !session.isExporting {
-                Text("Left out: \(session.leftOut.joined(separator: ", "))")
-                    .font(ThemeFont.label)
-                    .foregroundStyle(Theme.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .help("Lottie players can't draw these, so the file has everything else without them.")
-            }
+
         }
         .padding(Theme.panelPad)
     }
@@ -229,6 +235,53 @@ struct ExportPanel: View {
             .animation(Theme.exportEase, value: showsCounter)
         }
         .clipped()
+        .overlay(alignment: .top) {
+            if let lottieNotice {
+                NoticeCard(notice: lottieNotice) { self.lottieNotice = nil }
+                    .help("Lottie players can't draw these, so the file has everything else without them.")
+                    .padding(Theme.floatInset)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.18), value: lottieNotice)
+    }
+
+    // MARK: What a Lottie leaves out
+
+    /// Looks, off the main thread, at what a Lottie of the project as it is
+    /// would leave out, and says so over the preview.
+    private func checkLottie() {
+        lottieCheck += 1
+        guard settings.format.isLottie else {
+            lottieNotice = nil
+            return
+        }
+        let token = lottieCheck
+        let project = controller.project
+        let exported = settings.exported(project.composition)
+        let frames = session.range.map { ExportTiming.frames(from: $0.lowerBound, to: $0.upperBound, in: exported) }
+        var timed = project
+        timed.composition = exported
+        Task.detached(priority: .userInitiated) {
+            let leftOut = LottieCheck.leftOut(timed, frames: frames)
+            await MainActor.run {
+                guard token == lottieCheck, settings.format.isLottie else { return }
+                showLottieNotice(leftOut)
+            }
+        }
+    }
+
+    private func showLottieNotice(_ leftOut: [String]) {
+        guard !leftOut.isEmpty else {
+            lottieNotice = nil
+            return
+        }
+        lottieNotice = Notice(text: "Lottie leaves out: \(leftOut.joined(separator: ", "))", state: .note)
+        lottieShown += 1
+        let shown = lottieShown
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
+            if lottieShown == shown { lottieNotice = nil }
+        }
     }
 
     // MARK: Setting up
@@ -240,6 +293,7 @@ struct ExportPanel: View {
         editor.exportPlayer = made
         typesSize = !ExportSettings.scales.contains(settings.scale)
         fitPlayer()
+        checkLottie()
         if session.isExporting {
             percent = Int(((session.progress ?? 0) * 100).rounded(.down))
             showsCounter = true

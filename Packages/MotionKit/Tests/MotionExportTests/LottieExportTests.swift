@@ -259,6 +259,9 @@ private func scene() -> (project: Project, square: UUID, group: UUID) {
         let (url, outcome) = try export(project, as: .lottie)
         defer { try? FileManager.default.removeItem(at: url) }
         #expect(outcome.leftOut == ["Shadows"])
+        // The quick look the export panel takes says the same beforehand.
+        #expect(LottieCheck.leftOut(project) == ["Shadows"])
+        #expect(LottieCheck.leftOut(scene().project).isEmpty)
     }
 
     @Test func dotLottieHoldsTheAnimation() throws {

@@ -58,7 +58,7 @@ final class LottieWriter {
     private var recordings: [UUID: Recording] = [:]
     /// Where each layer is drawn among its siblings at the first frame.
     private var rank: [UUID: Int] = [:]
-    private var omissions = Set<LottieOmission>()
+    private var omissions = LottieOmissions()
     private var comps: [(id: String, name: String, plans: [Plan])] = []
     private(set) var images: [LottieImage] = []
     private var imageIDs: [UUID: Int] = [:]
@@ -73,7 +73,7 @@ final class LottieWriter {
     }
 
     /// What was left out, in a fixed order.
-    var leftOut: [String] { LottieOmission.allCases.filter(omissions.contains).map(\.rawValue) }
+    var leftOut: [String] { omissions.names }
 
     // MARK: Recording
 
@@ -118,15 +118,15 @@ final class LottieWriter {
             for layer in scene.layers {
                 let world = scene.worldProjection(of: layer.id).flatMap { LottieGeometry.flat($0, over: layer.size) }
                 recording(layer.id).record(Sample(layer: layer, world: world), at: f)
-                note(layer)
+                omissions.note(layer)
             }
             for mask in scene.masks {
                 recording(mask.id).record(Sample(layer: mask, world: nil), at: f)
-                note(mask)
+                omissions.note(mask)
             }
             let order = scene.drawingOrder().map { scene.layers[$0].id }
             if let firstOrder {
-                if order != firstOrder.filter(Set(order).contains) { omissions.insert(.order) }
+                if order != firstOrder.filter(Set(order).contains) { omissions.found.insert(.order) }
             } else {
                 firstOrder = order
                 for (i, id) in order.enumerated() { rank[id] = i }
@@ -140,43 +140,6 @@ final class LottieWriter {
         let made = Recording(count: frameCount)
         recordings[id] = made
         return made
-    }
-
-    /// Notes what a layer has that a Lottie cannot draw.
-    private func note(_ layer: ResolvedLayer) {
-        if !layer.shadows.isEmpty || !layer.innerShadows.isEmpty { omissions.insert(.shadows) }
-        if layer.blur > 0 { omissions.insert(.blur) }
-        if layer.backgroundBlur != nil { omissions.insert(.backgroundBlur) }
-        if layer.glass != .none { omissions.insert(.glass) }
-        if layer.curl != .none { omissions.insert(.pageCurls) }
-        if layer.motion != .none { omissions.insert(.motionBlur) }
-        if layer.placed != .none || layer.warp.tilt.isTilted || layer.warp.bend != .zero { omissions.insert(.depth) }
-        if layer.blendMode == .linearBurn { omissions.insert(.linearBurn) }
-        switch layer.content {
-        case .video: omissions.insert(.video)
-        case .text(let t):
-            for unit in t.units {
-                if unit.blur > 0 { omissions.insert(.blur) }
-                if unit.motion != .none { omissions.insert(.motionBlur) }
-                if !unit.transform.isAffine { omissions.insert(.depth) }
-            }
-        case .shape, .group: break
-        }
-        if let look = layer.look {
-            for paint in look.fills { note(paint) }
-            for stroke in look.strokes {
-                if case .image = stroke.paint { omissions.insert(.pictureStrokes) } else { note(stroke.paint) }
-            }
-        }
-    }
-
-    private func note(_ paint: ResolvedPaint) {
-        switch paint {
-        case .angular: omissions.insert(.angularGradients)
-        case .radial(_, _, _, let aspect): if abs(aspect - 1) > 1e-6 { omissions.insert(.ovalGradients) }
-        case .image(let image): if image.tiles { omissions.insert(.tiledPictures) }
-        case .solid, .linear: break
-        }
     }
 
     // MARK: Writing
