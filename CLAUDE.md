@@ -74,7 +74,7 @@ Everything else is in `docs/decisions/`, one file a topic. **Before working on a
 | `docs/decisions/look.md` | Frames, Blend modes and shadows, Pictures are fills, Replace and cropping, Fills, strokes and effects are lists, Gradients, Copy and Paste Style, Arc and Star, Corner radius on any shape, Masks, Blur, Glass |
 | `docs/decisions/text.md` | Text |
 | `docs/decisions/canvas.md` | The pen and point editing, Canvas, The tool bar, Canvas outlines, The anchor, Snapping and alignment |
-| `docs/decisions/inspector.md` | The layer inspector, The inspector's grid, Dragging numbers, Arrow keys in number fields, Fields, Colour picking |
+| `docs/decisions/inspector.md` | The layer inspector, Several layers selected, The inspector's grid, Dragging numbers, Arrow keys in number fields, Fields, Colour picking, Selection colours |
 | `docs/decisions/app.md` | The window's size, One window, Home folders, Search, Settings, Onboarding, Opening card, The window chrome, Focus, Saving, Menus |
 | `docs/decisions/import-and-ai.md` | AI apps through MCP, The Figma plugin, SVG import |
 | `docs/decisions/media-and-export.md` | Media, GIF and WebM, Export, Lottie |

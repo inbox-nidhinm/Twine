@@ -74,6 +74,10 @@ struct LayerInspector: View {
                 PanelDivider()
                 StrokeSection(layer: layer, shape: look, controller: controller)
             }
+            // Every colour inside a group or frame, as Figma lists them.
+            if layer.isGroup && layer.template == nil {
+                SelectionColorsSection(ids: [layer.id], controller: controller)
+            }
             PanelDivider()
             EffectsSection(layer: layer, controller: controller)
             // Masks are made from the layers' right-click menu, as in Figma;

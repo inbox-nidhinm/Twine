@@ -61,7 +61,8 @@ struct InspectorPanel: View {
     // MARK: Several layers
 
     /// What several layers have in common to change together: lining them
-    /// up, and how they mix and show; for texts, their type and colour too.
+    /// up, and how they mix and show; for texts, their type and colour too;
+    /// and every colour they use.
     private func multipleSelection(_ layers: [Layer]) -> some View {
         let values = layers.map(\.opacity)
         let shared = values.allSatisfy { abs($0 - values[0]) < 1e-9 } ? values[0] : values.max() ?? 1
@@ -93,6 +94,7 @@ struct InspectorPanel: View {
                 PanelDivider()
                 TextFillSection(layers: layers, controller: controller)
             }
+            SelectionColorsSection(ids: layers.map(\.id), controller: controller)
         }
     }
 
