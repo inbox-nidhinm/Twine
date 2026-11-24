@@ -19,7 +19,9 @@ struct Arguments {
     func string(_ key: String) -> String? {
         switch self[key] {
         case .string(let s)?: return s
-        case .number(let n)?: return n.rounded() == n ? String(Int(n)) : String(n)
+        // A whole number reads without its ".0", while it is one an `Int`
+        // holds: past that, converting stops the app.
+        case .number(let n)?: return n.rounded() == n && abs(n) < 1e15 ? String(Int(n)) : String(n)
         default: return nil
         }
     }

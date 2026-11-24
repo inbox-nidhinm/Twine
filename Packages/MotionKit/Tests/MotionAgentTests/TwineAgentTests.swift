@@ -258,6 +258,21 @@ struct TwineAgentTests {
         #expect(host.exported?.scale == 0.5)
     }
 
+    /// Arguments an AI app might well send, which once stopped the app.
+    @Test func oddArgumentsAreRefusedNotFatal() async throws {
+        let host = TestHost()
+        let agent = TwineAgent(host: host)
+        for fps in [0, -30, 1e12] {
+            #expect(await refusal(agent, "export", ["format": "mp4", "fps": .number(fps)]).contains("fps"))
+        }
+        #expect(host.exported == nil)
+        _ = try await call(agent, "export", ["format": "mp4", "fps": 24])
+        #expect(host.exported?.frameRate == 24)
+        // A text argument given as a number too large to be a whole one.
+        #expect(!(await refusal(agent, "add_layer", ["type": 1e30])).isEmpty)
+        #expect(!(await refusal(agent, "update_layers", ["layer_ids": [1e30], "name": "X"])).isEmpty)
+    }
+
     @Test func anExportIntoAFolderGoesInsideIt() throws {
         let files = FileManager.default
         let folder = files.temporaryDirectory.appendingPathComponent("Twine-agent-\(UUID().uuidString)")

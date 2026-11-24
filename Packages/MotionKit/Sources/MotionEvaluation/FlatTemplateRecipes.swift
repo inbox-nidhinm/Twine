@@ -202,7 +202,7 @@ extension TemplateRecipes {
         let cell = vertical ? Size2(side * 4 / 3, side) : Size2(side, side * 4 / 3)
         let pitch = (vertical ? cell.height : cell.width) * (1 + s.f("gap"))
         let reach = (vertical ? k.h : k.w) * 1.6
-        let copies = max(Int((reach / (Double(n) * pitch)).rounded(.up)), 1)
+        let copies = max(fit((reach / (Double(n) * pitch)).rounded(.up)), 1)
         let count = n * copies, length = Double(count) * pitch
         let along = turned(p, steps: s.c("motion") == "stop" ? count : nil) * length
         let c = s.f("curve")
@@ -298,7 +298,7 @@ extension TemplateRecipes {
         let width = s.f("cardSize") * k.u
         let cell = k.cell(width)
         let pitch = width * (1 - s.f("overlap") * 0.9)
-        let copies = max(Int((hypot(k.w, k.h) * 1.4 / (Double(n) * pitch)).rounded(.up)), 1)
+        let copies = max(fit((hypot(k.w, k.h) * 1.4 / (Double(n) * pitch)).rounded(.up)), 1)
         let count = n * copies, length = Double(count) * pitch
         let along = turned(p, steps: s.c("motion") == "step" ? count : nil) * length
         let dir = s.c("direction") == "upRight" ? Vec2(0.8, -0.6) : Vec2(0.8, 0.6)
@@ -346,7 +346,7 @@ extension TemplateRecipes {
         for row in 0..<rows {
             let widths = (0..<shape.count).map { shape[($0 + row * 2) % shape.count] * h }
             let once = widths.reduce(0, +) + gap * Double(widths.count)
-            let copies = max(Int((k.w * 1.5 / once).rounded(.up)), 1)
+            let copies = max(fit((k.w * 1.5 / once).rounded(.up)), 1)
             let length = once * Double(copies)
             let way: Double = (s.c("direction") == "right") != (row % 2 == 1) ? -1 : 1
             let y = gap + h / 2 + Double(row) * (h + gap)
@@ -492,7 +492,7 @@ extension TemplateRecipes {
         let pitch = cell.width * (1 + s.f("gap"))
         let rowPitch = h * (1 + s.f("gap"))
         let span = hypot(k.w, k.h) * 1.3
-        let per = max(Int((span / pitch).rounded(.up)) + 1, 2)
+        let per = max(fit((span / pitch).rounded(.up)) + 1, 2)
         let length = Double(per) * pitch
         let turn = tilted ? 0 : rad(s.n("tilt"))
         var cards: [TemplateCard] = []
@@ -517,7 +517,7 @@ extension TemplateRecipes {
         let w = (k.w - g * Double(columns + 1)) / Double(columns)
         let cell = Size2(w, w * 1.25)
         let pitch = cell.height + g
-        let per = max(Int((k.h * 1.6 / pitch).rounded(.up)) + 1, 2)
+        let per = max(fit((k.h * 1.6 / pitch).rounded(.up)) + 1, 2)
         let length = Double(per) * pitch
         var cards: [TemplateCard] = []
         for c in 0..<columns {

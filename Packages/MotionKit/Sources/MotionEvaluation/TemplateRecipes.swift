@@ -312,10 +312,32 @@ public enum TemplateRecipes {
     /// The template at `phase` in a frame of `size`, with `slots` slots
     /// (its frame's children; a new template's count when not given).
     public static func scene(_ setup: TemplateSetup, phase: Double, size: Size2, slots: Int? = nil) -> TemplateScene {
+        var scene = made(setup, phase: phase, size: size, slots: slots)
+        if scene.cards.count > maxCards { scene.cards.removeLast(scene.cards.count - maxCards) }
+        return scene
+    }
+
+    /// The most cards a template ever makes. Recipes fill the frame with as
+    /// many cards as fit, so a frame resized to a sliver (1920 by 1) asks
+    /// for tens of thousands; no real template comes near this many.
+    public static let maxCards = 4096
+
+    /// How many cards fit, from a division of the frame's measures: a whole
+    /// number from 0 to `most`. A frame resized to nothing makes the
+    /// division infinite or not a number, and `Int` of either stops the app.
+    static func fit(_ ratio: Double, most: Int = 256) -> Int {
+        guard !ratio.isNaN else { return 0 }
+        return Int(min(max(ratio, 0), Double(most)))
+    }
+
+    private static func made(_ setup: TemplateSetup, phase: Double, size: Size2, slots: Int?) -> TemplateScene {
         let slotCount = max(slots ?? slotCount(setup.kind), 0)
         let s = Settings(values: setup.settings, controls: controls(setup.kind))
-        let p = phase - phase.rounded(.down)
-        let k = Kit(size: size)
+        let p = phase.isFinite ? phase - phase.rounded(.down) : 0
+        // A Resize action can take a frame to nothing (growing in from 0):
+        // the measures are held to a pixel, so no recipe divides by zero.
+        func side(_ v: Double) -> Double { v.isFinite ? max(v, 1) : 1 }
+        let k = Kit(size: Size2(side(size.width), side(size.height)))
         switch setup.kind {
         case .ringStream: return ringStream(s, p, k)
         case .curvedWall: return wall(s, p, k, vertical: false)
@@ -411,7 +433,7 @@ public enum TemplateRecipes {
         let pitch = (vertical ? cell.height : cell.width) * gap
         let across = (vertical ? cell.width : cell.height) * gap
         let span = (vertical ? k.h : k.w) * 1.6
-        let perLine = max(Int((span / pitch).rounded(.up)) + 1, 2)
+        let perLine = max(fit((span / pitch).rounded(.up)) + 1, 2)
         let length = Double(perLine) * pitch
         let curvature = s.f("curvature")
         let radius = abs(curvature) > 0.01 ? (vertical ? k.h : k.w) / (abs(curvature) * .pi / 2) : 0
@@ -456,7 +478,7 @@ public enum TemplateRecipes {
         let across = k.w * 0.9 / Double(n)
         let width = min(s.f("cardSize") * k.w * (parallax ? 0.5 : 0.4), across / gap)
         let pitch = width * 4 / 3 * gap
-        let perColumn = max(Int((k.h * 1.6 / pitch).rounded(.up)) + 1, 2)
+        let perColumn = max(fit((k.h * 1.6 / pitch).rounded(.up)) + 1, 2)
         let length = Double(perColumn) * pitch
         let curvature = parallax ? 0 : s.f("curvature")
         let radius = abs(curvature) > 0.01 ? k.w / (abs(curvature) * .pi / 2) : 0
@@ -744,7 +766,7 @@ public enum TemplateRecipes {
         var index = 0
         for ring in 0..<rings {
             let r = outer * Double(rings - ring) / Double(rings)
-            let n = max(Int((2 * .pi * r / (width * 1.25)).rounded(.down)), 3)
+            let n = max(fit((2 * .pi * r / (width * 1.25)).rounded(.down)), 3)
             let way: Double
             switch s.c("direction") {
             case "back": way = -1

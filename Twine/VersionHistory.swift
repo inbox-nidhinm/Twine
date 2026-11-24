@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 256
+    static let pushes = 257
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -72,6 +72,10 @@ enum VersionHistory {
             "An export asked for by an AI app can no longer delete a folder. Given a folder as its path (\"export it to my Renders folder\"), the export replaced the folder, and everything in it, with the one file; a project, being a folder, could go the same way. A folder now takes the export inside it, under the project's name; a project or an app is refused; and a file is only ever replaced by an export of the same kind (any other name gains the format's ending). The exporter itself now refuses to replace a folder, whoever asks.",
             "Clicking into a number field and out again no longer changes the value. A field wrote back the number it was showing, which is often rounded: X 100.25 became 100.2, with an undo step. With several things selected it gave them all the first one's value: several bars' Start (a stagger collapsed), several layers' opacity, several texts' colour. A field left reading what it showed now changes nothing, hex fields included.",
             "A drag is always one undo step, in order, and never swallows later edits. Dragging a number until its own row disappeared (Tilt, Skew, Bend or Z reaching 0) or pressing Escape mid-drag could leave the drag's step open, so every edit after it went unrecorded and unsaved until another drag ended, and cancelling that drag threw them all away: the step now closes when its field goes, and any step still open closes at the next press or drag. Delete, Return and Undo wait while a drag is held (Escape still cancels it), a middle click no longer replaces a bar drag in the timeline, and an edit from an AI app waits for the drag to finish. An import that finishes mid-drag is its own step, undone in the order things happened.",
+            "A template frame resized to nothing no longer stops Twine. A Resize action with a From or To of 0 on a template (growing it in from nothing) crashed as soon as the field was set, and again every time the project opened; nine templates were affected, the walls, columns, tickers and film rolls. Their maths now holds the frame to a pixel, and a frame resized to a sliver makes at most 4,096 cards, not tens of thousands.",
+            "The export panel's range no longer outlives a shorter scene. With Part of the animation set from 3 to 5 seconds and the scene then cut to 2, typing in To crashed, and Export quietly wrote a single frame. The range is now fitted to the scene whenever the panel shows or the length changes: cut where it reaches past the end, and back to Whole animation when it starts past it.",
+            "Number fields refuse numbers no project can hold. Typing twenty digits (or 1e19) into a whole-number field, such as a Move's To, a Resize, a Z-Index or a Start in frames, stopped Twine, as did a custom frame rate of 0.0003. Fields now take numbers up to a thousand million either way, the same limit files and AI apps are held to, and the custom frame rate starts at 0.001.",
+            "An AI app can no longer stop Twine with an odd argument: an export at 0 frames a second (or a negative or enormous rate) is refused with a plain message, and a text argument given as an enormous number is read as it stands.",
         ], misc: [
             "In Animate, a selected layer's first section is Add to Layer (New Action and Select Preset, each half the panel wide, as they were), with Templates in a section of its own below it.",
             "Templates have their own icon in the layers panel, the designer's, in place of the frame icon.",

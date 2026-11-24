@@ -22,6 +22,15 @@ final class ExportSession {
     /// this scene rather than to every export.
     var range: ClosedRange<Double>?
 
+    /// `range` held inside a scene `duration` long: one that reaches past
+    /// the end stops at it, and one that starts at or past the end is
+    /// dropped, for the whole scene. The range is kept while the window is
+    /// open, and the scene can be made shorter in between.
+    static func fitted(_ range: ClosedRange<Double>?, to duration: Double) -> ClosedRange<Double>? {
+        guard let range, range.lowerBound < duration else { return nil }
+        return max(range.lowerBound, 0)...min(range.upperBound, duration)
+    }
+
     /// From 0 to 1 while an export runs, nil otherwise.
     private(set) var progress: Double?
     /// The file just written, offered for a few seconds to show in Finder.
@@ -62,6 +71,7 @@ final class ExportSession {
         if design && !settings.format.isMovie { project.actions = [] }
         // The range's frames count at the rate the movie is made at.
         let exported = settings.exported(project.composition)
+        range = Self.fitted(range, to: project.composition.duration)
         let frames = settings.format.isMovie
             ? range.map { ExportTiming.frames(from: $0.lowerBound, to: $0.upperBound, in: exported) }
             : nil

@@ -426,8 +426,14 @@ struct UnitField: View {
 
     /// The number alone: its unit is drawn beside it.
     private func format(_ v: Double) -> String {
-        decimals == 0 ? String(Int(v.rounded())) : Self.trimmed(v, decimals)
+        decimals == 0 ? String(Int(saturating: v.rounded())) : Self.trimmed(v, decimals)
     }
+
+    /// Whether a typed or dragged number is one a project can hold: finite,
+    /// and within the limit files, pastes and AI apps are held to. Past
+    /// it, whole numbers no longer fit an `Int` (typing twenty digits
+    /// stopped the app) and drawing has nothing sensible to do.
+    static func holds(_ v: Double) -> Bool { v.isFinite && abs(v) <= FileSafety.limit }
 
     static let mixedText = "Mixed"
 
@@ -438,7 +444,7 @@ struct UnitField: View {
     private func nudge(by delta: Double) {
         let from = number(in: text) ?? value
         let v = ArrowNudge.rounded(from + delta, decimals: decimals)
-        guard v.isFinite, accepts(v) else { NSSound.beep(); return }
+        guard UnitField.holds(v), accepts(v) else { NSSound.beep(); return }
         if mixed || abs(v - value) > .ulpOfOne { commit(v) }
         text = format(v)
     }
@@ -470,7 +476,7 @@ struct UnitField: View {
         // change the value on a mere click in and out, and with several
         // layers or actions selected give them all the first one's.
         let untouched = !mixed && typed == format(value)
-        if !untouched, let v = Double(typed), v.isFinite, accepts(v), mixed || abs(v - value) > .ulpOfOne {
+        if !untouched, let v = Double(typed), Self.holds(v), accepts(v), mixed || abs(v - value) > .ulpOfOne {
             commit(v)
             // The new value, not `value`: that still holds the old one until
             // the view updates, and showing it would put the old number back
@@ -553,7 +559,7 @@ struct OptionalField: View {
     }
 
     private func format(_ v: Double) -> String {
-        decimals == 0 ? String(Int(v.rounded())) : UnitField.trimmed(v, decimals)
+        decimals == 0 ? String(Int(saturating: v.rounded())) : UnitField.trimmed(v, decimals)
     }
 
     /// Up or down arrow: from the number typed, or the one it falls back to
@@ -564,7 +570,7 @@ struct OptionalField: View {
         let from = Double(typed.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "."))
             ?? value ?? placeholder
         let v = ArrowNudge.rounded(from + delta, decimals: decimals)
-        guard v.isFinite, accepts(v) else { NSSound.beep(); return }
+        guard UnitField.holds(v), accepts(v) else { NSSound.beep(); return }
         if value.map({ abs($0 - v) > .ulpOfOne }) ?? true { commit(v) }
         text = format(v)
     }
@@ -576,7 +582,7 @@ struct OptionalField: View {
         if typed.isEmpty {
             if value != nil { commit(nil) }
             text = ""
-        } else if let v = Double(typed), v.isFinite, accepts(v) {
+        } else if let v = Double(typed), UnitField.holds(v), accepts(v) {
             // Left reading what it was showing, nothing was typed: the
             // number shown may be rounded, and must not replace the value.
             if value.map({ typed != format($0) && abs($0 - v) > .ulpOfOne }) ?? true { commit(v) }

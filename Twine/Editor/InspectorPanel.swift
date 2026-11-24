@@ -140,7 +140,7 @@ struct InspectorPanel: View {
                     if customRate || !FrameRate.presets.contains(composition.frameRate) {
                         LabeledRow(label: "Custom") {
                             UnitField(value: composition.frameRate.perSecond, decimals: 3, suffix: "fps",
-                                      accepts: { $0 > 0 && $0 <= 1000 }) { v in
+                                      accepts: { $0 >= 0.001 && $0 <= 1000 }) { v in
                                 edit { $0.frameRate = Self.rate(from: v) }
                             }
                         }
@@ -219,8 +219,10 @@ struct InspectorPanel: View {
         for broadcast in [FrameRate.fps23_976, .fps29_97, .fps59_94] where abs(broadcast.perSecond - fps) < 0.006 {
             return broadcast
         }
-        if abs(fps - fps.rounded()) < 0.0005 { return FrameRate(frames: Int(fps.rounded())) }
-        let frames = Int((fps * 1000).rounded())
+        // Never no frames at all: a rate that rounds to zero is not a rate,
+        // and `FrameRate` stops the app rather than hold one.
+        if fps.rounded() >= 1, abs(fps - fps.rounded()) < 0.0005 { return FrameRate(frames: Int(saturating: fps.rounded())) }
+        let frames = max(Int(saturating: (fps * 1000).rounded()), 1)
         let divisor = gcd(frames, 1000)
         return FrameRate(frames: frames / divisor, seconds: 1000 / divisor)
     }

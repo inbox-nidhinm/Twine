@@ -87,6 +87,11 @@ struct ExportPanel: View {
         }
         .onChange(of: session.settings) { _, _ in fitPlayer() }
         .onChange(of: session.range) { _, _ in fitPlayer() }
+        // A range set for a longer scene never outlives it.
+        .onChange(of: composition.duration, initial: true) { _, duration in
+            let fitted = ExportSession.fitted(session.range, to: duration)
+            if fitted != session.range { session.range = fitted }
+        }
         .onChange(of: session.settings.format) { _, _ in checkLottie() }
         .onChange(of: session.completed) { _, url in
             if url != nil, settings.format.isLottie { showLottieNotice(session.leftOut) }
@@ -167,11 +172,14 @@ struct ExportPanel: View {
                 HStack(spacing: 8) {
                     UnitField(unit: "From", value: range.lowerBound, decimals: 2, suffix: "s",
                               accepts: { $0 >= 0 && $0 < range.upperBound }) { v in
-                        session.range = snapped(v)...range.upperBound
+                        // Snapping to a frame can round up to the end.
+                        let from = snapped(v)
+                        if from < range.upperBound { session.range = from...range.upperBound }
                     }
                     UnitField(unit: "To", value: range.upperBound, decimals: 2, suffix: "s",
                               accepts: { $0 > range.lowerBound }) { v in
-                        session.range = range.lowerBound...min(snapped(v), composition.duration)
+                        let to = min(snapped(v), composition.duration)
+                        if to > range.lowerBound { session.range = range.lowerBound...to }
                     }
                 }
                 .help("The part of the animation to export, in seconds. The movie starts at From.")

@@ -153,6 +153,28 @@ import MotionModel
         #expect(atTwo == still)
     }
 
+    /// A Resize action can take a template frame to nothing, or to a
+    /// sliver: every recipe still makes a scene, of a sane number of cards.
+    @Test func aFrameOfNoSizeOrASliverStillMakesAScene() {
+        let sizes = [Size2(0, 0), Size2(0, 720), Size2(1280, 0), Size2(1920, 1), Size2(1, 1080), Size2(1e9, 1e-9),
+                     Size2(-200, 300), Size2(.nan, 720), Size2(.infinity, .infinity)]
+        for kind in TemplateKind.allCases {
+            for size in sizes {
+                let cards = TemplateRecipes.scene(TemplateSetup(kind: kind), phase: 0.3, size: size).cards
+                #expect(cards.count <= TemplateRecipes.maxCards, "\(kind) at \(size)")
+            }
+            // And through `evaluate`, as a Resize from nothing reaches it.
+            var frame = Self.frame(kind)
+            frame.size = Size2(0, 0)
+            let scene = evaluate(Project(composition: Composition(width: 1280, height: 720), layers: [frame]), at: 0)
+            #expect(scene.layers.count <= TemplateRecipes.maxCards * 2 + 1, "\(kind)")
+        }
+        #expect(TemplateRecipes.fit(.infinity) == 256)
+        #expect(TemplateRecipes.fit(.nan) == 0)
+        #expect(TemplateRecipes.fit(-3) == 0)
+        #expect(TemplateRecipes.fit(7) == 7)
+    }
+
     @Test func settingsAreRead() {
         var frame = Self.frame(.ringStream)
         frame.template?.settings["count"] = .number(6)

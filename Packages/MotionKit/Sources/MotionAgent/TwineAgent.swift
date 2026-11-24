@@ -807,8 +807,12 @@ public final class TwineAgent {
             guard e > s else { throw AgentError("end must come after start") }
             range = s...e
         }
+        // A rate of nothing (an app's way of saying "the usual") is no
+        // rate to make a movie at, and building one stops the app.
+        let fps = try a.int("fps")
+        if let fps, !(1...240).contains(fps) { throw AgentError("fps is from 1 to 240; leave it out for the project's own") }
         let request = AgentExport(format: format, url: url, scale: min(max(try a.number("scale") ?? 1, 0.1), 4),
-                                  frameRate: try a.int("fps"), range: range, time: try a.number("time"))
+                                  frameRate: fps, range: range, time: try a.number("time"))
         let written = try await host.export(request)
         return .json(["path": .string(written.path)])
     }
