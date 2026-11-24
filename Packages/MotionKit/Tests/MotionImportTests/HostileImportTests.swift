@@ -73,6 +73,26 @@ import MotionModel
         #expect(SVGNumber.parse("12px") == 12)
     }
 
+    /// A number that is not one, anywhere in a project, makes every save of
+    /// it fail: whatever is read must be writable.
+    @Test func notNumbersInGradientsStrokesAndBlursStayOutOfTheProject() throws {
+        let digits = String(repeating: "9", count: 400)
+        let bodies = [
+            ##"<defs><linearGradient id="g" x1="nan" y1="inf" x2="1e999" y2="-inf"><stop offset="0" stop-color="red"/><stop offset="1" stop-color="blue"/></linearGradient></defs><rect width="10" height="10" fill="url(#g)"/>"##,
+            ##"<defs><linearGradient id="g"><stop offset="nan" stop-color="red"/><stop offset="inf%" stop-color="blue"/></linearGradient></defs><rect width="10" height="10" fill="url(#g)" stroke="url(#g)"/>"##,
+            ##"<defs><radialGradient id="g" cx="nan" cy="nan" r="inf"><stop offset="0" stop-color="red"/><stop offset="1" stop-color="blue"/></radialGradient></defs><circle r="5" fill="url(#g)"/>"##,
+            ##"<foreignObject><div xmlns="http://www.w3.org/1999/xhtml" style="backdrop-filter:blur(\##(digits)px)"></div></foreignObject><rect width="10" height="10" fill="red"/>"##,
+            String(repeating: ##"<g transform="scale(1e9)">"##, count: 30)
+                + ##"<rect width="1e-300" height="1e-300" stroke="black" stroke-width="5" stroke-dasharray="4 2" stroke-dashoffset="3"/>"##
+                + String(repeating: "</g>", count: 30),
+        ]
+        for body in bodies {
+            let r = try read(svg(body))
+            #expect(allFinite([r.layer]), "\(body.prefix(60))")
+            #expect((try? JSONEncoder().encode(r.layer)) != nil, "\(body.prefix(60))")
+        }
+    }
+
     @Test func runawayScalesLeaveTheLayerOut() throws {
         let scales = String(repeating: #"<g transform="scale(1e9)">"#, count: 40)
         let r = try read(svg(scales + #"<rect width="10" height="10"/>"# + String(repeating: "</g>", count: 40)

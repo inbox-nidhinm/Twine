@@ -508,7 +508,7 @@ private struct SoundSection: View {
             HeaderRow(title: "Sound") {}
             SliderRow(label: "Volume", value: min(volume, 1) * 100, range: 0...100, readout: { "\(Int($0.rounded()))%" },
                       onChange: { v in
-                          var l = layer
+                          var l = controller.project.layer(withID: layer.id) ?? layer
                           // There is no mute button (the user asked for the
                           // slider alone), so moving it brings back a sound
                           // muted before.
@@ -609,19 +609,23 @@ private struct FillSection: View {
     }
 
     private func editShape(_ change: (inout ShapeContent) -> Void) {
-        controller.edit(layer.id) { l in l.look = edited(change) }
+        controller.edit(layer.id) { l in
+            guard var s = l.look else { return }
+            change(&s)
+            l.look = s
+        }
     }
 
-    private func edited(_ change: (inout ShapeContent) -> Void) -> ShapeContent {
-        var s = shape
-        change(&s)
-        return s
-    }
-
-    /// For the colour well and hex field, which report whole layers.
+    /// For the colour well and hex field, which report whole layers: the
+    /// layer as it is in the project now, with its look changed. A picker
+    /// stays open with the closures it was given, and the copy of the layer
+    /// this view was built with can be old by the time it is dragged in (the
+    /// layer nudged, or changed by an AI app, meanwhile); writing that copy
+    /// back put the layer, and everything in a frame, back as it was.
     private func editedShape(_ change: (inout ShapeContent) -> Void) -> Layer {
-        var l = layer
-        l.look = edited(change)
+        guard var l = controller.project.layer(withID: layer.id), var s = l.look else { return layer }
+        change(&s)
+        l.look = s
         return l
     }
 }
@@ -772,8 +776,8 @@ private struct StrokeSection: View {
                     PaintEditor(paint: stroke.paint, isEnabled: stroke.isEnabled, controller: controller, layer: layer,
                                 title: "Stroke", slot: .stroke(i),
                                 change: { paint in
-                                    var l = layer
-                                    var s = shape
+                                    // The layer as it is now: see `FillSection.editedShape`.
+                                    guard var l = controller.project.layer(withID: layer.id), var s = l.look else { return [] }
                                     if s.strokes.indices.contains(i) { s.strokes[i].paint = paint }
                                     l.look = s
                                     return [l]
@@ -816,9 +820,11 @@ private struct StrokeSection: View {
     }
 
     private func editShape(_ change: (inout ShapeContent) -> Void) {
-        var s = shape
-        change(&s)
-        controller.edit(layer.id) { l in l.look = s }
+        controller.edit(layer.id) { l in
+            guard var s = l.look else { return }
+            change(&s)
+            l.look = s
+        }
     }
 }
 
@@ -1456,7 +1462,9 @@ private struct EffectsSection: View {
 
     /// The layer with the drop or inner shadow at `index` changed.
     private func withShadow(_ index: Int, _ change: (inout DropShadow) -> Void) -> Layer {
-        var l = layer
+        // The layer as it is now, not as this view was built with: an open
+        // picker would otherwise write an old copy of it back.
+        var l = controller.project.layer(withID: layer.id) ?? layer
         guard l.effects.indices.contains(index) else { return l }
         switch l.effects[index].kind {
         case .dropShadow(var s):

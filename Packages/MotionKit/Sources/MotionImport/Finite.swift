@@ -24,6 +24,19 @@ enum Finite {
         let numbers = [t.position.x, t.position.y, t.anchor.x, t.anchor.y, t.scale.x, t.scale.y, t.rotation,
                        t.skew.x, t.skew.y, layer.size.width, layer.size.height, layer.opacity]
         guard numbers.allSatisfy(fits) else { return false }
+        // Gradients and strokes too: their numbers come through the same
+        // transforms, and one that is not a number makes the project
+        // impossible to save.
+        if let look = layer.look {
+            let gradients = (look.fills.map(\.paint) + look.strokes.map(\.paint)).compactMap(\.gradient)
+            for g in gradients {
+                let own = [g.start.x, g.start.y, g.end.x, g.end.y, g.across ?? 1] + g.stops.map(\.position)
+                guard own.allSatisfy(fits) else { return false }
+            }
+            for s in look.strokes {
+                guard ([s.width, s.dashOffset] + s.dashPattern).allSatisfy(fits) else { return false }
+            }
+        }
         guard case .path(let path)? = layer.look?.geometry else { return true }
         return path.subpaths.allSatisfy { subpath in
             subpath.points.allSatisfy { p in

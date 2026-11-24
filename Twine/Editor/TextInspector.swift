@@ -341,7 +341,11 @@ struct TextStrokeSection: View {
                 VStack(alignment: .leading, spacing: 8) {
                     PaintEditor(paint: .solid(Self.color(of: stroke)), isEnabled: stroke.isEnabled, controller: controller,
                                 layer: layer, title: "Stroke",
-                                change: { paint in [layer.editingText { if case .solid(let c) = paint { $0.stroke?.paint = .color(c) } }] },
+                                change: { paint in
+                                    controller.freshLayers([layer.id]).map {
+                                        $0.editingText { if case .solid(let c) = paint { $0.stroke?.paint = .color(c) } }
+                                    }
+                                },
                                 toggle: { edit { $0.stroke?.isEnabled.toggle() } },
                                 showsToggle: true)
                     HStack(spacing: 8) {

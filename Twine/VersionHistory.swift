@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 257
+    static let pushes = 258
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -76,6 +76,10 @@ enum VersionHistory {
             "The export panel's range no longer outlives a shorter scene. With Part of the animation set from 3 to 5 seconds and the scene then cut to 2, typing in To crashed, and Export quietly wrote a single frame. The range is now fitted to the scene whenever the panel shows or the length changes: cut where it reaches past the end, and back to Whole animation when it starts past it.",
             "Number fields refuse numbers no project can hold. Typing twenty digits (or 1e19) into a whole-number field, such as a Move's To, a Resize, a Z-Index or a Start in frames, stopped Twine, as did a custom frame rate of 0.0003. Fields now take numbers up to a thousand million either way, the same limit files and AI apps are held to, and the custom frame rate starts at 0.001.",
             "An AI app can no longer stop Twine with an odd argument: an export at 0 frames a second (or a negative or enormous rate) is refused with a plain message, and a text argument given as an enormous number is read as it stands.",
+            "An open colour picker no longer puts the layer back as it was. A fill, stroke or shadow picker worked on the copy of the layer it opened with, so after a nudge with the arrow keys (or a change from an AI app) the next drag in the picker moved the layer back, and on a frame removed anything added inside it since, with its actions. Pickers, the Volume slider and the fill, stroke and shadow rows now all change the layer as it is at that moment.",
+            "File > Duplicate makes a real project. It used to open an untitled copy with no file: its pictures and videos showed grey, it was not in the projects folder and never appeared on the home screen. It now saves, copies the project beside itself as Name copy (as the home screen's Duplicate does) and opens the copy.",
+            "Twine says when it cannot save. The save that follows every change threw its error away, so with a full disk or a drive gone every save failed unseen until the project was closed. A note now says changes are not being saved and why, again each minute while it lasts, and once more when saving works again.",
+            "An SVG can no longer make a project impossible to save. A gradient position, a stop's offset or a background blur written as nan or inf (or with hundreds of digits) came in as a number that cannot be written to a file, and every save failed from then on. Those numbers are now read like every other, stroke widths and dashes under huge scales are held, and a layer whose gradient or stroke still runs away is left out, as one placed past the limit already was.",
         ], misc: [
             "In Animate, a selected layer's first section is Add to Layer (New Action and Select Preset, each half the panel wide, as they were), with Templates in a section of its own below it.",
             "Templates have their own icon in the layers panel, the designer's, in place of the frame icon.",

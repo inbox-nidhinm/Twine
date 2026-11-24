@@ -354,7 +354,8 @@ private struct Reader {
             // just before its shape; the shape takes it.
             if let text = element.xmlString.range(of: #"backdrop-filter:\s*blur\(([0-9.]+)px\)"#, options: .regularExpression) {
                 let digits = element.xmlString[text].filter { $0.isNumber || $0 == "." }
-                pendingBackgroundBlur = Double(digits).map { $0 * 2 }
+                // Hundreds of digits read as infinity, which no file holds.
+                pendingBackgroundBlur = SVGNumber.sane(Double(digits)).map { $0 * 2 }
             }
             return []
         case "text":
@@ -529,7 +530,9 @@ private struct Reader {
         // drawn through its transform.
         var layer: Layer
         let geometry: ShapeGeometry
-        let widthScale = sqrt(abs(ctm.determinant))
+        // Held, as nested scales can make it infinite while a tiny shape
+        // keeps the layer's own box in range.
+        let widthScale = min(SVGNumber.sane(sqrt(abs(ctm.determinant))) ?? 1, SVGNumber.limit)
         switch (outline, SVGTransform.decompose(ctm)) {
         case (.rectangle(let box, let rx, let ry), let parts?) where abs(rx * parts.scale.x - ry * parts.scale.y) < 1e-6:
             geometry = .rectangle(cornerRadii: CornerRadii(all: rx * parts.scale.x))
@@ -555,15 +558,15 @@ private struct Reader {
         }
         if let paint = paint(style["stroke"], opacity: style.fraction("stroke-opacity"), style: style,
                              userBounds: userBounds, ctm: ctm, layer: layer), !paint.isImage {
-            let width = style.number("stroke-width", default: 1) * widthScale
+            let width = min(style.number("stroke-width", default: 1) * widthScale, SVGNumber.limit)
             if width > 0 {
                 var stroke = Stroke(paint: paint, width: width)
                 stroke.cap = LineCap(rawValue: style["stroke-linecap"] ?? "") ?? .butt
                 stroke.join = style["stroke-linejoin"] == "round" ? .round : style["stroke-linejoin"] == "bevel" ? .bevel : .miter
-                let dashes = SVGNumber.list(style["stroke-dasharray"] ?? "").map { $0 * widthScale }
+                let dashes = SVGNumber.list(style["stroke-dasharray"] ?? "").map { min($0 * widthScale, SVGNumber.limit) }
                 if !dashes.isEmpty, dashes.contains(where: { $0 > 0 }) {
                     stroke.dashPattern = dashes.count % 2 == 1 ? dashes + dashes : dashes
-                    stroke.dashOffset = style.number("stroke-dashoffset", default: 0) * widthScale
+                    stroke.dashOffset = min(max(style.number("stroke-dashoffset", default: 0) * widthScale, -SVGNumber.limit), SVGNumber.limit)
                 }
                 shape.strokes = [stroke]
             }
@@ -645,7 +648,11 @@ private struct Reader {
                 var last = 0.0
                 return stops.map { stop in
                     let style = SVGStyle.of(stop, parent: SVGStyle(), sheet: sheet)
-                    var offset = style["offset"].map { $0.hasSuffix("%") ? (Double($0.dropLast()) ?? 0) / 100 : Double($0) ?? 0 } ?? 0
+                    // `sane`: Swift reads "nan" and "inf" as numbers, and
+                    // one in a project makes every save of it fail.
+                    var offset = style["offset"].map {
+                        $0.hasSuffix("%") ? (SVGNumber.sane(Double($0.dropLast())) ?? 0) / 100 : SVGNumber.sane(Double($0)) ?? 0
+                    } ?? 0
                     offset = max(min(max(offset, 0), 1), last)
                     last = offset
                     var color = SVGColor.parse(style["stop-color"] ?? "black") ?? .black
@@ -670,8 +677,8 @@ private struct Reader {
         let boxUnits = gradientAttribute(element, "gradientUnits") != "userSpaceOnUse"
         func coordinate(_ name: String, _ fallback: Double) -> Double {
             guard let text = gradientAttribute(element, name) else { return fallback }
-            if text.hasSuffix("%") { return (Double(text.dropLast()) ?? 0) / 100 * (boxUnits ? 1 : 100) }
-            return Double(text) ?? fallback
+            if text.hasSuffix("%") { return (SVGNumber.sane(Double(text.dropLast())) ?? 0) / 100 * (boxUnits ? 1 : 100) }
+            return SVGNumber.sane(Double(text)) ?? fallback
         }
         let own = SVGTransform.parse(gradientAttribute(element, "gradientTransform"))
         let toUser = boxUnits ? own.then(Affine.scale(Vec2(userBounds.width, userBounds.height)))

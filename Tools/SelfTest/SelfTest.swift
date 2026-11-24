@@ -545,6 +545,8 @@ enum SelfTest {
             case "call":
                 switch parts[1] {
                 case "duplicate": controller.duplicateSelection()
+                // File > Duplicate: a copy of the project, opened in the window.
+                case "duplicateproject": (window.windowController?.document as? ProjectDocument)?.duplicate(nil)
                 case "shortcuts": (window.windowController as? EditorWindowController)?.toggleShortcuts(nil)
                 // ⌘K, in the editor or on the home screen, whichever has the window.
                 case "search":

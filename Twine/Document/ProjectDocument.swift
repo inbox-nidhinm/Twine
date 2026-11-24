@@ -233,11 +233,33 @@ final class ProjectDocument: NSDocument {
                 // redone lets go of what it no longer needs here.
                 self.editorController?.releaseUnusedMedia()
                 guard self.isDocumentEdited else { return }
-                self.autosave(withImplicitCancellability: false) { _ in }
+                self.autosave(withImplicitCancellability: false) { [weak self] error in
+                    MainActor.assumeIsolated { self?.noteSave(error) }
+                }
             }
         }
         RunLoop.main.add(timer, forMode: .common)
         saveSoon = timer
+    }
+
+    /// When a save last failed and was said to have, nil while saves work.
+    private var saveFailedAt: Date?
+
+    /// Says when the save after a change fails (a full disk, a drive gone,
+    /// a value that cannot be written), and when saves work again. Said once,
+    /// then once a minute while it goes on: a save follows every change, and
+    /// without a word every one of them could fail unseen until the project
+    /// was closed, with nothing to go back to.
+    private func noteSave(_ error: Error?) {
+        guard let editor = editorController?.editor else { return }
+        guard let error else {
+            if saveFailedAt != nil { editor.showNotice("Changes are being saved again.") }
+            saveFailedAt = nil
+            return
+        }
+        if let last = saveFailedAt, Date().timeIntervalSince(last) < 60 { return }
+        saveFailedAt = Date()
+        editor.showNotice("Changes are not being saved. \((error as NSError).localizedDescription)")
     }
 
     /// Set once closed, when nothing may be staged or saved any more.
@@ -341,6 +363,36 @@ final class ProjectDocument: NSDocument {
     override func makeWindowControllers() {
         guard let store else { return }
         addWindowController(EditorWindowController(document: self, store: store))
+    }
+
+    /// File > Duplicate: a copy of the project beside it, "Name copy", as
+    /// the home screen's Duplicate makes, opened in the window. The system's
+    /// own Duplicate opens an untitled copy with no file, which in Twine has
+    /// no pictures or videos (they are found through the file), is not in
+    /// the projects folder, and so never shows on the home screen.
+    override func duplicate(_ sender: Any?) {
+        guard let url = fileURL else { return NSSound.beep() }
+        editorController?.finishEditing()
+        let copy = { [weak self] in
+            guard let self else { return }
+            let target = Creations.uniqueURL(for: "\(self.name) copy", in: url.deletingLastPathComponent())
+            do {
+                try FileManager.default.copyItem(at: url, to: target)
+            } catch {
+                return self.presentError(error, modalFor: MainWindow.window, delegate: nil, didPresent: nil, contextInfo: nil)
+            }
+            NSDocumentController.shared.openDocument(withContentsOf: target, display: true) { _, _, error in
+                if let error { NSApp.presentError(error) }
+            }
+        }
+        // The copy is of the file, so what has not been saved is saved first.
+        guard hasUnautosavedChanges || isDocumentEdited else { return copy() }
+        autosave(withImplicitCancellability: false) { [weak self] error in
+            MainActor.assumeIsolated {
+                guard let error else { return copy() }
+                self?.presentError(error, modalFor: MainWindow.window, delegate: nil, didPresent: nil, contextInfo: nil)
+            }
+        }
     }
 
     /// The project's name, as the home screen and the layers panel show it.
