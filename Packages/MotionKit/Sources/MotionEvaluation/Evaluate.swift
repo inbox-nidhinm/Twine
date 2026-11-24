@@ -196,6 +196,9 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
     let pictures = project.pictureSizes
     // Worked out only once a template asks.
     var videos: [UUID: VideoClip]?
+    /// How many values so far were taken from the clock itself, not from
+    /// actions: a still group holding one is worked out afresh each time.
+    var clockReads = 0
     cache?.begin(pictures: pictures)
     defer { cache?.end() }
     var out: [ResolvedLayer] = []
@@ -254,7 +257,14 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
                 out.append(contentsOf: run)
                 continue
             }
-            defer { if whole { cache?.keep(Array(out[first...]), of: layer, parent: parent) } }
+            // Not kept when something in it read the clock (a template's
+            // videos, which play round with the scene even with no bar on
+            // the template): the run would hand back the moment it was made
+            // at, and the videos stood still on the canvas and in exports.
+            let clockReadsBefore = clockReads
+            defer {
+                if whole, clockReads == clockReadsBefore { cache?.keep(Array(out[first...]), of: layer, parent: parent) }
+            }
             let made: ResolvedLayer?
             // A frame in 3D's camera as it is now, for placing its children,
             // and a template's place in its loop.
@@ -313,6 +323,7 @@ private func scene(of project: Project, at time: Double, tracks: ActionTracks, b
                     for i in first..<out.count {
                         if case .video(let media, _, let fit) = out[i].content, let clip = clips[media] {
                             out[i].content = .video(mediaID: media, sourceTime: TemplateCards.videoTime(time, length: clip.length), fit: fit)
+                            clockReads += 1
                         }
                     }
                 }

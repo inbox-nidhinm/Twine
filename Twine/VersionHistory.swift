@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 258
+    static let pushes = 259
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -80,6 +80,11 @@ enum VersionHistory {
             "File > Duplicate makes a real project. It used to open an untitled copy with no file: its pictures and videos showed grey, it was not in the projects folder and never appeared on the home screen. It now saves, copies the project beside itself as Name copy (as the home screen's Duplicate does) and opens the copy.",
             "Twine says when it cannot save. The save that follows every change threw its error away, so with a full disk or a drive gone every save failed unseen until the project was closed. A note now says changes are not being saved and why, again each minute while it lasts, and once more when saving works again.",
             "An SVG can no longer make a project impossible to save. A gradient position, a stop's offset or a background blur written as nan or inf (or with hundreds of digits) came in as a number that cannot be written to a file, and every save failed from then on. Those numbers are now read like every other, stroke widths and dashes under huge scales are held, and a layer whose gradient or stroke still runs away is left out, as one placed past the limit already was.",
+            "A sound or video inside a hidden group or frame is silent. Hiding a frame that held a video took its picture away but left its sound playing, in the preview and in exports.",
+            "A Lottie of a line being erased is erased. A stroke that was whole at the first exported frame and trimmed later (100% to 0%, or a range starting while the line was fully drawn) came out whole all the way through.",
+            "A click that wobbles is still a click. Pressing on a layer and moving a point or two before letting go moved it by a pixel (or onto a guide) and left a Move Layer step; with a shape tool it drew a one-pixel shape, and with Option it left a copy on top of the original. Nothing now moves, resizes, turns or is drawn until the pointer has gone three points from where it was pressed, as path points and gradients already worked.",
+            "A layer copied from inside a frame or group pastes where it was. It used to paste at its place inside the frame counted from the scene's corner, without the frame's turn or scale. And layers pasted into another project bring their pictures, videos and sounds with them, where they used to show grey; a file that has since gone is named in a note.",
+            "Videos in a template with no bar keep playing. They played until the first edit and then stood still on the canvas, and stood on their first frame in an export.",
         ], misc: [
             "In Animate, a selected layer's first section is Add to Layer (New Action and Select Preset, each half the panel wide, as they were), with Templates in a section of its own below it.",
             "Templates have their own icon in the layers panel, the designer's, in place of the frame icon.",

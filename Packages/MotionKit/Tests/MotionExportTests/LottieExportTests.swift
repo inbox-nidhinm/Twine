@@ -253,6 +253,30 @@ private func scene() -> (project: Project, square: UUID, group: UUID) {
         #expect(paths.count >= 2)
     }
 
+    /// A line that starts whole and is then erased: whole at the first
+    /// frame, so its path there is the outline, but it must still be drawn
+    /// along its own, changing path.
+    @Test func aLineErasedFromWholeIsStillTrimmed() throws {
+        var shape = ShapeContent(geometry: .ellipse(arc: .full))
+        var stroke = Stroke(paint: .color(RGBA(0, 0, 0)))
+        stroke.width = 4
+        stroke.alignment = .center
+        shape.strokes = [stroke]
+        let ring = Layer(name: "Ring", content: .shape(shape), size: Size2(80, 80), position: Vec2(100, 100))
+        let erase = Action(target: ring.id, start: 0.5, duration: 1, easing: .linear,
+                           spec: .trim(TrimAction(end: TrimRange(direction: .startToEnd, amount: 0))))
+        let project = Project(composition: Composition(width: 200, height: 200, frameRate: .fps30, duration: 2),
+                              layers: [ring], actions: [erase])
+        let (url, _) = try export(project, as: .lottie)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let json = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: Any]
+        let layer = try #require((json["layers"] as! [[String: Any]]).first { $0["nm"] as? String == "Ring" })
+        let items = (layer["shapes"] as! [[String: Any]])[0]["it"] as! [[String: Any]]
+        let path = try #require(items.first { $0["ty"] as? String == "sh" })
+        // The path changes over time, as the line is erased.
+        #expect((path["ks"] as! [String: Any])["a"] as? Int == 1)
+    }
+
     @Test func whatLottieCannotDrawIsNamed() throws {
         var (project, squareID, _) = scene()
         _ = project.updateLayer(squareID) { $0.effects.append(Effect(kind: .dropShadow(DropShadow()))) }

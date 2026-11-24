@@ -20,6 +20,9 @@ final class Held {
 }
 
 enum SelfTest {
+    /// The kit's own clipboard for copied layers, never the person's.
+    static let board = NSPasteboard(name: NSPasteboard.Name("com.nidhin.twine.selftest.layers"))
+
     /// The script runs once, from the first project to open; later ones (a
     /// second project, or one reopened from home) only show in the log.
     nonisolated(unsafe) static var started = false
@@ -552,8 +555,11 @@ enum SelfTest {
                 case "search":
                     if let editor = window.windowController as? EditorWindowController { editor.showSearch(nil) }
                     else { HomeWindowController.shared.showSearch(nil) }
-                case "copy": controller.copySelection()
-                case "paste": controller.paste()
+                // Layers go by a clipboard of the kit's own, so a test never
+                // writes over what the person has copied. (Copied actions
+                // still use the real one.)
+                case "copy": controller.copySelection(to: Self.board)
+                case "paste": controller.paste(from: Self.board.data(forType: EditorController.pasteboardType) != nil ? Self.board : .general)
                 case "undo": controller.store.undoManager.undo()
                 case "focuscanvas": controller.editor.focus = .canvas
                 case "copyeasing": controller.copyEasing()

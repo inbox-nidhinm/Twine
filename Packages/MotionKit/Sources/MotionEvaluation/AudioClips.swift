@@ -51,14 +51,27 @@ public struct VolumePoint: Sendable, Equatable {
 /// Everything the composition sounds like, as clips: one for each Play on an
 /// audio layer, or on a video whose file has sound. A later Play on the same
 /// layer cuts off an earlier one, as it does for the picture. Layers switched
-/// off, muted or at no volume are silent, and nothing plays past the end of
+/// off (or inside a group or frame that is), muted or at no volume are silent, and nothing plays past the end of
 /// its file or of the composition. Volume actions give the level as it
 /// changes. Preview and export both play exactly this.
 public func audioClips(_ project: Project) -> [AudioClip] {
     let assets = Dictionary(project.media.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     let tracks = Dictionary(grouping: project.actions.filter(\.isEnabled), by: \.targetLayerID)
     var clips: [AudioClip] = []
-    for layer in project.allLayers where layer.isVisible {
+    // The layers that can be heard, in the tree's order: switched on, and
+    // in no group or frame that is switched off. A video in a hidden frame
+    // was gone from the picture but still heard, in preview and export.
+    var heard: [Layer] = []
+    func gather(_ layers: [Layer]) {
+        for layer in layers where layer.isVisible {
+            switch layer.content {
+            case .audio, .video: heard.append(layer)
+            default: if layer.isGroup { gather(layer.children) }
+            }
+        }
+    }
+    gather(project.layers)
+    for layer in heard {
         let mediaID: UUID, volume: Double, muted: Bool
         switch layer.content {
         case .audio(let a): (mediaID, volume, muted) = (a.mediaID, min(a.volume, 1), a.isMuted)

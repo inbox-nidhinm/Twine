@@ -59,6 +59,10 @@ final class CanvasNSView: NSView {
     /// Space is held: a drag pans rather than acting on layers.
     private var spaceHeld = false
     var drag: CanvasDrag?
+    /// Where the mouse went down, in view points, and whether the pointer
+    /// has since gone far enough from there for the press to be a drag.
+    private var pressViewPoint = CGPoint.zero
+    private var pastDeadZone = false
     /// What the drag in progress has snapped to, for the guides.
     var snap: Snapping.Result?
     /// What a drag can snap to, gathered as it begins: the boxes of every
@@ -678,6 +682,8 @@ final class CanvasNSView: NSView {
         guard let controller, let scene else { return }
         let viewPoint = convert(event.locationInWindow, from: nil)
         let point = viewToComposition(viewPoint)
+        pressViewPoint = viewPoint
+        pastDeadZone = false
         let shift = event.modifierFlags.contains(.shift)
 
         if spaceHeld { return beginPan(event) }
@@ -836,6 +842,19 @@ final class CanvasNSView: NSView {
         let point = viewToComposition(viewPoint)
         let shift = event.modifierFlags.contains(.shift)
         let option = event.modifierFlags.contains(.option)
+        // A press that only wobbles is a click, not a drag: until the
+        // pointer has gone a few points from where it was pressed, nothing
+        // moves, resizes, turns or is drawn. Without this a click to select
+        // shifted the layer by a pixel (or onto a guide) with an undo step,
+        // and a click with a shape tool drew a one-pixel shape.
+        if !pastDeadZone {
+            switch drag {
+            case .create, .move, .resize, .rotate, .anchor, .action:
+                guard hypot(viewPoint.x - pressViewPoint.x, viewPoint.y - pressViewPoint.y) > CanvasHandles.clickReach else { return }
+            default: break
+            }
+            pastDeadZone = true
+        }
 
         switch drag {
         case .pan(let p):
@@ -986,8 +1005,7 @@ final class CanvasNSView: NSView {
             }
             // Back to the arrow after drawing, as in Figma.
             controller.editor.tool = .select
-        case .move(let move) where move.duplicating
-            && viewToComposition(convert(event.locationInWindow, from: nil)) == move.start:
+        case .move(let move) where move.duplicating && !pastDeadZone:
             // Option-clicked without moving: no copies after all.
             controller.cancel()
             controller.editor.selection = move.sources

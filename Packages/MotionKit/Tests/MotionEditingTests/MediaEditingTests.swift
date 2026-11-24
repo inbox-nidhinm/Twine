@@ -42,6 +42,22 @@ import MotionEvaluation
         #expect(audioClips(Project(layers: [hidden], actions: [play(hidden, at: 0, for: 1)], media: [sound])).isEmpty)
     }
 
+    /// A sound or a video in a group or frame that is switched off is gone
+    /// with it, however deep.
+    @Test func soundInsideAHiddenGroupIsSilent() {
+        let s = layer()
+        var inner = Layer(name: "Inner", content: .group(GroupContent(children: [s])), size: Size2(10, 10), position: .zero)
+        var outer = Layer(name: "Outer", content: .group(GroupContent(children: [inner])), size: Size2(10, 10), position: .zero)
+        let actions = [play(s, at: 0, for: 1)]
+        #expect(audioClips(Project(layers: [outer], actions: actions, media: [sound])).count == 1)
+        outer.isVisible = false
+        #expect(audioClips(Project(layers: [outer], actions: actions, media: [sound])).isEmpty)
+        outer.isVisible = true
+        inner.isVisible = false
+        outer.children = [inner]
+        #expect(audioClips(Project(layers: [outer], actions: actions, media: [sound])).isEmpty)
+    }
+
     @Test func trimmingAPlayBarsStartTrimsTheFile() {
         let s = layer()
         let original = play(s, at: 1, for: 3, from: 0.5)

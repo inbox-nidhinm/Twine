@@ -438,7 +438,14 @@ final class LottieWriter {
                     look.strokes.indices.contains(i) ? Self.strokeValues(look.strokes[i], as: op, widthScale: 1) : nil
                 }
                 if stroke.alignment == .center || !first.isClosed {
-                    add(op, path: stroke.trimmed == nil ? -1 : i, fillRule: first.fillRule, value: value)
+                    // Trimmed at any frame, not only the first: a line that
+                    // starts whole and is then erased has no trimmed path at
+                    // frame 0, and drawn along the outline it stayed whole.
+                    let trims = (0..<frameCount).contains { f in
+                        guard let strokes = place(f)?.layer.look?.strokes, strokes.indices.contains(i) else { return false }
+                        return strokes[i].trimmed != nil
+                    }
+                    add(op, path: trims ? i : -1, fillRule: first.fillRule, value: value)
                 } else {
                     flush()
                     out += alignedStroke(name: name, place: place, revealed: revealed, stroke: i, op: op,

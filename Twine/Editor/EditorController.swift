@@ -1547,6 +1547,11 @@ final class EditorController {
         var actions: [Action]
         /// The scenes the layers' actions make whole; nil in older copies.
         var scenes: [TimelineScene]?
+        /// The pictures, videos and sounds the layers use, and where each
+        /// one's file was when copied, so a paste into another project can
+        /// bring them along; nil in older copies.
+        var media: [MediaAsset]?
+        var mediaFiles: [String: String]?
 
         /// A copy read from the clipboard, which any app can write to: its
         /// numbers, times and type sizes held in range, as a project file's are.
@@ -1558,15 +1563,32 @@ final class EditorController {
         }
     }
 
-    func copySelection() {
+    /// `board` is the clipboard, or the test kit's own.
+    func copySelection(to board: NSPasteboard = .general) {
         if timelineHasFocus, !selectedActions.isEmpty { return copySelectedActions() }
-        let layers = topmost(selectedLayers)
-        let ids = Set(layers.flatMap { [$0] + Project(layers: [$0]).allLayers }.map(\.id))
-        let actions = project.actions.filter { ids.contains($0.targetLayerID) }
+        let selected = topmost(selectedLayers)
+        // Copied as they would stand at the top level, which is where a
+        // paste puts them. A layer in a group or frame counts its place
+        // from its parent, so copied as it was it pasted somewhere else,
+        // without the parent's turn or scale, its Move actions off too.
+        var source = project
+        let nested = selected.map(\.id).filter { project.location(of: $0)?.parentID != nil }
+        if !nested.isEmpty,
+           (try? Arrangement.move(nested, to: nil, index: nil, in: project).apply(to: &source)) == nil {
+            source = project
+        }
+        let layers = selected.compactMap { source.layer(withID: $0.id) }
+        let within = layers.flatMap { [$0] + Project(layers: [$0]).allLayers }
+        let ids = Set(within.map(\.id))
+        let actions = source.actions.filter { ids.contains($0.targetLayerID) }
+        let used = Set(within.flatMap(\.mediaIDs))
+        let media = project.media.filter { used.contains($0.id) }
+        var files: [String: String] = [:]
+        for asset in media { files[asset.id.uuidString] = document?.mediaURL(for: asset.id)?.path }
         let clipboard = LayerClipboard(layers: layers, actions: actions,
-                                       scenes: Scenes.whole(Set(actions.map(\.id)), in: project.scenes))
+                                       scenes: Scenes.whole(Set(actions.map(\.id)), in: source.scenes),
+                                       media: media.isEmpty ? nil : media, mediaFiles: files.isEmpty ? nil : files)
         guard !layers.isEmpty, let data = try? JSONEncoder().encode(clipboard) else { return }
-        let board = NSPasteboard.general
         board.clearContents()
         board.setData(data, forType: Self.pasteboardType)
     }
@@ -1624,14 +1646,41 @@ final class EditorController {
         }
     }
 
+    /// Pasted layers, with the files they use when this project has not got
+    /// them (a copy from another project): each is copied into the project
+    /// first, as an import's is, so its picture is not left grey. A file
+    /// that is gone is said to be.
     private func pasteLayers(_ clipboard: LayerClipboard) {
+        let have = Set(project.media.map(\.id))
+        let missing = (clipboard.media ?? []).filter { !have.contains($0.id) }
+        guard !missing.isEmpty, let document else { return pasteLayers(clipboard, adding: []) }
+        Task { @MainActor in
+            var added: [MediaAsset] = []
+            var lost: [String] = []
+            for asset in missing {
+                let file = clipboard.mediaFiles?[asset.id.uuidString].map { URL(fileURLWithPath: $0) }
+                if let file, FileManager.default.fileExists(atPath: file.path),
+                   (try? await document.stage(file, as: asset.fileName)) != nil {
+                    added.append(asset)
+                } else {
+                    lost.append(asset.originalName)
+                }
+            }
+            guard !isClosed else { return }
+            pasteLayers(clipboard, adding: added)
+            if !lost.isEmpty { editor.showNotice("Couldn't bring \(lost.joined(separator: ", ")) along.") }
+        }
+    }
+
+    private func pasteLayers(_ clipboard: LayerClipboard, adding media: [MediaAsset]) {
         var map: [UUID: UUID] = [:]
         let copies = clipboard.layers.map { $0.duplicated(recordingIDs: &map) }
         let pairs = Project(actions: clipboard.actions).actionCopyPairs(for: map)
         let actions = pairs.map(\.copy)
         let scenes = Scenes.copying(pairs.map { ($0.original, $0.copy.id, nil) }, whole: clipboard.scenes ?? [],
                                     in: project.scenes)
-        if perform(.batch([.insertLayers(copies, parentID: nil, index: nil), .insertActions(actions)] + sceneChange(scenes),
+        if perform(.batch(media.map { .addMedia($0) } + [.insertLayers(copies, parentID: nil, index: nil), .insertActions(actions)]
+                          + sceneChange(scenes),
                           name: copies.count == 1 ? "Paste Layer" : "Paste Layers")) {
             editor.selection = Set(copies.map(\.id))
         }
