@@ -54,8 +54,22 @@ final class AppAgentHost: AgentHost {
 
     func perform(_ command: EditorCommand) throws {
         guard let controller else { throw AgentError("No project is open in Twine") }
+        try Self.waitForDrag(in: controller)
         try controller.store.perform(command)
         Self.closeUndoGroup()
+    }
+
+    /// A change from an AI app never lands in the middle of the person's
+    /// drag, where it would sit inside the drag's undo step (and Escape
+    /// would throw it away with the drag): while the mouse is held it is
+    /// refused, to be tried again. A drag left open with the mouse up never
+    /// ended, and is closed as its own step first.
+    private static func waitForDrag(in controller: EditorController) throws {
+        guard controller.store.isChanging else { return }
+        if NSEvent.pressedMouseButtons & 1 != 0 {
+            throw AgentError("The person is in the middle of a drag in Twine. Try again in a moment.")
+        }
+        controller.end()
     }
 
     /// A change that arrives outside a click or a key press leaves the
@@ -68,8 +82,10 @@ final class AppAgentHost: AgentHost {
         NSApp.postEvent(nudge, atStart: false)
     }
 
-    func undo(redo: Bool) -> String? {
-        guard let undo = controller?.store.undoManager else { return nil }
+    func undo(redo: Bool) throws -> String? {
+        guard let controller else { return nil }
+        try Self.waitForDrag(in: controller)
+        let undo = controller.store.undoManager
         if redo {
             guard undo.canRedo else { return nil }
             let name = undo.redoActionName
@@ -183,9 +199,11 @@ final class AppAgentHost: AgentHost {
             ? request.range.map { ExportTiming.frames(from: $0.lowerBound, to: $0.upperBound, in: exported) } : nil
 
         let name = document.fileURL?.deletingPathExtension().lastPathComponent ?? "Twine"
-        let url = request.url ?? Self.free("\(name).\(request.format.fileExtension)",
-                                           in: AppSettings.shared.exportFolder
-                                               ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0])
+        let ending = request.format.fileExtension
+        let url = try request.url.map { try AgentExport.destination(for: $0, ending: ending, name: name) }
+            ?? AgentExport.free("\(name).\(ending)",
+                                in: AppSettings.shared.exportFolder
+                                    ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0])
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         var media = document.mediaURLs
         for id in TemplateSampleFiles.ids { media[id] = TemplateSampleFiles.url(for: id) }
@@ -200,17 +218,6 @@ final class AppAgentHost: AgentHost {
             }
         }
         return url
-    }
-
-    /// `file` in `folder`, numbered past any already there.
-    private static func free(_ file: String, in folder: URL) -> URL {
-        let base = (file as NSString).deletingPathExtension, ext = (file as NSString).pathExtension
-        var n = 1
-        while true {
-            let url = folder.appendingPathComponent(n == 1 ? base : "\(base) \(n)").appendingPathExtension(ext)
-            if !FileManager.default.fileExists(atPath: url.path) { return url }
-            n += 1
-        }
     }
 }
 

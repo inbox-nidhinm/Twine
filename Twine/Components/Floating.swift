@@ -199,7 +199,29 @@ final class ChromelessWindow: NSWindow {
         }
     }
 
+    /// Whether a drag that undoes as one step is open in the project
+    /// showing. Set by the canvas, which knows the project.
+    var isDragOpen: () -> Bool = { false }
+    /// Closes such a drag's undo step. Called on every press: a press
+    /// cannot begin while a drag is held, so a step still open then belongs
+    /// to a drag whose mouse-up never came.
+    var closeStaleDrag: () -> Void = {}
+
+    /// While a drag is held, keys wait: Delete, Return or Undo in the
+    /// middle of a drag would run a command inside its undo step, and the
+    /// steps would then undo out of order. Escape passes, as it cancels the
+    /// drag. The mouse is asked, not remembered, so a drag that never ended
+    /// cannot leave the keyboard dead.
+    private var holdsDrag: Bool { NSEvent.pressedMouseButtons & 1 != 0 && isDragOpen() }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if holdsDrag, event.keyCode != 53 { return true }
+        return super.performKeyEquivalent(with: event)
+    }
+
     override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown { closeStaleDrag() }
+        if event.type == .keyDown, event.keyCode != 53, holdsDrag { return }
         if event.type == .leftMouseDown || event.type == .rightMouseDown,
            let fieldEditor = firstResponder as? NSText,
            let field = fieldEditor.delegate as? NSView {

@@ -129,6 +129,8 @@ final class CanvasNSView: NSView {
         // The canvas is where the keyboard goes by default, so tool letters
         // and the delete key work without clicking it first.
         window.preferredResponder = self
+        window.isDragOpen = { [weak self] in self?.controller?.store.isChanging ?? false }
+        window.closeStaleDrag = { [weak self] in self?.controller?.end() }
         DispatchQueue.main.async { [weak self] in
             guard let self, window.firstResponder === window else { return }
             window.makeFirstResponder(self)

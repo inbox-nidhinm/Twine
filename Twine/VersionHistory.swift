@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 255
+    static let pushes = 256
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -69,6 +69,9 @@ enum VersionHistory {
             "Curved cards have two faces: as one turns away, the part still facing you stays at full strength and only the part facing away fades to the back fade, smoothly, and neither shows through the other. The whole card used to dim at once as its middle passed edge-on.",
             "The template picker's first tiles (Ring Stream to Tunnel) were empty in the app as built: the tiles drawn while the picker was still opening came out blank and stayed so. Tiles are now drawn away from the main thread, as exports are, and a blank one is drawn again.",
             "Split into Layers on a template whose cards turn round (a Wheel, or any bar holding more than one loop) no longer makes them spin the long way back at the end of each turn.",
+            "An export asked for by an AI app can no longer delete a folder. Given a folder as its path (\"export it to my Renders folder\"), the export replaced the folder, and everything in it, with the one file; a project, being a folder, could go the same way. A folder now takes the export inside it, under the project's name; a project or an app is refused; and a file is only ever replaced by an export of the same kind (any other name gains the format's ending). The exporter itself now refuses to replace a folder, whoever asks.",
+            "Clicking into a number field and out again no longer changes the value. A field wrote back the number it was showing, which is often rounded: X 100.25 became 100.2, with an undo step. With several things selected it gave them all the first one's value: several bars' Start (a stagger collapsed), several layers' opacity, several texts' colour. A field left reading what it showed now changes nothing, hex fields included.",
+            "A drag is always one undo step, in order, and never swallows later edits. Dragging a number until its own row disappeared (Tilt, Skew, Bend or Z reaching 0) or pressing Escape mid-drag could leave the drag's step open, so every edit after it went unrecorded and unsaved until another drag ended, and cancelling that drag threw them all away: the step now closes when its field goes, and any step still open closes at the next press or drag. Delete, Return and Undo wait while a drag is held (Escape still cancels it), a middle click no longer replaces a bar drag in the timeline, and an edit from an AI app waits for the drag to finish. An import that finishes mid-drag is its own step, undone in the order things happened.",
         ], misc: [
             "In Animate, a selected layer's first section is Add to Layer (New Action and Select Preset, each half the panel wide, as they were), with Templates in a section of its own below it.",
             "Templates have their own icon in the layers panel, the designer's, in place of the frame icon.",

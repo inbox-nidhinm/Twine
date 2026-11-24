@@ -27,8 +27,9 @@ public protocol AgentHost: AnyObject {
     /// own, and the editor shows it at once.
     func perform(_ command: EditorCommand) throws
     /// Undoes (or redoes) the last step, giving its name, nil when there
-    /// was none.
-    func undo(redo: Bool) -> String?
+    /// was none. Throws when it cannot be done just now (the person is in
+    /// the middle of a drag).
+    func undo(redo: Bool) throws -> String?
 
     /// The projects in the projects folder.
     func projects() -> [AgentProject]
@@ -64,6 +65,10 @@ public struct AgentProject: Sendable, Equatable {
 }
 
 /// An export as the tool asks for it.
+///
+/// `destination` turns the path asked for into the file to write: an AI app
+/// told "export it to my Renders folder" gives the folder, and writing a file
+/// in that folder's place would delete it and everything in it.
 public struct AgentExport: Sendable, Equatable {
     public var format: ExportFormat
     /// Where to write; nil puts it beside the project's other exports.
@@ -74,6 +79,35 @@ public struct AgentExport: Sendable, Equatable {
     public var range: ClosedRange<Double>?
     /// A still's moment; nil is the design.
     public var time: Double?
+
+    /// The file an export asked for at `url` is written to. A folder takes
+    /// the export inside it, as `name` with the format's ending, numbered
+    /// past any file already there; a project or an app is refused, being
+    /// folders that are not for putting files in. A file keeps its name,
+    /// given the format's ending when it has another, so an export can
+    /// replace an earlier export but never a file of some other kind.
+    public static func destination(for url: URL, ending: String, name: String) throws -> URL {
+        var isFolder: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder), isFolder.boolValue else {
+            return url.pathExtension.lowercased() == ending.lowercased() ? url : url.appendingPathExtension(ending)
+        }
+        let isPackage = (try? url.resourceValues(forKeys: [.isPackageKey]).isPackage) ?? false
+        if isPackage || ["twine", "app"].contains(url.pathExtension.lowercased()) {
+            throw AgentError("\(url.lastPathComponent) is not a folder to export into. Give a file path, or an ordinary folder.")
+        }
+        return free("\(name).\(ending)", in: url)
+    }
+
+    /// `file` in `folder`, numbered past any already there.
+    public static func free(_ file: String, in folder: URL) -> URL {
+        let base = (file as NSString).deletingPathExtension, ext = (file as NSString).pathExtension
+        var n = 1
+        while true {
+            let url = folder.appendingPathComponent(n == 1 ? base : "\(base) \(n)").appendingPathExtension(ext)
+            if !FileManager.default.fileExists(atPath: url.path) { return url }
+            n += 1
+        }
+    }
 
     public init(format: ExportFormat, url: URL?, scale: Double, frameRate: Int?, range: ClosedRange<Double>?, time: Double?) {
         self.format = format

@@ -114,7 +114,7 @@ extension TwineAgent {
                          required: ["paths"])),
         AgentTool("export", "Exports the project and waits for the file. Movies and Lotties take the whole timeline unless start and end are given; lottie is vector JSON (blur, shadows, glass, video and 3D left out), dotlottie the same zipped; png is one frame, the design unless time is given.",
                   schema(["format": enumeration(["mp4", "hevc", "hevc-alpha", "prores", "prores4444", "gif", "webm", "lottie", "dotlottie", "png"], "The kind of file"),
-                          "path": string("Where to write it; beside the export folder from Settings, or the project, when left out"),
+                          "path": string("The file to write, or a folder to put it in; the export folder from Settings when left out. A file of the same kind there is replaced"),
                           "scale": number("1 is the composition's size"), "fps": number("Frames a second"),
                           "start": number("Seconds"), "end": number("Seconds"), "time": number("For png: the moment")])),
     ]

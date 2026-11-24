@@ -712,7 +712,9 @@ final class TimelineTracksView: NSView {
     }
 
     override func otherMouseDown(with event: NSEvent) {
-        guard let viewport else { return }
+        // Not over a drag under way: its mouse-up would find the pan in its
+        // place, and its undo step would never close.
+        guard drag == nil, let viewport else { return }
         drag = .pan(startX: convert(event.locationInWindow, from: nil).x, startTime: viewport.start)
         Cursors.handGrabbed.set()
     }

@@ -96,6 +96,12 @@ public enum Exporter {
             project.composition.background.isTransparent = false
         }
         let fileManager = FileManager.default
+        // A folder is never a file to replace (a project is a folder too):
+        // moving the export into its place would delete it and all it holds.
+        var isFolder: ObjCBool = false
+        if fileManager.fileExists(atPath: url.path, isDirectory: &isFolder), isFolder.boolValue {
+            throw ExportError.failed("\(url.lastPathComponent) is a folder, and an export never replaces a folder.")
+        }
         let folder = try fileManager.url(for: .itemReplacementDirectory, in: .userDomainMask,
                                          appropriateFor: url, create: true)
         defer { try? fileManager.removeItem(at: folder) }

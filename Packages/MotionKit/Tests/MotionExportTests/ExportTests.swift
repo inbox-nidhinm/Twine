@@ -181,6 +181,20 @@ private func pixel(_ buffer: CVPixelBuffer, _ x: Int, _ y: Int) -> (r: Int, g: I
         #expect(try Data(contentsOf: url) == Data("keep".utf8))
     }
 
+    /// Moving the export into a folder's place would delete the folder and
+    /// everything in it.
+    @Test func neverReplacesAFolder() throws {
+        let folder = temporaryURL("mp4")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let kept = folder.appendingPathComponent("kept.txt")
+        try Data("keep".utf8).write(to: kept)
+        #expect(throws: ExportError.self) {
+            try Exporter.export(project(transparent: false), settings: ExportSettings(format: .png), to: folder)
+        }
+        #expect(try Data(contentsOf: kept) == Data("keep".utf8))
+    }
+
     @Test func replacesAnExistingFile() async throws {
         let url = temporaryURL("mp4")
         defer { try? FileManager.default.removeItem(at: url) }

@@ -258,6 +258,32 @@ struct TwineAgentTests {
         #expect(host.exported?.scale == 0.5)
     }
 
+    @Test func anExportIntoAFolderGoesInsideIt() throws {
+        let files = FileManager.default
+        let folder = files.temporaryDirectory.appendingPathComponent("Twine-agent-\(UUID().uuidString)")
+        defer { try? files.removeItem(at: folder) }
+        try files.createDirectory(at: folder, withIntermediateDirectories: true)
+
+        // A folder takes the export inside it, numbered past what is there.
+        let first = try AgentExport.destination(for: folder, ending: "mp4", name: "Intro")
+        #expect(first == folder.appendingPathComponent("Intro.mp4"))
+        try Data().write(to: first)
+        #expect(try AgentExport.destination(for: folder, ending: "mp4", name: "Intro") == folder.appendingPathComponent("Intro 2.mp4"))
+
+        // A file of the same kind is the file; any other name gains the ending.
+        #expect(try AgentExport.destination(for: first, ending: "mp4", name: "Intro") == first)
+        let notes = folder.appendingPathComponent("notes.txt")
+        try Data("keep".utf8).write(to: notes)
+        #expect(try AgentExport.destination(for: notes, ending: "mp4", name: "Intro") == folder.appendingPathComponent("notes.txt.mp4"))
+        #expect(try AgentExport.destination(for: folder.appendingPathComponent("new"), ending: "gif", name: "Intro")
+                == folder.appendingPathComponent("new.gif"))
+
+        // A project is a folder too, and never one to export into.
+        let project = folder.appendingPathComponent("Intro.twine")
+        try files.createDirectory(at: project, withIntermediateDirectories: true)
+        #expect(throws: AgentError.self) { try AgentExport.destination(for: project, ending: "mp4", name: "Intro") }
+    }
+
     @Test func theCatalogCoversEveryKindAndPreset() throws {
         let actions = try #require(AgentCatalog.describe("actions")?["actions"]?["kinds"]?.array)
         let kinds = Set(actions.compactMap { $0["kind"]?.string })

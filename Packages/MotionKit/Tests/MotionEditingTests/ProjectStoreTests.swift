@@ -128,6 +128,91 @@ import MotionModel
         #expect(!store.undoManager.canUndo)
     }
 
+    /// An import finishing or an AI app's edit, in the middle of a drag.
+    @Test func aCommandDuringADragUndoesInTheOrderItHappened() throws {
+        var a = shape("A")
+        let b = shape("B")
+        let store = makeStore(Project(layers: [a]))
+        store.beginContinuousChange("Move")
+        a.transform.position = Vec2(10, 0)
+        try store.updateContinuousChange(.updateLayers([a]))
+        try store.perform(.insertLayers([b], parentID: nil, index: nil))
+        #expect(store.isChanging)
+        a.transform.position = Vec2(20, 0)
+        try store.updateContinuousChange(.updateLayers([a]))
+        store.endContinuousChange()
+
+        // The rest of the drag, then the command, then the drag's start.
+        store.undoManager.undo()
+        #expect(store.project.layers.map(\.transform.position) == [Vec2(10, 0), .zero])
+        store.undoManager.undo()
+        #expect(store.project.layers.map(\.transform.position) == [Vec2(10, 0)])
+        store.undoManager.undo()
+        #expect(store.project.layers.map(\.transform.position) == [.zero])
+        #expect(!store.undoManager.canUndo)
+    }
+
+    @Test func cancellingADragKeepsACommandThatCameDuringIt() throws {
+        var a = shape("A")
+        let b = shape("B")
+        let store = makeStore(Project(layers: [a]))
+        store.beginContinuousChange("Move")
+        a.transform.position = Vec2(10, 0)
+        try store.updateContinuousChange(.updateLayers([a]))
+        try store.perform(.insertLayers([b], parentID: nil, index: nil))
+        a.transform.position = Vec2(20, 0)
+        try store.updateContinuousChange(.updateLayers([a]))
+        store.cancelContinuousChange()
+        #expect(store.project.layers.map(\.name) == ["A", "B"])
+        #expect(store.project.layers[0].transform.position == Vec2(10, 0))
+    }
+
+    /// A drag whose mouse-up never came (its view went away mid-drag).
+    @Test func aDragLeftOpenIsItsOwnStepWhenTheNextBegins() throws {
+        var a = shape("A")
+        let store = makeStore(Project(layers: [a]))
+        store.beginContinuousChange("Change Value", folding: true)
+        try store.perform(.updateLayers([{ a.name = "Scrubbed"; return a }()]))
+
+        // An ordinary drag after it, cancelled: only that drag is taken back.
+        store.beginContinuousChange("Move")
+        a.transform.position = Vec2(50, 0)
+        try store.updateContinuousChange(.updateLayers([a]))
+        store.cancelContinuousChange()
+        #expect(store.project.layers[0].name == "Scrubbed")
+        #expect(store.project.layers[0].transform.position == .zero)
+        #expect(!store.isChanging)
+
+        // And edits after it are steps of their own again.
+        try store.perform(.updateLayers([{ a.transform.position = .zero; a.name = "Typed"; return a }()]))
+        store.undoManager.undo()
+        #expect(store.project.layers[0].name == "Scrubbed")
+        store.undoManager.undo()
+        #expect(store.project.layers[0].name == "A")
+        #expect(!store.undoManager.canUndo)
+    }
+
+    @Test func anUndoUnderAnOpenDragClosesIt() throws {
+        var a = shape("A")
+        let store = makeStore(Project(layers: [a]))
+        a.name = "Named"
+        try store.perform(.updateLayers([a]))
+        store.beginContinuousChange("Move")
+        a.transform.position = Vec2(10, 0)
+        try store.updateContinuousChange(.updateLayers([a]))
+
+        store.undoManager.undo()
+        #expect(store.project.layers[0].name == "A")
+        #expect(!store.isChanging)
+        // The drag's end records nothing out of order, and redo brings back
+        // what the undo left, the drag so far included.
+        store.endContinuousChange()
+        #expect(!store.undoManager.canUndo)
+        store.undoManager.redo()
+        #expect(store.project.layers[0].name == "Named")
+        #expect(store.project.layers[0].transform.position == Vec2(10, 0))
+    }
+
     @Test func movingKeepsRelativeOrderAndRefusesCycles() throws {
         let a = shape("A"), b = shape("B"), c = shape("C")
         let group = Layer(name: "G", content: .group(GroupContent()), size: Size2(1, 1), position: .zero)

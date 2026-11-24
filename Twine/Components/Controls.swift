@@ -465,7 +465,12 @@ struct UnitField: View {
         var typed = text.trimmingCharacters(in: .whitespaces)
         if !suffix.isEmpty, typed.hasSuffix(suffix) { typed.removeLast(suffix.count) }
         typed = typed.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
-        if let v = Double(typed), v.isFinite, accepts(v), mixed || abs(v - value) > .ulpOfOne {
+        // Left reading what it was showing, nothing was typed. The number
+        // shown is often rounded (100.25 reads 100.2), so committing it would
+        // change the value on a mere click in and out, and with several
+        // layers or actions selected give them all the first one's.
+        let untouched = !mixed && typed == format(value)
+        if !untouched, let v = Double(typed), v.isFinite, accepts(v), mixed || abs(v - value) > .ulpOfOne {
             commit(v)
             // The new value, not `value`: that still holds the old one until
             // the view updates, and showing it would put the old number back
@@ -572,7 +577,9 @@ struct OptionalField: View {
             if value != nil { commit(nil) }
             text = ""
         } else if let v = Double(typed), v.isFinite, accepts(v) {
-            if value.map({ abs($0 - v) > .ulpOfOne }) ?? true { commit(v) }
+            // Left reading what it was showing, nothing was typed: the
+            // number shown may be rounded, and must not replace the value.
+            if value.map({ typed != format($0) && abs($0 - v) > .ulpOfOne }) ?? true { commit(v) }
             text = format(v)
         } else {
             text = value.map(format) ?? ""
@@ -1129,11 +1136,19 @@ final class ScrubView: NSView {
         releasePointer()
     }
 
-    // Taken away mid-drag (the inspector rebuilt), the pointer is let go
-    // all the same: it must never stay hidden and held.
+    // Taken away mid-drag (the inspector rebuilt, or the drag reached the
+    // value that hides its own row), the pointer is let go all the same: it
+    // must never stay hidden and held. The drag's undo step is closed too:
+    // the mouse-up may never reach a view that has gone, and a step left
+    // open takes in every edit after it, none of them undoable or saved.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if window == nil { releasePointer() }
+        guard window == nil else { return }
+        if raw != nil {
+            surface?.scrubbing?.end()
+            raw = nil
+        }
+        releasePointer()
     }
 
     private func releasePointer() {

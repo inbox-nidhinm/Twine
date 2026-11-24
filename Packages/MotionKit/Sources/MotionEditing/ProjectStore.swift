@@ -50,8 +50,22 @@ public final class ProjectStore {
 
     /// Applies one command as one undo step. A command that changes nothing
     /// records nothing.
+    ///
+    /// A command from elsewhere while a drag is open (an import finishing,
+    /// an edit from an AI app) is its own step in between: the drag so far
+    /// is recorded first and the drag carries on from after the command, so
+    /// the steps undo in the order they happened and cancelling the drag
+    /// takes back only the drag. Recorded as one step from where the drag
+    /// began, the drag would undo to before a command that came after its
+    /// start, and the next undo would land on a half-dragged state.
     public func perform(_ command: EditorCommand) throws {
-        if foldsCommands, continuousStart != nil { return try command.apply(to: &project) }
+        if continuousStart != nil {
+            if foldsCommands { return try command.apply(to: &project) }
+            let name = continuousName
+            endContinuousChange()
+            defer { beginContinuousChange(name) }
+            return try perform(command)
+        }
         let before = project
         try command.apply(to: &project)
         guard project != before else { return }
@@ -95,14 +109,23 @@ public final class ProjectStore {
     /// With `folding`, `perform` joins the change too until it ends, so a
     /// control that only knows how to make ordinary edits still undoes as
     /// one step.
+    ///
+    /// A change still open belongs to a drag that never ended (its view
+    /// went away mid-drag, or its mouse-up went elsewhere), since every
+    /// drag begins once. It is recorded as its own step first: left open,
+    /// it would take this drag into its step, and cancelling this drag
+    /// would throw away everything since that one began.
     public func beginContinuousChange(_ name: String, folding: Bool = false) {
+        endContinuousChange()
         joinable = nil
-        if continuousStart == nil {
-            continuousStart = project
-            foldsCommands = folding
-        }
+        continuousStart = project
+        foldsCommands = folding
         continuousName = name
     }
+
+    /// Whether a continuous change is open: a drag is under way, or one
+    /// never ended.
+    public var isChanging: Bool { continuousStart != nil }
 
     /// One step of a continuous change. Applied at once so the canvas follows
     /// the pointer, but not recorded until `endContinuousChange`.
@@ -179,6 +202,12 @@ public final class ProjectStore {
     /// the other snapshot and register the one being left as its own reverse.
     private func restore(_ snapshot: Project, name: String) {
         joinable = nil
+        // An undo or redo under an open drag: the drag so far goes with the
+        // state being left (so the opposite brings it back), and the drag is
+        // closed. Ended later from where it began, it would record a step
+        // whose "before" is newer than the state now showing.
+        continuousStart = nil
+        foldsCommands = false
         if undoManager.isUndoing, let cost = undoCosts.popLast() {
             redoCosts.append(cost)
         } else if undoManager.isRedoing, let cost = redoCosts.popLast() {

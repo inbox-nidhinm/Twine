@@ -105,7 +105,11 @@ struct HexField: View {
         // view updates, and it would come back when the field lost focus.
         if var parsed = RGBA(typed: text) {
             parsed.a = color.a
-            if parsed != color { commit(parsed) }
+            // Compared as the six digits shown, not as exact numbers: most
+            // colours are not whole steps of 255, and a click in and out
+            // must not round them (or, with several texts selected, give
+            // them all the first one's colour).
+            if parsed.hex6 != color.hex6 { commit(parsed) }
             text = parsed.hex6
         } else {
             text = color.hex6

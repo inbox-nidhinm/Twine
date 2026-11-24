@@ -752,7 +752,7 @@ public final class TwineAgent {
         let steps = min(max(try a.int("steps") ?? 1, 1), 50)
         var names: [JSONValue] = []
         for _ in 0..<steps {
-            guard let name = host.undo(redo: redo) else { break }
+            guard let name = try host.undo(redo: redo) else { break }
             names.append(.string(name))
         }
         guard !names.isEmpty else { throw AgentError(redo ? "There is nothing to redo" : "There is nothing to undo") }
