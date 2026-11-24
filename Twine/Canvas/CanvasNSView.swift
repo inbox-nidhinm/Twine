@@ -45,6 +45,21 @@ final class CanvasNSView: NSView {
     private(set) var scene: ResolvedScene?
     /// Keeps the layers no action moves from one scene to the next.
     private let evaluation = EvaluationCache()
+    /// The scene at a moment other than the playhead's, as last worked out.
+    private var otherMoment: (project: Project, time: Double, scene: ResolvedScene)?
+
+    /// The scene at `time`, for handles drawn where a selected action ends
+    /// (or starts) whatever the playhead shows. Kept while the project and
+    /// the moment are the same, and worked out through the canvas's cache:
+    /// done afresh on every redraw and pointer move, it was a second whole
+    /// evaluation a frame while playing with such an action selected.
+    func moment(at time: Double) -> ResolvedScene? {
+        guard let controller else { return nil }
+        if let kept = otherMoment, kept.time == time, kept.project == controller.project { return kept.scene }
+        let made = evaluate(controller.project, at: time, cache: evaluation)
+        otherMoment = (controller.project, time, made)
+        return made
+    }
     private(set) var project: Project?
     private(set) var selection: [UUID] = []
     private(set) var tool: Tool = .select
@@ -277,7 +292,7 @@ final class CanvasNSView: NSView {
         pan = CGPoint(x: newOrigin.x - (area.midX - size.width * zoom / 2),
                       y: newOrigin.y - (area.midY - size.height * zoom / 2))
         hasFitted = true
-        updateContentsScale()
+        updateContentsScale(live: true)
         layoutWorld()
     }
 
@@ -285,13 +300,32 @@ final class CanvasNSView: NSView {
 
     /// Shapes are rasterised at their layer's scale, so zooming in without
     /// raising it would show soft edges.
-    private func updateContentsScale() {
+    /// `live` is a zoom by the person's hand, a pinch above all, whose
+    /// every step is a new scale: texts keep the pictures they have until
+    /// the zoom has rested a moment, then are drawn once at the scale it
+    /// came to rest at. Drawing every text again on every step is what
+    /// made zooming a project with hundreds of texts stutter.
+    private func updateContentsScale(live: Bool = false) {
         let backing = window?.backingScaleFactor ?? 2
         let wanted = backing * min(max(zoom, 1), 8)
         guard abs(renderer.contentsScale - wanted) > 0.01 else { return }
+        if live {
+            renderer.holdsTextScale = true
+            textSettle?.invalidate()
+            let timer = Timer(timeInterval: 0.2, repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.renderer.holdsTextScale = false
+                    self.redrawSoon()
+                }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            textSettle = timer
+        }
         renderer.contentsScale = wanted
         redrawSoon()
     }
+    private var textSettle: Timer?
 
     /// Draws the scene again at the new scale, once, a turn later: a zoom
     /// changes nothing in the project, so nothing else redraws, and glass
@@ -466,8 +500,8 @@ final class CanvasNSView: NSView {
     private func actionEndBox() -> (box: [CGPoint], isLine: Bool)? {
         guard animating, let controller, let action = controller.canvasAction,
               [.resize, .scale, .rotate].contains(action.spec.kind) else { return nil }
-        let end = evaluate(controller.project, at: action.end)
-        guard let corners = end.worldCorners(of: action.targetLayerID), let layer = end.layer(action.targetLayerID) else { return nil }
+        guard let end = moment(at: action.end),
+              let corners = end.worldCorners(of: action.targetLayerID), let layer = end.layer(action.targetLayerID) else { return nil }
         return (corners.map(compositionToView), isLine(layer))
     }
 
@@ -1126,7 +1160,7 @@ final class CanvasNSView: NSView {
         let id = action.targetLayerID
 
         func start(_ part: CanvasDrag.ActionEdit.Part, seekingToEnd: Bool) -> Bool {
-            let endScene = evaluate(controller.project, at: action.end)
+            guard let endScene = moment(at: action.end) else { return false }
             drag = .action(CanvasDrag.ActionEdit(action: action, part: part, start: point, from: from,
                                                  parentInverse: parentInverse, shown: scene.layer(id)?.position ?? from.position,
                                                  atEnd: endScene.layer(id), worldAtEnd: endScene.worldTransform(of: id)))

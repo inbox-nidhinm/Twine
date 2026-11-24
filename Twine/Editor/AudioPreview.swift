@@ -30,6 +30,8 @@ final class AudioPreview {
     private let renderer = AVSampleBufferAudioRenderer()
     private var mix: AudioComposition?
     private var clips: [AudioClip] = []
+    /// The project `clips` were last gathered from.
+    private var clipsOf: Project?
     private var isPlaying = false
     /// Where in the sound it was last set going, and when on the host clock.
     private var started = (time: 0.0, clock: 0.0)
@@ -67,11 +69,17 @@ final class AudioPreview {
             if isPlaying { stop() }
             return
         }
-        let now = audioClips(project)
-        if now != clips {
-            clips = now
-            rebuild(project)
-            if isPlaying { stop() }
+        // Worked out again only when the project has changed: this runs on
+        // every tick of playback, and gathering the clips copied every
+        // layer and regrouped every action each time, to find them the same.
+        if project != clipsOf {
+            clipsOf = project
+            let now = audioClips(project)
+            if now != clips {
+                clips = now
+                rebuild(project)
+                if isPlaying { stop() }
+            }
         }
         guard let mix else { return }
         // Kept in step while silent, so turning the sound back on in

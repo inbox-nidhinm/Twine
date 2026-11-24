@@ -96,7 +96,8 @@ extension CanvasNSView {
             paint = a.paint(initial: initial)
             // The layer as it is when the action ends (or starts), as a
             // Resize's handles are, so the line stays put whatever the playhead.
-            scene = evaluate(controller.project, at: initial ? a.start : a.end)
+            guard let then = moment(at: initial ? a.start : a.end) else { return nil }
+            scene = then
         } else {
             paint = layer.paint(at: edit.slot)
         }

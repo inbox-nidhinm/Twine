@@ -55,6 +55,15 @@ final class TimelineTracksView: NSView {
     /// For the right-click menu and the stagger card.
     var menus: MenuHost?
     private(set) var rows: [TimelineRow] = []
+    /// Everything `rows` are made from, as they were last made.
+    private struct RowSource: Equatable {
+        var project: Project
+        var only: Set<UUID>?
+        var folded: Set<UUID>
+        var foldedScenes: Set<UUID>
+        var soundLast: Bool
+    }
+    private var rowSource: RowSource?
 
     private var drag: Drag?
     /// What the dragged bar is lined up with, drawn as a guide: the time,
@@ -122,9 +131,18 @@ final class TimelineTracksView: NSView {
     func reload() {
         guard let controller else { return }
         let editor = controller.editor
-        rows = TimelineRow.rows(of: controller.project, only: editor.timelineOnlySelected ? editor.selection : nil,
-                                folded: editor.foldedLayers, foldedScenes: editor.foldedScenes, soundLast: editor.soundAtBottom)
-        sizeToRows()
+        // Rows are made again only when what they are made from changed.
+        // This runs whenever the playhead moves, and a move needs only a
+        // redraw: making them copied every layer and sorted every action,
+        // on every frame of playback.
+        let source = RowSource(project: controller.project, only: editor.timelineOnlySelected ? editor.selection : nil,
+                               folded: editor.foldedLayers, foldedScenes: editor.foldedScenes, soundLast: editor.soundAtBottom)
+        if source != rowSource {
+            rowSource = source
+            rows = TimelineRow.rows(of: source.project, only: source.only, folded: source.folded,
+                                    foldedScenes: source.foldedScenes, soundLast: source.soundLast)
+            sizeToRows()
+        }
         // A selection made elsewhere (the layers panel, the canvas) brings
         // its rows into view.
         if editor.selection != lastSelection {

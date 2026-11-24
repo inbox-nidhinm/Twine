@@ -230,6 +230,27 @@ extension PerformanceTests {
         for _ in 0..<frames { renderer.render(scenes[frames - 1]) }
         print("BENCH large layer tree, nothing changed: \(ms(CACurrentMediaTime() - start, frames: frames))")
 
+        // One mask, in the last frame (which nothing animates): a Figma or
+        // SVG import nearly always has some, and one used to make every
+        // frame copy and index every layer of the project.
+        var withMask = project
+        if case .group(var group) = withMask.layers[withMask.layers.count - 1].content, !group.children.isEmpty {
+            group.children[0].isMask = true
+            withMask.layers[withMask.layers.count - 1].content = .group(group)
+        }
+        let maskCache = EvaluationCache()
+        _ = evaluate(withMask, at: 0, cache: maskCache)
+        start = CACurrentMediaTime()
+        var maskScenes: [ResolvedScene] = []
+        for t in times { maskScenes.append(evaluate(withMask, at: t, cache: maskCache)) }
+        print("BENCH large evaluate, cached, one mask: \(ms(CACurrentMediaTime() - start, frames: frames))")
+        #expect(maskScenes[0].masks.count == 1)
+        let maskRenderer = CoreAnimationRenderer()
+        maskRenderer.render(maskScenes[0])
+        start = CACurrentMediaTime()
+        for scene in maskScenes { maskRenderer.render(scene) }
+        print("BENCH large layer tree update, one mask: \(ms(CACurrentMediaTime() - start, frames: frames))")
+
         let offscreen = try #require(OffscreenRenderer(pixelWidth: 1920, pixelHeight: 1080))
         var buffer: CVPixelBuffer?
         CVPixelBufferCreate(nil, 1920, 1080, kCVPixelFormatType_32BGRA,

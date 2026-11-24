@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 259
+    static let pushes = 260
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -85,6 +85,10 @@ enum VersionHistory {
             "A click that wobbles is still a click. Pressing on a layer and moving a point or two before letting go moved it by a pixel (or onto a guide) and left a Move Layer step; with a shape tool it drew a one-pixel shape, and with Option it left a copy on top of the original. Nothing now moves, resizes, turns or is drawn until the pointer has gone three points from where it was pressed, as path points and gradients already worked.",
             "A layer copied from inside a frame or group pastes where it was. It used to paste at its place inside the frame counted from the scene's corner, without the frame's turn or scale. And layers pasted into another project bring their pictures, videos and sounds with them, where they used to show grey; a file that has since gone is named in a note.",
             "Videos in a template with no bar keep playing. They played until the first edit and then stood still on the canvas, and stood on their first frame in an export.",
+            "A mask no longer slows every frame of a large project. With any layer used as a mask, each frame copied and indexed every layer in the project: 6.0 ms a frame in a 5,050-layer project, against 1.5 ms now.",
+            "The timeline and the sound no longer rebuild on every tick of the playhead. Rows are made again only when the project, the folds or the selection filter change, and the sound's clips only when the project does. A scrub step in a large project takes 9.8 ms, down from 21.",
+            "Playing with a Scale, Resize, Rotate or Path action selected no longer drops frames. Its handles cost a second whole evaluation every frame: 45 frames a second in a large project, 60 now.",
+            "Zooming with many texts is steadier. Texts keep the pictures they have while a pinch is under way and are drawn once, sharp, when it rests, where every text was drawn again on every step. A text's picture is also held to 8,192 pixels on its longer side however far the canvas is zoomed.",
         ], misc: [
             "In Animate, a selected layer's first section is Add to Layer (New Action and Select Preset, each half the panel wide, as they were), with Templates in a section of its own below it.",
             "Templates have their own icon in the layers panel, the designer's, in place of the frame icon.",

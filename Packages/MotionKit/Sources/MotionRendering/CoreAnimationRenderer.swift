@@ -83,8 +83,21 @@ public final class CoreAnimationRenderer: SceneRenderer {
     /// screens and high-resolution exports.
     public var contentsScale: CGFloat = 2 {
         didSet {
-            for node in nodes.values { node.setContentsScale(contentsScale) }
-            for mask in masks.values { mask.node.setContentsScale(contentsScale) }
+            for node in nodes.values { node.setContentsScale(contentsScale, holdingText: holdsTextScale) }
+            for mask in masks.values { mask.node.setContentsScale(contentsScale, holdingText: holdsTextScale) }
+        }
+    }
+
+    /// While set, a change of `contentsScale` leaves texts with the pictures
+    /// they have, stretched; cleared, they are drawn again at the scale now.
+    /// For a pinch on the canvas, whose every step is a new scale: drawing
+    /// every text in the project again on each step (630 of them, in a
+    /// large import) is what made zooming stutter. Never set for exports.
+    public var holdsTextScale = false {
+        didSet {
+            guard oldValue, !holdsTextScale else { return }
+            for node in nodes.values { node.settleTextScale() }
+            for mask in masks.values { mask.node.settleTextScale() }
         }
     }
 
@@ -254,7 +267,9 @@ public final class CoreAnimationRenderer: SceneRenderer {
                     return made
                 }()
             }
-            if case .text = layers[i].content { node.setTextZoom(Self.textZoom(of: layers[i], in: scene, scale: contentsScale)) }
+            if !holdsTextScale, case .text = layers[i].content {
+                node.setTextZoom(Self.textZoom(of: layers[i], in: scene, scale: contentsScale))
+            }
             if case .spread = layers[i].motion { node.setMotionZoom(Self.stretch(of: layers[i], in: scene)) }
             node.update(layers[i], media: media)
             if layers[i].glass != .none { glassAt.append(i) }
@@ -301,24 +316,32 @@ public final class CoreAnimationRenderer: SceneRenderer {
     /// gone.
     private func updateMasks(_ scene: ResolvedScene) {
         var masked = Set<UUID>()
-        for resolved in scene.layers {
-            guard let node = nodes[resolved.id] else { continue }
-            guard let mask = resolved.mask, let source = scene.mask(mask.layerID) else {
-                if node.container.mask != nil { node.container.mask = nil }
-                continue
-            }
+        // By place, passing over the unmasked without copying them or
+        // looking up their nodes: nearly every layer, every frame.
+        let layers = scene.layers
+        for i in layers.indices {
+            guard let mask = layers[i].mask, let source = scene.mask(mask.layerID),
+                  let node = nodes[layers[i].id] else { continue }
+            let resolved = layers[i]
             let made = masks[resolved.id] ?? {
                 let m = MaskNode(scale: contentsScale)
                 m.node.flipsContents = flipsContents
                 masks[resolved.id] = m
                 return m
             }()
-            if case .text = source.content { made.node.setTextZoom(Self.textZoom(of: source, in: scene, scale: contentsScale)) }
+            if !holdsTextScale, case .text = source.content {
+                made.node.setTextZoom(Self.textZoom(of: source, in: scene, scale: contentsScale))
+            }
             made.update(source, mask: mask, bounds: node.container.bounds, media: media)
             if node.container.mask !== made.root { node.container.mask = made.root }
             masked.insert(resolved.id)
         }
-        for id in masks.keys where !masked.contains(id) { masks[id] = nil }
+        // A layer no longer masked is one that had a mask node: only those
+        // can still wear one.
+        for id in masks.keys where !masked.contains(id) {
+            masks[id] = nil
+            if let node = nodes[id], node.container.mask != nil { node.container.mask = nil }
+        }
     }
 
     /// How much bigger than its own size a text is drawn, through its own
@@ -327,11 +350,14 @@ public final class CoreAnimationRenderer: SceneRenderer {
     /// its own size and stretched, and came out soft on the canvas and in
     /// exports. Rounded up in steps of about 41% (a half power of two) so a
     /// Scale action draws the text again a handful of times rather than on
-    /// every frame, never below 1, and held so the picture stays within
-    /// `TextImage.maxSide` pixels.
+    /// every frame, and held so the picture's longer side stays within
+    /// `TextImage.maxSide` pixels: below 1 when the scale alone would pass
+    /// it (a 600 point headline at 800% on a Retina screen asked for 9,600
+    /// pixels and about 100 MB), though never coarser than a pixel a point.
     static func textZoom(of layer: ResolvedLayer, in scene: ResolvedScene, scale: CGFloat) -> CGFloat {
         let side = max(layer.size.width, layer.size.height, 1)
-        return min(stretch(of: layer, in: scene), CGFloat(max(1, TextImage.maxSide / (side * max(Double(scale), 1)))))
+        let s = max(Double(scale), 1)
+        return min(stretch(of: layer, in: scene), CGFloat(max(TextImage.maxSide / (side * s), 1 / s)))
     }
 
     /// How much bigger than its own size a layer shows, through its own
@@ -480,7 +506,10 @@ final class Node {
     /// `CoreAnimationRenderer.textZoom`); its pictures are drawn that much
     /// finer than `scale`.
     private var textZoom: CGFloat = 1
-    private var textScale: CGFloat { scale * textZoom }
+    /// The scale texts are drawn at: `scale`, or the one from before a
+    /// pinch began while the renderer holds texts as they are.
+    private var textBase: CGFloat
+    private var textScale: CGFloat { textBase * textZoom }
     /// How much bigger than its own size the layer shows while it blurs,
     /// so its copies' one picture is drawn fine enough.
     private var motionZoom: CGFloat = 1
@@ -504,6 +533,7 @@ final class Node {
 
     init(scale: CGFloat) {
         self.scale = scale
+        textBase = scale
         container.anchorPoint = .zero
         container.position = .zero
         container.allowsGroupOpacity = true
@@ -515,12 +545,21 @@ final class Node {
         clipMask.fillColor = CGColor(gray: 0, alpha: 1)
     }
 
-    func setContentsScale(_ scale: CGFloat) {
+    func setContentsScale(_ scale: CGFloat, holdingText: Bool = false) {
         self.scale = scale
         last = nil
         container.contentsScale = scale
         for p in paintLayers { p.setContentsScale(scale) }
-        // Text is a picture drawn at a scale, so it is drawn again.
+        // Text is a picture drawn at a scale, so it is drawn again, unless
+        // the scale is still changing (see `holdsTextScale`).
+        if !holdingText { settleTextScale() }
+    }
+
+    /// Draws the text again at the scale now, if it was drawn at another.
+    func settleTextScale() {
+        guard textBase != scale else { return }
+        textBase = scale
+        last = nil
         textKeys = [nil, nil]
     }
 
