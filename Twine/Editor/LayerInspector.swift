@@ -1322,9 +1322,24 @@ private struct MaskSection: View {
     }
 }
 
-private struct EffectsSection: View {
+struct EffectsSection: View {
     let layer: Layer
     let controller: EditorController
+    /// The other selected layers, as `FillSection.others`: while every
+    /// layer has the same effects, each edit goes to that effect of every
+    /// layer; while they differ the section reads Mixed and + puts the one
+    /// picked in place of them all. Skew, Tilt and Bend are one layer's.
+    var others: [Layer] = []
+
+    private var everyone: [Layer] { [layer] + others }
+    private var ids: [UUID] { everyone.map(\.id) }
+
+    private var isMixed: Bool {
+        others.contains { other in
+            other.effects.count != layer.effects.count
+                || zip(other.effects, layer.effects).contains { $0.kind != $1.kind || $0.isEnabled != $1.isEnabled }
+        }
+    }
 
     @Environment(MenuHost.self) private var menus
     @State private var addFrame: CGRect = .zero
@@ -1337,6 +1352,7 @@ private struct EffectsSection: View {
     private var t: Transform { layer.transform }
     /// Sound is never drawn, so it cannot slant or turn.
     private var canWarp: Bool {
+        if !others.isEmpty { return false }
         if case .audio = layer.content { return false }
         return true
     }
@@ -1347,19 +1363,22 @@ private struct EffectsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Effects") {
-                IconButton(icon: .plus, help: "Add a shadow, a blur, glass, a skew, a tilt or a bend") {
+                IconButton(icon: .plus, help: isMixed ? "Replace the different effects with one"
+                                              : others.isEmpty ? "Add a shadow, a blur, glass, a skew, a tilt or a bend"
+                                              : "Add a shadow, a blur or glass") {
                     var entries: [MenuEntry] = [.item("Drop Shadow", icon: .shadow) { add(.dropShadow(DropShadow())) }]
                     // These follow a shape's outline, so only shapes and
                     // frames have them.
-                    if layer.look != nil {
+                    let shapes = everyone.allSatisfy { $0.look != nil }
+                    if shapes {
                         entries.append(.item("Inner Shadow", icon: .innerShadow) { add(.innerShadow(DropShadow(offset: Vec2(0, 4), blur: 4))) })
                     }
                     entries.append(.item("Layer Blur", icon: .layerBlur) { add(.layerBlur(LayerBlur())) })
-                    if layer.look != nil {
+                    if shapes {
                         entries.append(.item("Background Blur", icon: .backgroundBlur) { add(.backgroundBlur(BackgroundBlur())) })
                     }
                     // Glass bends within an outline, so an open path has none.
-                    if layer.look?.geometry.isClosed == true {
+                    if everyone.allSatisfy({ $0.look?.geometry.isClosed == true }) {
                         entries.append(.item("Glass", icon: .glass) { add(.glass(Glass())) })
                     }
                     if canWarp && !(showsSkew && showsTilt && showsBend) {
@@ -1372,15 +1391,19 @@ private struct EffectsSection: View {
                 }
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { addFrame = $0 }
             }
-            ForEach(Array(layer.effects.enumerated()), id: \.element.id) { index, effect in
-                effectRows(effect, index: index)
-                    .gridBody()
+            if isMixed {
+                MixedRow().gridBody()
+            } else {
+                ForEach(Array(layer.effects.enumerated()), id: \.element.id) { index, effect in
+                    effectRows(effect, index: index)
+                        .gridBody()
+                }
             }
             if showsSkew { skewRows.gridBody() }
             if showsTilt { tiltRows.gridBody() }
             if showsBend { bendRows.gridBody() }
         }
-        .sectionPadding(empty: layer.effects.isEmpty && !showsSkew && !showsTilt && !showsBend)
+        .sectionPadding(empty: layer.effects.isEmpty && !isMixed && !showsSkew && !showsTilt && !showsBend)
     }
 
     private func titleRow(_ icon: Icon, _ title: String, remove: @escaping () -> Void) -> some View {
@@ -1462,21 +1485,21 @@ private struct EffectsSection: View {
     @ViewBuilder private func effectRows(_ effect: Effect, index: Int) -> some View {
         VStack(alignment: .leading, spacing: Theme.space8) {
             titleRow(effect.icon, effect.title) {
-                controller.edit(layer.id) { l in l.effects.remove(at: index) }
+                editAll { l in if l.effects.indices.contains(index) { l.effects.remove(at: index) } }
             }
             switch effect.kind {
             case .dropShadow(let s), .innerShadow(let s):
                 HStack(spacing: Theme.space8) {
                     ColorWell(color: s.color, size: Theme.control, title: "Shadow",
-                              onChange: { c in controller.update([withShadow(index) { $0.color = c }]) },
+                              onChange: { c in controller.update(withShadows(index) { $0.color = c }) },
                               onBegin: { controller.begin("Shadow Colour") },
                               onEnd: { controller.end() })
                     HexField(color: s.color) { c in
-                        controller.perform(.updateLayers([withShadow(index) { $0.color = c }]))
+                        controller.perform(.updateLayers(withShadows(index) { $0.color = c }))
                     }
                     UnitField(value: s.opacity * 100, decimals: 0, suffix: "%",
                               accepts: { $0 >= 0 && $0 <= 100 }) { v in
-                        controller.perform(.updateLayers([withShadow(index) { $0.opacity = v / 100 }]))
+                        controller.perform(.updateLayers(withShadows(index) { $0.opacity = v / 100 }))
                     }
                     .frame(width: Theme.labelWidth)
                     .help("Shadow opacity")
@@ -1546,7 +1569,7 @@ private struct EffectsSection: View {
     private func field(_ index: Int, _ unit: String, _ value: Double, min: Double? = nil,
                        _ set: @escaping (inout DropShadow, Double) -> Void) -> some View {
         UnitField(unit: unit, value: value, decimals: 1, accepts: { v in min.map { v >= $0 } ?? true }) { v in
-            controller.perform(.updateLayers([withShadow(index) { set(&$0, v) }]))
+            controller.perform(.updateLayers(withShadows(index) { set(&$0, v) }))
         }
     }
 
@@ -1561,33 +1584,49 @@ private struct EffectsSection: View {
     }
 
     private func add(_ kind: EffectKind) {
-        controller.edit(layer.id) { l in l.effects.append(Effect(kind: kind)) }
+        let replaces = isMixed
+        editAll { l in
+            if replaces { l.effects = [Effect(kind: kind)] } else { l.effects.append(Effect(kind: kind)) }
+        }
     }
 
     private func edit(_ index: Int, _ change: (inout Effect) -> Void) {
-        controller.edit(layer.id) { l in
+        editAll { l in
             guard l.effects.indices.contains(index) else { return }
             change(&l.effects[index])
         }
     }
 
-    /// The layer with the drop or inner shadow at `index` changed.
-    private func withShadow(_ index: Int, _ change: (inout DropShadow) -> Void) -> Layer {
-        // The layer as it is now, not as this view was built with: an open
-        // picker would otherwise write an old copy of it back.
-        var l = controller.project.layer(withID: layer.id) ?? layer
-        guard l.effects.indices.contains(index) else { return l }
-        switch l.effects[index].kind {
-        case .dropShadow(var s):
-            change(&s)
-            l.effects[index].kind = .dropShadow(s)
-        case .innerShadow(var s):
-            change(&s)
-            l.effects[index].kind = .innerShadow(s)
-        default:
-            break
+    /// Every selected layer, as it is in the project now, as one undo step.
+    private func editAll(_ change: (inout Layer) -> Void) {
+        let edited = controller.freshLayers(ids).map { layer -> Layer in
+            var l = layer
+            change(&l)
+            return l
         }
-        return l
+        guard !edited.isEmpty else { return }
+        controller.perform(controller.layerUpdate(edited))
+    }
+
+    /// The layers with the drop or inner shadow at `index` changed.
+    private func withShadows(_ index: Int, _ change: (inout DropShadow) -> Void) -> [Layer] {
+        // The layers as they are now, not as this view was built with: an
+        // open picker would otherwise write an old copy of them back.
+        controller.freshLayers(ids).map { layer in
+            var l = layer
+            guard l.effects.indices.contains(index) else { return l }
+            switch l.effects[index].kind {
+            case .dropShadow(var s):
+                change(&s)
+                l.effects[index].kind = .dropShadow(s)
+            case .innerShadow(var s):
+                change(&s)
+                l.effects[index].kind = .innerShadow(s)
+            default:
+                break
+            }
+            return l
+        }
     }
 }
 

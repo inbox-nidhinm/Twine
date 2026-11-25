@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 275
+    static let pushes = 276
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -57,6 +57,9 @@ enum VersionHistory {
             "Fills and strokes for several layers. Shapes and frames selected together show their Fill and Stroke: while every layer has the same ones, each row, its card and the stroke's settings change that fill or stroke on all of them, and + adds one to each; while they differ the section reads Mixed, and + puts one in place of them all, as in Figma.",
             "Texts selected along with other layers show their Text section, which changes the texts; before, it showed only when every layer was a text.",
             "Number fields do sums. Type 100+20, 1920/2 or (10+5)*2 and the field takes the answer. Start with +, * or / to change the number already there: +10, *2, /2 (a leading minus is still a negative number; take away with +-10). With several layers selected, such a change goes to each layer from its own number, so +10 in X moves every one of them ten pixels.",
+            "Effects for several layers. Layers selected together show their Effects: + adds a shadow, a blur or glass to all of them; while they have the same effects, each field, the colour, show and hide and remove change that effect on every layer; while they differ the section reads Mixed, and + puts the one you pick in place of them all. Skew, Tilt and Bend stay one layer's.",
+            "A stroke for several texts: texts selected together show their Stroke, added, changed and removed on all of them at once, or reading Mixed while their strokes differ.",
+            "Several actions of one kind show Mixed in a number they do not share, for Move, Scale, Rotate, Opacity and Resize, in From and in To; before, the field showed the first action's number as if it were everyone's. Typing a number still sets it on all of them, and only that number.",
         ], fixes: [
             "Cards open beside the control that raises them again. The colour picker, a fill's or stroke's card, the stroke settings and the easing card had all been landing in the window's top-left corner since cards began letting clicks through to what is behind them.",
         ]),

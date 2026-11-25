@@ -60,7 +60,8 @@ struct ActionInspector: View {
                 }
             } else if sameKind {
                 PanelDivider()
-                ValueFields(controller: controller, action: first, inherited: controller.inheritedState(for: first))
+                ValueFields(controller: controller, action: first, inherited: controller.inheritedState(for: first),
+                            actions: actions)
                     .gridBody()
                     .padding(.vertical, Theme.panelPad)
             }
@@ -551,6 +552,37 @@ private struct ValueFields: View {
     let controller: EditorController
     let action: Action
     let inherited: LayerState?
+    /// Every selected action, all of this kind. Where they differ in a
+    /// number, its field reads Mixed (Move, Scale, Rotate, Opacity and
+    /// Resize, 26 November 2026; the other kinds still show the first's).
+    var actions: [Action] = []
+
+    /// Whether the selected actions differ in a number of their specs.
+    private func differ(_ number: (ActionSpec) -> Double?) -> Bool {
+        guard actions.count > 1 else { return false }
+        let first = number(action.spec)
+        return actions.contains { number($0.spec) != first }
+    }
+
+    private func moves(_ n: (MoveAction) -> Double?) -> Bool {
+        differ { if case .move(let m) = $0 { n(m) } else { nil } }
+    }
+
+    private func scales(_ n: (ScaleAction) -> Double?) -> Bool {
+        differ { if case .scale(let s) = $0 { n(s) } else { nil } }
+    }
+
+    private func rotates(_ n: (RotateAction) -> Double?) -> Bool {
+        differ { if case .rotate(let r) = $0 { n(r) } else { nil } }
+    }
+
+    private func opacities(_ n: (OpacityAction) -> Double?) -> Bool {
+        differ { if case .opacity(let o) = $0 { n(o) } else { nil } }
+    }
+
+    private func resizes(_ n: (ResizeAction) -> Double?) -> Bool {
+        differ { if case .resize(let r) = $0 { n(r) } else { nil } }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.space10) {
@@ -579,17 +611,17 @@ private struct ValueFields: View {
     @ViewBuilder private func move(_ m: MoveAction) -> some View {
         let from = inherited?.position ?? .zero
         StackedRow(label: "From", accessory: { clearButton(m.initial != nil) { editMove("Starting Value") { m, _ in m.initial = nil } } }) {
-            OptionalField(unit: "X", value: m.initial?.x, placeholder: from.x) { v in
+            OptionalField(unit: "X", value: moves { $0.initial?.x } ? nil : m.initial?.x, placeholder: from.x, mixed: moves { $0.initial?.x }) { v in
                 editMove("Starting Value") { m, s in m.initial = v.map { Vec2($0, (m.initial ?? s.position).y) } }
             }
-            OptionalField(unit: "Y", value: m.initial?.y, placeholder: from.y) { v in
+            OptionalField(unit: "Y", value: moves { $0.initial?.y } ? nil : m.initial?.y, placeholder: from.y, mixed: moves { $0.initial?.y }) { v in
                 editMove("Starting Value") { m, s in m.initial = v.map { Vec2((m.initial ?? s.position).x, $0) } }
             }
         }
         .help("Where it starts. Empty starts from wherever the layer is when the action begins.")
         StackedRow(label: m.mode == .to ? "To" : "By", menu: modeEntries(m.mode), swap: swap) {
-            UnitField(unit: "X", value: m.end.x) { v in editMove("Move") { m, _ in m.end.x = v } }
-            UnitField(unit: "Y", value: m.end.y) { v in editMove("Move") { m, _ in m.end.y = v } }
+            UnitField(unit: "X", value: m.end.x, mixed: moves { $0.end.x }) { v in editMove("Move") { m, _ in m.end.x = v } }
+            UnitField(unit: "Y", value: m.end.y, mixed: moves { $0.end.y }) { v in editMove("Move") { m, _ in m.end.y = v } }
         }
         .help(m.mode == .to ? "Where it ends, in the layer's parent's space." : "How far it moves from where it starts.")
         HStack {
@@ -637,14 +669,14 @@ private struct ValueFields: View {
         let from = inherited?.scale ?? .one
         StackedRow(label: "From", accessory: { clearButton(s.initial != nil) { editScale("Starting Value") { s, _ in s.initial = nil } } }) {
             if s.isLinked {
-                OptionalField(unit: "S", value: s.initial.map { $0.x * 100 }, placeholder: from.x * 100, decimals: 1, suffix: "%") { v in
+                OptionalField(unit: "S", value: scales { $0.initial?.x } ? nil : s.initial.map { $0.x * 100 }, placeholder: from.x * 100, decimals: 1, suffix: "%", mixed: scales { $0.initial?.x }) { v in
                     editScale("Starting Value") { s, _ in s.initial = v.map { Vec2($0 / 100, $0 / 100) } }
                 }
             } else {
-                OptionalField(unit: "X", value: s.initial.map { $0.x * 100 }, placeholder: from.x * 100, decimals: 1, suffix: "%") { v in
+                OptionalField(unit: "X", value: scales { $0.initial?.x } ? nil : s.initial.map { $0.x * 100 }, placeholder: from.x * 100, decimals: 1, suffix: "%", mixed: scales { $0.initial?.x }) { v in
                     editScale("Starting Value") { s, st in s.initial = v.map { Vec2($0 / 100, (s.initial ?? st.scale).y) } }
                 }
-                OptionalField(unit: "Y", value: s.initial.map { $0.y * 100 }, placeholder: from.y * 100, decimals: 1, suffix: "%") { v in
+                OptionalField(unit: "Y", value: scales { $0.initial?.y } ? nil : s.initial.map { $0.y * 100 }, placeholder: from.y * 100, decimals: 1, suffix: "%", mixed: scales { $0.initial?.y }) { v in
                     editScale("Starting Value") { s, st in s.initial = v.map { Vec2((s.initial ?? st.scale).x, $0 / 100) } }
                 }
             }
@@ -659,12 +691,12 @@ private struct ValueFields: View {
             }
         }) {
             if s.isLinked {
-                UnitField(unit: "S", value: s.end.x * 100, decimals: 1, suffix: "%") { v in
+                UnitField(unit: "S", value: s.end.x * 100, decimals: 1, suffix: "%", mixed: scales { $0.end.x }) { v in
                     editScale("Scale") { s, _ in s.end = Vec2(v / 100, v / 100) }
                 }
             } else {
-                UnitField(unit: "X", value: s.end.x * 100, decimals: 1, suffix: "%") { v in editScale("Scale") { s, _ in s.end.x = v / 100 } }
-                UnitField(unit: "Y", value: s.end.y * 100, decimals: 1, suffix: "%") { v in editScale("Scale") { s, _ in s.end.y = v / 100 } }
+                UnitField(unit: "X", value: s.end.x * 100, decimals: 1, suffix: "%", mixed: scales { $0.end.x }) { v in editScale("Scale") { s, _ in s.end.x = v / 100 } }
+                UnitField(unit: "Y", value: s.end.y * 100, decimals: 1, suffix: "%", mixed: scales { $0.end.y }) { v in editScale("Scale") { s, _ in s.end.y = v / 100 } }
             }
         }
         .help(s.mode == .to ? "The scale it ends at." : "What it multiplies the starting scale by.")
@@ -682,13 +714,13 @@ private struct ValueFields: View {
 
     @ViewBuilder private func rotate(_ r: RotateAction) -> some View {
         StackedRow(label: "From", accessory: { clearButton(r.initial != nil) { editRotate("Starting Value") { $0.initial = nil } } }) {
-            OptionalField(unit: "R", value: r.initial, placeholder: inherited?.rotation ?? 0, decimals: 1, suffix: "°") { v in
+            OptionalField(unit: "R", value: rotates { $0.initial } ? nil : r.initial, placeholder: inherited?.rotation ?? 0, decimals: 1, suffix: "°", mixed: rotates { $0.initial }) { v in
                 editRotate("Starting Value") { $0.initial = v }
             }
         }
         .help("The angle it starts at. Empty starts from the layer's angle when the action begins.")
         StackedRow(label: r.mode == .to ? "To" : "By", menu: modeEntries(r.mode), swap: swap) {
-            UnitField(unit: "R", value: r.end, decimals: 1, suffix: "°") { v in editRotate("Rotate") { $0.end = v } }
+            UnitField(unit: "R", value: r.end, decimals: 1, suffix: "°", mixed: rotates { $0.end }) { v in editRotate("Rotate") { $0.end = v } }
         }
         .help(r.mode == .to ? "The angle it ends at. 720° spins twice." : "How far it turns. Negative turns anticlockwise.")
     }
@@ -992,14 +1024,15 @@ private struct ValueFields: View {
 
     @ViewBuilder private func opacity(_ o: OpacityAction) -> some View {
         StackedRow(label: "From", accessory: { clearButton(o.initial != nil) { editOpacity("Starting Value") { $0.initial = nil } } }) {
-            OptionalField(value: o.initial.map { $0 * 100 }, placeholder: (inherited?.opacity ?? 1) * 100,
-                          suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
+            OptionalField(value: opacities { $0.initial } ? nil : o.initial.map { $0 * 100 },
+                          placeholder: (inherited?.opacity ?? 1) * 100,
+                          suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }, mixed: opacities { $0.initial }) { v in
                 editOpacity("Starting Value") { $0.initial = v.map { $0 / 100 } }
             }
         }
         .help("The opacity it starts at. Set it to fade a layer in from nothing, before the action begins.")
         StackedRow(label: "To", swap: swap) {
-            UnitField(value: o.end * 100, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
+            UnitField(value: o.end * 100, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }, mixed: opacities { $0.end }) { v in
                 editOpacity("Opacity") { $0.end = v / 100 }
             }
         }
@@ -1018,10 +1051,10 @@ private struct ValueFields: View {
     @ViewBuilder private func resize(_ r: ResizeAction) -> some View {
         let from = inherited?.size ?? Size2(0, 0)
         StackedRow(label: "From", accessory: { clearButton(r.initial != nil) { editResize("Starting Value") { r, _ in r.initial = nil } } }) {
-            OptionalField(unit: "W", value: r.initial?.width, placeholder: from.width, accepts: { $0 >= 0 }) { v in
+            OptionalField(unit: "W", value: resizes { $0.initial?.width } ? nil : r.initial?.width, placeholder: from.width, accepts: { $0 >= 0 }, mixed: resizes { $0.initial?.width }) { v in
                 editResize("Starting Value") { r, st in r.initial = v.map { Size2($0, (r.initial ?? st.size).height) } }
             }
-            OptionalField(unit: "H", value: r.initial?.height, placeholder: from.height, accepts: { $0 >= 0 }) { v in
+            OptionalField(unit: "H", value: resizes { $0.initial?.height } ? nil : r.initial?.height, placeholder: from.height, accepts: { $0 >= 0 }, mixed: resizes { $0.initial?.height }) { v in
                 editResize("Starting Value") { r, st in r.initial = v.map { Size2((r.initial ?? st.size).width, $0) } }
             }
         }
@@ -1032,13 +1065,13 @@ private struct ValueFields: View {
                 editResize("Link Size") { r, _ in r.isLinked.toggle() }
             }
         }) {
-            UnitField(unit: "W", value: r.end.width, accepts: { $0 >= 0 }) { v in
+            UnitField(unit: "W", value: r.end.width, accepts: { $0 >= 0 }, mixed: resizes { $0.end.width }) { v in
                 editResize("Resize") { r, _ in
                     if r.isLinked, r.end.width > 0 { r.end.height *= v / r.end.width }
                     r.end.width = v
                 }
             }
-            UnitField(unit: "H", value: r.end.height, accepts: { $0 >= 0 }) { v in
+            UnitField(unit: "H", value: r.end.height, accepts: { $0 >= 0 }, mixed: resizes { $0.end.height }) { v in
                 editResize("Resize") { r, _ in
                     if r.isLinked, r.end.height > 0 { r.end.width *= v / r.end.height }
                     r.end.height = v

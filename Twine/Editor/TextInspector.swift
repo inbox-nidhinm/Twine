@@ -349,6 +349,23 @@ struct TextStrokeSection: View {
     let layer: Layer
     let text: TextContent
     let controller: EditorController
+    /// The other selected texts: while every text has the same stroke (or
+    /// none has one) each edit goes to all of them; while they differ the
+    /// section reads Mixed, and + gives them all one new stroke.
+    var others: [Layer] = []
+
+    private var ids: [UUID] { [layer.id] + others.map(\.id) }
+
+    private var isMixed: Bool {
+        others.contains { other in
+            switch (other.textContent?.stroke, text.stroke) {
+            case (nil, nil): false
+            case let (a?, b?):
+                a.paint != b.paint || a.isEnabled != b.isEnabled || a.width != b.width || a.alignment != b.alignment || a.join != b.join
+            default: true
+            }
+        }
+    }
 
     @Environment(MenuHost.self) private var menus
     @State private var settingsFrame: CGRect = .zero
@@ -356,7 +373,11 @@ struct TextStrokeSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Stroke") {
-                if text.stroke == nil {
+                if isMixed {
+                    IconButton(icon: .plus, help: "Replace the different strokes with one") {
+                        edit { $0.stroke = Stroke(paint: .color(LayerFactory.defaultStroke), width: 2) }
+                    }
+                } else if text.stroke == nil {
                     IconButton(icon: .plus, help: "Add a stroke") {
                         edit { $0.stroke = Stroke(paint: .color(LayerFactory.defaultStroke), width: 2) }
                     }
@@ -364,12 +385,14 @@ struct TextStrokeSection: View {
                     IconButton(icon: .minus, help: "Remove the stroke") { edit { $0.stroke = nil } }
                 }
             }
-            if let stroke = text.stroke {
+            if isMixed {
+                MixedRow().gridBody()
+            } else if let stroke = text.stroke {
                 VStack(alignment: .leading, spacing: Theme.space8) {
                     PaintEditor(paint: .solid(Self.color(of: stroke)), isEnabled: stroke.isEnabled, controller: controller,
                                 layer: layer, title: "Stroke",
                                 change: { paint in
-                                    controller.freshLayers([layer.id]).map {
+                                    controller.freshLayers(ids).map {
                                         $0.editingText { if case .solid(let c) = paint { $0.stroke?.paint = .color(c) } }
                                     }
                                 },
@@ -393,7 +416,7 @@ struct TextStrokeSection: View {
                             menus.showPopup(at: CGPoint(x: inspectorLeft - Theme.floatGap - Theme.cardWidth,
                                                         y: settingsFrame.minY - 40)) {
                                 PopupCard(title: "Stroke", width: Theme.cardWidth) {
-                                    TextStrokeSettings(layerID: layer.id, controller: controller)
+                                    TextStrokeSettings(layerID: layer.id, controller: controller, others: others.map(\.id))
                                 }
                             }
                         }
@@ -403,7 +426,7 @@ struct TextStrokeSection: View {
                 .gridBody()
             }
         }
-        .sectionPadding(empty: text.stroke == nil)
+        .sectionPadding(empty: text.stroke == nil && !isMixed)
     }
 
     static func color(of stroke: Stroke) -> RGBA {
@@ -415,8 +438,7 @@ struct TextStrokeSection: View {
     }
 
     private func edit(_ change: (inout TextContent) -> Void) {
-        let edited = layer.editingText(change)
-        controller.edit(layer.id) { $0 = edited }
+        controller.editTexts(ids, change)
     }
 }
 
@@ -425,6 +447,7 @@ struct TextStrokeSection: View {
 private struct TextStrokeSettings: View {
     let layerID: UUID
     let controller: EditorController
+    var others: [UUID] = []
 
     var body: some View {
         if let layer = controller.project.layer(withID: layerID), case .text(let text) = layer.content, let stroke = text.stroke {
@@ -433,7 +456,7 @@ private struct TextStrokeSettings: View {
                     .font(ThemeFont.label)
                     .foregroundStyle(Theme.textSecondary)
                 SegmentRow(selection: stroke.join, options: LineJoin.allCases, title: { $0.rawValue.capitalized }) { j in
-                    controller.edit(layerID) { l in l = l.editingText { $0.stroke?.join = j } }
+                    controller.editTexts([layerID] + others) { $0.stroke?.join = j }
                 }
             }
             .help("How the stroke turns a corner")

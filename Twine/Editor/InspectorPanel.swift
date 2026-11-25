@@ -107,9 +107,11 @@ struct InspectorPanel: View {
                 PanelDivider()
                 TextSection(layers: texts, controller: controller)
             }
-            if texts.count == layers.count {
+            if texts.count == layers.count, let text = layers[0].textContent {
                 PanelDivider()
                 TextFillSection(layers: layers, controller: controller)
+                PanelDivider()
+                TextStrokeSection(layer: layers[0], text: text, controller: controller, others: Array(layers.dropFirst()))
             }
             // Shapes and frames take fills and strokes together.
             if let look = layers[0].look, layers.allSatisfy({ $0.look != nil }) {
@@ -119,6 +121,9 @@ struct InspectorPanel: View {
                 PanelDivider()
                 StrokeSection(layer: layers[0], shape: look, controller: controller, others: others)
             }
+            // Shadows, blurs and glass go on any layers together.
+            PanelDivider()
+            EffectsSection(layer: layers[0], controller: controller, others: Array(layers.dropFirst()))
             SelectionColorsSection(ids: layers.map(\.id), controller: controller)
         }
     }
