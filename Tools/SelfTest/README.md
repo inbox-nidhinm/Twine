@@ -7,7 +7,7 @@ A kit for checking changes in the real app without touching the copy the user ha
 ```bash
 Tools/SelfTest/install-hook.sh              # puts SelfTest.swift into the app
 Tools/SelfTest/make-test-app.sh             # builds build/TwineTest.app (debug; pass release to measure speed)
-Tools/SelfTest/run.sh Actions t1 "wait 1;seek 1;shot a"         # projects open in Animate; key m goes to Design
+Tools/SelfTest/run.sh Actions t1 "wait 1;seek 1;shot a"         # projects open in Animate (an empty one in Design); key m switches
 Tools/SelfTest/remove-hook.sh               # always, before committing (make-app.sh refuses until it is run)
 ```
 

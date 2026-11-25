@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 261
+    static let pushes = 262
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -99,7 +99,7 @@ enum VersionHistory {
             "The Text tool clicked on a text types into it, as in Figma; it used to put a second, empty text on top.",
             "A hex colour typed with its opacity (#FF000080) keeps the opacity.",
             "Select All goes by where you are: every bar after a click in the timeline, a frame's or group's own layers when the selection is inside one, the top level otherwise.",
-            "Escape no longer stops a running export (Cancel and the cross still do), and quitting or closing the window while one runs asks first.",
+            "Closing the export panel, by its cross or Escape, no longer stops a running export: it carries on, shown by the small progress card, and only Cancel stops it. Quitting, or closing a project or the window, while one runs asks first.",
             "With several things selected, Opacity, Start and Duration read Mixed when they differ, where they showed one layer's or bar's number as if all shared it.",
             "A number typed past a field's range takes the nearest one it allows (150% is 100%), and Escape in a field drops what was typed and hands the keyboard back to the canvas. Escape also closes the preset and template pickers.",
             "The layers panel remembers which groups were open when it is hidden and shown, and scrolls to a layer picked on the canvas. Rename from a right-click shows the panel first.",
@@ -107,6 +107,8 @@ enum VersionHistory {
             "Notes stay up longer the more they say, and for as long as the pointer rests on them.",
         ], misc: [
             "Settings is in the Twine menu (⌘,). File > Duplicate is named Duplicate Project, and Home is greyed out on the home screen.",
+            "A new, empty project opens in Design, where the drawing tools are; a project with layers still opens in Animate.",
+            "⌘W in a project closes the project and goes Home (File > Close Project), where it used to quit Twine. On the home screen it closes the window, which quits, as the red button does.",
             "The Export button's tooltip names the folder it saves to when one is set in Settings, the finished file's name shows beside Show in Finder, and sizes that are greyed out say Over 4K.",
             "An empty home screen shows a New Project tile where the first card will go.",
             "Tooltips for the same thing read the same in Design and Animate (the link buttons, Replace…, showing and hiding an effect).",

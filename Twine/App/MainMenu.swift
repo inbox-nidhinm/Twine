@@ -65,7 +65,8 @@ enum MainMenu {
         menu.addItem(.separator())
         menu.addItem(item("Import…", #selector(EditorWindowController.importMedia(_:)), "i"))
         menu.addItem(.separator())
-        menu.addItem(item("Close", #selector(NSWindow.performClose(_:)), "w"))
+        // In a project this is Close Project, and goes Home (`AppDelegate`).
+        menu.addItem(item("Close", #selector(AppDelegate.closeProjectOrWindow(_:)), "w"))
         menu.addItem(item("Save", #selector(NSDocument.save(_:)), "s"))
         menu.addItem(item("Duplicate Project", #selector(NSDocument.duplicate(_:)), "s", [.command, .shift]))
         menu.addItem(item("Rename…", #selector(NSDocument.rename(_:))))

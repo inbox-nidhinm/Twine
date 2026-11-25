@@ -1295,10 +1295,11 @@ final class EditorController {
         editor.showExport = true
     }
 
-    /// Puts the panel away, stopping an export still running.
+    /// Puts the panel away. An export still running carries on, shown by
+    /// the small progress card, which has its own cancel: closing the panel
+    /// used to throw the export away, however far it had got.
     func closeExport() {
         editor.exportPlayer?.pause()
-        if editor.exports.isExporting { editor.exports.cancel() }
         editor.exports.forgetCompleted()
         editor.showExport = false
     }

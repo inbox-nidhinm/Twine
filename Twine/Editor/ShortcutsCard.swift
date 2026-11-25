@@ -161,6 +161,7 @@ struct ShortcutsCard: View {
                     s("Rename in the layers panel", "double-click"),
                     s("Duplicate project", "⇧⌘S"),
                     s("Home", "⇧⌘H"),
+                    s("Close the project", "⌘W"),
                 ]),
             ],
         ]

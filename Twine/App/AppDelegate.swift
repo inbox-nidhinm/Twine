@@ -3,8 +3,25 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// Home is greyed out while the home screen is what is showing.
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        if item.action == #selector(showHome(_:)) { return !NSDocumentController.shared.documents.isEmpty }
+        if item.action == #selector(showHome(_:)) { return Self.showsProject }
+        if item.action == #selector(closeProjectOrWindow(_:)) { item.title = Self.showsProject ? "Close Project" : "Close" }
         return true
+    }
+
+    /// Whether the window is showing a project, not the home screen.
+    static var showsProject: Bool { MainWindow.window.windowController is EditorWindowController }
+
+    /// File > Close (Command-W). In a project it closes the project and
+    /// goes Home, as closing a file does in Figma or Jitter: closing the
+    /// one window quits, so Command-W used to take the whole app away. On
+    /// the home screen it closes the window, which quits, as the red
+    /// button always does.
+    @objc func closeProjectOrWindow(_ sender: Any?) {
+        guard Self.showsProject else { return MainWindow.window.performClose(sender) }
+        guard Self.isExporting else { return showHome(sender) }
+        Self.askToStopExport(or: "Stop and Close", remember: false) { [weak self] stop in
+            if stop { self?.showHome(sender) }
+        }
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -59,7 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     /// Asks, on the window, whether to stop the running export. `done`
     /// hears true when the person chose to stop it.
-    static func askToStopExport(or stop: String, done: @escaping (Bool) -> Void) {
+    static func askToStopExport(or stop: String, remember: Bool = true, done: @escaping (Bool) -> Void) {
         let alert = NSAlert()
         alert.messageText = "An export is still running."
         alert.informativeText = "Stopping now leaves no file."
@@ -67,7 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         alert.addButton(withTitle: stop)
         alert.beginSheetModal(for: MainWindow.window) { response in
             let stops = response == .alertSecondButtonReturn
-            if stops { exportStopAgreed = true }
+            if stops, remember { exportStopAgreed = true }
             done(stops)
         }
     }

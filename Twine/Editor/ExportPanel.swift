@@ -396,9 +396,7 @@ enum ExportKeys {
     static func handle(_ event: NSEvent, _ controller: EditorController) -> Bool {
         guard controller.editor.showExport else { return false }
         switch event.keyCode {
-        // Not while an export runs: one stray Escape threw away a long
-        // export, even at its last frames. Cancel and the cross still stop it.
-        case 53 where !controller.editor.exports.isExporting: controller.closeExport()
+        case 53: controller.closeExport()
         case 49 where !event.isARepeat: controller.editor.exportPlayer?.toggle()
         default: break
         }

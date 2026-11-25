@@ -362,6 +362,11 @@ final class ProjectDocument: NSDocument {
 
     override func makeWindowControllers() {
         guard let store else { return }
+        // A project with nothing in it opens in Design, where the tools
+        // are: in Animate an empty project showed an empty canvas, an empty
+        // timeline and no tool bar, and nothing to say where to begin. Any
+        // other project opens in Animate, as before.
+        if store.project.layers.isEmpty { editor.mode = .design }
         addWindowController(EditorWindowController(document: self, store: store))
     }
 
