@@ -73,7 +73,7 @@ struct GradientStopsEditor<BarButton: View, FirstRowButton: View>: View {
             return g
         }
         return HStack(spacing: Theme.space6) {
-            ColorWell(color: stop.color, size: Theme.control, title: title,
+            ColorWell(color: stop.color, size: Theme.glyph, title: title,
                       onChange: { edit.live(recoloured($0)) },
                       onBegin: { pick(index); edit.begin("Colour") }, onEnd: edit.end)
             HexField(color: stop.color) { c in

@@ -3,11 +3,14 @@ import AppKit
 
 /// Every colour, size, radius and type style in Twine, in one place.
 ///
-/// Taken from the "Flip Design System" page of the JUI Figma file
-/// (2XErpBfGuIGNU0DkL58Ute, node 171:2055), whose values in turn come from
-/// Flip's `FlipTheme`. The one deliberate difference is the accent: Twine is
-/// blue where Flip is green, and the two tokens derived from the accent
-/// (`rowSelected`, `accentHover`) are re-derived to match.
+/// The DialKit look (the `dialkit` branch, 26 November 2026): values from the
+/// "dialkit" page of the Twine Figma file (RRnath7INm7WH7CGLOfLdH, node
+/// 448:436), which took them from DialKit's own stylesheet (joshpuckett/dialkit,
+/// `src/styles/theme.css`). DialKit's surfaces are white at low opacity over
+/// its glass (#212121); where a token must be one solid colour it is that
+/// white already laid over the glass, so it reads the same on a panel. The
+/// accent stays Twine's blue. The Flip look this replaced is kept on the
+/// `archive/flip-look` branch and the `flip-look-v0.2.80` tag.
 ///
 /// Views read these and never write a literal. If a view needs a value that is
 /// not here, it belongs here first.
@@ -15,17 +18,23 @@ public enum Theme {
 
     // MARK: Surfaces (surface/*, border/*)
 
-    /// #1E1E1E. The canvas, and the track inside sliders and toggles.
+    /// #1E1E1E (dial/canvas). The canvas round the artboard.
     public static let canvas = Color(red: 0x1E / 255, green: 0x1E / 255, blue: 0x1E / 255)
-    /// #2C2C2C. Every floating card.
-    public static let panel = Color(red: 0x2C / 255, green: 0x2C / 255, blue: 0x2C / 255)
-    /// #383838. Fields, trays, and hover over `panel`.
-    public static let panelRaised = Color(red: 0x38 / 255, green: 0x38 / 255, blue: 0x38 / 255)
-    /// #484848. Hover over something already on `panelRaised`: the next rung of
-    /// the same ramp, so a hover on a tray still shows.
-    public static let panelHover = Color(red: 0x48 / 255, green: 0x48 / 255, blue: 0x48 / 255)
-    /// #424242. Rules, and the edge of every card.
-    public static let border = Color(red: 0x42 / 255, green: 0x42 / 255, blue: 0x42 / 255)
+    /// #212121 (dial/glass). Every floating card.
+    public static let panel = Color(red: 0x21 / 255, green: 0x21 / 255, blue: 0x21 / 255)
+    /// #2C2C2C (dial/surface, white at 5% over the glass). Every row: fields,
+    /// sliders, menus, toggles, trays; and hover over `panel`.
+    public static let panelRaised = Color(red: 0x2C / 255, green: 0x2C / 255, blue: 0x2C / 255)
+    /// #373737 (dial/surface-hover, white at 10%). A row under the pointer.
+    public static let panelHover = Color(red: 0x37 / 255, green: 0x37 / 255, blue: 0x37 / 255)
+    /// White at 10% (dial/border). The edge of every card.
+    public static let border = Color.white.opacity(0.10)
+    /// White at 6% (dial/surface-subtle). The rule between a panel's sections.
+    public static let rule = Color.white.opacity(0.06)
+    /// #2A2A2A (dial/dropdown). An open menu's card.
+    public static let dropdown = Color(red: 0x2A / 255, green: 0x2A / 255, blue: 0x2A / 255)
+    /// White at 60% (dial/focus-ring). The line round a field being typed in.
+    public static let focus = Color.white.opacity(0.6)
     /// A hairline over colour the theme does not control: a swatch, a well, a
     /// thumbnail, the inside of a track. Translucent so it reads on anything.
     public static let edge = Color.white.opacity(0.12)
@@ -47,16 +56,23 @@ public enum Theme {
     /// #33506C. A selected row. Mixed by eye rather than as the accent at some
     /// opacity over `panel`, which comes out greyer than the accent reads.
     public static let rowSelected = Color(red: 0x33 / 255, green: 0x50 / 255, blue: 0x6C / 255)
-    /// #5C5C5C. What is chosen inside the inspector: a segment, a switch that
-    /// is on. Grey rather than the accent, so settings never compete with the
-    /// selection on the canvas for attention.
-    public static let chosen = Color(red: 0x5C / 255, green: 0x5C / 255, blue: 0x5C / 255)
-    /// `chosen` under the pointer: a step lighter, as `accentHover` is.
-    public static let chosenHover = Color(red: 0x68 / 255, green: 0x68 / 255, blue: 0x68 / 255)
+    /// #434343 (dial/surface-active over a row). What is chosen inside the
+    /// inspector: a segment, the tool in hand. Grey rather than the accent,
+    /// so settings never compete with the selection on the canvas.
+    public static let chosen = Color(red: 0x43 / 255, green: 0x43 / 255, blue: 0x43 / 255)
+    /// `chosen` under the pointer, and a switch that is on (dial/border-hover
+    /// over a row).
+    public static let chosenHover = Color(red: 0x4C / 255, green: 0x4C / 255, blue: 0x4C / 255)
+    /// A slider's filled part (dial/surface-active), and while it drags
+    /// (dial/border-hover). Laid over the row, so translucent.
+    public static let sliderFill = Color.white.opacity(0.11)
+    public static let sliderFillActive = Color.white.opacity(0.15)
+    /// A slider's handle (3 by 20), shown under the pointer or while dragging.
+    public static let sliderHandle = Color.white.opacity(0.95)
     /// The row that is current without being selected.
     public static let rowCurrent = accent.opacity(0.22)
-    /// A row under the pointer. Translucent so the grain shows through.
-    public static let rowHover = Color.white.opacity(0.057)
+    /// A row under the pointer (dial/surface).
+    public static let rowHover = Color.white.opacity(0.05)
     /// A template's tile on Home's New from Template screen, and under the pointer.
     public static let templateTile = Color(red: 0x41 / 255, green: 0x41 / 255, blue: 0x41 / 255)
     public static let templateTileHover = Color(red: 0x4A / 255, green: 0x4A / 255, blue: 0x4A / 255)
@@ -68,6 +84,8 @@ public enum Theme {
     public static let previewShape = Color(white: 0.86)
     /// Smart guides and equal-spacing marks while something snaps.
     public static let guide = Color(red: 0xF2 / 255, green: 0x4E / 255, blue: 0x6B / 255)
+    /// A timeline bar that is not selected (dial/clip, white at 20%).
+    public static let clip = Color.white.opacity(0.20)
     /// A timeline scene's own colour: its span bar and the line down its
     /// rows (#2E5575, the user's choice), a deep blue apart from the light
     /// blue of a selection. Scenes have no row colour: the bar is enough.
@@ -77,13 +95,17 @@ public enum Theme {
 
     // MARK: Text (text/*)
 
-    public static let textPrimary = Color.white
-    public static let textSecondary = Color(white: 0.70)
-    /// Placeholders, units, readouts, disabled.
-    public static let textTertiary = Color(white: 0.50)
-    /// A field's name and unit inside its box (X, W, px, %): a step brighter
-    /// than `textTertiary`, which on the raised box was hard to read.
-    public static let fieldLabel = Color(white: 0.62)
+    /// White at 95% (dial/text-primary): values and names.
+    public static let textPrimary = Color.white.opacity(0.95)
+    /// White at 70% (dial/text-label): every row's name, and section titles.
+    public static let textSecondary = Color.white.opacity(0.70)
+    /// White at 40% (dial/text-tertiary). Placeholders, readouts, disabled.
+    public static let textTertiary = Color.white.opacity(0.40)
+    /// A field's name and unit inside its box (X, W, px, %), as DialKit's
+    /// labels inside a row: dial/text-label.
+    public static let fieldLabel = Color.white.opacity(0.70)
+    /// The panel's own title (dial/text-root).
+    public static let textRoot = Color.white
     /// Text drawn on a white fill, such as a slider readout once the fill
     /// reaches it.
     public static let textOnFill = Color(white: 0.32)
@@ -117,7 +139,7 @@ public enum Theme {
     /// floating cards (the easing card, popups) and the larger sheets
     /// (Version History, Keyboard Shortcuts).
     public static let hairline: CGFloat = 1
-    public static let cardHeader: CGFloat = 34
+    public static let cardHeader: CGFloat = 40
     public static let sheetHeader: CGFloat = 38
     /// Extra space between the lines of running text in a sheet (Version
     /// History's points): 11 pt text at about 155% of its size, 17 pt lines
@@ -146,25 +168,41 @@ public enum Theme {
     public static let disclosure: CGFloat = 14
     /// How far above and below an edge it can be grabbed to resize.
     public static let resizeEdge: CGFloat = 6
-    /// The shadow under every floating card.
-    public static let shadow = Color.black.opacity(0.4)
-    public static let shadowRadius: CGFloat = 12
-    public static let shadowY: CGFloat = 4
+    /// The shadow under every floating card: DialKit's 0 8 32 at 50%. A CSS
+    /// blur is twice SwiftUI's radius.
+    public static let shadow = Color.black.opacity(0.5)
+    public static let shadowRadius: CGFloat = 16
+    public static let shadowY: CGFloat = 8
 
-    /// How strongly surfaces take their grain. 1 is the artwork as drawn.
-    public static let grain: Double = 1
+    /// How strongly surfaces take their grain. DialKit's glass is flat, so none.
+    public static let grain: Double = 0
 
     // MARK: Sizes (size/*)
 
-    /// Every pressable thing in a panel is this tall.
-    public static let control: CGFloat = 24
+    /// Every row in a panel is this tall: a field, a slider, a menu, a
+    /// toggle, a button with a word (dial/row-height).
+    public static let control: CGFloat = 36
+    /// A small glyph button in a row or a header (add, remove, the eye), and
+    /// the colour well beside a hex.
+    public static let glyph: CGFloat = 24
+    /// A DialKit switch: its track and the round thumb inside it.
+    public static let toggleWidth: CGFloat = 36
+    public static let toggleHeight: CGFloat = 20
+    public static let toggleThumb: CGFloat = 16
+    /// A slider's handle, shown under the pointer or while dragging.
+    public static let sliderHandleWidth: CGFloat = 3
+    public static let sliderHandleHeight: CGFloat = 20
+    /// The inset of a row's name from its left, and of its value from its
+    /// right (DialKit's 10 and 12).
+    public static let labelInset: CGFloat = 10
+    public static let valueInset: CGFloat = 12
     /// How far typed text is lifted in its box, in screen pixels: AppKit's
     /// text field sets its line about half a point lower than a label, so
     /// a number looked low beside a menu's word (a whole pixel on a 1x
     /// screen).
     public static let fieldTextLift: CGFloat = 1
-    /// A button with a glyph and a word. One step up from `control`.
-    public static let button: CGFloat = control + 8
+    /// A button with a word on it, and a section's header row: one row.
+    public static let button: CGFloat = control
     /// Tools and other mode switches: the big square button.
     public static let modeButton: CGFloat = 36
     /// The box an icon is drawn in.
@@ -177,16 +215,16 @@ public enum Theme {
     public static let iconStroke: CGFloat = 1.92
     /// The tick in a checkbox, a little heavier than other icons.
     public static let checkStroke: CGFloat = 2.56
-    public static let panelRow: CGFloat = 24
+    public static let panelRow: CGFloat = control
     public static let listRow: CGFloat = 32
     public static let barRow: CGFloat = 40
     /// The box of a check mark.
     public static let checkbox: CGFloat = 14
-    /// Slider and toggle tracks.
-    public static let track: CGFloat = 26
+    /// Slider tracks: the whole row.
+    public static let track: CGFloat = control
     /// A picture's thumbnail in the inspector: as tall as two rows of
     /// controls with the gap between them.
-    public static let pictureWell: CGFloat = panelRow + 4 + 6 + button
+    public static let pictureWell: CGFloat = panelRow + rowGap + button
 
     /// A gradient stop's marker on the inspector's gradient bar, and the
     /// picked one's, taller so it reads as picked without colour.
@@ -201,24 +239,25 @@ public enum Theme {
     public static let homeSearch: CGFloat = 168
     public static let homeSort: CGFloat = 112
     /// The opacity joined to a fill's or stroke's hex on its one row.
-    public static let paintOpacity: CGFloat = 56
+    public static let paintOpacity: CGFloat = 68
 
     // MARK: Radii (radius/*)
 
-    public static let radiusPanel: CGFloat = 10
-    public static let radiusControl: CGFloat = 5
-    public static let radiusTrack: CGFloat = 7
-    public static let radiusRow: CGFloat = 4
-    public static let radiusTray: CGFloat = 4
-    public static let radiusMenu: CGFloat = 8
-    public static let radiusWell: CGFloat = 8
+    /// dial/radius-panel, dial/radius, dial/radius-inner.
+    public static let radiusPanel: CGFloat = 14
+    public static let radiusControl: CGFloat = 8
+    public static let radiusTrack: CGFloat = 8
+    public static let radiusRow: CGFloat = 6
+    public static let radiusTray: CGFloat = 6
+    public static let radiusMenu: CGFloat = 10
+    public static let radiusWell: CGFloat = 6
     public static let radiusSwatchMark: CGFloat = 2
     /// A bar in the timeline: an action's, or a scene's span.
     public static let radiusBar: CGFloat = 6
 
     /// A button's corner, scaled with its box so buttons of different sizes
     /// still look like one family.
-    public static func radius(forButton size: CGFloat) -> CGFloat { max(radiusControl, size * 0.2) }
+    public static func radius(forButton size: CGFloat) -> CGFloat { max(radiusRow, size * 0.22) }
 
     // MARK: Spacing (space/*)
 
@@ -264,7 +303,7 @@ public enum Theme {
     /// row sits in it, level with the row (the user's grid, 28 September
     /// 2026).
     public static let columnGap: CGFloat = 8
-    public static let rowGutter: CGFloat = control + columnGap
+    public static let rowGutter: CGFloat = glyph + columnGap
     /// How far a small button's box sits from the panel's right edge: closer
     /// than `panelPad`, because the box is wider than its glyph. Section
     /// headers' add and remove buttons and the button column share it, so
@@ -284,7 +323,8 @@ public enum Theme {
     /// The timeline's play controls: smaller than other bar buttons.
     public static let transportButton: CGFloat = 20
     public static let transportIcon: CGFloat = 16
-    public static let rowGap: CGFloat = 4
+    /// Between rows (dial/row-gap).
+    public static let rowGap: CGFloat = 6
     /// The thickness of a progress bar.
     public static let progressBar: CGFloat = 4
     /// The ring a notice shows while work is under way, and its line.
@@ -293,12 +333,13 @@ public enum Theme {
 
     // MARK: Widths (width/*)
 
-    public static let panelWidth: CGFloat = 232
-    public static let labelWidth: CGFloat = 58
+    /// dial/panel-width.
+    public static let panelWidth: CGFloat = 280
+    public static let labelWidth: CGFloat = 72
     /// The Text section's right-hand column (size, and Auto or Fixed), so
     /// the weight menu and the alignment tray get the rest.
     public static let textSideColumn: CGFloat = 76
-    public static let cardWidth: CGFloat = 240
+    public static let cardWidth: CGFloat = 280
     /// How tall the easing card's grid of tiles is before it scrolls.
     public static let easingGridHeight: CGFloat = 468
     public static let menuMinWidth: CGFloat = 168
@@ -347,7 +388,7 @@ public enum Theme {
     public static let onboardingArtwork = CGSize(width: 746, height: 886)
     public static let onboardingFolderName: CGFloat = 38
     public static let onboardingFolderBaseline: CGFloat = 651
-    public static let radiusCard: CGFloat = 12
+    public static let radiusCard: CGFloat = 14
     /// The home screen's Info card on a project: its width, which its
     /// thumbnail spans.
     public static let infoCardWidth: CGFloat = 340
@@ -398,22 +439,22 @@ public enum Theme {
 
 // MARK: - Type
 
-/// The type styles, by their names in Figma. SF Pro throughout, except the
-/// display face on the home screen.
+/// The type styles, by their names in Figma ("Dial/..."). SF Pro throughout,
+/// except the display face on the home screen.
 public enum ThemeFont {
-    /// Every label, value, menu row and tool name.
-    public static let label = Font.system(size: 11)
-    /// Section headings and popup card titles.
-    public static let labelStrong = Font.system(size: 11, weight: .semibold)
-    /// Readout values and secondary lines.
-    public static let caption = Font.system(size: 10)
-    /// The unit letter inside a unit field.
-    public static let unit = Font.system(size: 10, weight: .medium)
+    /// Every label, value, menu row and tool name (Dial/Label, Dial/Value).
+    public static let label = Font.system(size: 13, weight: .medium)
+    /// Section headings and popup card titles (Dial/Section).
+    public static let labelStrong = Font.system(size: 13, weight: .semibold)
+    /// Readout values and secondary lines (Dial/Small).
+    public static let caption = Font.system(size: 11, weight: .medium)
+    /// The unit letter inside a unit field: a row's name, as DialKit's.
+    public static let unit = Font.system(size: 13, weight: .medium)
     /// What is typed into the ⌘K search card, and its results.
     public static let search = Font.system(size: 14)
     public static let searchResult = Font.system(size: 12)
-    /// The document name.
-    public static let title = Font.system(size: 13, weight: .semibold)
+    /// The document name and a panel's own title (Dial/Root).
+    public static let title = Font.system(size: 15, weight: .semibold)
     /// A template's name on its tile on Home's New from Template screen.
     public static let tileName = Font.system(size: 13)
     /// Tiny numbers on tiles and markers.

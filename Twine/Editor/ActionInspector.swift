@@ -488,7 +488,7 @@ private struct EasingFields: View {
                         .foregroundStyle(Theme.textTertiary)
                 }
                 .padding(.horizontal, Theme.space8)
-                .frame(height: Theme.panelRow + 4)
+                .frame(height: Theme.panelRow)
                 .frame(maxWidth: .infinity)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
                     .fill(hovering ? Theme.panelHover : Theme.panelRaised))

@@ -4,12 +4,13 @@ import MotionEditing
 import AppKit
 import Theme
 
-/// Label above, then a chunky track the full width of the panel with the value
-/// drawn inside its right-hand end. The thumb is the right end of one white
-/// pill that grows with the value, not a knob.
+/// DialKit's slider: the whole row is the track, its name inside at the
+/// left and its value at the right, the filled part a lighter grey up to the
+/// value. A thin handle shows at the fill's edge under the pointer and while
+/// dragging, when the fill lightens and the value whitens.
 ///
 /// `range` is only what the track spans. Typing a value outside it is allowed
-/// everywhere a slider has a field beside it; the pill simply pins at the end.
+/// everywhere a slider has a field beside it; the fill simply pins at the end.
 struct SliderRow<Accessory: View>: View {
     let label: String
     let value: Double
@@ -20,27 +21,20 @@ struct SliderRow<Accessory: View>: View {
     var onChange: (Double) -> Void
     var onBegin: () -> Void = {}
     var onEnd: () -> Void = {}
-    /// Sits at the end of the label's line, such as a stopwatch.
+    /// Sits at the row's end, in the button column, such as a stopwatch.
     @ViewBuilder var accessory: () -> Accessory
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.space6) {
-            HStack(spacing: 0) {
-                Text(label)
-                    .font(ThemeFont.label)
-                    .foregroundStyle(Theme.textSecondary)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                accessory()
-            }
-            PillTrack(value: value, range: range, readout: readout(value),
+        HStack(spacing: Theme.columnGap) {
+            PillTrack(label: label, value: value, range: range, readout: readout(value),
                       onChange: onChange, onBegin: onBegin, onEnd: onEnd)
+            accessory()
         }
-        .padding(.vertical, Theme.space2)
     }
 }
 
 private struct PillTrack: View {
+    let label: String
     let value: Double
     let range: ClosedRange<Double>
     let readout: String
@@ -48,74 +42,69 @@ private struct PillTrack: View {
     var onBegin: () -> Void
     var onEnd: () -> Void
 
-    /// Where in the thumb the drag started, so grabbing it by an edge does not
-    /// snap its centre to the pointer. A press on the bare track seeds it with
-    /// half the thumb, which makes a click on the track a jump-to.
-    @State private var grab: CGFloat?
+    @State private var dragging = false
     @State private var hovering = false
-
-    private let thumbWidth: CGFloat = 16
-    private let readoutWidth: CGFloat = 46
-    private let inset: CGFloat = 2
 
     var body: some View {
         GeometryReader { geo in
-            let travel = max(geo.size.width - thumbWidth - inset * 2, 1)
+            let width = max(geo.size.width, 1)
             let span = max(range.upperBound - range.lowerBound, .leastNonzeroMagnitude)
             let t = min(max((value - range.lowerBound) / span, 0), 1)
-            let fillRight = inset + thumbWidth + travel * CGFloat(t)
-            // Once the fill reaches the number, the number goes dark instead of
-            // disappearing white on white.
-            let onFill = fillRight > geo.size.width - readoutWidth - 4
+            let fill = width * CGFloat(t)
+            let active = hovering || dragging
+            let shape = RoundedRectangle(cornerRadius: Theme.radiusControl)
 
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: Theme.radiusTrack)
-                    .fill(Theme.canvas)
-                    .overlay(RoundedRectangle(cornerRadius: Theme.radiusTrack)
-                        .strokeBorder(Theme.edge, lineWidth: Theme.hairline))
-
-                // Covered area and handle in one shape, so there is no seam
-                // between two whites.
-                RoundedRectangle(cornerRadius: Theme.radiusTrack - 1)
-                    .fill(Theme.thumb)
-                    .frame(width: thumbWidth + travel * CGFloat(t), height: Theme.track - inset * 2)
-                    .overlay(alignment: .trailing) {
-                        RoundedRectangle(cornerRadius: Theme.radiusGrip)
-                            .fill(hovering || grab != nil ? Theme.grip : .clear)
-                            .frame(width: Theme.gripWidth, height: Theme.gripHeight)
-                            .padding(.trailing, thumbWidth / 2 - Theme.gripWidth / 2)
-                    }
-                    .padding(.leading, inset)
-
-                Text(readout)
-                    .font(ThemeFont.label)
-                    .monospacedDigit()
-                    .foregroundStyle(onFill ? Theme.textOnFill : Theme.textTertiary)
-                    .lineLimit(1)
-                    .frame(width: readoutWidth, alignment: .trailing)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.trailing, Theme.space10)
-                    .allowsHitTesting(false)
+                Theme.panelRaised
+                Rectangle()
+                    .fill(dragging ? Theme.sliderFillActive : Theme.sliderFill)
+                    .frame(width: fill)
+                // The handle sits just inside the fill's edge, never past the
+                // row's ends.
+                Capsule()
+                    .fill(Theme.sliderHandle)
+                    .frame(width: Theme.sliderHandleWidth, height: Theme.sliderHandleHeight)
+                    .offset(x: min(max(fill - Theme.space6 - Theme.sliderHandleWidth, Theme.space4),
+                                   width - Theme.space4 - Theme.sliderHandleWidth))
+                    .opacity(active ? 1 : 0)
+                HStack(spacing: Theme.space8) {
+                    Text(label)
+                        .font(ThemeFont.label)
+                        .foregroundStyle(Theme.fieldLabel)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Text(readout)
+                        .font(ThemeFont.label)
+                        .monospacedDigit()
+                        .foregroundStyle(dragging ? Theme.textRoot : Theme.textPrimary)
+                        .lineLimit(1)
+                }
+                .padding(.leading, Theme.labelInset)
+                .padding(.trailing, Theme.valueInset)
+                .allowsHitTesting(false)
             }
-            .contentShape(Rectangle())
+            .clipShape(shape)
+            .contentShape(shape)
+            .animation(.easeOut(duration: 0.15), value: active)
             .onHover { hovering = $0 }
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { g in
-                        let thumbX = inset + travel * CGFloat(t)
-                        if grab == nil {
-                            let onThumb = g.startLocation.x >= thumbX && g.startLocation.x <= thumbX + thumbWidth
-                            grab = onThumb ? g.startLocation.x - thumbX : thumbWidth / 2
+                        if !dragging {
+                            dragging = true
                             onBegin()
                         }
-                        let x = min(max(g.location.x - (grab ?? 0) - inset, 0), travel)
-                        onChange(range.lowerBound + Double(x / travel) * span)
+                        let x = min(max(g.location.x, 0), width)
+                        onChange(range.lowerBound + Double(x / width) * span)
                     }
                     .onEnded { _ in
-                        grab = nil
+                        dragging = false
                         onEnd()
                     }
             )
+            .accessibilityElement()
+            .accessibilityLabel(label)
+            .accessibilityValue(readout)
         }
         .frame(height: Theme.track)
     }
@@ -129,59 +118,71 @@ extension SliderRow where Accessory == EmptyView {
     }
 }
 
-/// The switch, built from the slider's parts: the same track and the same
-/// white pill, moved to one end or the other. Off sits in the canvas's dark,
-/// on in the inspector's grey for chosen things.
+/// DialKit's switch: a round thumb in a short grey track, the track a
+/// step lighter when on.
 struct PillToggle: View {
     let isOn: Bool
     /// What it switches, for VoiceOver: the row's name.
     var label = ""
     let toggle: () -> Void
 
-    @State private var hovering = false
+    var body: some View {
+        Button(action: toggle) { PillSwitch(isOn: isOn) }
+            .buttonStyle(.plain)
+            .accessibilityLabel(label)
+            .accessibilityValue(isOn ? "On" : "Off")
+    }
+}
 
-    private let width: CGFloat = 46
-    private let inset: CGFloat = 2
+/// The drawing of a switch, for a row that is itself the button.
+struct PillSwitch: View {
+    let isOn: Bool
 
     var body: some View {
-        let thumb = Theme.track - inset * 2
+        let inset = (Theme.toggleHeight - Theme.toggleThumb) / 2
+        ZStack(alignment: isOn ? .trailing : .leading) {
+            Capsule().fill(isOn ? Theme.chosenHover : Theme.chosen)
+            Circle()
+                .fill(Theme.textPrimary)
+                .frame(width: Theme.toggleThumb, height: Theme.toggleThumb)
+                .padding(.horizontal, inset)
+        }
+        .frame(width: Theme.toggleWidth, height: Theme.toggleHeight)
+        .animation(.easeOut(duration: 0.16), value: isOn)
+        .contentShape(Rectangle())
+    }
+}
+
+/// DialKit's toggle row: the whole row is the button, its name brightening
+/// when on.
+struct ToggleRow: View {
+    let label: String
+    let isOn: Bool
+    let toggle: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
         Button(action: toggle) {
-            ZStack(alignment: isOn ? .trailing : .leading) {
-                RoundedRectangle(cornerRadius: Theme.radiusTrack)
-                    .fill(isOn ? (hovering ? Theme.chosenHover : Theme.chosen) : Theme.canvas)
-                    .overlay(RoundedRectangle(cornerRadius: Theme.radiusTrack)
-                        .strokeBorder(hovering ? Theme.edgeHover : Theme.edge, lineWidth: Theme.hairline))
-                RoundedRectangle(cornerRadius: Theme.radiusTrack - 1)
-                    .fill(Theme.thumb)
-                    .frame(width: thumb, height: thumb)
-                    .overlay(RoundedRectangle(cornerRadius: Theme.radiusGrip).fill(Theme.grip).frame(width: Theme.gripWidth, height: Theme.gripHeight))
-                    .padding(.horizontal, inset)
+            HStack(spacing: Theme.space8) {
+                Text(label)
+                    .font(ThemeFont.label)
+                    .foregroundStyle(isOn ? Theme.textPrimary : Theme.fieldLabel)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                PillSwitch(isOn: isOn)
             }
-            .frame(width: width, height: Theme.track)
-            .animation(.easeOut(duration: 0.16), value: isOn)
+            .padding(.leading, Theme.labelInset)
+            .padding(.trailing, Theme.space8)
+            .frame(height: Theme.panelRow)
+            .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
+                .fill(hovering ? Theme.panelHover : Theme.panelRaised))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .accessibilityLabel(label)
         .accessibilityValue(isOn ? "On" : "Off")
-    }
-}
-
-struct ToggleRow: View {
-    let label: String
-    let isOn: Bool
-    let toggle: () -> Void
-
-    var body: some View {
-        HStack(spacing: Theme.space8) {
-            Text(label)
-                .font(ThemeFont.label)
-                .foregroundStyle(Theme.textSecondary)
-            Spacer(minLength: 0)
-            PillToggle(isOn: isOn, label: label, toggle: toggle)
-        }
-        .frame(height: Theme.panelRow + 4)
     }
 }
 
@@ -305,8 +306,8 @@ struct SegmentRow<Value: Hashable>: View {
         // The chosen grey and its white words change together.
         .animation(Theme.hoverGlide, value: selection)
         .padding(Theme.trayPad)
-        .background(RoundedRectangle(cornerRadius: Theme.radiusControl + 1).fill(Theme.panelRaised))
-        .frame(height: Theme.panelRow + 4)
+        .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
+        .frame(height: Theme.panelRow)
     }
 
     private func highlight(_ fill: Color, _ box: CGRect) -> some View {
@@ -340,7 +341,7 @@ private struct Segment: View {
                         .lineLimit(1)
                 }
             }
-                .foregroundStyle(isOn ? Theme.textOnColor : isHovered ? Theme.textPrimary : Theme.textSecondary)
+                .foregroundStyle(isOn || isHovered ? Theme.textPrimary : Theme.textSecondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
         }
@@ -401,6 +402,7 @@ struct UnitField: View {
                 .textFieldStyle(.plain)
                 .font(ThemeFont.label)
                 .monospacedDigit()
+                .multilineTextAlignment(.trailing)
                 .foregroundStyle(Theme.textPrimary)
                 .liftedFieldText()
                 .focused($focused)
@@ -431,7 +433,8 @@ struct UnitField: View {
             // The unit stays put at the end, typed or not.
             if !suffix.isEmpty { UnitSuffix(suffix) }
         }
-        .padding(.horizontal, Theme.space8)
+        .padding(.leading, Theme.labelInset)
+        .padding(.trailing, Theme.valueInset)
         .frame(height: Theme.control)
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: corner).fill(Theme.panelRaised))
@@ -593,6 +596,7 @@ struct OptionalField: View {
                 .textFieldStyle(.plain)
                 .font(ThemeFont.label)
                 .monospacedDigit()
+                .multilineTextAlignment(.trailing)
                 .foregroundStyle(Theme.textPrimary)
                 .liftedFieldText()
                 .focused($focused)
@@ -614,7 +618,8 @@ struct OptionalField: View {
                 }
             if !suffix.isEmpty { UnitSuffix(suffix) }
         }
-        .padding(.horizontal, Theme.space8)
+        .padding(.leading, Theme.labelInset)
+        .padding(.trailing, Theme.valueInset)
         .frame(height: Theme.control)
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
@@ -748,7 +753,7 @@ struct StackedRow<Accessory: View, Content: View>: View {
                 Spacer(minLength: 0)
             }
             .rowButton { if let swap { SwapButton(action: swap) } }
-            .frame(height: 14)
+            .frame(height: Theme.space16)
             if Accessory.self == EmptyView.self {
                 fields
             } else {
@@ -829,7 +834,7 @@ struct ReadoutRow: View {
 struct PanelDivider: View {
     var body: some View {
         Rectangle()
-            .fill(Theme.border)
+            .fill(Theme.rule)
             .frame(height: Theme.hairline)
     }
 }
@@ -854,11 +859,11 @@ struct SectionHeader: View {
         HStack(spacing: Theme.space6) {
             Text(title)
                 .font(ThemeFont.labelStrong)
-                .foregroundStyle(Theme.textPrimary)
+                .foregroundStyle(Theme.textSecondary)
             Spacer(minLength: 0)
             if let isOpen {
-                IconView(.chevronDown, size: 14)
-                    .foregroundStyle(Theme.textTertiary)
+                IconView(.chevronDown, size: Theme.iconRow)
+                    .foregroundStyle(Theme.textSecondary)
                     .rotationEffect(.degrees(isOpen ? 0 : -90))
             }
         }
@@ -880,8 +885,7 @@ struct StepRow: View {
         HStack(spacing: Theme.space8) {
             Text(label)
                 .font(ThemeFont.label)
-                .foregroundStyle(Theme.textSecondary)
-                .frame(width: Theme.labelWidth, alignment: .leading)
+                .foregroundStyle(Theme.fieldLabel)
                 .lineLimit(1)
             Spacer(minLength: 0)
             HStack(spacing: 0) {
@@ -890,12 +894,14 @@ struct StepRow: View {
                     .font(ThemeFont.label)
                     .monospacedDigit()
                     .foregroundStyle(Theme.textPrimary)
-                    .frame(width: 28)
+                    .frame(width: Theme.space20 + Theme.space8)
                 StepButton(icon: .plus, disabled: value >= range.upperBound) { commit(min(range.upperBound, value + 1)) }
             }
-            .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
         }
+        .padding(.leading, Theme.labelInset)
+        .padding(.trailing, Theme.space6)
         .frame(height: Theme.panelRow)
+        .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
     }
 }
 
@@ -911,8 +917,8 @@ private struct StepButton: View {
             IconView(icon, size: Theme.iconRow)
                 .foregroundStyle(disabled ? Theme.textTertiary.opacity(0.4)
                                  : hovering ? Theme.textPrimary : Theme.textSecondary)
-                .frame(width: Theme.rowIconButton, height: Theme.control)
-                .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
+                .frame(width: Theme.glyph, height: Theme.glyph)
+                .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
                     .fill(hovering && !disabled ? Theme.panelHover : .clear))
                 .contentShape(Rectangle())
         }
@@ -932,7 +938,7 @@ struct HeaderRow<Accessory: View>: View {
         HStack(spacing: Theme.space2) {
             Text(title)
                 .font(ThemeFont.labelStrong)
-                .foregroundStyle(Theme.textPrimary)
+                .foregroundStyle(Theme.textSecondary)
             Spacer(minLength: 0)
             accessory()
         }
@@ -985,10 +991,10 @@ extension View {
             // Holds the column's width even when the button is not showing,
             // so the row still stops where the others do.
             ZStack {
-                Color.clear.frame(width: Theme.control, height: 1)
+                Color.clear.frame(width: Theme.glyph, height: 1)
                 button()
             }
-            .frame(width: Theme.control)
+            .frame(width: Theme.glyph)
         }
         .padding(.trailing, -Theme.rowGutter)
     }
@@ -1027,7 +1033,7 @@ extension View {
     /// so it is plain which one is being typed in.
     func focusRing(_ isFocused: Bool, corner: CGFloat = Theme.radiusControl) -> some View {
         overlay(RoundedRectangle(cornerRadius: corner)
-            .strokeBorder(isFocused ? Theme.accent : .clear, lineWidth: Theme.hairline))
+            .strokeBorder(isFocused ? Theme.focus : .clear, lineWidth: Theme.hairline))
     }
 }
 

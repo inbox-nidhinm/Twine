@@ -8,14 +8,14 @@ struct BarGlyph: View {
     var isOn: Bool = false
     var hovering: Bool = false
     var disabled: Bool = false
-    var size: CGFloat = Theme.control
+    var size: CGFloat = Theme.glyph
     var iconBox: CGFloat = Theme.icon
     /// What a hover lifts to. On a raised ground, such as the tools tray, pass
     /// `panelHover`, the next rung up, or the hover would not show.
     var hoverFill: Color = Theme.panelRaised.opacity(0.6)
-    /// What shows the button is on: the accent for tools, `chosen` for a
-    /// switch that is on, as in the inspector.
-    var onFill: Color = Theme.accent
+    /// What shows the button is on: `chosen`, DialKit's grey, for tools and
+    /// switches alike; the accent is kept for the selection.
+    var onFill: Color = Theme.chosen
     /// The icon in full white without being on, as the pause button is
     /// while playing.
     var lit: Bool = false
@@ -45,10 +45,10 @@ struct BarButton: View {
     var help: String
     var isOn: Bool = false
     var disabled: Bool = false
-    var size: CGFloat = Theme.control
+    var size: CGFloat = Theme.glyph
     var iconBox: CGFloat = Theme.icon
     var hoverFill: Color = Theme.panelRaised.opacity(0.6)
-    var onFill: Color = Theme.accent
+    var onFill: Color = Theme.chosen
     var lit: Bool = false
     var hoverLights: Bool = false
     let action: () -> Void
@@ -80,16 +80,18 @@ struct PanelButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: Theme.space5) {
-                if let icon { IconView(icon, size: 16) }
+            // DialKit's button: the word centred, secondary until the
+            // pointer comes, on a row's ground that lifts under it.
+            HStack(spacing: Theme.space6) {
+                if let icon { IconView(icon, size: Theme.iconRow) }
                 Text(title).font(ThemeFont.label)
-                Spacer(minLength: 0)
             }
-            .foregroundStyle(disabled ? Theme.textTertiary.opacity(0.45) : Theme.textSecondary)
+            .frame(maxWidth: .infinity)
+            .foregroundStyle(disabled ? Theme.textTertiary.opacity(0.45) : hovering ? Theme.textPrimary : Theme.textSecondary)
             .padding(.horizontal, Theme.space8)
             .frame(height: Theme.button)
             .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
-                .fill(hovering && !disabled ? Theme.panelRaised : Theme.panelRaised.opacity(0.5)))
+                .fill(hovering && !disabled ? Theme.panelHover : Theme.panelRaised))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -114,7 +116,7 @@ struct HeadButton: View {
                 .lineLimit(1)
                 .fixedSize()
                 .padding(.horizontal, Theme.space12)
-                .frame(height: Theme.panelRow + 4)
+                .frame(height: Theme.panelRow)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl + 1)
                     .fill(hovering ? Theme.panelHover : Theme.panelRaised))
                 .contentShape(Rectangle())
@@ -164,8 +166,8 @@ struct PrimaryButton: View {
 struct IconButton: View {
     let icon: Icon
     var help: String
-    var size: CGFloat = Theme.control
-    var iconBox: CGFloat = 15
+    var size: CGFloat = Theme.glyph
+    var iconBox: CGFloat = Theme.iconRow
     let action: () -> Void
 
     @State private var hovering = false
@@ -177,8 +179,8 @@ struct IconButton: View {
                 .foregroundStyle(!isEnabled ? Theme.textTertiary : hovering ? Theme.textPrimary : Theme.textSecondary)
                 .opacity(isEnabled ? 1 : 0.4)
                 .frame(width: size, height: size)
-                .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
-                    .fill(hovering && isEnabled ? Theme.panelRaised : .clear))
+                .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
+                    .fill(hovering && isEnabled ? Theme.panelHover : .clear))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

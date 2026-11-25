@@ -1123,7 +1123,7 @@ struct PaintEditor: View {
 
     private func colorFields(_ color: RGBA, _ make: @escaping (RGBA) -> Paint) -> some View {
         HStack(spacing: Theme.space6) {
-            ColorWell(color: color, size: Theme.control, title: title,
+            ColorWell(color: color, size: Theme.glyph, title: title,
                       onChange: { controller.update(change(make($0))) },
                       onBegin: { controller.begin("Colour") },
                       onEnd: { controller.end() })
@@ -1490,7 +1490,7 @@ struct EffectsSection: View {
             switch effect.kind {
             case .dropShadow(let s), .innerShadow(let s):
                 HStack(spacing: Theme.space8) {
-                    ColorWell(color: s.color, size: Theme.control, title: "Shadow",
+                    ColorWell(color: s.color, size: Theme.glyph, title: "Shadow",
                               onChange: { c in controller.update(withShadows(index) { $0.color = c }) },
                               onBegin: { controller.begin("Shadow Colour") },
                               onEnd: { controller.end() })

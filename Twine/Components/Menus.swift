@@ -246,7 +246,7 @@ private struct MenuCard: View {
             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                 switch entry.kind {
                 case .separator:
-                    Rectangle().fill(Theme.border).frame(height: Theme.hairline).padding(.vertical, Theme.space4)
+                    Rectangle().fill(Theme.rule).frame(height: Theme.hairline).padding(.vertical, Theme.space4)
                 case .header(let title):
                     Text(title)
                         .font(ThemeFont.caption)
@@ -268,7 +268,7 @@ private struct MenuCard: View {
         }
         .padding(Theme.menuPad)
         .frame(minWidth: Theme.menuMinWidth, alignment: .leading)
-        .floatingPanel(corner: Theme.radiusMenu)
+        .floatingPanel(corner: Theme.radiusMenu, fill: Theme.dropdown)
     }
 }
 
@@ -304,11 +304,11 @@ private struct MenuItemRow: View {
                         .fixedSize()
                 }
             }
-            .foregroundStyle(disabled ? Theme.textTertiary.opacity(0.6) : Theme.textPrimary)
-            .padding(.horizontal, Theme.space6)
+            .foregroundStyle(disabled ? Theme.textTertiary.opacity(0.6) : lit ? Theme.textPrimary : Theme.textSecondary)
+            .padding(.horizontal, Theme.labelInset)
             .frame(height: Theme.control)
             .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
-                .fill(lit && !disabled ? Theme.accent : .clear))
+                .fill(lit && !disabled ? Theme.panelHover : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -317,9 +317,9 @@ private struct MenuItemRow: View {
     }
 }
 
-/// A named choice that opens the app's menu just under itself. Shaped like a
-/// slider row, name above and control across the panel, so it keeps the same
-/// line down the column.
+/// A named choice that opens the app's menu just under itself: DialKit's
+/// select, one row with its name at the left and the choice and a chevron
+/// at the right.
 struct MenuRow: View {
     let label: String
     /// What the control reads when shut: the choice in force.
@@ -328,26 +328,21 @@ struct MenuRow: View {
     var isEnabled = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.space6) {
-            Text(label)
-                .font(ThemeFont.label)
-                .foregroundStyle(Theme.textSecondary)
-                .lineLimit(1)
-            MenuField(value: value, entries: entries, isEnabled: isEnabled)
-        }
-        .padding(.vertical, Theme.space2)
+        MenuField(label: label, value: value, entries: entries, isEnabled: isEnabled)
     }
 }
 
 /// The control of a `MenuRow` on its own, for choices sitting side by side
 /// under one name.
 struct MenuField: View {
+    /// The row's name, at its left, with the choice moved to the right.
+    var label: String? = nil
     /// What the control reads when shut: the choice in force.
     let value: String
     let entries: () -> [MenuEntry]
     var isEnabled = true
     /// `Theme.control` to sit level with number fields in one row.
-    var height: CGFloat = Theme.panelRow + 4
+    var height: CGFloat = Theme.panelRow
     /// A `PanelButton`'s grounds and words, to sit among them, as Home's
     /// order menu does beside its New buttons.
     var quiet = false
@@ -365,15 +360,24 @@ struct MenuField: View {
             menus.show(entries(), at: CGPoint(x: frame.minX, y: frame.maxY + 4))
         } label: {
             HStack(spacing: Theme.space6) {
+                if let label {
+                    Text(label)
+                        .font(ThemeFont.label)
+                        .foregroundStyle(Theme.fieldLabel)
+                        .lineLimit(1)
+                        .fixedSize()
+                    Spacer(minLength: Theme.space8)
+                }
                 Text(value)
                     .font(ThemeFont.label)
                     .foregroundStyle(!isEnabled ? Theme.textTertiary : quiet ? Theme.textSecondary : Theme.textPrimary)
                     .lineLimit(1)
-                Spacer(minLength: 0)
+                if label == nil { Spacer(minLength: 0) }
                 IconView(.chevronDown, size: Theme.iconSmall)
-                    .foregroundStyle(Theme.textTertiary)
+                    .foregroundStyle(Theme.textSecondary)
             }
-            .padding(.horizontal, Theme.space8)
+            .padding(.leading, Theme.labelInset)
+            .padding(.trailing, Theme.labelInset)
             .frame(height: height)
             .frame(maxWidth: .infinity)
             .background(RoundedRectangle(cornerRadius: Theme.radiusControl)

@@ -61,7 +61,7 @@ struct ColorRow: View {
 
     var body: some View {
         HStack(spacing: Theme.space6) {
-            ColorWell(color: color, size: Theme.control, title: title,
+            ColorWell(color: color, size: Theme.glyph, title: title,
                       onChange: edit.live, onBegin: edit.begin, onEnd: edit.end)
             HexField(color: color) { edit.commit($0) }
             UnitField(value: color.a * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
@@ -83,7 +83,7 @@ struct ShadowControls: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.space8) {
             HStack(spacing: Theme.space6) {
-                ColorWell(color: shadow.color, size: Theme.control, title: "Shadow",
+                ColorWell(color: shadow.color, size: Theme.glyph, title: "Shadow",
                           onChange: { c in edit.live(with { $0.color = c }) }, onBegin: edit.begin, onEnd: edit.end)
                 HexField(color: shadow.color) { c in edit.commit(with { $0.color = c }) }
                 UnitField(value: shadow.opacity * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
@@ -184,7 +184,7 @@ extension GlassControls where Button == EmptyView {
 /// A small picture of a paint, over the transparency pattern.
 struct PaintSwatch: View {
     let paint: Paint
-    var size: CGFloat = Theme.control
+    var size: CGFloat = Theme.glyph
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Theme.radiusControl)

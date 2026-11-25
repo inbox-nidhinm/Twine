@@ -126,7 +126,7 @@ struct SettingsPage: View {
             dashes
             row(.fillSolid, "Background", help: "The colour behind a new project's layers") {
                 HStack(spacing: Theme.rowGap * 2) {
-                    ColorWell(color: c.background.color, size: Theme.control, title: "Background",
+                    ColorWell(color: c.background.color, size: Theme.glyph, title: "Background",
                               onChange: { settings.newProject.background.color = $0 })
                     HexField(color: c.background.color) { settings.newProject.background.color = $0 }
                 }
@@ -305,7 +305,7 @@ struct SettingsPage: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .padding(.horizontal, Theme.space8)
-                .frame(maxWidth: .infinity, minHeight: Theme.panelRow + 4, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: Theme.panelRow, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
                 .help(folder.standardizedFileURL.path)
             HStack(spacing: Theme.columnGap) {

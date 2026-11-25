@@ -48,7 +48,7 @@ struct SelectionColorsSection: View {
 
     private func colorRow(_ color: RGBA, places: [SelectionColors.Place]) -> some View {
         HStack(spacing: Theme.space6) {
-            ColorWell(color: color, size: Theme.control, title: "Selection Colour",
+            ColorWell(color: color, size: Theme.glyph, title: "Selection Colour",
                       onChange: { c in
                           if let command = SelectionColors.setting(places, to: c, in: controller.project) {
                               controller.update(command)

@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 280
+    static let pushes = 281
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -41,6 +41,7 @@ enum VersionHistory {
 
     static let builds: [Build] = [
         .init(date: "26 November 2026", title: "Interface polish", features: [
+            "The DialKit look, on its own branch (dialkit): DialKit's flat dark glass and white-tinted greys, 13 pt type, 36 pt rows with each row's name inside it at the left and its value at the right, sliders that fill the whole row with a thin handle under the pointer, round switches, 280 pt panels with 14 pt corners, grey for the tool in hand and in menus, and timeline bars in DialKit's grey. Blue stays for the selection and Export. The Flip look is kept on the archive/flip-look branch.",
             "Fills and strokes take one row each in Design, as Figma's do: the swatch, then a colour's hex and opacity, a gradient's kind or a picture's opacity, then show or hide and remove. Clicking the swatch raises a card with the kinds along its top (Solid, Linear, Radial, Angular and, for a fill, Image) and that kind's controls under them: the colour picker, a gradient's bar of stops over the picker for the picked stop, or a picture's mode, turn and Replace. A gradient's card stays up while you drag its line on the canvas. Strokes can be made gradients here too.",
             "Export sits beside the Animate and Design switch at the top of the inspector, a quiet button always in sight, in place of the blue bar along the panel's foot.",
             "Animate's inspector is laid out the same way whatever is selected. With nothing selected it shows the composition, as Design does. With layers selected it lists their actions, each with when it runs, a click selecting it; then New Action, Select Preset and Templates as small buttons, where an action's settings have them too. The big tiles are gone.",

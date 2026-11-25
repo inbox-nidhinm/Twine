@@ -554,7 +554,7 @@ final class TimelineTracksView: NSView {
         let radius = shows ? rect.width / 2 : action.isInstant ? Theme.radiusBar / 2 : Theme.radiusBar
         let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
         ctx.addPath(path)
-        ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.panelHover).cgColor)
+        ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.clip).cgColor)
         ctx.fillPath()
         // Bars folded together overlap: an edge keeps each one's ends in sight.
         if row.folded != nil {

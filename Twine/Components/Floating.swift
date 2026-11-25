@@ -7,14 +7,14 @@ extension View {
     /// canvas, so each needs its own edge: a border alone reads as a seam and a
     /// shadow alone as a smudge. A card lying flat on a page, as Settings'
     /// are, takes no shadow.
-    func floatingPanel(corner: CGFloat = Theme.radiusPanel, shadow: Bool = true) -> some View {
+    func floatingPanel(corner: CGFloat = Theme.radiusPanel, shadow: Bool = true, fill: Color = Theme.panel) -> some View {
         // The cursor area sits behind the fill, where it can never take a click.
         // It is there to claim the app's arrow back from a canvas underneath.
         background(CursorArea())
             // Grained inside the background rather than over the finished card,
             // so the texture stays under the labels and glyphs.
             .background(RoundedRectangle(cornerRadius: corner)
-                .fill(Theme.panel)
+                .fill(fill)
                 .grained()
                 .clipShape(RoundedRectangle(cornerRadius: corner)))
             .overlay(RoundedRectangle(cornerRadius: corner)
