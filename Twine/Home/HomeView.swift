@@ -55,6 +55,13 @@ struct HomeView: View {
         .background(Theme.canvas.grained())
         // The app's arrow everywhere, never the system's.
         .background(CursorArea())
+        .overlay(alignment: .top) {
+            if let text = library.notice {
+                NoticeCard(notice: Notice(text: text, state: .note)) { library.say(nil) }
+                    .padding(Theme.floatInset)
+                    .transition(.opacity)
+            }
+        }
         .overlay {
             if library.showVersionHistory {
                 VersionHistoryCard { library.showVersionHistory = false }
@@ -318,12 +325,36 @@ struct HomeView: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: card, maximum: card), spacing: gutter,
                                              alignment: .topLeading)],
                           alignment: .leading, spacing: gutter) {
+                    // An empty shelf shows where a project starts, in the
+                    // place the first card will take.
+                    if library.shownItems.isEmpty { newProjectTile }
                     ForEach(library.shownItems) { item in projectCard(item) }
                 }
                 .padding(margin)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// A card's worth of dashed outline with a plus: New Project, on an
+    /// empty shelf.
+    private var newProjectTile: some View {
+        let side = card - cardPad * 2
+        return Button { library.newProject() } label: {
+            VStack(spacing: 8) {
+                IconView(.plus, size: 20)
+                Text("New Project").font(ThemeFont.label)
+            }
+            .foregroundStyle(Theme.textSecondary)
+            .frame(width: side, height: side)
+            .background(RoundedRectangle(cornerRadius: thumbRadius)
+                .strokeBorder(Theme.edge, style: StrokeStyle(lineWidth: Theme.hairline, dash: [5, 4])))
+            .contentShape(Rectangle())
+            .padding(.horizontal, cardPad)
+            .padding(.top, cardPad)
+        }
+        .buttonStyle(.plain)
+        .help("New Project (⌘N)")
     }
 
     private func projectCard(_ item: Library.Item) -> some View {

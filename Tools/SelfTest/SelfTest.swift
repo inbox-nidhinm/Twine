@@ -548,6 +548,9 @@ enum SelfTest {
             case "call":
                 switch parts[1] {
                 case "duplicate": controller.duplicateSelection()
+                // Edit > Select All, which a menu key cannot reach while the
+                // test copy is in the background.
+                case "selectall": controller.selectAll()
                 // File > Duplicate: a copy of the project, opened in the window.
                 case "duplicateproject": (window.windowController?.document as? ProjectDocument)?.duplicate(nil)
                 case "shortcuts": (window.windowController as? EditorWindowController)?.toggleShortcuts(nil)

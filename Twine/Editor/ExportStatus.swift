@@ -75,6 +75,8 @@ private struct ProgressTrack: View {
 struct NoticeCard: View {
     let notice: Notice
     let dismiss: () -> Void
+    /// Told while the pointer rests on the card, which keeps it up.
+    var hold: (Bool) -> Void = { _ in }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -96,6 +98,7 @@ struct NoticeCard: View {
         .padding(.trailing, Theme.barPad)
         .padding(.vertical, Theme.barPad)
         .floatingPanel()
+        .onHover(perform: hold)
         .animation(.easeOut(duration: 0.18), value: notice)
     }
 }

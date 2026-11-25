@@ -53,7 +53,7 @@ struct EditorView: View {
             }
 
             if let notice = editor.notice {
-                NoticeCard(notice: notice) { editor.dismissNotice() }
+                NoticeCard(notice: notice, dismiss: { editor.dismissNotice() }, hold: { editor.holdNotice($0) })
                     .padding(Theme.floatInset)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .transition(.opacity)

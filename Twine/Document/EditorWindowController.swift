@@ -54,6 +54,15 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     // MARK: NSWindowDelegate
 
+    /// Closing stops an export that is running, so it asks first.
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard editor.exports.isExporting, !AppDelegate.exportStopAgreed else { return true }
+        AppDelegate.askToStopExport(or: "Stop and Close") { stop in
+            if stop { sender.close() }
+        }
+        return false
+    }
+
     /// Closing the window closes the project and, as it is the only window,
     /// the app.
     func windowWillClose(_ notification: Notification) {
@@ -187,6 +196,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     @objc func zoomOut(_ sender: Any?) { controller.canvas?.zoom(by: 0.5) }
     @objc func zoomToFit(_ sender: Any?) { controller.canvas?.fitToWindow(animated: true) }
     @objc func zoomToActualSize(_ sender: Any?) { controller.canvas?.zoomToActualSize() }
+    @objc func zoomToSelection(_ sender: Any?) { controller.canvas?.zoomToSelection() }
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         let hasSelection = !controller.selection.isEmpty
@@ -196,6 +206,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         case #selector(delete(_:)), #selector(copy(_:)), #selector(cut(_:)), #selector(duplicateLayers(_:)),
              #selector(groupLayers(_:)), #selector(frameLayers(_:)), #selector(useAsMask(_:)), #selector(bringForward(_:)), #selector(sendBackward(_:)),
              #selector(bringToFront(_:)), #selector(sendToBack(_:)):
+            return hasSelection
+        case #selector(zoomToSelection(_:)):
             return hasSelection
         case #selector(renameLayer(_:)):
             return controller.selection.count == 1

@@ -102,6 +102,7 @@ struct ShortcutsCard: View {
                     s("Pan", "Space", "drag"),
                     s("Zoom to fit, actual size", "⌘0", "⌥⌘0"),
                     s("Zoom in, out", "⌘=", "⌘-"),
+                    s("Zoom to the selection", "⇧2"),
                     s("Hide layers, inspector", "⌘1", "⌘2"),
                     s("Full screen", "⌃⌘F"),
                     s("Keyboard shortcuts", "⌘/"),

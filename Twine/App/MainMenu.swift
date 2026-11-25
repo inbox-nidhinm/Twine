@@ -40,6 +40,8 @@ enum MainMenu {
         menu.addItem(item("About Twine", #selector(NSApplication.orderFrontStandardAboutPanel(_:))))
         menu.addItem(item("Version History", #selector(AppDelegate.showVersionHistory(_:))))
         menu.addItem(.separator())
+        menu.addItem(item("Settings…", #selector(AppDelegate.showSettings(_:)), ","))
+        menu.addItem(.separator())
         let services = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")
         services.submenu = NSMenu(title: "Services")
         NSApp.servicesMenu = services.submenu
@@ -65,7 +67,7 @@ enum MainMenu {
         menu.addItem(.separator())
         menu.addItem(item("Close", #selector(NSWindow.performClose(_:)), "w"))
         menu.addItem(item("Save", #selector(NSDocument.save(_:)), "s"))
-        menu.addItem(item("Duplicate", #selector(NSDocument.duplicate(_:)), "s", [.command, .shift]))
+        menu.addItem(item("Duplicate Project", #selector(NSDocument.duplicate(_:)), "s", [.command, .shift]))
         menu.addItem(item("Rename…", #selector(NSDocument.rename(_:))))
         menu.addItem(item("Move To…", #selector(NSDocument.move(_:))))
         menu.addItem(item("Revert To…", #selector(NSDocument.browseVersions(_:))))
@@ -143,6 +145,9 @@ enum MainMenu {
         menu.addItem(item("Zoom Out", #selector(EditorWindowController.zoomOut(_:)), "-"))
         menu.addItem(item("Zoom to Fit", #selector(EditorWindowController.zoomToFit(_:)), "0"))
         menu.addItem(item("Actual Size", #selector(EditorWindowController.zoomToActualSize(_:)), "0", [.command, .option]))
+        // Shift-2 works on the canvas without being a menu key, so an @
+        // typed into a field stays an @. The menu names it.
+        menu.addItem(item("Zoom to Selection    ⇧2", #selector(EditorWindowController.zoomToSelection(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Enter Full Screen", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]))
         return menu

@@ -137,7 +137,20 @@ final class EditorController {
         editor.selectedActions = Set(keep.map(\.id))
     }
 
+    /// Select All goes by where the person is: after a click in the
+    /// timeline, every bar it shows; with the selection inside one group or
+    /// frame, that group's layers; otherwise the top level's.
     func selectAll() {
+        if timelineHasFocus {
+            let shown = editor.timelineOnlySelected
+                ? project.actions.filter { editor.selection.contains($0.targetLayerID) } : project.actions
+            if !shown.isEmpty { return selectActions(Set(shown.map(\.id))) }
+        }
+        let parents = Set(editor.selection.map { project.location(of: $0)?.parentID })
+        if parents.count == 1, let parent = parents.first.flatMap({ $0 }), let group = project.layer(withID: parent) {
+            editor.selection = Set(group.children.filter { !$0.isLocked }.map(\.id))
+            return
+        }
         editor.selection = Set(project.layers.filter { !$0.isLocked }.map(\.id))
     }
 
@@ -326,6 +339,7 @@ final class EditorController {
     func step(_ frames: Int) {
         stop()
         seek(to: frameRate.time(ofFrame: frameRate.frame(at: editor.time) + frames))
+        editor.viewport.follow(editor.time)
     }
 
     /// Jumps the playhead to the next or previous start or end of any action.
@@ -334,10 +348,11 @@ final class EditorController {
         let target = forward ? ActionEditing.edge(after: editor.time, in: project)
                              : ActionEditing.edge(before: editor.time, in: project)
         if let target { seek(to: target) } else { NSSound.beep() }
+        editor.viewport.follow(editor.time)
     }
 
-    func jumpToStart() { stop(); editor.time = 0 }
-    func jumpToEnd() { stop(); editor.time = lastFrameTime }
+    func jumpToStart() { stop(); editor.time = 0; editor.viewport.follow(0) }
+    func jumpToEnd() { stop(); editor.time = lastFrameTime; editor.viewport.follow(lastFrameTime) }
 
     /// Called by the display's clock while playing. Plays in real time, and
     /// either loops or stops on the last frame.
@@ -354,6 +369,7 @@ final class EditorController {
             }
         }
         editor.time = next
+        editor.viewport.follow(next)
         followAudio()
     }
 
@@ -387,7 +403,7 @@ final class EditorController {
         let work = editor.beginWork("Importing \(label)", after: urls.contains(where: WebMConversion.isWebM) ? 0 : 0.4)
         var commands: [EditorCommand] = []
         var added: [UUID] = []
-        var skipped = false
+        var skipped: [String] = []
         var oversized: [String] = []
         let composition = project.composition
         let center = point ?? Vec2(Double(composition.width) / 2, Double(composition.height) / 2)
@@ -407,11 +423,11 @@ final class EditorController {
                 }
             } else {
                 if MediaImport.isOversizedPicture(url) { oversized.append(url.lastPathComponent); continue }
-                guard var described = await MediaImport.describe(url) else { skipped = true; continue }
+                guard var described = await MediaImport.describe(url) else { skipped.append(url.lastPathComponent); continue }
                 if let existing = known.first(where: { $0.contentHash == described.contentHash }) {
                     described = existing
                 } else {
-                    do { try await document.stage(url, as: described.fileName) } catch { skipped = true; continue }
+                    do { try await document.stage(url, as: described.fileName) } catch { skipped.append(url.lastPathComponent); continue }
                     commands.append(.addMedia(described))
                     known.append(described)
                 }
@@ -432,9 +448,17 @@ final class EditorController {
             }
             added.append(layer.id)
         }
-        if skipped { NSSound.beep() }
-        // Said after the work's own last word, so it is not written over.
-        defer { if !oversized.isEmpty { editor.showNotice(MediaImport.oversizedNotice(oversized)) } }
+        // Said after the work's own last word, so it is not written over:
+        // which files would not open (there used to be only a beep), and
+        // which were too large.
+        defer {
+            var notes: [String] = []
+            if let first = skipped.first {
+                notes.append("Couldn't open \(first)\(skipped.count > 1 ? " and \(skipped.count - 1) more" : "").")
+            }
+            if !oversized.isEmpty { notes.append(MediaImport.oversizedNotice(oversized)) }
+            if !notes.isEmpty { editor.showNotice(notes.joined(separator: " ")) }
+        }
         guard !commands.isEmpty, perform(.batch(commands, name: undoName ?? (added.count == 1 ? "Import" : "Import Files"))) else {
             editor.finishWork(work, done: nil)
             return []
@@ -463,7 +487,10 @@ final class EditorController {
     /// another kind than `kind` or one that will not open.
     private func bringIn(_ url: URL, as kind: MediaKind) async -> (asset: MediaAsset, isNew: Bool)? {
         if WebMConversion.isWebM(url) {
-            guard kind == .video else { NSSound.beep(); return nil }
+            guard kind == .video else {
+                editor.showNotice("\(url.lastPathComponent) isn't a picture.")
+                return nil
+            }
             let work = editor.beginWork("Importing \(url.lastPathComponent)", after: 0)
             let brought = await bringInWebM(url, known: project.media, work: work)
             editor.finishWork(work, done: brought == nil ? nil : "Imported \(url.lastPathComponent)")
@@ -474,9 +501,14 @@ final class EditorController {
             return nil
         }
         let work = editor.beginWork("Importing \(url.lastPathComponent)", after: 0.4)
-        guard let document, let described = await MediaImport.describe(url), described.kind == kind else {
+        guard let document, let described = await MediaImport.describe(url) else {
             editor.finishWork(work, done: nil)
-            NSSound.beep()
+            editor.showNotice("Couldn't open \(url.lastPathComponent).")
+            return nil
+        }
+        guard described.kind == kind else {
+            editor.finishWork(work, done: nil)
+            editor.showNotice("\(url.lastPathComponent) isn't a \(kind == .video ? "video" : kind == .audio ? "sound" : "picture").")
             return nil
         }
         if let existing = project.media.first(where: { $0.contentHash == described.contentHash }) {
@@ -485,7 +517,7 @@ final class EditorController {
         }
         do { try await document.stage(url, as: described.fileName) } catch {
             editor.finishWork(work, done: nil)
-            NSSound.beep()
+            editor.showNotice("Couldn't copy \(url.lastPathComponent) into the project.")
             return nil
         }
         editor.finishWork(work, done: "Imported \(url.lastPathComponent)")
@@ -748,23 +780,37 @@ final class EditorController {
         let fitting = composition.size
         return Task { @MainActor in
             // Read on a worker thread: a large drawing takes a while, and the
-            // app should not freeze meanwhile.
+            // app should not freeze meanwhile. A notice says it is under
+            // way once it has taken a moment, and when it is done.
+            let work = editor.beginWork("Importing \(url.lastPathComponent)", after: 0.4)
             let reading = Task.detached(priority: .userInitiated) { () -> SVGImport.Result? in
                 // Read whole into memory, so a file far past any drawing is refused first.
                 guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= SVGImport.largestFile,
                       let data = try? Data(contentsOf: url) else { return nil }
                 return try? SVGImport.read(data, name: name, center: center, fitting: fitting)
             }
-            guard let read = await reading.value else { NSSound.beep(); return nil }
+            guard let read = await reading.value else {
+                editor.finishWork(work, done: nil)
+                editor.showNotice("Couldn't read \(url.lastPathComponent).")
+                return nil
+            }
             let result = read.reusing(project.media)
             var commands: [EditorCommand] = []
             for item in result.media {
-                do { try await document.stage(item.data, as: item.asset.fileName) } catch { NSSound.beep(); return nil }
+                do { try await document.stage(item.data, as: item.asset.fileName) } catch {
+                    editor.finishWork(work, done: nil)
+                    editor.showNotice("Couldn't copy \(url.lastPathComponent)'s pictures into the project.")
+                    return nil
+                }
                 commands.append(.addMedia(item.asset))
             }
             commands.append(.insertLayers([result.layer], parentID: nil, index: nil))
-            guard perform(.batch(commands, name: "Import SVG")) else { return nil }
+            guard perform(.batch(commands, name: "Import SVG")) else {
+                editor.finishWork(work, done: nil)
+                return nil
+            }
             select([result.layer.id])
+            editor.finishWork(work, done: "Imported \(url.lastPathComponent)")
             return result.layer.id
         }
     }
@@ -777,16 +823,21 @@ final class EditorController {
     func pasteFromFigma(_ text: String) {
         guard let document else { return }
         Task { @MainActor in
-            // Read on a worker thread, pictures and all, as an SVG is.
+            // Read on a worker thread, pictures and all, as an SVG is, with
+            // a notice once it has taken a moment.
+            let work = editor.beginWork("Pasting from Figma", after: 0.4)
+            defer { editor.finishWork(work, done: nil) }
             guard let read = await Task.detached(priority: .userInitiated, operation: { try? FigmaImport.read(text) }).value
-            else { return NSSound.beep() }
+            else { return editor.showNotice("Couldn't read what was copied from Figma. Copy it again with the Twine plugin.") }
             var commands: [EditorCommand] = []
             // Whole pixels, so edges that were crisp in Figma stay so.
             let c = project.composition
             let offset = Vec2((Double(c.width) / 2 - read.bounds.center.x).rounded(),
                               (Double(c.height) / 2 - read.bounds.center.y).rounded())
             for item in read.media where !project.media.contains(where: { $0.contentHash == item.asset.contentHash }) {
-                do { try await document.stage(item.data, as: item.asset.fileName) } catch { return NSSound.beep() }
+                do { try await document.stage(item.data, as: item.asset.fileName) } catch {
+                    return editor.showNotice("Couldn't copy the pictures from Figma into the project.")
+                }
                 commands.append(.addMedia(item.asset))
             }
             let layers = read.layers.map { $0.translated(by: offset) }.map { reusingKnownPictures($0, from: read.media) }
@@ -903,6 +954,7 @@ final class EditorController {
         guard !removed.isEmpty else { return NSSound.beep() }
         if perform(.batch([.deleteActions(removed), .insertActions(added)], name: "Split into Actions")) {
             selectActions(Set(added.map(\.id)))
+            editor.focus = .timeline
         }
     }
 
@@ -915,6 +967,10 @@ final class EditorController {
         guard !added.isEmpty else { return NSSound.beep() }
         guard perform(.batch([.insertActions(added)], name: name)) else { return }
         selectActions(Set(added.map(\.id)))
+        // The keys follow the new bars, as after a click on them: Delete
+        // straight after adding an action took the whole layer, since the
+        // last click had been on the canvas or in the inspector.
+        editor.focus = .timeline
         editor.reveal(added)
         guard let last = added.max(by: { $0.end < $1.end }), last.end > editor.time else { return }
         stop()
@@ -1218,6 +1274,7 @@ final class EditorController {
         if perform(.batch([.insertActions(placed.actions), .updateActions(placed.moved)] + sceneChange(scenes),
                           name: made.count == 1 ? "Paste Action" : "Paste Actions")) {
             selectActions(Set(placed.actions.map(\.id)))
+            editor.focus = .timeline
             editor.reveal(placed.actions)
         }
     }
@@ -1596,6 +1653,15 @@ final class EditorController {
     func cutSelection() {
         copySelection()
         deleteSelection()
+    }
+
+    /// Copies the selected layers, wherever the last click was: what a
+    /// layer's own right-click menu asks for.
+    func copySelectedLayers() {
+        let focus = editor.focus
+        editor.focus = .canvas
+        copySelection()
+        editor.focus = focus
     }
 
     var canPaste: Bool {

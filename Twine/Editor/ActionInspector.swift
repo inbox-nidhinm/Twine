@@ -404,7 +404,8 @@ private struct TimingFields: View {
         HStack(alignment: .top, spacing: 8) {
             named("Start") {
                 UnitField(value: frames ? Double(rate.frame(at: first.start)) : first.start,
-                          decimals: frames ? 0 : 2, suffix: frames ? "f" : "s", accepts: { $0 >= 0 }) { v in
+                          decimals: frames ? 0 : 2, suffix: frames ? "f" : "s", accepts: { $0 >= 0 },
+                          mixed: actions.shared(\.start) == nil) { v in
                     let t = rate.snapped(frames ? rate.time(ofFrame: Int(v.rounded())) : v)
                     controller.editActions("Change Timing") { $0.start = max(t, 0) }
                 }
@@ -413,7 +414,8 @@ private struct TimingFields: View {
             if !first.spec.kind.isAlwaysInstant {
                 named("Duration") {
                     UnitField(value: frames ? Double(rate.frame(at: first.duration)) : first.duration,
-                              decimals: frames ? 0 : 2, suffix: frames ? "f" : "s", accepts: { $0 >= 0 }) { v in
+                              decimals: frames ? 0 : 2, suffix: frames ? "f" : "s", accepts: { $0 >= 0 },
+                              mixed: actions.shared(\.duration) == nil) { v in
                         let d = rate.snapped(frames ? rate.time(ofFrame: Int(v.rounded())) : v)
                         controller.editActions("Change Timing") { $0.duration = max(d, 0) }
                     }
@@ -668,7 +670,7 @@ private struct ValueFields: View {
         }
         .help("The scale it starts at. Empty starts from the layer's scale when the action begins.")
         StackedRow(label: s.mode == .to ? "To" : "By", menu: modeEntries(s.mode), swap: swap, accessory: {
-            IconButton(icon: s.isLinked ? .link : .unlink, help: s.isLinked ? "Unlink width and height" : "Link width and height") {
+            IconButton(icon: s.isLinked ? .link : .unlink, help: s.isLinked ? "Scales both ways together" : "Scales each way separately") {
                 editScale("Link Scale") { s, _ in
                     s.isLinked.toggle()
                     if s.isLinked { s.end.y = s.end.x; s.initial = s.initial.map { Vec2($0.x, $0.x) } }
@@ -1044,7 +1046,8 @@ private struct ValueFields: View {
         }
         .help("The size it starts at. Empty starts from the layer's size when the action begins.")
         StackedRow(label: "To", swap: swap, accessory: {
-            IconButton(icon: r.isLinked ? .link : .unlink, help: r.isLinked ? "Unlink width and height" : "Keep width and height in proportion") {
+            IconButton(icon: r.isLinked ? .link : .unlink, help: r.isLinked ? "Keeps proportions: width and height change together"
+                                                             : "Width and height change separately") {
                 editResize("Link Size") { r, _ in r.isLinked.toggle() }
             }
         }) {

@@ -86,6 +86,10 @@ struct HexField: View {
                 .liftedFieldText()
                 .focused($focused)
                 .onSubmit(apply)
+                .onExitCommand {
+                    text = color.hex6
+                    UnitField.leaveField()
+                }
                 .onChange(of: focused) { _, now in if !now { apply() } }
                 .onAppear { text = color.hex6 }
                 .onChange(of: color) { old, now in if !focused || text == old.hex6 { text = now.hex6 } }
@@ -104,12 +108,16 @@ struct HexField: View {
         // The parsed colour, not `color`: that is still the old one until the
         // view updates, and it would come back when the field lost focus.
         if var parsed = RGBA(typed: text) {
-            parsed.a = color.a
+            // Eight digits carry an opacity (#FF000080, as CSS and Figma
+            // write it), which is kept; six or fewer leave the colour's own.
+            let digits = text.trimmingCharacters(in: .whitespaces).drop { $0 == "#" }.count
+            let carriesAlpha = digits == 8
+            if !carriesAlpha { parsed.a = color.a }
             // Compared as the six digits shown, not as exact numbers: most
             // colours are not whole steps of 255, and a click in and out
             // must not round them (or, with several texts selected, give
             // them all the first one's colour).
-            if parsed.hex6 != color.hex6 { commit(parsed) }
+            if parsed.hex6 != color.hex6 || (carriesAlpha && abs(parsed.a - color.a) > 0.002) { commit(parsed) }
             text = parsed.hex6
         } else {
             text = color.hex6

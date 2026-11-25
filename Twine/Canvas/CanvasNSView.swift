@@ -277,6 +277,26 @@ final class CanvasNSView: NSView {
         zoom(to: 1, around: CGPoint(x: usableRect.midX, y: usableRect.midY))
     }
 
+    /// Fills the canvas with the selected layers, as Figma's Shift-2 does,
+    /// or with the whole composition when nothing is selected.
+    func zoomToSelection() {
+        guard let scene, let size = compositionSize else { return }
+        let corners = selection.compactMap { scene.worldCorners(of: $0) }.flatMap { $0 }
+        guard !corners.isEmpty else { return fitToWindow(animated: true) }
+        let xs = corners.map(\.x), ys = corners.map(\.y)
+        let (minX, maxX, minY, maxY) = (xs.min() ?? 0, xs.max() ?? 0, ys.min() ?? 0, ys.max() ?? 0)
+        let margin = 48.0
+        let area = usableRect.insetBy(dx: margin, dy: margin)
+        guard area.width > 0, area.height > 0 else { return }
+        zoom = clampZoom(min(area.width / max(maxX - minX, 1), area.height / max(maxY - minY, 1)))
+        // The composition sits centred when `pan` is zero; moved so the
+        // selection's middle is in the middle of the canvas.
+        pan = CGPoint(x: (size.width / 2 - (minX + maxX) / 2) * zoom, y: (size.height / 2 - (minY + maxY) / 2) * zoom)
+        hasFitted = true
+        updateContentsScale()
+        layoutWorld()
+    }
+
     func zoom(by factor: Double) {
         zoom(to: zoom * factor, around: CGPoint(x: usableRect.midX, y: usableRect.midY))
     }
@@ -757,6 +777,13 @@ final class CanvasNSView: NSView {
         // keyboard in its text box, then hands back the arrow.
         if tool == .text {
             controller.editor.tool = .select
+            // On a text already there, the tool types into it, as in Figma:
+            // it used to put a second, empty text on top.
+            if let hit = layer(at: point, deep: true), controller.project.layer(withID: hit)?.isText == true,
+               !controller.isLocked(hit) {
+                controller.select([hit])
+                return beginTextEditing(hit, selectAll: false, at: point)
+            }
             let parent = frame(under: point)
             if let id = controller.addText(at: point, in: parent, parentWorld: animating ? parentWorld(parent) : nil) {
                 beginTextEditing(id, selectAll: true)
@@ -1505,8 +1532,12 @@ final class CanvasNSView: NSView {
             menus.show(controller.layerMenu(for: layer), at: origin)
         } else {
             controller.deselectAll()
-            guard controller.canPaste else { return }
-            menus.show([.item("Paste") { controller.paste() }], at: origin)
+            menus.show([
+                .item("Paste", disabled: !controller.canPaste) { controller.paste() },
+                .item("Select All", disabled: controller.project.layers.isEmpty) { controller.selectAll() },
+                .separator,
+                .item("Zoom to Fit") { [weak self] in self?.fitToWindow(animated: true) },
+            ], at: origin)
         }
     }
 
@@ -1565,6 +1596,8 @@ final class CanvasNSView: NSView {
         case 126: controller.nudge(by: Vec2(0, -step))
         default:
             let flags = event.modifierFlags.intersection([.command, .control, .option])
+            // Shift-2 zooms to the selection, as in Figma.
+            if flags.isEmpty, event.keyCode == 19, event.modifierFlags.contains(.shift) { return zoomToSelection() }
             // The tools' keys work in Animate too, where there is no bar.
             if flags.isEmpty, let key = event.charactersIgnoringModifiers, let tool = Tool.forKey(key) {
                 controller.editor.tool = tool

@@ -392,6 +392,10 @@ struct UnitField: View {
                 .liftedFieldText()
                 .focused($focused)
                 .onSubmit(apply)
+                .onExitCommand {
+                    text = shown(value)
+                    Self.leaveField()
+                }
                 .onChange(of: focused) { _, now in
                     if now && mixed { text = "" }
                     if !now { apply() }
@@ -476,15 +480,47 @@ struct UnitField: View {
         // change the value on a mere click in and out, and with several
         // layers or actions selected give them all the first one's.
         let untouched = !mixed && typed == format(value)
-        if !untouched, let v = Double(typed), Self.holds(v), accepts(v), mixed || abs(v - value) > .ulpOfOne {
+        // Past the field's range, the nearest number it takes (150% is
+        // 100%), as dragging rests at the limit: the old number used to come
+        // back without a word.
+        let number = untouched ? nil : Double(typed).flatMap { v in
+            Self.holds(v) ? (accepts(v) ? v : Self.nearest(to: v, from: value, decimals: decimals, accepts: accepts)) : nil
+        }
+        if let v = number, mixed || abs(v - value) > .ulpOfOne {
             commit(v)
             // The new value, not `value`: that still holds the old one until
             // the view updates, and showing it would put the old number back
             // the moment the field lost focus.
             text = format(v)
         } else {
+            // A number that is no use at all says so.
+            if !untouched, Double(typed) != nil, number == nil { NSSound.beep() }
             text = shown(value)
         }
+    }
+
+    /// The number nearest `wanted` that a field takes, looking between it
+    /// and `current` (which the field holds, so takes): found by halving,
+    /// as a field's range is only known by asking. Nil when nothing nearer
+    /// than `current` is taken, or the limit itself is not (a field that
+    /// must stay above zero).
+    static func nearest(to wanted: Double, from current: Double, decimals: Int, accepts: (Double) -> Bool) -> Double? {
+        guard current.isFinite, accepts(current) else { return nil }
+        var taken = current, refused = wanted
+        for _ in 0..<60 {
+            let middle = (taken + refused) / 2
+            if accepts(middle) { taken = middle } else { refused = middle }
+        }
+        let rounded = ArrowNudge.rounded(taken, decimals: max(decimals, 3))
+        guard accepts(rounded), abs(rounded - current) > 1e-9 else { return nil }
+        return rounded
+    }
+
+    /// Escape in a field: what was typed is dropped, and the keyboard goes
+    /// back to the canvas, so the next key is a shortcut again.
+    static func leaveField() {
+        let window = MainWindow.window
+        window.makeFirstResponder(window.preferredResponder)
     }
 }
 
@@ -531,6 +567,10 @@ struct OptionalField: View {
                 .liftedFieldText()
                 .focused($focused)
                 .onSubmit(apply)
+                .onExitCommand {
+                    text = value.map(format) ?? ""
+                    UnitField.leaveField()
+                }
                 .onChange(of: focused) { _, now in if !now { apply() } }
                 .onAppear { text = value.map(format) ?? "" }
                 .onChange(of: value) { old, now in
@@ -582,12 +622,15 @@ struct OptionalField: View {
         if typed.isEmpty {
             if value != nil { commit(nil) }
             text = ""
-        } else if let v = Double(typed), UnitField.holds(v), accepts(v) {
+        } else if let typedNumber = Double(typed), UnitField.holds(typedNumber),
+                  let v = accepts(typedNumber) ? typedNumber
+                      : UnitField.nearest(to: typedNumber, from: value ?? placeholder, decimals: decimals, accepts: accepts) {
             // Left reading what it was showing, nothing was typed: the
             // number shown may be rounded, and must not replace the value.
             if value.map({ typed != format($0) && abs($0 - v) > .ulpOfOne }) ?? true { commit(v) }
             text = format(v)
         } else {
+            if Double(typed) != nil { NSSound.beep() }
             text = value.map(format) ?? ""
         }
     }

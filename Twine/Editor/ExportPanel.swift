@@ -199,14 +199,18 @@ struct ExportPanel: View {
                     session.request(nil)
                 }
             }
-            .help(session.isExporting ? "Stop the export" : "Choose where to save it. (⌘E)")
+            .help(session.isExporting ? "Stop the export"
+                  : AppSettings.shared.exportFolder.map { "Saves to \($0.lastPathComponent), the export folder in Settings. (⌘E)" }
+                      ?? "Choose where to save it. (⌘E)")
             if let url = session.completed, !session.isExporting {
                 Button {
                     NSWorkspace.shared.activateFileViewerSelecting([url])
                 } label: {
-                    Text("Show in Finder")
+                    Text("Show \(url.lastPathComponent) in Finder")
                         .font(ThemeFont.label)
                         .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                         .frame(maxWidth: .infinity)
                         .frame(height: Theme.panelRow)
                         .contentShape(Rectangle())
@@ -333,7 +337,7 @@ struct ExportPanel: View {
             s.scale = scale
             let (w, h) = fits ? s.pixelSize(of: composition)
                 : (Int((Double(composition.width) * scale).rounded()), Int((Double(composition.height) * scale).rounded()))
-            return MenuEntry.item("\(Int(scale * 100))%   \(w) × \(h)",
+            return MenuEntry.item("\(Int(scale * 100))%   \(w) × \(h)" + (fits ? "" : "   Over 4K"),
                                   checked: !typesSize && abs(scale - settings.effectiveScale(for: composition)) < 1e-9,
                                   disabled: !fits) {
                 session.settings.scale = scale
@@ -392,7 +396,9 @@ enum ExportKeys {
     static func handle(_ event: NSEvent, _ controller: EditorController) -> Bool {
         guard controller.editor.showExport else { return false }
         switch event.keyCode {
-        case 53: controller.closeExport()
+        // Not while an export runs: one stray Escape threw away a long
+        // export, even at its last frames. Cancel and the cross still stop it.
+        case 53 where !controller.editor.exports.isExporting: controller.closeExport()
         case 49 where !event.isARepeat: controller.editor.exportPlayer?.toggle()
         default: break
         }

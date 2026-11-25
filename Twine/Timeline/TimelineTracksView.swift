@@ -71,6 +71,8 @@ final class TimelineTracksView: NSView {
     /// ends) and of the bar being dragged.
     private var snap: (time: Double, target: CGFloat?, dragged: CGFloat)?
     private var lastSelection: Set<UUID> = []
+    /// The layer whose row the pointer is over, as told to the editor.
+    private var hoveredLayer: UUID?
     /// The action last clicked without Shift, where a Shift-click's run of
     /// rows starts.
     private var rangeAnchor: UUID?
@@ -274,7 +276,15 @@ final class TimelineTracksView: NSView {
 
     override func layout() {
         super.layout()
+        viewport?.visibleWidth = Double(bounds.width - gutter)
         fitIfNeeded()
+    }
+
+    /// The whole composition across the tracks again, as at first sight.
+    func fitToScene() {
+        viewport?.hasFitted = false
+        fitIfNeeded()
+        needsDisplay = true
     }
 
     /// The whole composition across the tracks at first sight.
@@ -313,6 +323,13 @@ final class TimelineTracksView: NSView {
             trims = spanEdge(at: p, rect: rect) != nil
         }
         if drag == nil { (trims ? Cursors.resizeHorizontal : Cursors.arrow).set() }
+        // Shared with the canvas and the layers panel, which both show it:
+        // with layers named alike, a bar alone did not say whose it was.
+        let over = index.flatMap { rows[$0].header == nil ? rows[$0].action.targetLayerID : nil }
+        if over != hoveredLayer {
+            if let editor = controller?.editor, over != nil || editor.hoveredLayer == hoveredLayer { editor.hoveredLayer = over }
+            hoveredLayer = over
+        }
         if label != hoveredLabel || bar != hoveredBar {
             hoveredLabel = label
             hoveredBar = bar
@@ -322,6 +339,9 @@ final class TimelineTracksView: NSView {
 
     override func mouseExited(with event: NSEvent) {
         Cursors.arrow.set()
+        // Cleared only if nothing else has taken the hover since.
+        if let editor = controller?.editor, hoveredLayer != nil, editor.hoveredLayer == hoveredLayer { editor.hoveredLayer = nil }
+        hoveredLayer = nil
         hoveredLabel = nil
         hoveredBar = nil
         needsDisplay = true
@@ -770,6 +790,12 @@ final class TimelineTracksView: NSView {
 
     override func mouseDragged(with event: NSEvent) {
         guard let controller, let viewport, let drag else { return }
+        // Past the top or bottom edge, the rows scroll under the drag, so a
+        // bar or a selection box can reach rows that were out of view.
+        switch drag {
+        case .move, .reorder, .marquee: autoscroll(with: event)
+        default: break
+        }
         let p = convert(event.locationInWindow, from: nil)
         let rate = controller.frameRate
         switch drag {
@@ -1007,6 +1033,8 @@ final class TimelineTracksView: NSView {
                 editor.foldedLayers = Set(controller.project.actions.map(\.targetLayerID))
             },
             .item("Unfold All Layers", disabled: editor.foldedLayers.isEmpty) { editor.foldedLayers = [] },
+            .separator,
+            .item("Zoom to Fit") { [weak self] in self?.fitToScene() },
             .separator,
             .item("Show Only Selected Layers", checked: editor.timelineOnlySelected) { editor.timelineOnlySelected.toggle() },
             .item("Show Times as Frames", checked: editor.showsFrames) { editor.showsFrames.toggle() },

@@ -124,7 +124,16 @@ struct PresetPicker: View {
                     .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
                     .focusRing(searching)
                     // Return takes the first match, as the first tile shown.
-                    .onSubmit { if let first = groups.lazy.compactMap({ g in matching.first { $0.group == g } }).first { pick(first) } }
+                    .onSubmit {
+                        if let first = groups.lazy.compactMap({ g in matching.first { $0.group == g } }).first {
+                            pick(first)
+                            UnitField.leaveField()
+                        }
+                    }
+                    .onExitCommand {
+                        close()
+                        UnitField.leaveField()
+                    }
                     .onAppear { searching = true }
                 if matching.isEmpty {
                     Text("No presets")

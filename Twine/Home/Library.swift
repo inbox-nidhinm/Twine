@@ -40,6 +40,19 @@ final class Library {
     /// The Settings page in the shelf's place.
     var showsSettings = false
     var showVersionHistory = false
+    /// A note for the home screen, shown for a few seconds: why a rename
+    /// or a new folder did not take, which used to be a beep alone.
+    private(set) var notice: String?
+    @ObservationIgnored private var noticeTimer: Timer?
+
+    func say(_ text: String?) {
+        notice = text
+        noticeTimer?.invalidate()
+        guard text != nil else { return }
+        noticeTimer = Timer.scheduledTimer(withTimeInterval: 6, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.notice = nil }
+        }
+    }
     /// The project whose Info card is up.
     var info: Item?
     /// The New from Template card is up.
@@ -112,7 +125,10 @@ final class Library {
         guard !trimmed.isEmpty, !trimmed.contains("/"),
               !ProjectFormat.readableExtensions.contains((trimmed as NSString).pathExtension) else { NSSound.beep(); return nil }
         let url = Creations.folder.appendingPathComponent(trimmed, isDirectory: true)
-        guard !FileManager.default.fileExists(atPath: url.path) else { NSSound.beep(); return nil }
+        guard !FileManager.default.fileExists(atPath: url.path) else {
+            say("There is already a folder called \u{201C}\(trimmed)\u{201D}.")
+            return nil
+        }
         do { try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false) } catch {
             NSApp.presentError(error)
             return nil
@@ -126,7 +142,9 @@ final class Library {
         guard !trimmed.isEmpty, trimmed != folder.name, !trimmed.contains("/"),
               !ProjectFormat.readableExtensions.contains((trimmed as NSString).pathExtension) else { return }
         let target = folder.url.deletingLastPathComponent().appendingPathComponent(trimmed, isDirectory: true)
-        guard !FileManager.default.fileExists(atPath: target.path) else { return NSSound.beep() }
+        guard !FileManager.default.fileExists(atPath: target.path) else {
+            return say("There is already a folder called \u{201C}\(trimmed)\u{201D}.")
+        }
         do {
             try FileManager.default.moveItem(at: folder.url, to: target)
         } catch {
@@ -202,7 +220,9 @@ final class Library {
         } else {
             let target = item.url.deletingLastPathComponent()
                 .appendingPathComponent(trimmed).appendingPathExtension(item.url.pathExtension)
-            guard !FileManager.default.fileExists(atPath: target.path) else { return NSSound.beep() }
+            guard !FileManager.default.fileExists(atPath: target.path) else {
+                return say("There is already a project called \u{201C}\(trimmed)\u{201D} here.")
+            }
             do { try FileManager.default.moveItem(at: item.url, to: target) } catch { NSApp.presentError(error) }
         }
         refresh()

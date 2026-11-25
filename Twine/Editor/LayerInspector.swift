@@ -289,16 +289,18 @@ struct LayerInspector: View {
             }
         case .polygon(let sides, let corner):
             VStack(alignment: .leading, spacing: 8) {
-                StepRow(label: "Sides", value: sides, range: 3...60) { n in
-                    setGeometry(.polygon(sides: n, cornerRadius: corner))
+                UnitField(unit: "Sides", value: Double(sides), step: 0.2, accepts: { $0 >= 3 && $0 <= 60 }) { v in
+                    setGeometry(.polygon(sides: Int(v.rounded()), cornerRadius: corner))
                 }
+                .help("How many sides, from 3 to 60")
                 cornerRadiusField
             }
         case .star(let points, let inner, let corner):
             VStack(alignment: .leading, spacing: 8) {
-                StepRow(label: "Points", value: points, range: 3...60) { n in
-                    setGeometry(.star(points: n, innerRadius: inner, cornerRadius: corner))
+                UnitField(unit: "Points", value: Double(points), step: 0.2, accepts: { $0 >= 3 && $0 <= 60 }) { v in
+                    setGeometry(.star(points: Int(v.rounded()), innerRadius: inner, cornerRadius: corner))
                 }
+                .help("How many points, from 3 to 60")
                 HStack(spacing: 8) {
                     UnitField(unit: "Inner", value: inner * 100, decimals: 1, suffix: "%", accepts: { $0 >= 0 }) { v in
                         setGeometry(.star(points: points, innerRadius: v / 100, cornerRadius: corner))
@@ -458,6 +460,8 @@ struct BlendOpacityRow: View {
     let entries: () -> [MenuEntry]
     let opacity: Double
     var isGroup = false
+    /// Several layers of different opacity: the field reads Mixed.
+    var mixedOpacity = false
     /// 0 to 1.
     let setOpacity: (Double) -> Void
 
@@ -466,7 +470,8 @@ struct BlendOpacityRow: View {
             MenuField(value: blend, entries: entries, height: Theme.control)
                 .help(isGroup ? "Blend: how the layer mixes with what is behind it. At Normal, what is inside a group or frame blends through it, as Figma's Pass Through does."
                               : "Blend: how the layer mixes with what is behind it")
-            UnitField(value: opacity * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
+            UnitField(value: opacity * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 },
+                      mixed: mixedOpacity) { v in
                 setOpacity(v / 100)
             }
             .frame(width: Theme.labelWidth)
@@ -1278,7 +1283,7 @@ private struct EffectsSection: View {
 
     /// Show and hide, on an effect's first row of values.
     private func eyeButton(_ effect: Effect, _ index: Int) -> some View {
-        IconButton(icon: effect.isEnabled ? .eye : .eyeSlash, help: effect.isEnabled ? "Hide" : "Show") {
+        IconButton(icon: effect.isEnabled ? .eye : .eyeSlash, help: effect.isEnabled ? "Hide the effect" : "Show the effect") {
             edit(index) { $0.isEnabled.toggle() }
         }
     }

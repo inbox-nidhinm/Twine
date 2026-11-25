@@ -65,7 +65,8 @@ struct InspectorPanel: View {
     /// and every colour they use.
     private func multipleSelection(_ layers: [Layer]) -> some View {
         let values = layers.map(\.opacity)
-        let shared = values.allSatisfy { abs($0 - values[0]) < 1e-9 } ? values[0] : values.max() ?? 1
+        let alike = values.allSatisfy { abs($0 - values[0]) < 1e-9 }
+        let shared = alike ? values[0] : values.max() ?? 1
         let blends = Set(layers.map(\.blendMode))
         return VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 8) {
@@ -78,7 +79,7 @@ struct InspectorPanel: View {
                 HeaderRow(title: "Appearance") {}
                 BlendOpacityRow(blend: blends.count == 1 ? layers[0].blendMode.title : "Mixed",
                                 entries: { blendEntries(layers) }, opacity: shared,
-                                isGroup: layers.contains(where: \.isGroup)) { v in
+                                isGroup: layers.contains(where: \.isGroup), mixedOpacity: !alike) { v in
                     controller.perform(.updateLayers(layers.map { l in
                         var c = l
                         c.opacity = v

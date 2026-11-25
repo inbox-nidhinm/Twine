@@ -143,7 +143,7 @@ struct TemplateSlotSection: View {
                 }
                 .buttonStyle(.plain)
                 .help(media == nil ? "Choose a picture or video, or drop one here" : "Choose another picture or video, or drop one here")
-                PanelButton(title: media == nil ? "Choose Picture or Video" : "Replace", icon: .image) {
+                PanelButton(title: media == nil ? "Choose Picture or Video…" : "Replace…", icon: .image) {
                     controller.chooseTemplatePicture(template.id, slot: index)
                 }
                 if media != nil {

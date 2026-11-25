@@ -173,6 +173,8 @@ private struct FontList: View {
     let pick: (String) -> Void
 
     @State private var search = ""
+    /// The row the arrow keys are on, which Return picks.
+    @State private var highlighted: String?
     @FocusState private var searching: Bool
     private let families = [TextLayout.systemFamily] + TextLayout.installedFamilies
         .filter { !$0.hasPrefix(".") }.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
@@ -188,17 +190,41 @@ private struct FontList: View {
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
                 .focusRing(searching)
                 .onAppear { searching = true }
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(shown, id: \.self) { family in
-                        FontRow(family: family, isCurrent: family.caseInsensitiveCompare(current) == .orderedSame) {
-                            pick(family)
+                // Return takes the row the arrows are on, or the first match.
+                .onSubmit { if let family = highlighted ?? shown.first { pick(family) } }
+                .onChange(of: search) { _, _ in highlighted = nil }
+                .onKeyPress(.downArrow) { move(1) }
+                .onKeyPress(.upArrow) { move(-1) }
+            ScrollViewReader { list in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(shown, id: \.self) { family in
+                            FontRow(family: family, isCurrent: family.caseInsensitiveCompare(current) == .orderedSame,
+                                    isHighlighted: family == highlighted) {
+                                pick(family)
+                            }
+                            .id(family)
                         }
                     }
                 }
+                .frame(height: Theme.control * 12)
+                // Opens at the font in use, not at A with it far out of sight.
+                .onAppear {
+                    let inUse = families.first { $0.caseInsensitiveCompare(current) == .orderedSame }
+                    DispatchQueue.main.async { if let inUse { list.scrollTo(inUse, anchor: .center) } }
+                }
+                .onChange(of: highlighted) { _, family in if let family { list.scrollTo(family) } }
             }
-            .frame(height: Theme.control * 12)
         }
+    }
+
+    private func move(_ by: Int) -> KeyPress.Result {
+        let list = shown
+        guard !list.isEmpty else { return .handled }
+        let from = highlighted ?? (search.isEmpty ? list.first { $0.caseInsensitiveCompare(current) == .orderedSame } : nil)
+        let at = from.flatMap(list.firstIndex(of:))
+        highlighted = list[min(max((at ?? (by > 0 ? -1 : list.count)) + by, 0), list.count - 1)]
+        return .handled
     }
 
     private var shown: [String] {
@@ -210,6 +236,7 @@ private struct FontList: View {
 private struct FontRow: View {
     let family: String
     let isCurrent: Bool
+    var isHighlighted = false
     let pick: () -> Void
 
     @State private var hovering = false
@@ -227,7 +254,7 @@ private struct FontRow: View {
             .foregroundStyle(Theme.textPrimary)
             .padding(.horizontal, 6)
             .frame(height: Theme.control)
-            .background(RoundedRectangle(cornerRadius: Theme.radiusRow).fill(hovering ? Theme.accent : .clear))
+            .background(RoundedRectangle(cornerRadius: Theme.radiusRow).fill(hovering || isHighlighted ? Theme.accent : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

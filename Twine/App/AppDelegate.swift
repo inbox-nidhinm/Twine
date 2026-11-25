@@ -1,6 +1,12 @@
 import AppKit
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+    /// Home is greyed out while the home screen is what is showing.
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == #selector(showHome(_:)) { return !NSDocumentController.shared.documents.isEmpty }
+        return true
+    }
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Before anything reads a setting or the projects folder.
         FormerName.carryOver()
@@ -33,12 +39,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
+    /// Quitting stops an export that is running, so it asks first: minutes
+    /// of a long export used to go with one Command-Q, without a word.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !Self.exportStopAgreed, Self.isExporting, MainWindow.window.isVisible else { return .terminateNow }
+        Self.askToStopExport(or: "Stop and Quit") { stop in
+            NSApp.reply(toApplicationShouldTerminate: stop)
+        }
+        return .terminateLater
+    }
+
+    /// Set once the person has agreed to stop the export, so closing the
+    /// window and the quit that follows it ask only once.
+    static var exportStopAgreed = false
+
+    static var isExporting: Bool {
+        NSDocumentController.shared.documents.contains { ($0 as? ProjectDocument)?.editor.exports.isExporting == true }
+    }
+
+    /// Asks, on the window, whether to stop the running export. `done`
+    /// hears true when the person chose to stop it.
+    static func askToStopExport(or stop: String, done: @escaping (Bool) -> Void) {
+        let alert = NSAlert()
+        alert.messageText = "An export is still running."
+        alert.informativeText = "Stopping now leaves no file."
+        alert.addButton(withTitle: "Keep Exporting")
+        alert.addButton(withTitle: stop)
+        alert.beginSheetModal(for: MainWindow.window) { response in
+            let stops = response == .alertSecondButtonReturn
+            if stops { exportStopAgreed = true }
+            done(stops)
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         AgentService.shared.stop()
     }
 
     @objc func showHome(_ sender: Any?) {
         HomeWindowController.shared.showWindow(nil)
+    }
+
+    /// Settings live on the home screen, so that is where this goes.
+    @objc func showSettings(_ sender: Any?) {
+        HomeWindowController.shared.showWindow(nil)
+        HomeWindowController.shared.library.showsSettings = true
     }
 
     @objc func showOnboarding(_ sender: Any?) {

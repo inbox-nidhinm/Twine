@@ -20,7 +20,12 @@ struct LayersPanel: View {
     @State private var nameHover = false
     @FocusState private var fileFocused: Bool
 
-    @State private var expanded: Set<UUID> = []
+    /// The groups and frames that are open, kept by the editor so they
+    /// outlast the panel being hidden.
+    private var expanded: Set<UUID> {
+        get { editor.expandedLayers }
+        nonmutating set { editor.expandedLayers = newValue }
+    }
     /// Where a shift-click extends a run from.
     @State private var lastClicked: UUID?
 
@@ -29,21 +34,29 @@ struct LayersPanel: View {
             header
             PanelDivider()
             SectionHeader(title: "Layers")
-            ScrollView {
-                // Worked out once, not by every row scanning every layer.
-                let masks = controller.project.maskIDs
-                LazyVStack(spacing: 0) {
-                    ForEach(rows) { row in
-                        LayerRow(row: row, editor: editor, controller: controller, isMask: masks.contains(row.id),
-                                 isExpanded: expanded.contains(row.id),
-                                 toggleExpanded: { toggle(row.id) },
-                                 click: { click(row.id, NSEvent.modifierFlags) })
+                .overlay(alignment: .trailing) { soloSwitch }
+            ScrollViewReader { list in
+                ScrollView {
+                    // Worked out once, not by every row scanning every layer.
+                    let masks = controller.project.maskIDs
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows) { row in
+                            LayerRow(row: row, editor: editor, controller: controller, isMask: masks.contains(row.id),
+                                     isExpanded: expanded.contains(row.id),
+                                     toggleExpanded: { toggle(row.id) },
+                                     click: { click(row.id, NSEvent.modifierFlags) })
+                                .id(row.id)
+                        }
                     }
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, Theme.panelPad)
                 }
-                .padding(.horizontal, 4)
-                .padding(.bottom, Theme.panelPad)
+                .frame(maxHeight: .infinity)
+                // A layer picked on the canvas, or one about to be renamed,
+                // is brought into view: a turn on, once its group has opened.
+                .onChange(of: editor.selection) { _, _ in reveal(in: list) }
+                .onChange(of: editor.renaming) { _, id in if id != nil { reveal(in: list) } }
             }
-            .frame(maxHeight: .infinity)
         }
         .overlay(alignment: .topTrailing) {
             IconButton(icon: .home, help: "Home (⇧⌘H)") {
@@ -57,6 +70,39 @@ struct LayersPanel: View {
         .onChange(of: editor.selection) { _, selection in
             for id in selection { expanded.formUnion(store.project.ancestors(of: id)) }
         }
+    }
+
+    /// Scrolls just far enough to show the first selected row (or the one
+    /// being renamed), if it is out of sight.
+    private func reveal(in list: ScrollViewProxy) {
+        DispatchQueue.main.async {
+            let wanted = editor.renaming ?? rows.first { editor.selection.contains($0.id) }?.id
+            if let wanted { list.scrollTo(wanted) }
+        }
+    }
+
+    /// Shown while any layer is soloed, lit, and switches them all off: a
+    /// solo left on inside a folded group hid everything else on the canvas
+    /// with nothing to say why, and is kept with the file.
+    @ViewBuilder private var soloSwitch: some View {
+        let soloed = soloedLayers
+        if !soloed.isEmpty {
+            Button { controller.perform(.setSoloed(soloed, false)) } label: {
+                IconView(.solo, size: 15)
+                    .foregroundStyle(Theme.textPrimary)
+                    .frame(width: Theme.rowIconButton, height: Theme.listRow)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Only soloed layers are showing. Click to show them all")
+            .padding(.trailing, Theme.buttonInset)
+        }
+    }
+
+    private var soloedLayers: Set<UUID> {
+        var ids: Set<UUID> = []
+        store.project.forEachLayer { if $0.isSoloed { ids.insert($0.id) } }
+        return ids
     }
 
     // MARK: Rows
@@ -212,17 +258,17 @@ private struct LayerRow: View {
             Spacer(minLength: 0)
             if layer.isSoloed || lit {
                 toggle(.solo, on: layer.isSoloed, help: layer.isSoloed ? "Unsolo" : "Solo: show only this") {
-                    controller.perform(.setSoloed([layer.id], !layer.isSoloed))
+                    controller.perform(.setSoloed(switched, !layer.isSoloed))
                 }
             }
             if layer.isLocked || lit {
                 toggle(layer.isLocked ? .lock : .unlock, on: layer.isLocked, help: layer.isLocked ? "Unlock" : "Lock") {
-                    controller.perform(.setLocked([layer.id], !layer.isLocked))
+                    controller.perform(.setLocked(switched, !layer.isLocked))
                 }
             }
             if !layer.isVisible || lit {
                 toggle(layer.isVisible ? .eye : .eyeSlash, on: !layer.isVisible, help: layer.isVisible ? "Hide" : "Show") {
-                    controller.perform(.setVisible([layer.id], !layer.isVisible))
+                    controller.perform(.setVisible(switched, !layer.isVisible))
                 }
             }
         }
@@ -292,6 +338,10 @@ private struct LayerRow: View {
         if draft != layer.name { controller.perform(.renameLayer(layer.id, draft)) }
     }
 
+    /// The layers a switch on this row changes: every selected layer when
+    /// the row is one of them, as the timeline's eye and the layer menu do.
+    private var switched: Set<UUID> { controller.switched(by: layer) }
+
     private func toggle(_ icon: Icon, on: Bool, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             IconView(icon, size: 15)
@@ -339,8 +389,20 @@ extension EditorController {
     /// canvas alike. The layer is selected first.
     func layerMenu(for layer: Layer) -> [MenuEntry] {
         var entries: [MenuEntry] = [
-            .item("Rename") { self.editor.renaming = layer.id },
+            // The name is edited in its row, so the panel is shown first.
+            .item("Rename") {
+                self.editor.showLayers = true
+                self.editor.renaming = layer.id
+            },
             .item("Duplicate") { self.duplicateSelectedLayers() },
+            .separator,
+            .item("Cut") { self.copySelectedLayers(); self.deleteSelectedLayers() },
+            .item("Copy") { self.copySelectedLayers() },
+            .item("Paste", disabled: !canPaste) { self.paste() },
+            .separator,
+            .item("Bring to Front") { self.restack(.front) },
+            .item("Send to Back") { self.restack(.back) },
+            .separator,
             .item("Group Selection") { self.groupSelection() },
             .item("Frame Selection") { self.frameSelection() },
         ]
@@ -357,15 +419,24 @@ extension EditorController {
             let onto = editor.selection.contains(layer.id) ? selectedLayers : [layer]
             entries += [.separator, .item(copiedActionCount == 1 ? "Paste Action" : "Paste Actions") { self.pasteActions(onto: onto) }]
         }
+        // Every selected layer when this is one of them, as Delete,
+        // Duplicate and Group in this menu already take the selection.
+        let ids = switched(by: layer)
         entries += [
             .separator,
-            .item(layer.isSoloed ? "Unsolo" : "Solo") { self.perform(.setSoloed([layer.id], !layer.isSoloed)) },
-            .item(layer.isLocked ? "Unlock" : "Lock") { self.perform(.setLocked([layer.id], !layer.isLocked)) },
-            .item(layer.isVisible ? "Hide" : "Show") { self.perform(.setVisible([layer.id], !layer.isVisible)) },
+            .item(layer.isSoloed ? "Unsolo" : "Solo") { self.perform(.setSoloed(ids, !layer.isSoloed)) },
+            .item(layer.isLocked ? "Unlock" : "Lock") { self.perform(.setLocked(ids, !layer.isLocked)) },
+            .item(layer.isVisible ? "Hide" : "Show") { self.perform(.setVisible(ids, !layer.isVisible)) },
             .separator,
             .item("Delete") { self.deleteSelectedLayers() },
         ]
         return entries
+    }
+
+    /// The layers a switch or menu item on `layer` changes: the whole
+    /// selection when `layer` is in it, otherwise the layer alone.
+    func switched(by layer: Layer) -> Set<UUID> {
+        editor.selection.contains(layer.id) ? editor.selection : [layer.id]
     }
 }
 

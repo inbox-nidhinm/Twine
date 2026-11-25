@@ -41,7 +41,16 @@ struct TemplatePicker: View {
                     .frame(height: Theme.control)
                     .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
                     .focusRing(searching)
-                    .onSubmit { if let first = matching.first { pick(first) } }
+                    .onSubmit {
+                        if let first = matching.first {
+                            pick(first)
+                            UnitField.leaveField()
+                        }
+                    }
+                    .onExitCommand {
+                        close()
+                        UnitField.leaveField()
+                    }
                     .onAppear { searching = true }
                 if matching.isEmpty {
                     Text("No templates")

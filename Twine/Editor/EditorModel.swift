@@ -77,7 +77,18 @@ final class EditorModel {
         // A note says something went wrong or needs saying; work under way
         // gives way to it rather than writing over it.
         work = nil
-        show(Notice(text: text, state: .note), for: 6)
+        // Six seconds, or longer for more words: a Figma paste's four lines
+        // went as fast as one.
+        show(Notice(text: text, state: .note), for: max(6, Double(text.count) / 15))
+    }
+
+    /// The pointer resting on the notice holds it; leaving lets it go a
+    /// moment later. Work under way is not timed, so has nothing to hold.
+    func holdNotice(_ held: Bool) {
+        guard let notice else { return }
+        if case .working = notice.state { return }
+        noticeTimer?.invalidate()
+        if !held { show(notice, for: 2) }
     }
 
     /// Starts following some work with `text` and a loader, shown once it
@@ -192,6 +203,10 @@ final class EditorModel {
     private static let soundAtBottomKey = "timelineSoundAtBottom"
     /// Layers whose timeline rows are folded into one.
     var foldedLayers: Set<UUID> = []
+    /// Groups and frames open in the layers panel. Kept here, not in the
+    /// panel, which is taken out of the window while hidden and came back
+    /// with every group shut.
+    var expandedLayers: Set<UUID> = []
     /// Timeline scenes folded to their one row.
     var foldedScenes: Set<UUID> = []
     /// The timeline card's height, which its top edge drags. Remembered for
@@ -240,6 +255,24 @@ final class TimelineViewport {
 
     func x(for time: Double) -> Double { (time - start) * pointsPerSecond }
     func time(at x: Double) -> Double { x / pointsPerSecond + start }
+
+    /// How wide the tracks are, in points, set by the tracks as they are
+    /// laid out. Not watched: nothing is drawn from it.
+    @ObservationIgnored var visibleWidth: Double = 0
+
+    /// Turns the page when `time` has left the tracks: on when it passes
+    /// the right edge, back when it is before the left. For the playhead
+    /// while playing, stepping and jumping (not while it is dragged), which
+    /// used to run off the edge of a zoomed-in timeline and out of sight.
+    func follow(_ time: Double) {
+        guard visibleWidth > Self.lead * 2 else { return }
+        let x = x(for: time)
+        if x > visibleWidth {
+            start = time - Self.lead / pointsPerSecond
+        } else if x < 0 {
+            start = time - (visibleWidth - Self.lead) / pointsPerSecond
+        }
+    }
 }
 
 enum Tool: String, CaseIterable {

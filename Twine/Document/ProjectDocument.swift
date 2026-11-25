@@ -410,7 +410,7 @@ final class ProjectDocument: NSDocument {
         let target = url.deletingLastPathComponent()
             .appendingPathComponent(trimmed).appendingPathExtension(url.pathExtension)
         guard !FileManager.default.fileExists(atPath: target.path) else {
-            NSSound.beep()
+            editorController?.editor.showNotice("There is already a project called \u{201C}\(trimmed)\u{201D} here.")
             return done(false)
         }
         move(to: target) { error in
