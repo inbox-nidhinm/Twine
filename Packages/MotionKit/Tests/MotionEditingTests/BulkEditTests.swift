@@ -144,4 +144,12 @@ import MotionModel
             #expect(abs(a.x - f.x) < 1e-6 && abs(a.y - f.y) < 1e-6)
         }
     }
+
+    /// A name with a number past any count does not stop the next name
+    /// being made.
+    @Test func aHugeNumberInANameIsPassedOver() {
+        let project = Project(layers: [shape("Rectangle 9223372036854775807", at: 0), shape("Rectangle 4", at: 0), shape("Rectangle", at: 0)])
+        #expect(LayerFactory.nextName("Rectangle", in: project) == "Rectangle 5")
+        #expect(LayerFactory.nextName("Ellipse", in: project) == "Ellipse 1")
+    }
 }

@@ -274,3 +274,18 @@ private func rect(_ name: String = "Rect", at position: Vec2 = Vec2(100, 100), s
         _ = evaluate(Project(layers: [mask, masked, masked]), at: 0)
     }
 }
+
+/// What only a damaged project holds must still draw.
+@Suite struct OddProjectEvaluationTests {
+    @Test func aSoundMarkedAsAMaskDrawsNothingAndStopsNothing() {
+        var sound = Layer(name: "Sound", content: .audio(AudioContent(mediaID: UUID())), size: Size2(0, 0), position: .zero)
+        sound.isMask = true
+        let shown = Layer(name: "Shown", content: .shape(ShapeContent(geometry: .rectangle(cornerRadii: .zero))),
+                          size: Size2(10, 10), position: .zero)
+        let scene = evaluate(Project(layers: [sound, shown]), at: 0)
+        #expect(scene.layers.map(\.id) == [shown.id])
+        #expect(scene.masks.isEmpty)
+        #expect(scene.layers[0].mask == nil)
+    }
+}
+

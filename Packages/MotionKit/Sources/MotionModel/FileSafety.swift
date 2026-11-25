@@ -136,7 +136,12 @@ extension Project {
         let biggest = FileSafety.largestComposition
         p.composition.width = min(max(p.composition.width, 1), biggest)
         p.composition.height = min(max(p.composition.height, 1), biggest)
-        p.composition.duration = FileSafety.time(p.composition.duration)
+        // A rate no screen or movie has (one frame in a thousand million
+        // seconds made every new action a day long) is the usual one.
+        if !(0.001...1000).contains(p.composition.frameRate.perSecond) { p.composition.frameRate = .fps30 }
+        // Never shorter than a frame: a scene of no length opened, but then
+        // refused every change to its size, rate or ground.
+        p.composition.duration = max(FileSafety.time(p.composition.duration), p.composition.frameRate.frameDuration)
         p.actions = FileSafety.held(p.actions)
         p.media = p.media.map { asset in
             var m = asset
@@ -151,6 +156,46 @@ extension Project {
             return m
         }
         p.layers = FileSafety.held(p.layers)
+        return p.withUniqueIDs()
+    }
+
+    /// The project with every id its own. Twine never writes two layers or
+    /// two actions with one id, but a file put together by hand or by
+    /// another tool can: edits to the second layer then landed on the
+    /// first, deleting it left its twin, and dragging one of two such bars
+    /// stopped the app. The first of each keeps the id (and with it the
+    /// actions that name it); a later one gets a new id.
+    func withUniqueIDs() -> Project {
+        var seen = Set<UUID>()
+        var repeated = false
+        forEachLayer { if !seen.insert($0.id).inserted { repeated = true } }
+        var actionIDs = Set<UUID>()
+        let repeatedActions = actions.contains { !actionIDs.insert($0.id).inserted }
+        guard repeated || repeatedActions else { return self }
+        var p = self
+        if repeated {
+            var taken = Set<UUID>()
+            func unique(_ list: [Layer]) -> [Layer] {
+                list.map { layer in
+                    var l = taken.insert(layer.id).inserted ? layer : layer.withID(UUID())
+                    if l.isGroup { l.children = unique(l.children) }
+                    return l
+                }
+            }
+            p.layers = unique(layers)
+        }
+        if repeatedActions {
+            var taken = Set<UUID>()
+            p.actions = actions.map { a in
+                guard !taken.insert(a.id).inserted else {
+                    var copy = Action(target: a.targetLayerID, start: a.start, duration: a.duration, easing: a.easing, name: a.name,
+                                      isEnabled: a.isEnabled, rowOrder: a.rowOrder, spec: a.spec)
+                    copy.motionBlur = a.motionBlur
+                    return copy
+                }
+                return a
+            }
+        }
         return p
     }
 }
@@ -174,6 +219,10 @@ extension FileSafety {
     public static func held(_ layers: [Layer]) -> [Layer] {
         layers.map { layer in
             var l = layer
+            // Only what can mask is a mask: a sound or a group marked as
+            // one (which only a damaged file does) once stopped the app as
+            // soon as the project was drawn.
+            if l.isMask, !l.canMask { l.isMask = false }
             switch l.content {
             case .text(var text):
                 guard !fontSizes.contains(text.fontSize) else { break }

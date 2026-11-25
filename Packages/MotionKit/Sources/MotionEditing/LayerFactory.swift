@@ -108,10 +108,15 @@ public enum LayerFactory {
 
     /// `Rectangle 3` when the project already has two rectangles, and so on.
     public static func nextName(_ base: String, in project: Project) -> String {
-        let taken = project.allLayers.compactMap { layer -> Int? in
-            guard layer.name.hasPrefix(base + " ") else { return nil }
-            return Int(layer.name.dropFirst(base.count + 1))
+        // Numbers past any real count are passed over: a layer named
+        // "Rectangle 9223372036854775807" made the next one's number
+        // overflow, which stopped the app.
+        var highest = 0
+        project.forEachLayer { layer in
+            guard layer.name.hasPrefix(base + " "), let n = Int(layer.name.dropFirst(base.count + 1)),
+                  n > highest, n < 1_000_000_000 else { return }
+            highest = n
         }
-        return "\(base) \((taken.max() ?? 0) + 1)"
+        return "\(base) \(highest + 1)"
     }
 }

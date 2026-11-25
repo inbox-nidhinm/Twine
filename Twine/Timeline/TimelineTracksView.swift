@@ -806,11 +806,14 @@ final class TimelineTracksView: NSView {
                                 row: rows.first { $0.actions.contains { $0.id == anchor.id } }?.y, event: event)
             // Times from where the drag began; rows as they are now.
             let rowsNow = Dictionary(controller.project.actions.map { ($0.id, $0.rowOrder) }, uniquingKeysWith: { a, _ in a })
-            var edited = Dictionary(uniqueKeysWithValues: ActionEditing.moved(originals, by: delta, rate: rate).map { moved -> (UUID, Action) in
+            // Never trusting ids to be each their own: two bars sharing one
+            // (a damaged file, before files were mended on opening) stopped
+            // the app here.
+            var edited = Dictionary(ActionEditing.moved(originals, by: delta, rate: rate).map { moved -> (UUID, Action) in
                 var a = moved
                 a.rowOrder = rowsNow[a.id] ?? a.rowOrder
                 return (a.id, a)
-            })
+            }, uniquingKeysWith: { first, _ in first })
             // One action dragged onto another row moves there.
             if originals.count == 1 {
                 for changed in reordered(anchor, toRowAt: p.y) {

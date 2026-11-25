@@ -38,8 +38,12 @@ final class ProjectDocument: NSDocument {
                                                      for saveOperation: NSDocument.SaveOperationType) -> Bool { false }
 
     nonisolated override func read(from fileWrapper: FileWrapper, ofType typeName: String) throws {
+        // Only an ordinary file is read: asked for its contents, a link or
+        // a folder in the document's place raises an exception, which
+        // stopped the app in place of saying the project cannot be opened.
         guard fileWrapper.isDirectory,
-              let data = fileWrapper.fileWrappers?[ProjectFormat.documentFileName]?.regularFileContents
+              let file = fileWrapper.fileWrappers?[ProjectFormat.documentFileName], file.isRegularFile,
+              let data = file.regularFileContents
         else { throw ProjectFileError.missingDocument }
         // A sound or video that lost its Play bar gets one back, so it shows
         // in the timeline, and an older Typewriter types rather than fades;

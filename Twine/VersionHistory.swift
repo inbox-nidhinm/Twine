@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 265
+    static let pushes = 266
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -123,6 +123,8 @@ enum VersionHistory {
             "The home screen opens without reading every project whole: a project with a picture is shown from the picture alone.",
             "Files a project no longer uses leave it. A picture, video or sound whose layer was deleted or whose picture was replaced stayed in the project for good, and went along with every duplicate; such files are now let go when the project is next opened, and are gone from the package at its next save.",
             "A long export no longer holds on to memory from every frame until it ends.",
+            "Files made to break Twine, or damaged by hand or by another tool, are read safely. An SVG can no longer slip past the two checks made before it is read (an entity hidden behind a quoted bracket, which could grow a few hundred bytes into gigabytes, and nesting hidden behind stray closing tags, which stopped the app); a clip path of thousands of shapes used by thousands of elements, and a paint made of thousands of fallbacks, are held to the reader's limits.",
+            "A project file with two layers or two actions sharing an id is mended as it opens (edits to one used to land on the other, and dragging such a bar stopped the app), as are a scene of no length, an absurd frame rate, and a sound or group marked as a mask. A project whose document is a link or a folder is refused with a message, and a layer named with an enormous number no longer stops the next layer being named.",
         ], misc: [
             "Settings is in the Twine menu (⌘,). File > Duplicate is named Duplicate Project, and Home is greyed out on the home screen.",
             "A new, empty project opens in Design, where the drawing tools are; a project with layers still opens in Animate.",

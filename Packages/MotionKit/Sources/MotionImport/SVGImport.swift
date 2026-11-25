@@ -121,15 +121,32 @@ public enum SVGImport {
     }
 
     /// Whether the file declares an entity that is a file or a web address
-    /// (`SYSTEM`, `PUBLIC`), a parameter entity, or one made of others.
-    /// Plain text entities, which Illustrator writes, are fine.
+    /// (`SYSTEM`, `PUBLIC`), a parameter entity, one made of others, or one
+    /// holding markup. Plain text entities, which Illustrator writes, are
+    /// fine.
+    ///
+    /// A declaration runs to the `>` that closes it, which is the first one
+    /// outside its quoted value: a `>` is allowed inside the quotes, and
+    /// stopping at that one (as this did) left the rest of the value
+    /// unread, so `">&a;&a;&a;"` passed as plain text and the entities
+    /// still grew a few hundred bytes into gigabytes.
     static func declaresRiskyEntities(_ data: Data) -> Bool {
-        let opening = Data("<!ENTITY".utf8), close = UInt8(ascii: ">")
+        let opening = Data("<!ENTITY".utf8)
+        let close = UInt8(ascii: ">"), double = UInt8(ascii: "\""), single = UInt8(ascii: "'")
         var from = data.startIndex
         while let found = data.range(of: opening, in: from..<data.endIndex) {
-            let end = data[found.upperBound...].firstIndex(of: close) ?? data.endIndex
+            var end = found.upperBound, quote: UInt8 = 0
+            while end < data.endIndex {
+                let byte = data[end]
+                if quote != 0 { if byte == quote { quote = 0 } }
+                else if byte == double || byte == single { quote = byte }
+                else if byte == close { break }
+                end += 1
+            }
             let body = String(decoding: data[found.upperBound..<end], as: UTF8.self)
-            if body.contains("%") || body.contains("&") || body.contains("SYSTEM") || body.contains("PUBLIC") { return true }
+            if body.contains("%") || body.contains("&") || body.contains("<") || body.contains("SYSTEM") || body.contains("PUBLIC") {
+                return true
+            }
             from = end
         }
         return false
@@ -162,7 +179,11 @@ public enum SVGImport {
             while i < n {
                 guard b[i] == lt, i + 1 < n else { i += 1; continue }
                 if b[i + 1] == slash {
-                    depth -= 1
+                    // Never below nothing open: closing tags written where
+                    // they close nothing (inside a DOCTYPE's own comments,
+                    // say) took the count far below zero, and a hundred
+                    // thousand real levels after them then counted as none.
+                    depth = max(depth - 1, 0)
                     i = after(">", from: i + 2)
                 } else if b[i + 1] == UInt8(ascii: "?") {
                     i = after("?>", from: i + 2)
@@ -602,8 +623,10 @@ private struct Reader {
     /// A fill or stroke: none, a colour, `currentColor`, or a gradient or a
     /// picture pattern by reference, with a colour to fall back on.
     private mutating func paint(_ value: String?, opacity: Double, style: SVGStyle, userBounds: Box,
-                                ctm: Affine, layer: Layer) -> Paint? {
-        guard var value = value?.trimmed, value != "none", !value.isEmpty else { return nil }
+                                ctm: Affine, layer: Layer, fallbacks: Int = 0) -> Paint? {
+        // A paint names one thing to fall back on, which may name another:
+        // a value made of thousands of them was followed that deep.
+        guard fallbacks < 8, var value = value?.trimmed, value != "none", !value.isEmpty else { return nil }
         if value == "currentColor" { value = style["color"] ?? "black" }
         if value.hasPrefix("url(") {
             let close = value.firstIndex(of: ")") ?? value.endIndex
@@ -619,7 +642,8 @@ private struct Reader {
                 }
             }
             let fallback = value[close...].dropFirst().trimmed
-            return fallback.isEmpty ? nil : paint(fallback, opacity: opacity, style: style, userBounds: userBounds, ctm: ctm, layer: layer)
+            return fallback.isEmpty ? nil : paint(fallback, opacity: opacity, style: style, userBounds: userBounds, ctm: ctm,
+                                                  layer: layer, fallbacks: fallbacks + 1)
         }
         guard var color = SVGColor.parse(value) else { return nil }
         color.a *= opacity
@@ -784,14 +808,24 @@ private struct Reader {
 
     /// The outline of everything in a clip path or a mask, drawn through
     /// their transforms into the composition, as one path.
-    private func combinedOutline(of container: XMLElement, units boxUnits: Bool, element: XMLElement, ctm: Affine) -> BezierPath? {
+    private mutating func combinedOutline(of container: XMLElement, units boxUnits: Bool, element: XMLElement, ctm: Affine) -> BezierPath? {
         var t = SVGTransform.parse(attr(container, "transform")).then(ctm)
         if boxUnits {
             guard let b = userBounds(of: element) else { return nil }
             t = Affine.scale(Vec2(b.width, b.height)).then(.translation(Vec2(b.minX, b.minY))).then(t)
         }
         var subpaths: [Subpath] = []
-        for child in container.children?.compactMap({ $0 as? XMLElement }) ?? [] {
+        let shapes = container.children?.compactMap({ $0 as? XMLElement }) ?? []
+        // Counted as the elements walked are: a clip or mask is read again
+        // for every element that uses it, so one of 50,000 shapes used by
+        // 50,000 elements was 2.5 thousand million outlines, outside every
+        // limit.
+        visited += shapes.count
+        guard visited <= SVGImport.maxElements else {
+            tooComplex = true
+            return nil
+        }
+        for child in shapes {
             var shape = child, childT = SVGTransform.parse(attr(child, "transform")).then(t)
             if child.localName == "use", let target = reference(attr(child, "href") ?? attr(child, "xlink:href")) {
                 childT = SVGTransform.parse(attr(target, "transform"))

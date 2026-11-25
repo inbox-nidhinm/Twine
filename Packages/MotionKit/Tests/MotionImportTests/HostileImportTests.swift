@@ -93,6 +93,49 @@ import MotionModel
         }
     }
 
+    /// A `>` is allowed inside an entity's quoted value: the check reads
+    /// the whole declaration, not only up to the first one.
+    @Test func entitiesHiddenBehindAQuotedCloseAreRefused() {
+        let doctype = ##"<!DOCTYPE svg [<!ENTITY a "aaaaaaaaaa"><!ENTITY b ">&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;"><!ENTITY c '>&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;'>]>"##
+        #expect(SVGImport.declaresRiskyEntities(svg("<text>&c;</text>", doctype: doctype)))
+        #expect(throws: (any Error).self) { try read(svg("<text>&c;</text>", doctype: doctype)) }
+        // Markup inside an entity is refused too: it would nest unseen.
+        #expect(SVGImport.declaresRiskyEntities(svg("", doctype: ##"<!DOCTYPE svg [<!ENTITY g "<g></g>">]>"##)))
+        // A plain text entity, as Illustrator writes, still reads.
+        let plain = ##"<!DOCTYPE svg [<!ENTITY ns_svg "http://www.w3.org/2000/svg">]>"##
+        #expect(!SVGImport.declaresRiskyEntities(svg("", doctype: plain)))
+    }
+
+    /// Closing tags written where they close nothing cannot hide real
+    /// nesting behind them.
+    @Test func nestingIsNotHiddenByStrayClosingTags() {
+        let hidden = "<!DOCTYPE svg [<!-- " + String(repeating: "</g>", count: 5000) + " -->]>"
+        let deep = String(repeating: "<g>", count: 5000) + String(repeating: "</g>", count: 5000)
+        let data = svg(deep, doctype: hidden)
+        #expect(SVGImport.nesting(of: data, limit: SVGImport.maxDepth) > SVGImport.maxDepth)
+        #expect(throws: (any Error).self) { try read(data) }
+        #expect(SVGImport.nesting(of: svg("<g><g><rect/></g></g>"), limit: SVGImport.maxDepth) == 3)
+    }
+
+    /// A clip path is read for every element that uses it: its shapes
+    /// count each time, so many shapes used many times is refused.
+    @Test func aLargeClipUsedManyTimesIsRefused() {
+        let clip = "<defs><clipPath id=\"c\">" + String(repeating: ##"<rect width="1" height="1"/>"##, count: 2000) + "</clipPath></defs>"
+        let users = String(repeating: ##"<rect width="10" height="10" clip-path="url(#c)"/>"##, count: 200)
+        #expect(throws: (any Error).self) { try read(svg(clip + users)) }
+        // A clip of a few shapes used a few times still reads.
+        let small = ##"<defs><clipPath id="c"><rect width="5" height="5"/></clipPath></defs>"## + String(repeating: ##"<rect width="10" height="10" clip-path="url(#c)"/>"##, count: 20)
+        #expect((try? read(svg(small))) != nil)
+    }
+
+    /// A paint made of thousands of things to fall back on is followed a
+    /// few deep, not all the way down the stack.
+    @Test func aPaintOfManyFallbacksIsNotFollowedForEver() throws {
+        let fill = String(repeating: "url(#nothing) ", count: 5000) + "red"
+        let r = try read(svg("<rect width=\"10\" height=\"10\" fill=\"" + fill + "\"/>"))
+        #expect(allFinite([r.layer]))
+    }
+
     @Test func runawayScalesLeaveTheLayerOut() throws {
         let scales = String(repeating: #"<g transform="scale(1e9)">"#, count: 40)
         let r = try read(svg(scales + #"<rect width="10" height="10"/>"# + String(repeating: "</g>", count: 40)
