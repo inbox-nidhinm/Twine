@@ -69,6 +69,10 @@ struct ColorWell: View {
 /// old value back if what was typed is not a colour.
 struct HexField: View {
     let color: RGBA
+    /// Square inside a `JoinedFields`, which rounds the whole.
+    var corner: CGFloat = Theme.radiusControl
+    /// Left out where the row is short of room, as on a fill's row.
+    var showsHash = true
     let commit: (RGBA) -> Void
 
     @State private var text = ""
@@ -76,9 +80,11 @@ struct HexField: View {
 
     var body: some View {
         HStack(spacing: Theme.space7) {
-            Text("#")
-                .font(ThemeFont.unit)
-                .foregroundStyle(Theme.textTertiary)
+            if showsHash {
+                Text("#")
+                    .font(ThemeFont.unit)
+                    .foregroundStyle(Theme.textTertiary)
+            }
             TextField("", text: $text)
                 .textFieldStyle(.plain)
                 .font(ThemeFont.label)
@@ -98,8 +104,8 @@ struct HexField: View {
         .padding(.horizontal, Theme.space8)
         .frame(height: Theme.control)
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
-        .focusRing(focused)
+        .background(RoundedRectangle(cornerRadius: corner).fill(Theme.panelRaised))
+        .focusRing(focused, corner: corner)
         .overlay {
             if !focused { ClickToType { ScrubSurface.focus { focused = true } } }
         }

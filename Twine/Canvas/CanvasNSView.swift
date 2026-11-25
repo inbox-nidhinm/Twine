@@ -732,7 +732,8 @@ final class CanvasNSView: NSView {
         if event.modifierFlags.contains(.control) { return rightMouseDown(with: event) }
         window?.makeFirstResponder(self)
         controller?.editor.focus = .canvas
-        if dismissTransients() { return }
+        // A gradient's card stays up while its line is worked on here.
+        if menus?.staysOverCanvas != true, dismissTransients() { return }
         guard let controller, let scene else { return }
         let viewPoint = convert(event.locationInWindow, from: nil)
         let point = viewToComposition(viewPoint)

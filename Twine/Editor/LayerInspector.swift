@@ -582,41 +582,12 @@ private struct FillSection: View {
         .sectionPadding(empty: shape.fills.isEmpty)
     }
 
-    @ViewBuilder private func fillRows(_ fill: Fill, index i: Int) -> some View {
-        // One picture fill a layer: Image is offered where it is, or on any
-        // fill while there is none.
-        let picture = shape.pictureIndex
-        let kinds = picture == nil || picture == i ? ["Solid", "Linear", "Radial", "Angular", "Image"]
-                                                   : ["Solid", "Linear", "Radial", "Angular"]
-        VStack(alignment: .leading, spacing: Theme.space8) {
-            InspectorItemTitle(icon: Icon.fillKind(fill.paint.kindName), title: "Fill") {
-                editShape { s in if s.fills.indices.contains(i) { s.fills.remove(at: i) } }
-            }
-            SegmentRow(selection: fill.paint.kindName, options: kinds, title: { $0 }, icon: Icon.fillKind) { kind in
-                if kind == "Image" {
-                    if !fill.paint.isImage { controller.fillWithPicture(layer.id, at: i) }
-                } else {
-                    editShape { s in if s.fills.indices.contains(i) { s.fills[i].paint = fill.paint.converted(to: kind) } }
-                    // Working on the gradient brings back its line, on this fill.
-                    controller.editor.hidesGradient = false
-                    if kind != "Solid" { controller.editor.gradient = GradientEdit(layerID: layer.id, slot: .fill(i)) }
-                }
-            }
-            .rowButton {
-                // Show and hide the fill, on its first row.
-                IconButton(icon: fill.isEnabled ? .eye : .eyeSlash, help: fill.isEnabled ? "Hide the fill" : "Show the fill") {
-                    editShape { s in if s.fills.indices.contains(i) { s.fills[i].isEnabled.toggle() } }
-                }
-            }
-            if let picture = fill.paint.imagePaint {
-                PictureFields(layer: layer, paint: picture, controller: controller)
-            } else {
-                PaintEditor(paint: fill.paint, isEnabled: fill.isEnabled, controller: controller, layer: layer,
-                            title: "Fill", slot: .fill(i),
-                            change: { paint in [editedShape { s in if s.fills.indices.contains(i) { s.fills[i].paint = paint } }] },
-                            toggle: { editShape { s in if s.fills.indices.contains(i) { s.fills[i].isEnabled.toggle() } } })
-            }
-        }
+    private func fillRows(_ fill: Fill, index i: Int) -> some View {
+        // One row a fill, as Figma has it: its kind and its colours are set
+        // on the card its swatch raises.
+        PaintRow(layer: layer, target: .fill(fill.id), paint: fill.paint, isEnabled: fill.isEnabled, controller: controller,
+                 toggle: { editShape { s in if s.fills.indices.contains(i) { s.fills[i].isEnabled.toggle() } } },
+                 remove: { editShape { s in if s.fills.indices.contains(i) { s.fills.remove(at: i) } } })
     }
 
     private func editShape(_ change: (inout ShapeContent) -> Void) {
@@ -626,26 +597,13 @@ private struct FillSection: View {
             l.look = s
         }
     }
-
-    /// For the colour well and hex field, which report whole layers: the
-    /// layer as it is in the project now, with its look changed. A picker
-    /// stays open with the closures it was given, and the copy of the layer
-    /// this view was built with can be old by the time it is dragged in (the
-    /// layer nudged, or changed by an AI app, meanwhile); writing that copy
-    /// back put the layer, and everything in a frame, back as it was.
-    private func editedShape(_ change: (inout ShapeContent) -> Void) -> Layer {
-        guard var l = controller.project.layer(withID: layer.id), var s = l.look else { return layer }
-        change(&s)
-        l.look = s
-        return l
-    }
 }
 
 // MARK: - Pictures and video
 
 /// A picture fill: the picture, Replace, how it fills the shape, its turn,
 /// and for tiles, their size.
-private struct PictureFields: View {
+struct PictureFields: View {
     let layer: Layer
     let paint: MotionModel.ImagePaint
     let controller: EditorController
@@ -781,20 +739,10 @@ private struct StrokeSection: View {
 
     @ViewBuilder private func strokeRows(_ stroke: Stroke, index i: Int) -> some View {
                 VStack(alignment: .leading, spacing: Theme.space8) {
-                    InspectorItemTitle(icon: .stroke, title: "Stroke") {
-                        editShape { s in if s.strokes.indices.contains(i) { s.strokes.remove(at: i) } }
-                    }
-                    PaintEditor(paint: stroke.paint, isEnabled: stroke.isEnabled, controller: controller, layer: layer,
-                                title: "Stroke", slot: .stroke(i),
-                                change: { paint in
-                                    // The layer as it is now: see `FillSection.editedShape`.
-                                    guard var l = controller.project.layer(withID: layer.id), var s = l.look else { return [] }
-                                    if s.strokes.indices.contains(i) { s.strokes[i].paint = paint }
-                                    l.look = s
-                                    return [l]
-                                },
-                                toggle: { editShape { s in if s.strokes.indices.contains(i) { s.strokes[i].isEnabled.toggle() } } },
-                                showsToggle: true)
+                    PaintRow(layer: layer, target: .stroke(stroke.id), paint: stroke.paint, isEnabled: stroke.isEnabled,
+                             controller: controller,
+                             toggle: { editShape { s in if s.strokes.indices.contains(i) { s.strokes[i].isEnabled.toggle() } } },
+                             remove: { editShape { s in if s.strokes.indices.contains(i) { s.strokes.remove(at: i) } } })
                     HStack(spacing: Theme.space8) {
                         // An open line has no inside or outside.
                         if shape.geometry.isClosed {

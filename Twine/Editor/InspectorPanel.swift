@@ -8,22 +8,25 @@ import Theme
 
 /// The right panel. The Animate and Design switch sits at its head; below it,
 /// whatever the selection can have done to it. With nothing selected, that is
-/// the composition itself. The Export button sits at the foot, always.
+/// the composition itself. Export sits beside the switch, always.
 struct InspectorPanel: View {
     let store: ProjectStore
     @Bindable var editor: EditorModel
     let controller: EditorController
 
-    @State private var compositionOpen = true
-    @State private var customRate = false
-
     var body: some View {
         VStack(spacing: 0) {
-            SegmentRow(selection: editor.mode, options: EditorModel.Mode.allCases, title: \.title) {
-                controller.setMode($0)
+            // The switch, and beside it Export: always in sight, in both
+            // modes, without being the loudest thing on screen.
+            HStack(spacing: Theme.space8) {
+                SegmentRow(selection: editor.mode, options: EditorModel.Mode.allCases, title: \.title) {
+                    controller.setMode($0)
+                }
+                .help("Animate adds actions and brings up the timeline. Design builds the layout, with no animation. (M)")
+                HeadButton(title: "Export") { controller.openExport() }
+                    .help("Choose a format and size, see what will be exported, and export it. (⌘E)")
             }
             .padding(Theme.panelPad)
-            .help("Animate adds actions and brings up the timeline. Design builds the layout, with no animation. (M)")
 
             PanelDivider()
             ScrollView {
@@ -35,11 +38,6 @@ struct InspectorPanel: View {
                     }
                 }
             }
-            // Last in the panel, in both modes, whatever is selected.
-            PanelDivider()
-            PrimaryButton(title: "Export") { controller.openExport() }
-                .padding(Theme.panelPad)
-                .help("Choose a format and size, see what will be exported, and export it. (⌘E)")
         }
     }
 
@@ -53,7 +51,7 @@ struct InspectorPanel: View {
         } else if selected.count > 1 {
             multipleSelection(selected)
         } else {
-            compositionSection
+            CompositionSection(store: store)
             PanelDivider()
         }
     }
@@ -115,12 +113,19 @@ struct InspectorPanel: View {
         }
         return entries
     }
+}
 
-    // MARK: Composition
+/// The composition's own settings: its size, frame rate, length and
+/// background. Shown with nothing selected, in both modes.
+struct CompositionSection: View {
+    let store: ProjectStore
+
+    @State private var compositionOpen = true
+    @State private var customRate = false
 
     private var composition: Composition { store.project.composition }
 
-    private var compositionSection: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             SectionHeader(title: "Composition", isOpen: compositionOpen) { compositionOpen.toggle() }
             if compositionOpen {
@@ -139,20 +144,18 @@ struct InspectorPanel: View {
                     MenuRow(label: "Frame rate", value: "\(composition.frameRate.label) fps", entries: rateEntries)
 
                     if customRate || !FrameRate.presets.contains(composition.frameRate) {
-                        LabeledRow(label: "Custom") {
-                            UnitField(value: composition.frameRate.perSecond, decimals: 3, suffix: "fps",
-                                      accepts: { $0 >= 0.001 && $0 <= 1000 }) { v in
-                                edit { $0.frameRate = Self.rate(from: v) }
-                            }
+                        UnitField(unit: "Custom", value: composition.frameRate.perSecond, decimals: 3, suffix: "fps",
+                                  accepts: { $0 >= 0.001 && $0 <= 1000 }) { v in
+                            edit { $0.frameRate = Self.rate(from: v) }
                         }
+                        .help("Frames a second")
                     }
 
-                    LabeledRow(label: "Duration") {
-                        UnitField(value: composition.duration, decimals: 3, suffix: "s", accepts: { $0 > 0 && $0 <= Composition.longest }) { v in
-                            edit { $0.duration = v }
-                        }
-                        .help("Length in seconds")
+                    UnitField(unit: "Duration", value: composition.duration, decimals: 3, suffix: "s",
+                              accepts: { $0 > 0 && $0 <= Composition.longest }) { v in
+                        edit { $0.duration = v }
                     }
+                    .help("Length in seconds")
 
                     background
                 }

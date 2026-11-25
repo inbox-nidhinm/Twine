@@ -62,6 +62,12 @@ final class MenuHost {
     /// the control that raised it, if the press was on it, does not raise
     /// it straight back.
     @ObservationIgnored private var justClosed: CGPoint?
+    /// Asked on a press over the canvas: true keeps the card up, as a
+    /// gradient's card stays while its line is dragged there.
+    @ObservationIgnored private var popupStays: (() -> Bool)?
+
+    /// A card alone is up that stays for presses on the canvas.
+    var staysOverCanvas: Bool { popup != nil && entries.isEmpty && popupStays?() == true }
 
     /// A menu, over the card that is up if any: nothing outside a menu can
     /// be clicked while it is up, as with a system menu.
@@ -72,7 +78,8 @@ final class MenuHost {
         highlighted = nil
     }
 
-    func showPopup<Content: View>(at origin: CGPoint, @ViewBuilder _ content: () -> Content) {
+    func showPopup<Content: View>(at origin: CGPoint, staysOverCanvas: (() -> Bool)? = nil,
+                                  @ViewBuilder _ content: () -> Content) {
         // The press that closed the card was on the control that raises
         // it: the click closes it, as a second click on a control should.
         if let closed = justClosed, closed == origin {
@@ -83,6 +90,7 @@ final class MenuHost {
         popup = AnyView(content())
         popupOrigin = origin
         popupFrame = .zero
+        popupStays = staysOverCanvas
     }
 
     /// Puts the menu away, and the card under it if there is no menu.
@@ -104,9 +112,10 @@ final class MenuHost {
     /// a colour picker open, a click on another swatch, another layer or a
     /// number used to do nothing but close the picker, and took a second
     /// click. A menu still takes the click that closes it, as menus do.
-    func pressed(at point: CGPoint) {
+    func pressed(at point: CGPoint, onCanvas: Bool = false) {
         justClosed = nil
         guard popup != nil, entries.isEmpty, popupFrame != .zero, !popupFrame.contains(point) else { return }
+        if onCanvas, popupStays?() == true { return }
         justClosed = popupOrigin
         popup = nil
     }

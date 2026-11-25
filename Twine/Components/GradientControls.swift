@@ -103,7 +103,7 @@ extension GradientStopsEditor where FirstRowButton == EmptyView {
 /// The gradient drawn left to right over the transparency pattern, with a
 /// marker for each stop. A press on a marker picks it and a drag moves it;
 /// a press anywhere else adds a stop there.
-private struct GradientBar: View {
+struct GradientBar: View {
     let gradient: MotionModel.Gradient
     let picked: Int?
     let pick: (Int?) -> Void

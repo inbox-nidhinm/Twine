@@ -105,7 +105,7 @@ struct ActionInspector: View {
 /// New Action and Select Preset as two small buttons, one over the other,
 /// at the foot of an action's settings: the tiles' choices, kept small
 /// since adding is not what this inspector is for.
-private struct AddAnother: View {
+struct AddAnother: View {
     let newActions: [MenuEntry]
     let hasPresets: Bool
     let pickPreset: () -> Void
@@ -399,43 +399,26 @@ private struct TimingFields: View {
         let frames = controller.editor.showsFrames
         let rate = controller.frameRate
         let first = actions[0]
-        // The names sit above the fields, so the fields keep their whole
-        // width for the number.
-        HStack(alignment: .top, spacing: Theme.space8) {
-            named("Start") {
-                UnitField(value: frames ? Double(rate.frame(at: first.start)) : first.start,
-                          decimals: frames ? 0 : 2, suffix: frames ? "f" : "s", accepts: { $0 >= 0 },
-                          mixed: actions.shared(\.start) == nil) { v in
-                    let t = rate.snapped(frames ? rate.time(ofFrame: Int(v.rounded())) : v)
-                    controller.editActions("Change Timing") { $0.start = max(t, 0) }
-                }
-                .help("When it starts, from the beginning of the animation.")
+        // Each on a row of its own with its name inside, as Design's fields
+        // have theirs: side by side, the names cut the numbers short.
+        VStack(spacing: Theme.space8) {
+            UnitField(unit: "Start", value: frames ? Double(rate.frame(at: first.start)) : first.start,
+                      decimals: frames ? 0 : 2, suffix: frames ? "f" : "s", accepts: { $0 >= 0 },
+                      mixed: actions.shared(\.start) == nil) { v in
+                let t = rate.snapped(frames ? rate.time(ofFrame: Int(v.rounded())) : v)
+                controller.editActions("Change Timing") { $0.start = max(t, 0) }
             }
+            .help("When it starts, from the beginning of the animation.")
             if !first.spec.kind.isAlwaysInstant {
-                named("Duration") {
-                    UnitField(value: frames ? Double(rate.frame(at: first.duration)) : first.duration,
-                              decimals: frames ? 0 : 2, suffix: frames ? "f" : "s", accepts: { $0 >= 0 },
-                              mixed: actions.shared(\.duration) == nil) { v in
-                        let d = rate.snapped(frames ? rate.time(ofFrame: Int(v.rounded())) : v)
-                        controller.editActions("Change Timing") { $0.duration = max(d, 0) }
-                    }
-                    .help("How long it runs. 0 makes the change instant.")
+                UnitField(unit: "Duration", value: frames ? Double(rate.frame(at: first.duration)) : first.duration,
+                          decimals: frames ? 0 : 2, suffix: frames ? "f" : "s", accepts: { $0 >= 0 },
+                          mixed: actions.shared(\.duration) == nil) { v in
+                    let d = rate.snapped(frames ? rate.time(ofFrame: Int(v.rounded())) : v)
+                    controller.editActions("Change Timing") { $0.duration = max(d, 0) }
                 }
+                .help("How long it runs. 0 makes the change instant.")
             }
         }
-    }
-
-    /// A field with its name above it, as a `StackedRow` has.
-    private func named(_ label: String, @ViewBuilder field: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: Theme.space6) {
-            Text(label)
-                .font(ThemeFont.label)
-                .foregroundStyle(Theme.textSecondary)
-                .lineLimit(1)
-                .frame(height: 14)
-            field()
-        }
-        .frame(maxWidth: .infinity)
     }
 }
 
@@ -486,11 +469,8 @@ private struct EasingFields: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.space6) {
-            Text("Easing")
-                .font(ThemeFont.label)
-                .foregroundStyle(Theme.textSecondary)
-                .lineLimit(1)
-            // A real button, so a click always lands.
+            // A real button, so a click always lands. Unnamed: the curve
+            // and its name say what it is.
             Button(action: open) {
                 HStack(spacing: Theme.space8) {
                     if let shared {
@@ -516,8 +496,9 @@ private struct EasingFields: View {
             .buttonStyle(.plain)
             .onHover { hovering = $0 }
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+            .help("Easing: how the change speeds up and slows down")
+            .accessibilityLabel("Easing")
         }
-        .padding(.vertical, Theme.space2)
     }
 
     /// The easing card, beside the inspector towards the canvas, level with

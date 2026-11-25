@@ -35,10 +35,11 @@ public enum Theme {
 
     // MARK: Accent (accent/*, row/*)
 
-    /// #217FD8. Everything that means *selected* or *in hand* reads this: rows,
-    /// the tool in hand, and the canvas's outlines, handles and marquee. One
-    /// constant, so they cannot disagree. The inspector's controls stay out of
-    /// it (they use `chosen`), so the panel reads as one quiet surface.
+    /// #217FD8. The thing selected itself reads this: the canvas's outlines,
+    /// handles and marquee, and a selected bar on the timeline. Rows that
+    /// list it (layers panel, timeline labels) use `rowSelected`, and what
+    /// is chosen among controls (the tool in hand, the inspector's segments)
+    /// uses `chosen`, so the accent is only ever the selection.
     public static let accent = Color(red: 0x21 / 255, green: 0x7F / 255, blue: 0xD8 / 255)
     /// #4D99E0, the accent under the pointer: a fifth of the way to white.
     /// Lighter rather than darker, because a step down would read as disabled.
@@ -190,6 +191,8 @@ public enum Theme {
     public static let gradientMarkerPicked: CGFloat = 16
     /// The picked gradient stop's place, beside the gradient bar.
     public static let stopField: CGFloat = 52
+    /// The opacity joined to a fill's or stroke's hex on its one row.
+    public static let paintOpacity: CGFloat = 56
 
     // MARK: Radii (radius/*)
 

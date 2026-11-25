@@ -230,7 +230,8 @@ final class ChromelessWindow: NSWindow {
         // an open menu takes every key.
         if event.type == .leftMouseDown || event.type == .rightMouseDown, let menus, let content = contentView {
             let p = content.convert(event.locationInWindow, from: nil)
-            menus.pressed(at: CGPoint(x: p.x, y: content.isFlipped ? p.y : content.bounds.height - p.y))
+            menus.pressed(at: CGPoint(x: p.x, y: content.isFlipped ? p.y : content.bounds.height - p.y),
+                          onCanvas: isOverCanvas(event.locationInWindow))
         }
         if event.type == .keyDown, let menus, menus.key(event) { return }
         if event.type == .leftMouseDown || event.type == .rightMouseDown,
@@ -243,6 +244,17 @@ final class ChromelessWindow: NSWindow {
             }
         }
         super.sendEvent(event)
+    }
+
+    /// Whether a press at a point in window coordinates lands on the canvas
+    /// or on something drawn inside it.
+    private func isOverCanvas(_ locationInWindow: NSPoint) -> Bool {
+        var view = viewUnder(locationInWindow)
+        while let v = view {
+            if v is CanvasNSView { return true }
+            view = v.superview
+        }
+        return false
     }
 
     /// The frontmost view at a point in window coordinates, as a click there

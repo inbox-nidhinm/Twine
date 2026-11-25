@@ -4,7 +4,7 @@ import Theme
 
 /// Design mode's bar: the tools, straight on the floating bar. One hover
 /// highlight slides from tool to tool under the pointer, and the tool in
-/// hand's accent slides to the next tool picked, rather than each lighting
+/// hand's grey slides to the next tool picked, rather than each lighting
 /// up by itself (the user's choice, 30 September 2026, with the
 /// tray behind the tools, which Flip needed to part two rows, taken away).
 struct ToolBar: View {
@@ -53,20 +53,20 @@ struct ToolBar: View {
                 // the next tool however it is picked (a click or its key).
                 if let box = frames[.tool(editor.tool)] {
                     RoundedRectangle(cornerRadius: radius(.tool(editor.tool)))
-                        .fill(Theme.accent)
+                        .fill(Theme.chosen)
                         .frame(width: box.width, height: box.height)
                         .offset(x: box.minX, y: box.minY)
                 }
             }
         }
-        // The tool in hand's accent and its white icon change together.
+        // The tool in hand's grey and its white icon change together.
         .animation(Theme.hoverGlide, value: editor.tool)
         .padding(Theme.trayPad + Theme.barPad)
         .floatingPanel()
     }
 
     private func tool(_ tool: Tool) -> some View {
-        // The accent is drawn behind the row, so it can slide, not by the button.
+        // The grey is drawn behind the row, so it can slide, not by the button.
         BarButton(icon: tool.icon, help: "\(tool.title) (\(tool.key))", isOn: editor.tool == tool,
                   size: Theme.modeButton, iconBox: Theme.icon, hoverFill: .clear, onFill: .clear) {
             pick(tool)

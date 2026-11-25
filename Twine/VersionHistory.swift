@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 270
+    static let pushes = 271
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -70,6 +70,11 @@ enum VersionHistory {
             "The app's menus take the keyboard: the arrows move through one, Return or Space picks, a letter goes to the next item starting with it, and Escape closes it. Keys pressed while a menu is open no longer reach the canvas behind it, where Delete deleted the selection.",
             "Several selected layers drag together in the layers panel, and a line shows where they will land: along the top of a row for in front of it, along the bottom for behind, the row outlined for inside a group.",
             "Files dropped anywhere in a project's window are imported, at the middle of the composition; only the canvas used to take them, so a sound dragged onto the timeline slid back.",
+            "Fills and strokes take one row each in Design, as Figma's do: the swatch, then a colour's hex and opacity, a gradient's kind or a picture's opacity, then show or hide and remove. Clicking the swatch raises a card with the kinds along its top (Solid, Linear, Radial, Angular and, for a fill, Image) and that kind's controls under them: the colour picker, a gradient's bar of stops over the picker for the picked stop, or a picture's mode, turn and Replace. A gradient's card stays up while you drag its line on the canvas. Strokes can be made gradients here too.",
+            "Export sits beside the Animate and Design switch at the top of the inspector, a quiet button always in sight, in place of the blue bar along the panel's foot.",
+            "Animate's inspector is laid out the same way whatever is selected. With nothing selected it shows the composition, as Design does. With layers selected it lists their actions, each with when it runs, a click selecting it; then New Action, Select Preset and Templates as small buttons, where an action's settings have them too. The big tiles are gone.",
+            "One look for what is selected. A selected row is the same muted blue in the layers panel and on the timeline; the bright blue is kept for the selection itself, on the canvas and on a selected bar; the tool in hand is grey, as the inspector's chosen segments are.",
+            "An action's Start and Duration have their names inside their fields, as Design's fields do, each on a row of its own so no number is cut short; Easing's menu stands without a caption. The composition's Duration and custom frame rate read the same way.",
         ], fixes: [
             "Several texts can be changed at once. With more than one text selected in Design, the inspector showed only alignment, blend and opacity, so their font, weight, size, alignment, sizing, spacing and colour could not be changed together. The Text and Fill sections now show for them, every change going to all of them as one step of undo, and anything they do not share reads Mixed.",
             "Twine no longer opens by itself. Every Claude session (including ones Claude starts in the background, ready for your next chat) says hello to Twine as it starts, and Twine opened to answer, so it kept reopening after you quit it. Twine now opens only when an AI app actually uses it, to read or change a project.",

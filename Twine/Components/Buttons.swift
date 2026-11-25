@@ -98,6 +98,33 @@ struct PanelButton: View {
     }
 }
 
+/// A short button with a word on it at the head of a panel, level with the
+/// mode switch beside it and as quiet: Export.
+struct HeadButton: View {
+    let title: String
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(ThemeFont.labelStrong)
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, Theme.space12)
+                .frame(height: Theme.panelRow + 4)
+                .background(RoundedRectangle(cornerRadius: Theme.radiusControl + 1)
+                    .fill(hovering ? Theme.panelHover : Theme.panelRaised))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityLabel(title)
+    }
+}
+
 /// The one button that does a panel's main thing, filled with the accent:
 /// Export. `quiet` gives it a plain button's colours in the same place, for
 /// what is not the main thing (Cancel while exporting).

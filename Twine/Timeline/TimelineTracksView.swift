@@ -404,12 +404,14 @@ final class TimelineTracksView: NSView {
         let full = CGRect(x: 0, y: row.y, width: bounds.width, height: TimelineRow.height)
         let label = CGRect(x: 0, y: row.y, width: gutter, height: TimelineRow.height)
 
-        // The row: the accent across it when its action is selected, a tint
-        // when only its layer is.
+        // The row: a selected row's colour on its label when its action is
+        // selected, as a layers panel row has, and fainter across its
+        // track, where the bar itself takes the accent; a tint when only
+        // its layer is.
         if selected {
-            ctx.setFillColor(NSColor(Theme.accent).withAlphaComponent(0.35).cgColor)
+            ctx.setFillColor(NSColor(Theme.rowSelected).withAlphaComponent(0.4).cgColor)
             ctx.fill(full)
-            ctx.setFillColor(NSColor(Theme.accent).cgColor)
+            ctx.setFillColor(NSColor(Theme.rowSelected).cgColor)
             ctx.fill(label)
         } else if layerSelected {
             ctx.setFillColor(NSColor(Theme.rowHover).cgColor)
