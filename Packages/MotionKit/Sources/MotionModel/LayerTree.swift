@@ -147,6 +147,94 @@ extension Project {
         return min(max(index, 0), count)
     }
 
+    // MARK: Many at once
+
+    /// Every layer's id, gathered in one walk.
+    public var layerIDs: Set<UUID> {
+        var ids = Set<UUID>()
+        forEachLayer { ids.insert($0.id) }
+        return ids
+    }
+
+    /// Replaces many layers in one walk of the tree, each by the layer
+    /// given for its id, and says which ids were found. For edits of
+    /// thousands of layers at once: changing each with `updateLayer`
+    /// searched the whole tree every time. A replaced layer is not looked
+    /// inside, so none of the layers given may sit inside another.
+    @discardableResult
+    public mutating func replaceLayers(_ replacements: [UUID: Layer]) -> Set<UUID> {
+        var found = Set<UUID>()
+        _ = Self.replace(replacements, in: &layers, found: &found)
+        return found
+    }
+
+    /// Takes many layers out of the tree in one walk, children and all,
+    /// in no particular order. A removed layer is not looked inside.
+    public mutating func removeLayers(_ ids: Set<UUID>) -> [Layer] {
+        var out: [Layer] = []
+        _ = Self.remove(ids, from: &layers, into: &out)
+        return out
+    }
+
+    /// Puts layers, in their order, into a group or at the top level, as
+    /// `insertLayer` puts one: the first at `index`, the rest after it.
+    @discardableResult
+    public mutating func insertLayers(_ new: [Layer], parentID: UUID?, at index: Int?) -> Bool {
+        guard let parentID else {
+            layers.insert(contentsOf: new, at: Self.clamp(index, layers.count))
+            return true
+        }
+        guard self.layer(withID: parentID)?.isGroup == true else { return false }
+        return updateLayer(parentID) { parent in
+            var children = parent.children
+            children.insert(contentsOf: new, at: Self.clamp(index, children.count))
+            parent.children = children
+        }
+    }
+
+    /// Lists are written back only where something under them changed, so
+    /// the rest of the tree keeps sharing its storage with the snapshot
+    /// before.
+    private static func replace(_ map: [UUID: Layer], in list: inout [Layer], found: inout Set<UUID>) -> Bool {
+        var changed = false
+        for i in list.indices {
+            if found.count == map.count { break }
+            if let new = map[list[i].id] {
+                list[i] = new
+                found.insert(new.id)
+                changed = true
+            } else if list[i].isGroup {
+                var children = list[i].children
+                if replace(map, in: &children, found: &found) {
+                    list[i].children = children
+                    changed = true
+                }
+            }
+        }
+        return changed
+    }
+
+    private static func remove(_ ids: Set<UUID>, from list: inout [Layer], into out: inout [Layer]) -> Bool {
+        var changed = false
+        if list.contains(where: { ids.contains($0.id) }) {
+            var kept: [Layer] = []
+            kept.reserveCapacity(list.count)
+            for layer in list {
+                if ids.contains(layer.id) { out.append(layer) } else { kept.append(layer) }
+            }
+            list = kept
+            changed = true
+        }
+        for i in list.indices where list[i].isGroup {
+            var children = list[i].children
+            if remove(ids, from: &children, into: &out) {
+                list[i].children = children
+                changed = true
+            }
+        }
+        return changed
+    }
+
     private static func find(_ id: UUID, in list: [Layer]) -> Layer? {
         for i in list.indices {
             if list[i].id == id { return list[i] }

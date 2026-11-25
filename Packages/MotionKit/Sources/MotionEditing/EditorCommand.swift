@@ -123,20 +123,28 @@ public enum EditorCommand: Sendable {
                 guard blocked.isDisjoint(with: ids) else { throw EditorError.invalidMove }
             }
             // A layer inside another moving group travels with that group
-            // rather than on its own.
-            let ordered = p.allLayers.map(\.id).filter {
-                ids.contains($0) && Set(p.ancestors(of: $0)).isDisjoint(with: ids)
+            // rather than on its own. Found, taken out and put back in one
+            // walk of the tree each: done layer by layer, each of those
+            // searched the whole tree, and moving two thousand layers at
+            // once (Select All in a large import, then Group) took a third
+            // of a second.
+            let wanted = Set(ids)
+            let parents = p.parents
+            func travels(_ id: UUID) -> Bool {
+                var current = id
+                while let up = parents[current] {
+                    if wanted.contains(up) { return true }
+                    current = up
+                }
+                return false
             }
-            var moving: [Layer] = []
-            for id in ordered {
-                guard let removed = p.removeLayer(id) else { throw EditorError.notFound(id) }
-                moving.append(removed)
+            var place: [UUID: Int] = [:]
+            p.forEachLayer { layer in
+                if wanted.contains(layer.id), place[layer.id] == nil, !travels(layer.id) { place[layer.id] = place.count }
             }
-            var at = index
-            for layer in moving {
-                p.insertLayer(layer, parentID: parentID, at: at)
-                at = at.map { $0 + 1 }
-            }
+            // Back in the order they stood in, whatever order they came out.
+            let moving = p.removeLayers(Set(place.keys)).sorted { (place[$0.id] ?? 0) < (place[$1.id] ?? 0) }
+            p.insertLayers(moving, parentID: parentID, at: index)
 
         case .renameLayer(let id, let name):
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -151,6 +159,26 @@ public enum EditorCommand: Sendable {
             try Self.each(ids, in: &p) { $0.isSoloed = on }
 
         case .updateLayers(let layers):
+            // Many at once go in one walk of the tree, when none sits
+            // inside another (then the order they are given in matters,
+            // and they go one by one as a few always do).
+            if layers.count > 8 {
+                let replacements = Dictionary(layers.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+                let parents = p.parents
+                let nested = replacements.keys.contains { id in
+                    var current = id
+                    while let up = parents[current] {
+                        if replacements[up] != nil { return true }
+                        current = up
+                    }
+                    return false
+                }
+                if !nested, replacements.count == layers.count {
+                    let found = p.replaceLayers(replacements)
+                    if let missing = layers.first(where: { !found.contains($0.id) }) { throw EditorError.notFound(missing.id) }
+                    break
+                }
+            }
             for layer in layers {
                 guard p.updateLayer(layer.id, { $0 = layer }) else { throw EditorError.notFound(layer.id) }
             }
@@ -159,7 +187,23 @@ public enum EditorCommand: Sendable {
             guard !p.media.contains(where: { $0.id == asset.id }) else { throw EditorError.duplicateID(asset.id) }
             p.media.append(asset)
 
+        // A few actions are each checked against the project as it stands.
+        // Many (a paste, Split into Layers, a drag of thousands of bars)
+        // are checked against the ids gathered once: checked one by one,
+        // every action was compared with every other, which at a hundred
+        // thousand actions froze the app for tens of seconds.
         case .insertActions(let actions):
+            if actions.count > 8 {
+                var taken = Set(p.actions.map(\.id))
+                let layers = p.layerIDs
+                for action in actions {
+                    guard taken.insert(action.id).inserted else { throw EditorError.duplicateID(action.id) }
+                    guard layers.contains(action.targetLayerID) else { throw EditorError.notFound(action.targetLayerID) }
+                    guard action.fitsInTime else { throw EditorError.invalidValue }
+                }
+                p.actions.append(contentsOf: actions)
+                break
+            }
             for action in actions {
                 guard !p.actions.contains(where: { $0.id == action.id }) else { throw EditorError.duplicateID(action.id) }
                 guard p.layer(withID: action.targetLayerID) != nil else { throw EditorError.notFound(action.targetLayerID) }
@@ -168,6 +212,18 @@ public enum EditorCommand: Sendable {
             }
 
         case .updateActions(let actions):
+            if actions.count > 8 {
+                // A damaged file may repeat an id; the first place counts.
+                let places = Dictionary(p.actions.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
+                let layers = p.layerIDs
+                for action in actions {
+                    guard let i = places[action.id] else { throw EditorError.notFound(action.id) }
+                    guard layers.contains(action.targetLayerID) else { throw EditorError.notFound(action.targetLayerID) }
+                    guard action.fitsInTime else { throw EditorError.invalidValue }
+                    p.actions[i] = action
+                }
+                break
+            }
             for action in actions {
                 guard let i = p.actions.firstIndex(where: { $0.id == action.id }) else { throw EditorError.notFound(action.id) }
                 guard p.layer(withID: action.targetLayerID) != nil else { throw EditorError.notFound(action.targetLayerID) }

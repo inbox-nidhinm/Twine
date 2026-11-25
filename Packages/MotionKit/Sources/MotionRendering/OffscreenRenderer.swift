@@ -130,7 +130,14 @@ public final class OffscreenRenderer {
         }
     }
 
+    /// One frame, with a pool of its own: an export draws thousands on a
+    /// background queue, where nothing drains what Metal and Core Animation
+    /// leave to be let go later, so it all stayed until the export ended.
     private func draw(_ scene: ResolvedScene) {
+        autoreleasepool { drawFrame(scene) }
+    }
+
+    private func drawFrame(_ scene: ResolvedScene) {
         let sx = scene.size.width > 0 ? Double(pixelWidth) / scene.size.width : 1
         let sy = scene.size.height > 0 ? Double(pixelHeight) / scene.size.height : 1
         CATransaction.begin()

@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 264
+    static let pushes = 265
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -119,6 +119,10 @@ enum VersionHistory {
             "A page curl is drawn again when its layer is resized while paused.",
             "An export asked for by an AI app shows its done note only when it finished, not when it failed.",
             "A video whose first frame comes late, or whose frames are far apart, no longer risks being read again from the start on every draw.",
+            "Edits of many things at once are quick however many there are. Adding or changing thousands of actions together (a paste, Split into Layers, a drag of many bars) compared every action with every other, and moving or grouping thousands of layers searched the whole project for each: 20,000 actions took 435 ms to add and now take 5, and 2,000 layers took 455 ms to move and now take 13. A template whose bar has too many loops to split into layers says so, where it froze the app.",
+            "The home screen opens without reading every project whole: a project with a picture is shown from the picture alone.",
+            "Files a project no longer uses leave it. A picture, video or sound whose layer was deleted or whose picture was replaced stayed in the project for good, and went along with every duplicate; such files are now let go when the project is next opened, and are gone from the package at its next save.",
+            "A long export no longer holds on to memory from every frame until it ends.",
         ], misc: [
             "Settings is in the Twine menu (⌘,). File > Duplicate is named Duplicate Project, and Home is greyed out on the home screen.",
             "A new, empty project opens in Design, where the drawing tools are; a project with layers still opens in Animate.",

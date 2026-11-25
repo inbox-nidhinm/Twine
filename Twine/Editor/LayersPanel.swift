@@ -68,7 +68,19 @@ struct LayersPanel: View {
         // Selecting something inside a folded group opens the group, so the
         // selection is never hidden in the list.
         .onChange(of: editor.selection) { _, selection in
-            for id in selection { expanded.formUnion(store.project.ancestors(of: id)) }
+            guard !selection.isEmpty else { return }
+            // Every layer's parent from one walk: asking for each selected
+            // layer's own way up searched the whole tree for every one.
+            let parents = store.project.parents
+            var open = expanded
+            for id in selection {
+                var current = id
+                while let up = parents[current] {
+                    open.insert(up)
+                    current = up
+                }
+            }
+            if open != expanded { expanded = open }
         }
     }
 

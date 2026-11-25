@@ -47,13 +47,21 @@ final class ProjectDocument: NSDocument {
         // Masks kept the old way become mask groups (`MaskConversion`).
         // Older templates' slot lists become their frames' children first, so
         // no Play bar is given to a slot's video.
-        let project = MaskConversion.converted(Presets.withTypewriters(MediaPlays.withPlayBars(
+        var project = MaskConversion.converted(Presets.withTypewriters(MediaPlays.withPlayBars(
             TemplateSlots.converted(try ProjectFormat.decode(data)))))
+        // Files nothing in the project uses any more (their layer deleted,
+        // their picture replaced) leave it here, where no undo step can
+        // want them back: they used to stay in the project for good. As
+        // above, the file itself changes only when next saved.
+        let unused = Set(project.unusedMedia.map(\.id))
+        if !unused.isEmpty { project.media.removeAll { unused.contains($0.id) } }
+        let listed = Set(project.media.map(\.fileName))
         // Anything in the media folder that is not an ordinary file with a
-        // plain name (a link could lead anywhere on the Mac) is let go, so
-        // no save carries it on.
+        // plain name (a link could lead anywhere on the Mac), or that the
+        // project does not list, is let go, so no save carries it on.
         if let media = fileWrapper.fileWrappers?[ProjectFormat.mediaFolderName], media.isDirectory {
-            for (name, file) in media.fileWrappers ?? [:] where !file.isRegularFile || !FileSafety.isPlainName(name) {
+            for (name, file) in media.fileWrappers ?? [:]
+            where !file.isRegularFile || !FileSafety.isPlainName(name) || !listed.contains(name) {
                 media.removeFileWrapper(file)
             }
         }

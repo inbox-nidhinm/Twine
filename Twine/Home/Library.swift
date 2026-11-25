@@ -104,7 +104,12 @@ final class Library {
                 return Item(url: url, modified: modified, composition: known.composition, thumbnail: known.thumbnail, folder: folder)
             }
             let thumb = ProjectDocument.packageFile(ProjectFormat.thumbnailFileName, in: url).flatMap(NSImage.init(contentsOf:))
-            let composition = (try? Creations.read(url))?.composition
+            // The document is read only for a project with no picture yet,
+            // whose card shows its frame's shape and ground instead. With a
+            // picture the card needs nothing else, and reading every
+            // project whole, on the main thread, at every launch, held the
+            // home screen up for as long as a few large projects take.
+            let composition = thumb == nil ? (try? Creations.read(url))?.composition : nil
             read[url] = (modified, composition, thumb)
             return Item(url: url, modified: modified, composition: composition, thumbnail: thumb, folder: folder)
         }

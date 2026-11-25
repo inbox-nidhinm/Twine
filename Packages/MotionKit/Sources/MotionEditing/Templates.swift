@@ -187,14 +187,32 @@ public enum Templates {
         angle + 360 * ((near - angle) / 360).rounded()
     }
 
+    /// The most a split works through, in cards times steps: about 35
+    /// loops of the largest sequence, 170 of an ordinary template. Each is
+    /// up to nine actions, and a bar set to hundreds of loops asked for
+    /// millions, which no timeline can show and no Mac can make quickly.
+    public static let mostSplitWork = 50_000
+
+    /// Whether the template `id` has too many loops on its bar to split.
+    public static func splitIsTooLong(_ id: UUID, in project: Project) -> Bool {
+        guard let frame = project.layer(withID: id), let setup = frame.template,
+              let bar = project.actions.first(where: { $0.targetLayerID == id && $0.spec.kind == .template }),
+              case .template(let play) = bar.spec, bar.duration > 0 else { return false }
+        let steps = max(Int(saturating: (Double(splitSteps(for: setup.kind)) * play.loops).rounded(.up)), 1)
+        let cards = TemplateCards.make(frame, setup, phase: setup.pose, size: frame.size, pictures: project.pictureSizes,
+                                       videos: project.videoClips).cards.count
+        return steps > mostSplitWork / max(cards, 1)
+    }
+
     /// The template frame `id` as an ordinary frame in 3D: its cards made
     /// real layers where they rest, and its motion, across its bar, made
     /// To actions from step to step, gathered in a scene named after it.
     /// A card hidden at both ends of a step goes there at once, so the
     /// cards going round the end of a stream do not sweep across. Nil for
-    /// anything but a template.
+    /// anything but a template, and for one with too many loops to split
+    /// (`splitIsTooLong`).
     public static func split(_ id: UUID, in project: Project) -> EditorCommand? {
-        guard let frame = project.layer(withID: id), let setup = frame.template else { return nil }
+        guard let frame = project.layer(withID: id), let setup = frame.template, !splitIsTooLong(id, in: project) else { return nil }
         let pictures = project.pictureSizes
         let clips = project.videoClips
         let bar = project.actions.first { $0.targetLayerID == id && $0.spec.kind == .template }

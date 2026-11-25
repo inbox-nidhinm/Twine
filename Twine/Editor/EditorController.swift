@@ -645,6 +645,9 @@ final class EditorController {
 
     /// Turns a template into an ordinary frame in 3D of cards and actions.
     func splitTemplate(_ id: UUID) {
+        if Templates.splitIsTooLong(id, in: project) {
+            return editor.showNotice("That is too many loops to split into layers. Give the template's bar fewer loops first.")
+        }
         guard let command = Templates.split(id, in: project) else { return NSSound.beep() }
         if perform(command) { editor.selection = [id] }
     }

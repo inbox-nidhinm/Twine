@@ -113,6 +113,7 @@ public enum Arrangement {
     /// Exact when the groups on the way are moved, turned or scaled evenly,
     /// as ungrouping is.
     public static func move(_ ids: [UUID], to parentID: UUID?, index: Int?, in project: Project) -> EditorCommand {
+        if ids.count > 8 { return moveMany(ids, to: parentID, index: index, in: project) }
         let movingSet = Set(ids)
         // A layer inside another moving one travels with it.
         let own = ids.filter { Set(project.ancestors(of: $0)).isDisjoint(with: movingSet) }
@@ -128,6 +129,59 @@ public enum Arrangement {
                 actions += project.actions.filter { $0.targetLayerID == id }
                     .map { $0.remapped(point: m.apply, vector: m.applyToVector, angle: angle, scale: scale,
                                        mirrored: Self.mirrors(m)) }
+            }
+        }
+        var commands: [EditorCommand] = [.moveLayers(ids, parentID: parentID, index: index)]
+        if !edited.isEmpty { commands.append(.updateLayers(edited)) }
+        if !actions.isEmpty { commands.append(.updateActions(actions)) }
+        return .batch(commands, name: ids.count == 1 ? "Move Layer" : "Move Layers")
+    }
+
+    /// `move` for many layers at once, from what one walk of the tree
+    /// gathers: every layer's parent, the groups on the way and the moving
+    /// layers themselves, with each group's place worked out once and the
+    /// actions sorted by their layer once. Asked layer by layer, each of
+    /// those searched the whole project.
+    private static func moveMany(_ ids: [UUID], to parentID: UUID?, index: Int?, in project: Project) -> EditorCommand {
+        let movingSet = Set(ids)
+        let parents = project.parents
+        var groups: [UUID: Layer] = [:]
+        var moving: [UUID: Layer] = [:]
+        project.forEachLayer { layer in
+            if layer.isGroup { groups[layer.id] = layer }
+            if movingSet.contains(layer.id), moving[layer.id] == nil { moving[layer.id] = layer }
+        }
+        var worlds: [UUID: Affine] = [:]
+        func world(of id: UUID?) -> Affine {
+            guard let id, let layer = groups[id] else { return .identity }
+            if let known = worlds[id] { return known }
+            let t = layer.transform
+            let made = Affine.layer(position: t.position, anchor: t.anchor, scale: t.scale, rotation: t.rotation, skew: t.skew)
+                .then(world(of: parents[id]))
+            worlds[id] = made
+            return made
+        }
+        func travels(_ id: UUID) -> Bool {
+            var current = id
+            while let up = parents[current] {
+                if movingSet.contains(up) { return true }
+                current = up
+            }
+            return false
+        }
+        var edited: [Layer] = []
+        var actions: [Action] = []
+        if let into = world(of: parentID).inverted {
+            let byLayer = Dictionary(grouping: project.actions, by: \.targetLayerID)
+            // A layer inside another moving one travels with it.
+            for id in ids where !travels(id) {
+                guard let layer = moving[id], parents[id] != parentID else { continue }
+                let m = world(of: parents[id]).then(into)
+                let (angle, scale) = turnAndScale(of: m)
+                edited.append(carried(layer, by: m))
+                actions += (byLayer[id] ?? []).map {
+                    $0.remapped(point: m.apply, vector: m.applyToVector, angle: angle, scale: scale, mirrored: Self.mirrors(m))
+                }
             }
         }
         var commands: [EditorCommand] = [.moveLayers(ids, parentID: parentID, index: index)]

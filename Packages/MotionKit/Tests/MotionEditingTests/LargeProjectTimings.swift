@@ -50,6 +50,40 @@ struct LargeProjectTimings {
         print("BENCH opening heldInRange: \(ms(CACurrentMediaTime() - start, 5))")
     }
 
+    /// Edits of many things at once: a paste or a split of thousands of
+    /// actions, a drag of thousands of bars, and many layers moved or
+    /// grouped together.
+    @Test func bulk() throws {
+        let project = Self.project()
+        var ids: [UUID] = []
+        project.forEachLayer { if !$0.isGroup { ids.append($0.id) } }
+        let actions = ids.flatMap { id in
+            (0..<4).map { k in
+                Action(target: id, start: Double(k), duration: 1, spec: .move(MoveAction(mode: .by, end: Vec2(10, 0))))
+            }
+        }
+        var p = project
+        var start = CACurrentMediaTime()
+        try EditorCommand.insertActions(actions).apply(to: &p)
+        print("BENCH bulk insert \(actions.count) actions: \(ms(CACurrentMediaTime() - start, 1))")
+        let shifted = p.actions.map { a -> Action in var b = a; b.start += 0.5; return b }
+        start = CACurrentMediaTime()
+        try EditorCommand.updateActions(shifted).apply(to: &p)
+        print("BENCH bulk update \(shifted.count) actions: \(ms(CACurrentMediaTime() - start, 1))")
+
+        // Twenty frames' layers, two thousand in all, out to the top level.
+        let moving = project.layers.prefix(20).flatMap { $0.children.map(\.id) }
+        var q = p
+        start = CACurrentMediaTime()
+        let move = Arrangement.move(moving, to: nil, index: nil, in: q)
+        print("BENCH bulk move \(moving.count) layers, making the command: \(ms(CACurrentMediaTime() - start, 1))")
+        start = CACurrentMediaTime()
+        try move.apply(to: &q)
+        print("BENCH bulk move \(moving.count) layers, applying it: \(ms(CACurrentMediaTime() - start, 1))")
+        #expect(q.layers.count == project.layers.count + moving.count)
+        #expect(q.actions.count == actions.count)
+    }
+
     @MainActor @Test func editing() throws {
         let project = Self.project()
         print("BENCH editing: \(project.allLayers.count) layers")

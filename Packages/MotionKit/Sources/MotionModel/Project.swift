@@ -149,3 +149,35 @@ public struct MediaAsset: Codable, Sendable, Equatable, Identifiable {
 public enum MediaKind: String, Codable, Sendable {
     case image, video, audio
 }
+
+extension Project {
+    /// The imported files nothing in the project refers to any more: left
+    /// behind by a deleted layer or a replaced picture. Found when a project
+    /// is opened, when no undo step can want them back, so they can leave
+    /// the package (an 800 MB video once imported stayed in its project for
+    /// good, and went along with every duplicate).
+    ///
+    /// A file counts as used when a layer shows or plays it, and, to be
+    /// sure, when its id appears anywhere in the layers and actions as they
+    /// are written: a reference of a kind not thought of here still keeps
+    /// its file. If they cannot be written, nothing counts as unused.
+    public var unusedMedia: [MediaAsset] {
+        guard !media.isEmpty else { return [] }
+        var used = Set<UUID>()
+        forEachLayer { layer in
+            for id in layer.mediaIDs { used.insert(id) }
+            for stroke in layer.look?.strokes ?? [] {
+                if let id = stroke.paint.imagePaint?.mediaID { used.insert(id) }
+            }
+        }
+        let doubtful = media.filter { !used.contains($0.id) }
+        guard !doubtful.isEmpty else { return [] }
+        struct Written: Encodable {
+            let layers: [Layer]
+            let actions: [Action]
+        }
+        guard let data = try? JSONEncoder().encode(Written(layers: layers, actions: actions)) else { return [] }
+        let text = String(decoding: data, as: UTF8.self)
+        return doubtful.filter { !text.localizedCaseInsensitiveContains($0.id.uuidString) }
+    }
+}
