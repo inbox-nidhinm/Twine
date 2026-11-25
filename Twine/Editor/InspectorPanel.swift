@@ -70,8 +70,20 @@ struct InspectorPanel: View {
             VStack(alignment: .leading, spacing: Theme.space8) {
                 HeaderRow(title: "Position") {}
                 AlignRow(controller: controller)
+                HStack(spacing: Theme.space8) {
+                    SharedField(unit: "X", layers: layers, controller: controller, get: { $0.transform.position.x }) { l, v in
+                        l.transform.position = Vec2(v, l.transform.position.y)
+                    }
+                    SharedField(unit: "Y", layers: layers, controller: controller, get: { $0.transform.position.y }) { l, v in
+                        l.transform.position = Vec2(l.transform.position.x, v)
+                    }
+                }
+                .help("Where each anchor point sits, in pixels. Type +10 or *2 to change each from its own.")
+                .gridBody()
             }
             .padding(.bottom, Theme.panelPad)
+            PanelDivider()
+            sharedLayout(layers)
             PanelDivider()
             VStack(alignment: .leading, spacing: Theme.space8) {
                 HeaderRow(title: "Appearance") {}
@@ -87,14 +99,100 @@ struct InspectorPanel: View {
                 .gridBody()
             }
             .padding(.bottom, Theme.panelPad)
-            if layers.allSatisfy(\.isText) {
+            // The texts among them take type together, whatever else is
+            // selected with them (26 November 2026; only when every layer
+            // was a text before).
+            let texts = layers.filter(\.isText)
+            if !texts.isEmpty {
                 PanelDivider()
-                TextSection(layers: layers, controller: controller)
+                TextSection(layers: texts, controller: controller)
+            }
+            if texts.count == layers.count {
                 PanelDivider()
                 TextFillSection(layers: layers, controller: controller)
             }
+            // Shapes and frames take fills and strokes together.
+            if let look = layers[0].look, layers.allSatisfy({ $0.look != nil }) {
+                let others = Array(layers.dropFirst())
+                PanelDivider()
+                FillSection(layer: layers[0], shape: look, controller: controller, others: others)
+                PanelDivider()
+                StrokeSection(layer: layers[0], shape: look, controller: controller, others: others)
+            }
             SelectionColorsSection(ids: layers.map(\.id), controller: controller)
         }
+    }
+
+    /// Size, scale, turn and corners for several layers: each field reads
+    /// their number, or Mixed, and sets it on all of them.
+    private func sharedLayout(_ layers: [Layer]) -> some View {
+        // A group's size is only where it was made.
+        let sized = layers.allSatisfy { !$0.isGroup || $0.isFrame }
+        let cornered = layers.allSatisfy { layer in
+            switch layer.look?.geometry {
+            case .rectangle, .polygon, .star, .path: true
+            default: false
+            }
+        }
+        let groups = layers.compactMap { layer -> GroupContent? in
+            if case .group(let g) = layer.content { return g }
+            return nil
+        }
+        return VStack(alignment: .leading, spacing: Theme.space8) {
+            HeaderRow(title: "Layout") {}
+            Group {
+                if sized {
+                    HStack(spacing: Theme.space8) {
+                        SharedField(unit: "W", layers: layers, controller: controller, accepts: { $0 >= 0 },
+                                    get: { $0.size.width }) { l, v in l = l.resized(toWidth: v) }
+                        SharedField(unit: "H", layers: layers, controller: controller, accepts: { $0 >= 0 },
+                                    get: { $0.size.height }) { l, v in l = l.resized(toHeight: v) }
+                    }
+                }
+                HStack(spacing: Theme.space8) {
+                    SharedField(unit: "SX", layers: layers, controller: controller, suffix: "%",
+                                get: { $0.transform.scale.x * 100 }) { l, v in
+                        let s = l.transform.scale
+                        let y = l.transform.isScaleLinked ? (s.x != 0 ? s.y / s.x * v / 100 : v / 100) : s.y
+                        l.transform.scale = Vec2(v / 100, y)
+                    }
+                    .help("Scale across")
+                    SharedField(unit: "SY", layers: layers, controller: controller, suffix: "%",
+                                get: { $0.transform.scale.y * 100 }) { l, v in
+                        let s = l.transform.scale
+                        let x = l.transform.isScaleLinked ? (s.y != 0 ? s.x / s.y * v / 100 : v / 100) : s.x
+                        l.transform.scale = Vec2(x, v / 100)
+                    }
+                    .help("Scale down")
+                }
+                HStack(spacing: Theme.space8) {
+                    SharedField(unit: "R", layers: layers, controller: controller, suffix: "°",
+                                get: { $0.transform.rotation }) { l, v in l.transform.rotation = v }
+                        .help("Rotation in degrees, clockwise")
+                    if cornered {
+                        SharedRadiusField(layers: layers, controller: controller)
+                    } else {
+                        Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+                    }
+                }
+                if groups.count == layers.count {
+                    let clips = groups.allSatisfy(\.clipsContent)
+                    CheckRow(label: "Clip content", isOn: clips) {
+                        controller.perform(controller.layerUpdate(controller.freshLayers(layers.map(\.id)).map { layer in
+                            var l = layer
+                            if case .group(var g) = l.content {
+                                g.clipsContent = !clips
+                                l.content = .group(g)
+                            }
+                            return l
+                        }))
+                    }
+                    .help("Hides whatever lies outside each one's box.")
+                }
+            }
+            .gridBody()
+        }
+        .padding(.bottom, Theme.panelPad)
     }
 
     private func blendEntries(_ layers: [Layer]) -> [MenuEntry] {
@@ -112,6 +210,91 @@ struct InspectorPanel: View {
             }
         }
         return entries
+    }
+}
+
+/// One number of several layers, in a field that sets it on all of them:
+/// it reads the number they share, or Mixed. A plain number goes to every
+/// layer; a change typed with a sign first (`+10`, `*2`) goes to each from
+/// its own number.
+private struct SharedField: View {
+    let unit: String
+    let layers: [Layer]
+    let controller: EditorController
+    var suffix = ""
+    var accepts: (Double) -> Bool = { _ in true }
+    let get: (Layer) -> Double
+    let set: (inout Layer, Double) -> Void
+
+    var body: some View {
+        let values = layers.map(get)
+        let alike = values.allSatisfy { abs($0 - values[0]) < 1e-9 }
+        UnitField(unit: unit, value: values[0], decimals: 1, suffix: suffix, accepts: accepts, mixed: !alike,
+                  commitEach: { change in
+                      edit { l in
+                          let v = change(get(l))
+                          if UnitField.holds(v), accepts(v) { set(&l, v) }
+                      }
+                  }) { v in
+            edit { set(&$0, v) }
+        }
+    }
+
+    private func edit(_ change: (inout Layer) -> Void) {
+        let edited = controller.freshLayers(layers.map(\.id)).map { layer -> Layer in
+            var l = layer
+            change(&l)
+            return l
+        }
+        guard !edited.isEmpty else { return }
+        controller.perform(controller.layerUpdate(edited))
+    }
+}
+
+/// The corner radius of several shapes: the largest of each one's corners,
+/// set on every corner of all of them, their Path actions following as
+/// they do for one layer.
+private struct SharedRadiusField: View {
+    let layers: [Layer]
+    let controller: EditorController
+
+    var body: some View {
+        let values = layers.map(Self.radius)
+        let alike = values.allSatisfy { abs($0 - values[0]) < 1e-9 }
+        UnitField(icon: .cornerTopLeft, value: values[0], decimals: 1, accepts: { $0 >= 0 }, mixed: !alike,
+                  commitEach: { change in set { max(change(Self.radius($0)), 0) } }) { v in
+            set { _ in v }
+        }
+        .help("Corner radius, in pixels")
+    }
+
+    private static func radius(_ layer: Layer) -> Double {
+        if let largest = CornerEditing.radii(of: layer, at: nil).max() { return largest }
+        if case .rectangle(let r)? = layer.look?.geometry { return max(r.topLeft, r.topRight, r.bottomRight, r.bottomLeft) }
+        return 0
+    }
+
+    private func set(_ radius: (Layer) -> Double) {
+        var edited: [Layer] = []
+        var moved: [Action] = []
+        for layer in controller.freshLayers(layers.map(\.id)) {
+            let v = radius(layer)
+            guard UnitField.holds(v) else { continue }
+            if CornerEditing.hasCorners(layer) {
+                let (changed, actions) = CornerEditing.setting(v, at: nil, of: layer, actions: controller.project.actions)
+                edited.append(changed)
+                moved += actions
+            } else if var look = layer.look, case .rectangle = look.geometry {
+                var l = layer
+                look.geometry = .rectangle(cornerRadii: CornerRadii(all: v))
+                l.look = look
+                edited.append(l)
+            }
+        }
+        guard !edited.isEmpty else { return }
+        let update = controller.layerUpdate(edited)
+        controller.perform(moved.isEmpty ? .batch([update], name: "Corner Radius")
+                                         : .batch([update, .updateActions(moved)], name: "Corner Radius"))
     }
 }
 

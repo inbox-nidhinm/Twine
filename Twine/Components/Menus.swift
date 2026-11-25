@@ -348,6 +348,9 @@ struct MenuField: View {
     var isEnabled = true
     /// `Theme.control` to sit level with number fields in one row.
     var height: CGFloat = Theme.panelRow + 4
+    /// A `PanelButton`'s grounds and words, to sit among them, as Home's
+    /// order menu does beside its New buttons.
+    var quiet = false
 
     @Environment(MenuHost.self) private var menus
     @State private var frame: CGRect = .zero
@@ -364,7 +367,7 @@ struct MenuField: View {
             HStack(spacing: Theme.space6) {
                 Text(value)
                     .font(ThemeFont.label)
-                    .foregroundStyle(isEnabled ? Theme.textPrimary : Theme.textTertiary)
+                    .foregroundStyle(!isEnabled ? Theme.textTertiary : quiet ? Theme.textSecondary : Theme.textPrimary)
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 IconView(.chevronDown, size: Theme.iconSmall)
@@ -374,7 +377,8 @@ struct MenuField: View {
             .frame(height: height)
             .frame(maxWidth: .infinity)
             .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
-                .fill(hovering && isEnabled ? Theme.panelHover : Theme.panelRaised))
+                .fill(quiet ? (hovering && isEnabled ? Theme.panelRaised : Theme.panelRaised.opacity(0.5))
+                            : hovering && isEnabled ? Theme.panelHover : Theme.panelRaised))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

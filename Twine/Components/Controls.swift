@@ -1,5 +1,6 @@
 import SwiftUI
 import MotionModel
+import MotionEditing
 import AppKit
 import Theme
 
@@ -372,6 +373,10 @@ struct UnitField: View {
     /// Several layers with different values: reads `Mixed` until a number
     /// is typed, nudged or dragged, which `value` starts from.
     var mixed = false
+    /// For a field standing for several layers: a typed change to the number
+    /// (`+10`, `*2`) goes to each from its own, where `commit` would give
+    /// them all one. Nil for a field with one number behind it.
+    var commitEach: (((Double) -> Double) -> Void)? = nil
     let commit: (Double) -> Void
 
     @State private var text = ""
@@ -470,7 +475,7 @@ struct UnitField: View {
     private func number(in text: String) -> Double? {
         var typed = text.trimmingCharacters(in: .whitespaces)
         if !suffix.isEmpty, typed.hasSuffix(suffix) { typed.removeLast(suffix.count) }
-        return Double(typed.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "."))
+        return NumberExpression.value(of: typed, from: value)
     }
 
     /// Up to `decimals` places, with trailing zeros dropped, so 5 reads `5`
@@ -493,10 +498,20 @@ struct UnitField: View {
         // change the value on a mere click in and out, and with several
         // layers or actions selected give them all the first one's.
         let untouched = !mixed && typed == format(value)
-        // Past the field's range, the nearest number it takes (150% is
-        // 100%), as dragging rests at the limit: the old number used to come
-        // back without a word.
-        let number = untouched ? nil : Double(typed).flatMap { v in
+        // Several layers and a change typed (`+10`, `*2`): each takes it
+        // from its own number.
+        if !untouched, let commitEach, let change = NumberExpression.change(in: typed) {
+            commitEach(change)
+            text = shown(value)
+            commits += 1
+            return
+        }
+        // A sum (`100+20`) or a change to the number there (`*2`) is worked
+        // out first. Past the field's range, the nearest number it takes
+        // (150% is 100%), as dragging rests at the limit: the old number
+        // used to come back without a word.
+        let typedNumber = NumberExpression.value(of: typed, from: value)
+        let number = untouched ? nil : typedNumber.flatMap { v in
             Self.holds(v) ? (accepts(v) ? v : Self.nearest(to: v, from: value, decimals: decimals, accepts: accepts)) : nil
         }
         if let v = number, mixed || abs(v - value) > .ulpOfOne {
@@ -508,7 +523,7 @@ struct UnitField: View {
             commits += 1
         } else {
             // A number that is no use at all says so.
-            if !untouched, Double(typed) != nil, number == nil { NSSound.beep() }
+            if !untouched, typedNumber != nil, number == nil { NSSound.beep() }
             text = shown(value)
         }
     }
@@ -624,8 +639,7 @@ struct OptionalField: View {
     private func nudge(by delta: Double) {
         var typed = text.trimmingCharacters(in: .whitespaces)
         if !suffix.isEmpty, typed.hasSuffix(suffix) { typed.removeLast(suffix.count) }
-        let from = Double(typed.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "."))
-            ?? value ?? placeholder
+        let from = NumberExpression.value(of: typed, from: value ?? placeholder) ?? value ?? placeholder
         let v = ArrowNudge.rounded(from + delta, decimals: decimals)
         guard UnitField.holds(v), accepts(v) else { NSSound.beep(); return }
         if value.map({ abs($0 - v) > .ulpOfOne }) ?? true { commit(v) }
@@ -639,7 +653,7 @@ struct OptionalField: View {
         if typed.isEmpty {
             if value != nil { commit(nil) }
             text = ""
-        } else if let typedNumber = Double(typed), UnitField.holds(typedNumber),
+        } else if let typedNumber = NumberExpression.value(of: typed, from: value ?? placeholder), UnitField.holds(typedNumber),
                   let v = accepts(typedNumber) ? typedNumber
                       : UnitField.nearest(to: typedNumber, from: value ?? placeholder, decimals: decimals, accepts: accepts) {
             // Left reading what it was showing, nothing was typed: the
@@ -650,7 +664,7 @@ struct OptionalField: View {
             }
             text = format(v)
         } else {
-            if Double(typed) != nil { NSSound.beep() }
+            if NumberExpression.value(of: typed, from: value ?? placeholder) != nil { NSSound.beep() }
             text = value.map(format) ?? ""
         }
     }

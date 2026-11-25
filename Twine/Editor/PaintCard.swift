@@ -37,6 +37,9 @@ struct PaintRow: View {
     let paint: Paint
     let isEnabled: Bool
     let controller: EditorController
+    /// Other selected layers with the same paints: the paint in the same
+    /// place of each changes with this one.
+    var others: [UUID] = []
     let toggle: () -> Void
     let remove: () -> Void
 
@@ -129,7 +132,7 @@ struct PaintRow: View {
     /// One finished change, made to the layer as it is in the project now.
     private func commit(_ paint: Paint) {
         guard let fresh = controller.project.layer(withID: layer.id), let slot = fresh.slot(target) else { return }
-        controller.perform(.updateLayers([fresh.with(paint, at: slot)]))
+        controller.perform(.updateLayers(controller.painted(paint, at: slot, of: fresh, and: others)))
     }
 
     private func open() {
@@ -150,7 +153,7 @@ struct PaintRow: View {
                             guard let layer = controller?.project.layer(withID: id), let slot = layer.slot(target) else { return false }
                             return layer.paint(at: slot)?.gradient != nil
                         }) {
-            PaintCard(layerID: id, target: target, swatches: swatches, controller: controller)
+            PaintCard(layerID: id, target: target, swatches: swatches, controller: controller, others: others)
         }
     }
 }
@@ -165,6 +168,8 @@ struct PaintCard: View {
     let target: PaintTarget
     let swatches: [RGBA]
     let controller: EditorController
+    /// Other selected layers whose paint in the same place changes too.
+    var others: [UUID] = []
 
     @Environment(MenuHost.self) private var menus
 
@@ -190,10 +195,11 @@ struct PaintCard: View {
     }
 
     /// One picture fill a layer: Image is offered where it is, or on any
-    /// fill while there is none. A stroke has no picture.
+    /// fill while there is none. A stroke has no picture, and several
+    /// layers do not take one together.
     private func kinds(_ layer: Layer, _ slot: PaintSlot) -> [String] {
         var kinds = ["Solid", "Linear", "Radial", "Angular"]
-        if case .fill(let i) = slot {
+        if case .fill(let i) = slot, others.isEmpty {
             let picture = layer.look?.pictureIndex
             if picture == nil || picture == i { kinds.append("Image") }
         }
@@ -285,13 +291,13 @@ struct PaintCard: View {
     /// One finished change to the paint as it is in the project now.
     private func commit(_ change: (Paint) -> Paint) {
         guard let now = current else { return }
-        controller.perform(.updateLayers([now.layer.with(change(now.paint), at: now.slot)]))
+        controller.perform(.updateLayers(controller.painted(change(now.paint), at: now.slot, of: now.layer, and: others)))
     }
 
     /// A step of a drag, between `begin` and `end`.
     private func live(_ change: (Paint) -> Paint) {
         guard let now = current else { return }
-        controller.update([now.layer.with(change(now.paint), at: now.slot)])
+        controller.update(controller.painted(change(now.paint), at: now.slot, of: now.layer, and: others))
     }
 
     private func live(_ paint: Paint) { live { _ in paint } }
@@ -303,5 +309,15 @@ private extension Paint {
         guard var g = gradient, g.stops.indices.contains(stop) else { return self }
         g.stops[stop].color = color
         return withGradient(g)
+    }
+}
+
+extension EditorController {
+    /// `layer` with a paint in one of its places, and with it each of the
+    /// `others` that has a paint in that place, as they are in the project now.
+    func painted(_ paint: Paint, at slot: PaintSlot, of layer: Layer, and others: [UUID]) -> [Layer] {
+        [layer.with(paint, at: slot)] + freshLayers(others).compactMap { other in
+            other.paint(at: slot) == nil ? nil : other.with(paint, at: slot)
+        }
     }
 }

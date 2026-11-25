@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 274
+    static let pushes = 275
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -53,6 +53,10 @@ enum VersionHistory {
             "Several layers selected show their own outlines and no box round them all, which had no handles and only looked as if it could be resized.",
             "Home has a search field that narrows the projects shown to those whose names hold what you type (Escape empties it) and a menu to order them by Last edited or by Name, which it remembers. New Folder is a row with a plus, no longer greyed like something switched off.",
             "The export screen's settings sit under the project's name at the top of their column, with Export alone at the foot.",
+            "Several layers can be changed together in Design. With more than one selected, the inspector shows X and Y, width and height, scale, rotation and corner radius: each field reads the number the layers share, or Mixed, and a number typed goes to all of them. Groups and frames selected together share Clip content.",
+            "Fills and strokes for several layers. Shapes and frames selected together show their Fill and Stroke: while every layer has the same ones, each row, its card and the stroke's settings change that fill or stroke on all of them, and + adds one to each; while they differ the section reads Mixed, and + puts one in place of them all, as in Figma.",
+            "Texts selected along with other layers show their Text section, which changes the texts; before, it showed only when every layer was a text.",
+            "Number fields do sums. Type 100+20, 1920/2 or (10+5)*2 and the field takes the answer. Start with +, * or / to change the number already there: +10, *2, /2 (a leading minus is still a negative number; take away with +-10). With several layers selected, such a change goes to each layer from its own number, so +10 in X moves every one of them ten pixels.",
         ], fixes: [
             "Cards open beside the control that raises them again. The colour picker, a fill's or stroke's card, the stroke settings and the easing card had all been landing in the window's top-left corner since cards began letting clicks through to what is behind them.",
         ]),

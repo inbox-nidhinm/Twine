@@ -634,47 +634,97 @@ private struct SoundSection: View {
 
 // MARK: - Fill
 
-private struct FillSection: View {
+struct FillSection: View {
     let layer: Layer
     let shape: ShapeContent
     let controller: EditorController
+    /// The other selected layers, whose fills are changed with this one's
+    /// (26 November 2026). While every layer has the same fills, the rows
+    /// are the first layer's and each edit goes to that fill of every
+    /// layer; while they differ, the section reads Mixed and + puts one
+    /// fill in place of them all, as in Figma.
+    var others: [Layer] = []
+
+    private var isMixed: Bool {
+        guard !others.isEmpty else { return false }
+        // A picture is one layer's own: its crop and its file.
+        if shape.fills.contains(where: { $0.paint.isImage }) { return true }
+        return others.contains { other in
+            guard let fills = other.look?.fills, fills.count == shape.fills.count else { return true }
+            return zip(fills, shape.fills).contains { $0.paint != $1.paint || $0.isEnabled != $1.isEnabled }
+        }
+    }
 
     var body: some View {
+        let mixed = isMixed
         VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Fill") {
-                IconButton(icon: .plus, help: shape.fills.isEmpty ? "Add a fill" : "Add a fill on top") {
+                IconButton(icon: .plus, help: mixed ? "Replace the different fills with one"
+                                                    : shape.fills.isEmpty ? "Add a fill" : "Add a fill on top") {
                     editShape { s in
-                        // The first in the shape's own grey; another, a
-                        // see-through black over what is there.
-                        s.fills.append(Fill(paint: .color(s.fills.isEmpty ? LayerFactory.defaultFill : RGBA(0, 0, 0, 0.2))))
+                        if mixed {
+                            s.fills = [Fill(paint: .color(LayerFactory.defaultFill))]
+                        } else {
+                            // The first in the shape's own grey; another, a
+                            // see-through black over what is there.
+                            s.fills.append(Fill(paint: .color(s.fills.isEmpty ? LayerFactory.defaultFill : RGBA(0, 0, 0, 0.2))))
+                        }
                     }
                 }
             }
-            // Every fill, the top one (the one a Colour action changes)
-            // first, as the layers panel lists layers (4 October 2026; only
-            // the top one showed before).
-            ForEach(Array(shape.fills.enumerated()).reversed(), id: \.element.id) { index, fill in
-                fillRows(fill, index: index)
-                    .gridBody()
+            if mixed {
+                MixedRow().gridBody()
+            } else {
+                // Every fill, the top one (the one a Colour action changes)
+                // first, as the layers panel lists layers (4 October 2026;
+                // only the top one showed before).
+                ForEach(Array(shape.fills.enumerated()).reversed(), id: \.element.id) { index, fill in
+                    fillRows(fill, index: index)
+                        .gridBody()
+                }
             }
         }
-        .sectionPadding(empty: shape.fills.isEmpty)
+        .sectionPadding(empty: shape.fills.isEmpty && !mixed)
     }
 
     private func fillRows(_ fill: Fill, index i: Int) -> some View {
         // One row a fill, as Figma has it: its kind and its colours are set
         // on the card its swatch raises.
         PaintRow(layer: layer, target: .fill(fill.id), paint: fill.paint, isEnabled: fill.isEnabled, controller: controller,
+                 others: others.map(\.id),
                  toggle: { editShape { s in if s.fills.indices.contains(i) { s.fills[i].isEnabled.toggle() } } },
                  remove: { editShape { s in if s.fills.indices.contains(i) { s.fills.remove(at: i) } } })
     }
 
     private func editShape(_ change: (inout ShapeContent) -> Void) {
-        controller.edit(layer.id) { l in
-            guard var s = l.look else { return }
-            change(&s)
-            l.look = s
+        controller.editLooks([layer.id] + others.map(\.id), change)
+    }
+}
+
+/// What a section reads while the selected layers' fills or strokes differ.
+struct MixedRow: View {
+    var body: some View {
+        Text(UnitField.mixedText)
+            .font(ThemeFont.label)
+            .foregroundStyle(Theme.textTertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: Theme.control)
+    }
+}
+
+extension EditorController {
+    /// Changes the look of each of these layers the same way, as they are
+    /// in the project now, as one undo step. Layers with no look are left.
+    func editLooks(_ ids: [UUID], _ change: (inout ShapeContent) -> Void) {
+        let edited = freshLayers(ids).compactMap { layer -> Layer? in
+            guard var look = layer.look else { return nil }
+            var l = layer
+            change(&look)
+            l.look = look
+            return l
         }
+        guard !edited.isEmpty else { return }
+        perform(layerUpdate(edited))
     }
 }
 
@@ -783,20 +833,40 @@ private struct VideoSection: View {
 
 // MARK: - Stroke
 
-private struct StrokeSection: View {
+struct StrokeSection: View {
     let layer: Layer
     let shape: ShapeContent
     let controller: EditorController
+    /// The other selected layers, as `FillSection.others`.
+    var others: [Layer] = []
+
+    private var isMixed: Bool {
+        guard !others.isEmpty else { return false }
+        return others.contains { other in
+            guard let strokes = other.look?.strokes, strokes.count == shape.strokes.count else { return true }
+            return zip(strokes, shape.strokes).contains { a, b in
+                a.paint != b.paint || a.isEnabled != b.isEnabled || a.width != b.width || a.alignment != b.alignment
+                    || a.cap != b.cap || a.join != b.join || a.dashPattern != b.dashPattern || a.dashOffset != b.dashOffset
+                    || a.dotted != b.dotted || a.trim != b.trim
+            }
+        }
+    }
 
     @Environment(MenuHost.self) private var menus
     /// Each stroke's settings button, to raise its card beside.
     @State private var settingsFrames: [UUID: CGRect] = [:]
 
     var body: some View {
+        let mixed = isMixed
         VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Stroke") {
-                IconButton(icon: .plus, help: shape.strokes.isEmpty ? "Add a stroke" : "Add a stroke on top") {
+                IconButton(icon: .plus, help: mixed ? "Replace the different strokes with one"
+                                                    : shape.strokes.isEmpty ? "Add a stroke" : "Add a stroke on top") {
                     editShape { s in
+                        if mixed {
+                            s.strokes = [Stroke(paint: .color(LayerFactory.defaultStroke), width: 2)]
+                            return
+                        }
                         // Another sits as the top one does, in the stroke colour.
                         var stroke = s.strokes.last?.withNewID() ?? Stroke(paint: .color(LayerFactory.defaultStroke), width: 2)
                         stroke.paint = .color(LayerFactory.defaultStroke)
@@ -805,21 +875,25 @@ private struct StrokeSection: View {
                     }
                 }
             }
-            // Every stroke, the one drawn on top first (4 October 2026; only
-            // the first showed before). Stroke and Trim actions drive the
-            // bottom one, the first in the list kept.
-            ForEach(Array(shape.strokes.enumerated()).reversed(), id: \.element.id) { index, stroke in
-                strokeRows(stroke, index: index)
-                    .gridBody()
+            if mixed {
+                MixedRow().gridBody()
+            } else {
+                // Every stroke, the one drawn on top first (4 October 2026;
+                // only the first showed before). Stroke and Trim actions
+                // drive the bottom one, the first in the list kept.
+                ForEach(Array(shape.strokes.enumerated()).reversed(), id: \.element.id) { index, stroke in
+                    strokeRows(stroke, index: index)
+                        .gridBody()
+                }
             }
         }
-        .sectionPadding(empty: shape.strokes.isEmpty)
+        .sectionPadding(empty: shape.strokes.isEmpty && !mixed)
     }
 
     @ViewBuilder private func strokeRows(_ stroke: Stroke, index i: Int) -> some View {
                 VStack(alignment: .leading, spacing: Theme.space8) {
                     PaintRow(layer: layer, target: .stroke(stroke.id), paint: stroke.paint, isEnabled: stroke.isEnabled,
-                             controller: controller,
+                             controller: controller, others: others.map(\.id),
                              toggle: { editShape { s in if s.strokes.indices.contains(i) { s.strokes[i].isEnabled.toggle() } } },
                              remove: { editShape { s in if s.strokes.indices.contains(i) { s.strokes.remove(at: i) } } })
                     HStack(spacing: Theme.space8) {
@@ -848,7 +922,8 @@ private struct StrokeSection: View {
                             menus.showPopup(at: CGPoint(x: inspectorLeft - Theme.floatGap - Theme.cardWidth,
                                                         y: settingsFrame.minY - 40)) {
                                 PopupCard(title: "Stroke", width: Theme.cardWidth) {
-                                    StrokeSettings(layerID: layer.id, strokeID: stroke.id, controller: controller)
+                                    StrokeSettings(layerID: layer.id, strokeID: stroke.id, controller: controller,
+                                                   others: others.map(\.id))
                                 }
                             }
                         }
@@ -858,11 +933,7 @@ private struct StrokeSection: View {
     }
 
     private func editShape(_ change: (inout ShapeContent) -> Void) {
-        controller.edit(layer.id) { l in
-            guard var s = l.look else { return }
-            change(&s)
-            l.look = s
-        }
+        controller.editLooks([layer.id] + others.map(\.id), change)
     }
 }
 
@@ -909,6 +980,8 @@ private struct StrokeSettings: View {
     /// others are added or removed.
     let strokeID: UUID
     let controller: EditorController
+    /// Other selected layers with the same strokes: theirs change too.
+    var others: [UUID] = []
 
     var body: some View {
         if let layer = controller.project.layer(withID: layerID), let stroke = layer.look?.strokes.first(where: { $0.id == strokeID }) {
@@ -978,10 +1051,10 @@ private struct StrokeSettings: View {
     }
 
     private func edit(_ change: @escaping (inout Stroke) -> Void) {
-        controller.edit(layerID) { l in
-            guard var s = l.look, let i = s.strokes.firstIndex(where: { $0.id == strokeID }) else { return }
-            change(&s.strokes[i])
-            l.look = s
+        // The same place in every layer's list, which is where this one is.
+        guard let i = controller.project.layer(withID: layerID)?.look?.strokes.firstIndex(where: { $0.id == strokeID }) else { return }
+        controller.editLooks([layerID] + others) { s in
+            if s.strokes.indices.contains(i) { change(&s.strokes[i]) }
         }
     }
 }

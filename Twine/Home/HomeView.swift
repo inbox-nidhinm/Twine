@@ -307,7 +307,7 @@ struct HomeView: View {
                 MenuField(value: library.sortsByName ? "Name" : "Last edited", entries: {
                     [.item("Last edited", checked: !library.sortsByName) { library.sortsByName = false },
                      .item("Name", checked: library.sortsByName) { library.sortsByName = true }]
-                }, height: Theme.button)
+                }, height: Theme.button, quiet: true)
                 .frame(width: Theme.homeSort)
                 .help("The order the projects are shown in")
                 PanelButton(title: "New from Template", icon: .template) { library.pickingTemplate = true }
