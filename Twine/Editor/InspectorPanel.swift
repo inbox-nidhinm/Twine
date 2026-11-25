@@ -6,9 +6,11 @@ import MotionEvaluation
 import MotionExport
 import Theme
 
-/// The right panel. The Animate and Design switch sits at its head; below it,
-/// whatever the selection can have done to it. With nothing selected, that is
-/// the composition itself. Export sits beside the switch, always.
+/// The right panel. At its head, as DialKit's root folder: what is selected,
+/// by name, with a line about it, and a chevron that folds the panel away;
+/// under that the Design and Animate switch and Export. Below, whatever the
+/// selection can have done to it. With nothing selected, that is the
+/// composition itself.
 struct InspectorPanel: View {
     let store: ProjectStore
     @Bindable var editor: EditorModel
@@ -16,18 +18,7 @@ struct InspectorPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // The switch, and beside it Export: always in sight, in both
-            // modes, without being the loudest thing on screen.
-            HStack(spacing: Theme.space8) {
-                SegmentRow(selection: editor.mode, options: EditorModel.Mode.allCases, title: \.title) {
-                    controller.setMode($0)
-                }
-                .help("Animate adds actions and brings up the timeline. Design builds the layout, with no animation. (M)")
-                HeadButton(title: "Export") { controller.openExport() }
-                    .help("Choose a format and size, see what will be exported, and export it. (⌘E)")
-            }
-            .padding(Theme.panelPad)
-
+            InspectorHead(store: store, editor: editor, controller: controller)
             PanelDivider()
             ScrollView {
                 VStack(spacing: 0) {
@@ -66,39 +57,48 @@ struct InspectorPanel: View {
         let alike = values.allSatisfy { abs($0 - values[0]) < 1e-9 }
         let shared = alike ? values[0] : values.max() ?? 1
         let blends = Set(layers.map(\.blendMode))
+        let position = Fold.section("Position"), appearance = Fold.section("Appearance")
         return VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: Theme.space8) {
-                HeaderRow(title: "Position") {}
-                AlignRow(controller: controller)
-                HStack(spacing: Theme.space8) {
-                    SharedField(unit: "X", layers: layers, controller: controller, get: { $0.transform.position.x }) { l, v in
-                        l.transform.position = Vec2(v, l.transform.position.y)
+            VStack(alignment: .leading, spacing: Theme.rowGap) {
+                HeaderRow(title: "Position", fold: position) {}
+                if position.isOpen {
+                    AlignRow(controller: controller)
+                    Group {
+                        HStack(spacing: Theme.space8) {
+                            SharedField(unit: "X", layers: layers, controller: controller, get: { $0.transform.position.x }) { l, v in
+                                l.transform.position = Vec2(v, l.transform.position.y)
+                            }
+                            SharedField(unit: "Y", layers: layers, controller: controller, get: { $0.transform.position.y }) { l, v in
+                                l.transform.position = Vec2(l.transform.position.x, v)
+                            }
+                        }
+                        .help("Where each anchor point sits, in pixels. Type +10 or *2 to change each from its own.")
+                        SharedField(unit: "Rotation", layers: layers, controller: controller, suffix: "°",
+                                    get: { $0.transform.rotation }) { l, v in l.transform.rotation = v }
+                            .help("Rotation in degrees, clockwise")
                     }
-                    SharedField(unit: "Y", layers: layers, controller: controller, get: { $0.transform.position.y }) { l, v in
-                        l.transform.position = Vec2(l.transform.position.x, v)
-                    }
+                    .gridBody()
                 }
-                .help("Where each anchor point sits, in pixels. Type +10 or *2 to change each from its own.")
-                .gridBody()
             }
-            .padding(.bottom, Theme.panelPad)
+            .padding(.bottom, position.isOpen ? Theme.panelPad : 0)
             PanelDivider()
             sharedLayout(layers)
             PanelDivider()
-            VStack(alignment: .leading, spacing: Theme.space8) {
-                HeaderRow(title: "Appearance") {}
-                BlendOpacityRow(blend: blends.count == 1 ? layers[0].blendMode.title : "Mixed",
-                                entries: { blendEntries(layers) }, opacity: shared,
-                                isGroup: layers.contains(where: \.isGroup), mixedOpacity: !alike) { v in
-                    controller.perform(.updateLayers(layers.map { l in
-                        var c = l
-                        c.opacity = v
-                        return c
-                    }))
+            VStack(alignment: .leading, spacing: Theme.rowGap) {
+                HeaderRow(title: "Appearance", fold: appearance) {}
+                if appearance.isOpen {
+                    BlendOpacityRow(blend: blends.count == 1 ? layers[0].blendMode.title : "Mixed",
+                                    entries: { blendEntries(layers) }, opacity: shared,
+                                    isGroup: layers.contains(where: \.isGroup), mixedOpacity: !alike,
+                                    onBegin: { controller.begin("Opacity") },
+                                    onChange: { v in controller.update(Self.withOpacity(v, controller.freshLayers(layers.map(\.id)))) },
+                                    onEnd: { controller.end() }) { v in
+                        controller.perform(.updateLayers(Self.withOpacity(v, controller.freshLayers(layers.map(\.id)))))
+                    }
+                    .gridBody()
                 }
-                .gridBody()
             }
-            .padding(.bottom, Theme.panelPad)
+            .padding(.bottom, appearance.isOpen ? Theme.panelPad : 0)
             // The texts among them take type together, whatever else is
             // selected with them (26 November 2026; only when every layer
             // was a text before).
@@ -128,8 +128,16 @@ struct InspectorPanel: View {
         }
     }
 
-    /// Size, scale, turn and corners for several layers: each field reads
-    /// their number, or Mixed, and sets it on all of them.
+    private static func withOpacity(_ v: Double, _ layers: [Layer]) -> [Layer] {
+        layers.map { l in
+            var c = l
+            c.opacity = v
+            return c
+        }
+    }
+
+    /// Size, scale and corners for several layers: each field reads their
+    /// number, or Mixed, and sets it on all of them.
     private func sharedLayout(_ layers: [Layer]) -> some View {
         // A group's size is only where it was made.
         let sized = layers.allSatisfy { !$0.isGroup || $0.isFrame }
@@ -143,9 +151,10 @@ struct InspectorPanel: View {
             if case .group(let g) = layer.content { return g }
             return nil
         }
-        return VStack(alignment: .leading, spacing: Theme.space8) {
-            HeaderRow(title: "Layout") {}
-            Group {
+        let fold = Fold.section("Layout")
+        return VStack(alignment: .leading, spacing: Theme.rowGap) {
+            HeaderRow(title: "Layout", fold: fold) {}
+            if fold.isOpen { Group {
                 if sized {
                     HStack(spacing: Theme.space8) {
                         SharedField(unit: "W", layers: layers, controller: controller, accepts: { $0 >= 0 },
@@ -170,15 +179,8 @@ struct InspectorPanel: View {
                     }
                     .help("Scale down")
                 }
-                HStack(spacing: Theme.space8) {
-                    SharedField(unit: "R", layers: layers, controller: controller, suffix: "°",
-                                get: { $0.transform.rotation }) { l, v in l.transform.rotation = v }
-                        .help("Rotation in degrees, clockwise")
-                    if cornered {
-                        SharedRadiusField(layers: layers, controller: controller)
-                    } else {
-                        Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
-                    }
+                if cornered {
+                    SharedRadiusField(layers: layers, controller: controller)
                 }
                 if groups.count == layers.count {
                     let clips = groups.allSatisfy(\.clipsContent)
@@ -195,9 +197,9 @@ struct InspectorPanel: View {
                     .help("Hides whatever lies outside each one's box.")
                 }
             }
-            .gridBody()
+            .gridBody() }
         }
-        .padding(.bottom, Theme.panelPad)
+        .padding(.bottom, fold.isOpen ? Theme.panelPad : 0)
     }
 
     private func blendEntries(_ layers: [Layer]) -> [MenuEntry] {
@@ -215,6 +217,106 @@ struct InspectorPanel: View {
             }
         }
         return entries
+    }
+}
+
+/// The inspector's head: the selection's name and a line about it, the fold,
+/// the mode switch and Export.
+private struct InspectorHead: View {
+    let store: ProjectStore
+    let editor: EditorModel
+    let controller: EditorController
+
+    var body: some View {
+        let heading = self.heading
+        VStack(alignment: .leading, spacing: Theme.panelPad) {
+            HStack(alignment: .top, spacing: Theme.space8) {
+                VStack(alignment: .leading, spacing: Theme.space2) {
+                    Text(heading.title)
+                        .font(ThemeFont.title)
+                        .foregroundStyle(Theme.textRoot)
+                        .lineLimit(1)
+                    Text(heading.detail)
+                        .font(ThemeFont.caption)
+                        .foregroundStyle(Theme.textTertiary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                IconButton(icon: .chevronUp, help: "Hide the inspector (⌘2)") { editor.showInspector = false }
+                    .padding(.trailing, Theme.buttonInset - Theme.panelPad)
+            }
+            // The switch, and beside it Export: always in sight, in both modes.
+            HStack(spacing: Theme.space8) {
+                SegmentRow(selection: editor.mode, options: [.design, .animate], title: \.title) {
+                    controller.setMode($0)
+                }
+                .help("Design builds the layout, with no animation. Animate adds actions and brings up the timeline. (M)")
+                HeadButton(title: "Export") { controller.openExport() }
+                    .help("Choose a format and size, see what will be exported, and export it. (⌘E)")
+            }
+        }
+        .padding(Theme.panelPad)
+    }
+
+    /// What the head says: in Animate the selected actions, else the
+    /// selected layers, else the composition.
+    private var heading: (title: String, detail: String) {
+        let project = store.project
+        let actions = editor.mode == .animate ? controller.selectedActions : []
+        if actions.count == 1, let action = actions.first {
+            let layer = project.layer(withID: action.targetLayerID)?.name ?? ""
+            let end = action.start + action.duration
+            let when = action.isInstant ? "at \(Self.seconds(action.start))"
+                                        : "\(Self.seconds(action.start)) to \(Self.seconds(end))"
+            return (action.name, layer.isEmpty ? when : "\(layer) · \(when)")
+        }
+        if actions.count > 1 {
+            var names: [String] = []
+            for action in actions {
+                if let name = project.layer(withID: action.targetLayerID)?.name, !names.contains(name) { names.append(name) }
+            }
+            return ("\(actions.count) Actions", names.joined(separator: ", "))
+        }
+        let layers = controller.selectedLayers
+        if layers.count == 1, let layer = layers.first {
+            if case .audio = layer.content { return (layer.name, layer.kindTitle) }
+            return (layer.name, "\(layer.kindTitle) · \(Self.number(layer.size.width)) × \(Self.number(layer.size.height))")
+        }
+        if layers.count > 1 {
+            return ("\(layers.count) Layers", layers.map(\.name).joined(separator: ", "))
+        }
+        let c = project.composition
+        return ("Composition", "\(c.width) × \(c.height) · \(c.frameRate.label) fps · \(Self.seconds(c.duration))")
+    }
+
+    private static func number(_ v: Double) -> String {
+        v.formatted(.number.precision(.fractionLength(0...1)))
+    }
+
+    private static func seconds(_ t: Double) -> String {
+        t.formatted(.number.precision(.fractionLength(0...2))) + " s"
+    }
+}
+
+extension Layer {
+    /// What kind of layer this is, in a word, for the inspector's head.
+    var kindTitle: String {
+        switch content {
+        case .text: return "Text"
+        case .video: return "Video"
+        case .audio: return "Sound"
+        case .group: return isFrame ? (template != nil ? "Template" : "Frame") : "Group"
+        case .shape(let shape):
+            if shape.fills.contains(where: { $0.paint.isImage }) { return "Picture" }
+            switch shape.geometry {
+            case .rectangle: return "Rectangle"
+            case .ellipse: return "Ellipse"
+            case .line: return "Line"
+            case .polygon: return "Polygon"
+            case .star: return "Star"
+            case .path: return "Path"
+            }
+        }
     }
 }
 

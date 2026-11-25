@@ -185,6 +185,8 @@ public enum Theme {
     /// A small glyph button in a row or a header (add, remove, the eye), and
     /// the colour well beside a hex.
     public static let glyph: CGFloat = 24
+    /// The round button a folded panel leaves at the window's corner.
+    public static let foldedPanel: CGFloat = 44
     /// A DialKit switch: its track and the round thumb inside it.
     public static let toggleWidth: CGFloat = 36
     public static let toggleHeight: CGFloat = 20
@@ -238,6 +240,9 @@ public enum Theme {
     /// Home's search field and sort menu, beside the New buttons.
     public static let homeSearch: CGFloat = 168
     public static let homeSort: CGFloat = 112
+    /// An ellipse's Sweep and Ratio, joined to its Start in one box.
+    public static let arcSweepField: CGFloat = 76
+    public static let arcRatioField: CGFloat = 64
     /// The opacity joined to a fill's or stroke's hex on its one row.
     public static let paintOpacity: CGFloat = 68
 

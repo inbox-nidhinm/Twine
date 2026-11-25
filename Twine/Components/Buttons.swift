@@ -101,7 +101,8 @@ struct PanelButton: View {
 }
 
 /// A short button with a word on it at the head of a panel, level with the
-/// mode switch beside it and as quiet: Export.
+/// mode switch beside it: Export, in the accent, as the DialKit screens
+/// draw it.
 struct HeadButton: View {
     let title: String
     let action: () -> Void
@@ -111,14 +112,14 @@ struct HeadButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(ThemeFont.labelStrong)
-                .foregroundStyle(Theme.textPrimary)
+                .font(ThemeFont.label)
+                .foregroundStyle(Theme.textOnColor)
                 .lineLimit(1)
                 .fixedSize()
-                .padding(.horizontal, Theme.space12)
+                .padding(.horizontal, Theme.space20)
                 .frame(height: Theme.panelRow)
-                .background(RoundedRectangle(cornerRadius: Theme.radiusControl + 1)
-                    .fill(hovering ? Theme.panelHover : Theme.panelRaised))
+                .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
+                    .fill(hovering ? Theme.accentHover : Theme.accent))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

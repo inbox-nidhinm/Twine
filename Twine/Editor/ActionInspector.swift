@@ -25,13 +25,10 @@ struct ActionInspector: View {
     /// Presets count as one kind only when they are the same preset.
     private var sameKind: Bool { actions.allSatisfy { $0.spec.kind == first.spec.kind && $0.preset == first.preset } }
 
-    private var kindName: String {
-        first.preset.map { Presets.preset($0.preset).name } ?? first.spec.kind.defaultName
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HeaderRow(title: actions.count == 1 ? first.name : sameKind ? kindName : "Actions") {}
+            // The panel's head names the action; this is its timing.
+            HeaderRow(title: "Timing") {}
             VStack(alignment: .leading, spacing: Theme.space10) {
                 TimingFields(controller: controller, actions: actions)
                 // A Play runs at the clip's own speed, and a shake keeps its

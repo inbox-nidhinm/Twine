@@ -45,6 +45,21 @@ struct EditorView: View {
 
             bottomSurface
 
+            // A folded panel leaves a round button at its corner, as
+            // DialKit's collapsed panels do, which opens it again.
+            HStack(alignment: .top, spacing: 0) {
+                if !editor.showLayers {
+                    FoldedPanelButton(icon: .group, help: "Show Layers (⌘1)") { editor.showLayers = true }
+                        .padding(.top, Theme.space20 + Theme.space16)
+                }
+                Spacer(minLength: 0)
+                if !editor.showInspector {
+                    FoldedPanelButton(icon: .settings, help: "Show Inspector (⌘2)") { editor.showInspector = true }
+                }
+            }
+            .padding(Theme.floatInset)
+            .frame(maxHeight: .infinity, alignment: .top)
+
             if (editor.exports.isExporting || editor.exports.finished != nil) && !editor.showExport {
                 ExportStatus(session: editor.exports)
                     .padding(Theme.floatInset)
@@ -169,5 +184,29 @@ struct EditorView: View {
                           leading: leftGutter,
                           bottom: bottom + Theme.floatInset * 2,
                           trailing: rightGutter)
+    }
+}
+
+/// The round button a folded panel leaves behind.
+private struct FoldedPanelButton: View {
+    let icon: Icon
+    let help: String
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            IconView(icon, size: Theme.icon)
+                .foregroundStyle(hovering ? Theme.textPrimary : Theme.textSecondary)
+                .frame(width: Theme.foldedPanel, height: Theme.foldedPanel)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .floatingPanel(corner: Theme.foldedPanel / 2)
+        .help(help)
+        .accessibilityLabel(help)
+        .transition(.opacity)
     }
 }

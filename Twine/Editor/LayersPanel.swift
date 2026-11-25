@@ -218,6 +218,12 @@ struct LayersPanel: View {
                 .foregroundStyle(Theme.textTertiary)
                 .lineLimit(1)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // The fold, as on the inspector's head.
+        .overlay(alignment: .topTrailing) {
+            IconButton(icon: .chevronUp, help: "Hide Layers (⌘1)") { editor.showLayers = false }
+                .padding(.trailing, Theme.buttonInset - Theme.panelPad)
+        }
         .padding(.horizontal, Theme.panelPad)
         .padding(.top, Theme.space44)
         .padding(.bottom, Theme.panelPad)

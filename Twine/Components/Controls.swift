@@ -21,13 +21,16 @@ struct SliderRow<Accessory: View>: View {
     var onChange: (Double) -> Void
     var onBegin: () -> Void = {}
     var onEnd: () -> Void = {}
+    /// A number typed in place of the value, as DialKit's editable values:
+    /// a click on the value starts typing. Nil leaves it drag-only.
+    var commit: ((Double) -> Void)? = nil
     /// Sits at the row's end, in the button column, such as a stopwatch.
     @ViewBuilder var accessory: () -> Accessory
 
     var body: some View {
         HStack(spacing: Theme.columnGap) {
             PillTrack(label: label, value: value, range: range, readout: readout(value),
-                      onChange: onChange, onBegin: onBegin, onEnd: onEnd)
+                      onChange: onChange, onBegin: onBegin, onEnd: onEnd, commit: commit)
             accessory()
         }
     }
@@ -41,9 +44,14 @@ private struct PillTrack: View {
     var onChange: (Double) -> Void
     var onBegin: () -> Void
     var onEnd: () -> Void
+    var commit: ((Double) -> Void)?
 
     @State private var dragging = false
     @State private var hovering = false
+    @State private var typing = false
+    @State private var valueHover = false
+    @State private var text = ""
+    @FocusState private var focused: Bool
 
     var body: some View {
         GeometryReader { geo in
@@ -73,11 +81,20 @@ private struct PillTrack: View {
                         .foregroundStyle(Theme.fieldLabel)
                         .lineLimit(1)
                     Spacer(minLength: 0)
-                    Text(readout)
-                        .font(ThemeFont.label)
-                        .monospacedDigit()
-                        .foregroundStyle(dragging ? Theme.textRoot : Theme.textPrimary)
-                        .lineLimit(1)
+                    if !typing {
+                        Text(readout)
+                            .font(ThemeFont.label)
+                            .monospacedDigit()
+                            .foregroundStyle(dragging || valueHover ? Theme.textRoot : Theme.textPrimary)
+                            .lineLimit(1)
+                            .overlay(alignment: .bottom) {
+                                // DialKit underlines a value that can be typed.
+                                Rectangle()
+                                    .fill(valueHover ? Theme.fieldLabel : .clear)
+                                    .frame(height: Theme.hairline)
+                                    .offset(y: Theme.space2)
+                            }
+                    }
                 }
                 .padding(.leading, Theme.labelInset)
                 .padding(.trailing, Theme.valueInset)
@@ -105,16 +122,73 @@ private struct PillTrack: View {
             .accessibilityElement()
             .accessibilityLabel(label)
             .accessibilityValue(readout)
+            .overlay(alignment: .trailing) {
+                if typing {
+                    TextField("", text: $text)
+                        .textFieldStyle(.plain)
+                        .font(ThemeFont.label)
+                        .monospacedDigit()
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(Theme.textRoot)
+                        .focused($focused)
+                        .frame(width: Theme.paintOpacity)
+                        .overlay(alignment: .bottom) {
+                            Rectangle().fill(Theme.fieldLabel).frame(height: Theme.hairline).offset(y: Theme.space2)
+                        }
+                        .padding(.trailing, Theme.valueInset)
+                        .onAppear {
+                            text = Self.number(in: readout)
+                            DispatchQueue.main.async { focused = true }
+                        }
+                        .onSubmit(apply)
+                        .onExitCommand {
+                            typing = false
+                            UnitField.leaveField()
+                        }
+                        .onChange(of: focused) { _, now in if !now { apply() } }
+                } else if commit != nil {
+                    // The value's own button, over the track's drag.
+                    Button { typing = true } label: {
+                        Color.clear
+                            .frame(width: Theme.paintOpacity, height: Theme.track)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { valueHover = $0 }
+                    .help("Type a value")
+                }
+            }
         }
         .frame(height: Theme.track)
+    }
+
+    /// The readout's number, its unit left off.
+    private static func number(in readout: String) -> String {
+        readout.trimmingCharacters(in: CharacterSet(charactersIn: "0123456789.-").inverted)
+    }
+
+    private func apply() {
+        guard typing else { return }
+        typing = false
+        valueHover = false
+        let typed = Self.number(in: text).replacingOccurrences(of: ",", with: ".")
+        guard !typed.isEmpty, typed != Self.number(in: readout) else { return }
+        let current = Double(Self.number(in: readout)) ?? value
+        guard let v = NumberExpression.value(of: text.trimmingCharacters(in: CharacterSet(charactersIn: "%°s ")), from: current),
+              UnitField.holds(v) else {
+            NSSound.beep()
+            return
+        }
+        commit?(v)
     }
 }
 
 extension SliderRow where Accessory == EmptyView {
     init(label: String, value: Double, range: ClosedRange<Double>, readout: @escaping (Double) -> String = { "\(Int($0.rounded()))" },
-         onChange: @escaping (Double) -> Void, onBegin: @escaping () -> Void = {}, onEnd: @escaping () -> Void = {}) {
+         onChange: @escaping (Double) -> Void, onBegin: @escaping () -> Void = {}, onEnd: @escaping () -> Void = {},
+         commit: ((Double) -> Void)? = nil) {
         self.init(label: label, value: value, range: range, readout: readout, onChange: onChange,
-                  onBegin: onBegin, onEnd: onEnd, accessory: { EmptyView() })
+                  onBegin: onBegin, onEnd: onEnd, commit: commit, accessory: { EmptyView() })
     }
 }
 
@@ -928,23 +1002,81 @@ private struct StepButton: View {
     }
 }
 
-/// A section's title with actions at its end, such as adding a fill. For
-/// sections that do not fold.
+/// A section's title with actions at its end, such as adding a fill. With
+/// a `fold`, a chevron at the end says whether the section is open, as
+/// DialKit's folders do, and a click on the title or the chevron folds it.
 struct HeaderRow<Accessory: View>: View {
     let title: String
+    var fold: Fold? = nil
     @ViewBuilder var accessory: () -> Accessory
+
+    @State private var hovering = false
 
     var body: some View {
         HStack(spacing: Theme.space2) {
-            Text(title)
-                .font(ThemeFont.labelStrong)
-                .foregroundStyle(Theme.textSecondary)
-            Spacer(minLength: 0)
-            accessory()
+            if let fold {
+                Button(action: fold.toggle) {
+                    HStack(spacing: 0) {
+                        name
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering = $0 }
+                accessory()
+                IconButton(icon: fold.isOpen && fold.hasRows ? .chevronDown : .chevronRight,
+                           help: fold.isOpen ? "Fold \(title)" : "Open \(title)", action: fold.toggle)
+            } else {
+                name
+                Spacer(minLength: 0)
+                accessory()
+            }
         }
         .padding(.leading, Theme.panelPad)
         .padding(.trailing, Theme.buttonInset)
         .frame(height: Theme.button)
+    }
+
+    private var name: some View {
+        Text(title)
+            .font(ThemeFont.labelStrong)
+            .foregroundStyle(hovering ? Theme.textPrimary : Theme.textSecondary)
+    }
+}
+
+/// Whether a section is open, and how to fold it.
+struct Fold {
+    let isOpen: Bool
+    /// Whether it has rows to show: an empty section's chevron points
+    /// right, as DialKit's does, open or not.
+    var hasRows = true
+    let toggle: () -> Void
+
+    /// The inspector's section of this name, folded or open as it was left,
+    /// for every layer alike.
+    @MainActor
+    static func section(_ name: String, hasRows: Bool = true) -> Fold {
+        let folds = SectionFolds.shared
+        return Fold(isOpen: folds.isOpen(name), hasRows: hasRows) {
+            withAnimation(.easeOut(duration: 0.14)) { folds.toggle(name) }
+        }
+    }
+}
+
+/// The inspector's folded sections, by name, kept while the app runs so a
+/// section stays folded from one layer to the next.
+@MainActor @Observable
+final class SectionFolds {
+    static let shared = SectionFolds()
+
+    private var folded: Set<String> = []
+
+    func isOpen(_ name: String) -> Bool { !folded.contains(name) }
+
+    func toggle(_ name: String) {
+        if folded.contains(name) { folded.remove(name) } else { folded.insert(name) }
     }
 }
 

@@ -108,73 +108,106 @@ struct LayerInspector: View {
 
     // MARK: Position
 
-    /// Where the layer sits: lined up with the composition, its place, and,
-    /// from the button beside it, the point it turns about. Its turn is in
-    /// Layout, beside its corners.
+    /// Where the layer sits: lined up with the composition, its place, its
+    /// turn and the point it turns about, as the DialKit screens have them.
     private var positionSection: some View {
-        VStack(alignment: .leading, spacing: Theme.space8) {
-            HeaderRow(title: "Position") {}
-            AlignRow(controller: controller)
-            Group {
-                HStack(spacing: Theme.space8) {
-                    number("X", t.position.x) { l, v in
-                        l.transform.position = Vec2(v, l.transform.position.y)
-                    }
-                    number("Y", t.position.y) { l, v in
-                        l.transform.position = Vec2(l.transform.position.x, v)
-                    }
-                }
-                .help("Where the anchor point sits, in pixels")
-                .rowButton { AnchorButton(layer: layer, controller: controller) }
-                // Z shows in a frame in 3D, and wherever one is set.
-                if t.z != 0 || controller.project.space3D(holding: layer.id) != nil {
+        let fold = Fold.section("Position")
+        return VStack(alignment: .leading, spacing: Theme.rowGap) {
+            HeaderRow(title: "Position", fold: fold) {}
+            if fold.isOpen {
+                AlignRow(controller: controller)
+                Group {
                     HStack(spacing: Theme.space8) {
+                        number("X", t.position.x) { l, v in
+                            l.transform.position = Vec2(v, l.transform.position.y)
+                        }
+                        number("Y", t.position.y) { l, v in
+                            l.transform.position = Vec2(l.transform.position.x, v)
+                        }
+                    }
+                    .help("Where the anchor point sits, in pixels")
+                    // Z shows in a frame in 3D, and wherever one is set.
+                    if t.z != 0 || controller.project.space3D(holding: layer.id) != nil {
                         number("Z", t.z) { l, v in l.transform.z = v }
                             .help("How far towards you it sits, in pixels; negative is further away")
-                        Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
                     }
+                    rotationField
+                    MenuRow(label: "Anchor", value: anchorTitle, entries: anchorEntries)
+                        .help("Anchor: the point the layer turns and scales about")
                 }
+                .gridBody()
             }
-            .gridBody()
         }
-        .padding(.bottom, Theme.panelPad)
+        .padding(.bottom, fold.isOpen ? Theme.panelPad : 0)
+    }
+
+    /// The anchor's place in words: one of the nine, or Custom.
+    private var anchorTitle: String {
+        guard let (fx, fy) = layer.anchorFraction else { return "Custom" }
+        return Self.anchorName(fx, fy)
+    }
+
+    private static func anchorName(_ fx: Double, _ fy: Double) -> String {
+        if fx == 0.5 && fy == 0.5 { return "Centre" }
+        let across = fx == 0 ? "Left" : fx == 1 ? "Right" : ""
+        let down = fy == 0 ? "Top" : fy == 1 ? "Bottom" : ""
+        if across.isEmpty { return down }
+        if down.isEmpty { return across }
+        return "\(down) \(across.lowercased())"
+    }
+
+    /// The nine places, a row of the box between separators.
+    private func anchorEntries() -> [MenuEntry] {
+        let chosen = layer.anchorFraction
+        var entries: [MenuEntry] = []
+        for fy in [0.0, 0.5, 1] {
+            if fy > 0 { entries.append(.separator) }
+            for fx in [0.0, 0.5, 1] {
+                entries.append(.item(Self.anchorName(fx, fy), checked: chosen.map { $0.0 == fx && $0.1 == fy } ?? false) {
+                    controller.edit(layer.id) { l in l.moveAnchor(to: Vec2(l.size.width * fx, l.size.height * fy)) }
+                })
+            }
+        }
+        return entries
     }
 
     // MARK: Layout
 
-    /// How big the layer is and what shape: its size, its scale, its
-    /// corners or points, and for a group or frame, whether it clips.
+    /// How big the layer is and what shape: its size, its corners or
+    /// points, its scale, and for a group or frame, whether it clips.
     private var layoutSection: some View {
-        VStack(alignment: .leading, spacing: Theme.space8) {
-            HeaderRow(title: "Layout") {}
-            Group {
-                // A group's size is only where it was made; a frame's is its own.
-                if !layer.isGroup || layer.isFrame {
-                    HStack(spacing: Theme.space8) {
-                        number("W", layer.size.width, accepts: { $0 >= 0 }) { l, v in l = l.resized(toWidth: v) }
-                        number("H", layer.size.height, accepts: { $0 >= 0 }) { l, v in l = l.resized(toHeight: v) }
+        let fold = Fold.section("Layout")
+        return VStack(alignment: .leading, spacing: Theme.rowGap) {
+            HeaderRow(title: "Layout", fold: fold) {}
+            if fold.isOpen {
+                Group {
+                    // A group's size is only where it was made; a frame's is its own.
+                    if !layer.isGroup || layer.isFrame {
+                        HStack(spacing: Theme.space8) {
+                            number("W", layer.size.width, accepts: { $0 >= 0 }) { l, v in l = l.resized(toWidth: v) }
+                            number("H", layer.size.height, accepts: { $0 >= 0 }) { l, v in l = l.resized(toHeight: v) }
+                        }
+                        .rowButton { widthHeightLink }
                     }
-                    .rowButton { widthHeightLink }
-                }
-                scaleRow
-                // The turn, beside the corners where the shape has them.
-                if let geometry = layer.look?.geometry { shapeFields(geometry) } else { rotationAlone }
-                if case .group(let group) = layer.content {
-                    CheckRow(label: "Clip content", isOn: group.clipsContent) {
-                        controller.edit(layer.id) { l in
-                            if case .group(var g) = l.content {
-                                g.clipsContent.toggle()
-                                l.content = .group(g)
+                    if let geometry = layer.look?.geometry { shapeFields(geometry) }
+                    scaleRow
+                    if case .group(let group) = layer.content {
+                        CheckRow(label: "Clip content", isOn: group.clipsContent) {
+                            controller.edit(layer.id) { l in
+                                if case .group(var g) = l.content {
+                                    g.clipsContent.toggle()
+                                    l.content = .group(g)
+                                }
                             }
                         }
+                        .help(layer.isFrame ? "Hides whatever lies outside the frame, round its corners too."
+                                            : "Hides whatever lies outside the group's box.")
                     }
-                    .help(layer.isFrame ? "Hides whatever lies outside the frame, round its corners too."
-                                        : "Hides whatever lies outside the group's box.")
                 }
+                .gridBody()
             }
-            .gridBody()
         }
-        .padding(.bottom, Theme.panelPad)
+        .padding(.bottom, fold.isOpen ? Theme.panelPad : 0)
     }
 
     /// Keeps width and height in proportion. Text sets its own height, so it
@@ -192,47 +225,45 @@ struct LayerInspector: View {
     }
 
     private var rotationField: some View {
-        UnitField(unit: "R", value: t.rotation, decimals: 1, suffix: "°") { v in
+        UnitField(unit: "Rotation", value: t.rotation, decimals: 1, suffix: "°") { v in
             controller.edit(layer.id) { l in l.transform.rotation = v }
         }
         .help("Rotation in degrees, clockwise")
     }
 
-    /// The turn in half a row, where the shape has no corners to sit beside.
-    private var rotationAlone: some View {
-        HStack(spacing: Theme.space8) {
-            rotationField
-            Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
-        }
-    }
-
-    private var rotationAndRadius: some View {
-        HStack(spacing: Theme.space8) {
-            rotationField
-            cornerRadiusField
-        }
-    }
-
-    /// Both ways always, with their own link in the column.
-    private var scaleRow: some View {
+    /// One Scale slider while both ways go together, as DialKit draws it;
+    /// both ways as fields while they are apart. The link sits in the column.
+    @ViewBuilder private var scaleRow: some View {
         let scale = t.scale
-        return HStack(spacing: Theme.space8) {
-            UnitField(unit: "SX", value: scale.x * 100, decimals: 1, suffix: "%") { v in
-                controller.edit(layer.id) { l in
-                    let s = l.transform.scale
-                    let y = l.transform.isScaleLinked ? (s.x != 0 ? s.y / s.x * v / 100 : v / 100) : s.y
-                    l.transform.scale = Vec2(v / 100, y)
+        Group {
+            if t.isScaleLinked {
+                SliderRow(label: "Scale", value: scale.x * 100, range: 0...200,
+                          readout: { UnitField.trimmed($0, 1) + "%" },
+                          onChange: { v in
+                              guard var l = controller.project.layer(withID: layer.id) else { return }
+                              Self.scale(&l, toX: v)
+                              controller.update([l])
+                          },
+                          onBegin: { controller.begin("Scale") },
+                          onEnd: { controller.end() },
+                          commit: { v in controller.edit(layer.id) { Self.scale(&$0, toX: v) } })
+                    .help("Scale, both ways together")
+            } else {
+                HStack(spacing: Theme.space8) {
+                    UnitField(unit: "SX", value: scale.x * 100, decimals: 1, suffix: "%") { v in
+                        controller.edit(layer.id) { Self.scale(&$0, toX: v) }
+                    }
+                    .help("Scale across")
+                    UnitField(unit: "SY", value: scale.y * 100, decimals: 1, suffix: "%") { v in
+                        controller.edit(layer.id) { l in
+                            let s = l.transform.scale
+                            let x = l.transform.isScaleLinked ? (s.y != 0 ? s.x / s.y * v / 100 : v / 100) : s.x
+                            l.transform.scale = Vec2(x, v / 100)
+                        }
+                    }
+                    .help("Scale down")
                 }
             }
-            .help("Scale across")
-            UnitField(unit: "SY", value: scale.y * 100, decimals: 1, suffix: "%") { v in
-                controller.edit(layer.id) { l in
-                    let s = l.transform.scale
-                    let x = l.transform.isScaleLinked ? (s.y != 0 ? s.x / s.y * v / 100 : v / 100) : s.x
-                    l.transform.scale = Vec2(x, v / 100)
-                }
-            }
-            .help("Scale down")
         }
         .rowButton {
             IconButton(icon: t.isScaleLinked ? .link : .unlink,
@@ -242,18 +273,35 @@ struct LayerInspector: View {
         }
     }
 
+    /// Scale across set in percent, down following it while they are linked.
+    private static func scale(_ l: inout Layer, toX v: Double) {
+        let s = l.transform.scale
+        let y = l.transform.isScaleLinked ? (s.x != 0 ? s.y / s.x * v / 100 : v / 100) : s.y
+        l.transform.scale = Vec2(v / 100, y)
+    }
+
     // MARK: Appearance
 
     private var appearanceSection: some View {
-        VStack(alignment: .leading, spacing: Theme.space8) {
-            HeaderRow(title: "Appearance") {}
-            BlendOpacityRow(blend: layer.blendMode.title, entries: blendEntries,
-                            opacity: layer.opacity, isGroup: layer.isGroup) { v in
-                controller.edit(layer.id) { $0.opacity = v }
+        let fold = Fold.section("Appearance")
+        return VStack(alignment: .leading, spacing: Theme.rowGap) {
+            HeaderRow(title: "Appearance", fold: fold) {}
+            if fold.isOpen {
+                BlendOpacityRow(blend: layer.blendMode.title, entries: blendEntries,
+                                opacity: layer.opacity, isGroup: layer.isGroup,
+                                onBegin: { controller.begin("Opacity") },
+                                onChange: { v in
+                                    guard var l = controller.project.layer(withID: layer.id) else { return }
+                                    l.opacity = v
+                                    controller.update([l])
+                                },
+                                onEnd: { controller.end() }) { v in
+                    controller.edit(layer.id) { $0.opacity = v }
+                }
+                .gridBody()
             }
-            .gridBody()
         }
-        .padding(.bottom, Theme.panelPad)
+        .padding(.bottom, fold.isOpen ? Theme.panelPad : 0)
     }
 
 
@@ -263,8 +311,16 @@ struct LayerInspector: View {
         switch geometry {
         case .rectangle(let radii):
             let r = radii
-            VStack(alignment: .leading, spacing: Theme.space8) {
-                rotationAndRadius
+            VStack(alignment: .leading, spacing: Theme.rowGap) {
+                Group {
+                    // One radius as DialKit's slider, up to the round end;
+                    // a field where corners are picked on a path's points.
+                    if r.isUniform && !perCorner && pickedRefs == nil {
+                        radiusSlider(r.topLeft)
+                    } else {
+                        cornerRadiusField
+                    }
+                }
                 .rowButton {
                     IconButton(icon: .corners, help: perCorner ? "One radius for every corner" : "A radius for each corner") {
                         perCorner.toggle()
@@ -282,29 +338,24 @@ struct LayerInspector: View {
                 }
             }
         case .polygon(let sides, let corner):
-            VStack(alignment: .leading, spacing: Theme.space8) {
-                rotationAndRadius
-                UnitField(unit: "Sides", value: Double(sides), step: 0.2, accepts: { $0 >= 3 && $0 <= 60 }) { v in
-                    setGeometry(.polygon(sides: Int(v.rounded()), cornerRadius: corner))
-                }
-                .help("How many sides, from 3 to 60")
+            cornerRadiusField
+            UnitField(unit: "Sides", value: Double(sides), step: 0.2, accepts: { $0 >= 3 && $0 <= 60 }) { v in
+                setGeometry(.polygon(sides: Int(v.rounded()), cornerRadius: corner))
             }
+            .help("How many sides, from 3 to 60")
         case .star(let points, let inner, let corner):
-            VStack(alignment: .leading, spacing: Theme.space8) {
-                rotationAndRadius
-                HStack(spacing: Theme.space8) {
-                    UnitField(unit: "Points", value: Double(points), step: 0.2, accepts: { $0 >= 3 && $0 <= 60 }) { v in
-                        setGeometry(.star(points: Int(v.rounded()), innerRadius: inner, cornerRadius: corner))
-                    }
-                    .help("How many points, from 3 to 60")
-                    UnitField(unit: "Inner", value: inner * 100, decimals: 1, suffix: "%", accepts: { $0 >= 0 }) { v in
-                        setGeometry(.star(points: points, innerRadius: v / 100, cornerRadius: corner))
-                    }
-                    .help("How far in the inner points sit, as a share of the outer ones")
+            cornerRadiusField
+            HStack(spacing: Theme.space8) {
+                UnitField(unit: "Points", value: Double(points), step: 0.2, accepts: { $0 >= 3 && $0 <= 60 }) { v in
+                    setGeometry(.star(points: Int(v.rounded()), innerRadius: inner, cornerRadius: corner))
                 }
+                .help("How many points, from 3 to 60")
+                UnitField(unit: "Inner", value: inner * 100, decimals: 1, suffix: "%", accepts: { $0 >= 0 }) { v in
+                    setGeometry(.star(points: points, innerRadius: v / 100, cornerRadius: corner))
+                }
+                .help("How far in the inner points sit, as a share of the outer ones")
             }
         case .ellipse(let arc):
-            rotationAlone
             // One joined field, as Figma has it: where the slice starts, how
             // much of a full turn it sweeps, and the hole in the middle.
             JoinedFields {
@@ -316,19 +367,38 @@ struct LayerInspector: View {
                           accepts: { $0 >= 0 && $0 <= 100 }) { v in
                     setGeometry(.ellipse(arc: EllipseArc(start: arc.start, end: arc.start + v / 100 * 360, innerRadius: arc.innerRadius)))
                 }
-                .frame(width: 62)
+                .frame(width: Theme.arcSweepField)
                 .help("Sweep: how much of a full turn the slice goes round. 100% is the whole ellipse.")
                 UnitField(corner: 0, value: arc.innerRadius * 100, decimals: 1, suffix: "%", accepts: { $0 >= 0 && $0 < 100 }) { v in
                     setGeometry(.ellipse(arc: EllipseArc(start: arc.start, end: arc.end, innerRadius: v / 100)))
                 }
-                .frame(width: 48)
+                .frame(width: Theme.arcRatioField)
                 .help("Ratio: the hole in the middle, as a share of the ellipse. 0% is solid, 80% a thin ring.")
             }
         case .path:
-            rotationAndRadius
+            cornerRadiusField
         case .line:
-            rotationAlone
+            EmptyView()
         }
+    }
+
+    /// Every corner's radius as one slider, from square to fully round.
+    private func radiusSlider(_ radius: Double) -> some View {
+        let roundest = max(min(layer.size.width, layer.size.height) / 2, 1)
+        return SliderRow(label: "Radius", value: radius, range: 0...roundest,
+                         readout: { UnitField.trimmed($0, 1) },
+                         onChange: { v in
+                             // As a typed radius goes, Path actions following.
+                             let project = controller.project
+                             guard let l = project.layer(withID: layer.id) else { return }
+                             let (edited, moved) = CornerEditing.setting(max(v.rounded(), 0), at: nil, of: l, actions: project.actions)
+                             let update = controller.layerUpdate([edited])
+                             controller.update(moved.isEmpty ? update : .batch([update, .updateActions(moved)], name: "Corner Radius"))
+                         },
+                         onBegin: { controller.begin("Corner Radius") },
+                         onEnd: { controller.end() },
+                         commit: { v in controller.setCornerRadius(max(v, 0), of: layer.id, at: nil) })
+            .help("Corner radius, in pixels")
     }
 
     /// The points picked on this layer's points, nil when none are.
@@ -416,69 +486,6 @@ extension Layer {
     }
 }
 
-/// The anchor in the button column beside X and Y (26 November 2026; a box
-/// of nine points across half the panel before): nine dots, the anchor's
-/// lit, which raise the picker on a card.
-private struct AnchorButton: View {
-    let layer: Layer
-    let controller: EditorController
-
-    @Environment(MenuHost.self) private var menus
-    @State private var frame: CGRect = .zero
-    @State private var hovering = false
-
-    private let fractions: [Double] = [0, 0.5, 1]
-
-    var body: some View {
-        let chosen = layer.anchorFraction
-        Button {
-            let id = layer.id
-            // Under the button, its right edge on the button's.
-            menus.showPopup(at: CGPoint(x: frame.maxX - Theme.anchorCard, y: frame.maxY + Theme.space4)) {
-                AnchorCard(layerID: id, controller: controller)
-            }
-        } label: {
-            VStack(spacing: Theme.space3) {
-                ForEach(fractions, id: \.self) { fy in
-                    HStack(spacing: Theme.space3) {
-                        ForEach(fractions, id: \.self) { fx in
-                            Circle()
-                                .fill(chosen.map { $0.0 == fx && $0.1 == fy } ?? false ? Theme.textPrimary
-                                      : hovering ? Theme.textSecondary : Theme.textTertiary)
-                                .frame(width: Theme.anchorDot, height: Theme.anchorDot)
-                        }
-                    }
-                }
-            }
-            .frame(width: Theme.control, height: Theme.control)
-            .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(hovering ? Theme.panelRaised : .clear))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
-        .help("Anchor: the point the layer turns and scales about")
-        .accessibilityLabel("Anchor")
-    }
-}
-
-/// The nine anchor points on a card, reading the layer afresh so the lit
-/// point follows each pick.
-private struct AnchorCard: View {
-    let layerID: UUID
-    let controller: EditorController
-
-    var body: some View {
-        PopupCard(title: "Anchor", width: Theme.anchorCard) {
-            if let layer = controller.project.layer(withID: layerID) {
-                AnchorPicker(chosen: layer.anchorFraction) { fx, fy in
-                    controller.edit(layerID) { l in l.moveAnchor(to: Vec2(l.size.width * fx, l.size.height * fy)) }
-                }
-            }
-        }
-    }
-}
-
 /// The nine places an anchor can go, as a small box: its corners, the
 /// middles of its edges and its centre. The chosen one is filled; an anchor
 /// dragged anywhere else on the canvas leaves none chosen.
@@ -538,29 +545,35 @@ private struct AnchorDot: View {
 
 // MARK: - Appearance
 
-/// How a layer mixes with what is behind it and how much of it shows, side
-/// by side, as Figma has them. For one layer or several.
+/// How a layer mixes with what is behind it, as a select row, and how much
+/// of it shows, as a slider, as the DialKit screens have them. For one layer
+/// or several.
 struct BlendOpacityRow: View {
     let blend: String
     let entries: () -> [MenuEntry]
     let opacity: Double
     var isGroup = false
-    /// Several layers of different opacity: the field reads Mixed.
+    /// Several layers of different opacity: the slider reads Mixed.
     var mixedOpacity = false
-    /// 0 to 1.
+    /// A drag of the slider: one undo step from `onBegin` to `onEnd`,
+    /// `onChange` its steps, 0 to 1.
+    var onBegin: () -> Void = {}
+    var onChange: ((Double) -> Void)? = nil
+    var onEnd: () -> Void = {}
+    /// 0 to 1, as one undo step.
     let setOpacity: (Double) -> Void
 
     var body: some View {
-        HStack(spacing: Theme.space8) {
-            MenuField(value: blend, entries: entries, height: Theme.control)
+        VStack(alignment: .leading, spacing: Theme.rowGap) {
+            MenuRow(label: "Blend", value: blend, entries: entries)
                 .help(isGroup ? "Blend: how the layer mixes with what is behind it. At Normal, what is inside a group or frame blends through it, as Figma's Pass Through does."
                               : "Blend: how the layer mixes with what is behind it")
-            UnitField(value: opacity * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 },
-                      mixed: mixedOpacity) { v in
-                setOpacity(v / 100)
-            }
-            .frame(width: Theme.labelWidth)
-            .help("Opacity")
+            SliderRow(label: "Opacity", value: opacity * 100, range: 0...100,
+                      readout: { mixedOpacity ? UnitField.mixedText : "\(Int($0.rounded()))%" },
+                      onChange: { v in (onChange ?? setOpacity)(min(max(v, 0), 100) / 100) },
+                      onBegin: onBegin, onEnd: onEnd,
+                      commit: { v in setOpacity(min(max(v, 0), 100) / 100) })
+                .help("Opacity")
         }
     }
 }
@@ -657,8 +670,9 @@ struct FillSection: View {
 
     var body: some View {
         let mixed = isMixed
-        VStack(alignment: .leading, spacing: Theme.space8) {
-            HeaderRow(title: "Fill") {
+        let fold = Fold.section("Fill", hasRows: !shape.fills.isEmpty || mixed)
+        VStack(alignment: .leading, spacing: Theme.rowGap) {
+            HeaderRow(title: "Fill", fold: fold) {
                 IconButton(icon: .plus, help: mixed ? "Replace the different fills with one"
                                                     : shape.fills.isEmpty ? "Add a fill" : "Add a fill on top") {
                     editShape { s in
@@ -672,7 +686,8 @@ struct FillSection: View {
                     }
                 }
             }
-            if mixed {
+            if !fold.isOpen {
+            } else if mixed {
                 MixedRow().gridBody()
             } else {
                 // Every fill, the top one (the one a Colour action changes)
@@ -684,7 +699,7 @@ struct FillSection: View {
                 }
             }
         }
-        .sectionPadding(empty: shape.fills.isEmpty && !mixed)
+        .sectionPadding(empty: (shape.fills.isEmpty && !mixed) || !fold.isOpen)
     }
 
     private func fillRows(_ fill: Fill, index i: Int) -> some View {
@@ -858,8 +873,9 @@ struct StrokeSection: View {
 
     var body: some View {
         let mixed = isMixed
-        VStack(alignment: .leading, spacing: Theme.space8) {
-            HeaderRow(title: "Stroke") {
+        let fold = Fold.section("Stroke", hasRows: !shape.strokes.isEmpty || mixed)
+        VStack(alignment: .leading, spacing: Theme.rowGap) {
+            HeaderRow(title: "Stroke", fold: fold) {
                 IconButton(icon: .plus, help: mixed ? "Replace the different strokes with one"
                                                     : shape.strokes.isEmpty ? "Add a stroke" : "Add a stroke on top") {
                     editShape { s in
@@ -875,7 +891,8 @@ struct StrokeSection: View {
                     }
                 }
             }
-            if mixed {
+            if !fold.isOpen {
+            } else if mixed {
                 MixedRow().gridBody()
             } else {
                 // Every stroke, the one drawn on top first (4 October 2026;
@@ -887,7 +904,7 @@ struct StrokeSection: View {
                 }
             }
         }
-        .sectionPadding(empty: shape.strokes.isEmpty && !mixed)
+        .sectionPadding(empty: (shape.strokes.isEmpty && !mixed) || !fold.isOpen)
     }
 
     @ViewBuilder private func strokeRows(_ stroke: Stroke, index i: Int) -> some View {
@@ -1361,8 +1378,10 @@ struct EffectsSection: View {
     private var showsBend: Bool { canWarp && (addedBend || t.bend != .zero) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.space8) {
-            HeaderRow(title: "Effects") {
+        let empty = layer.effects.isEmpty && !isMixed && !showsSkew && !showsTilt && !showsBend
+        let fold = Fold.section("Effects", hasRows: !empty)
+        VStack(alignment: .leading, spacing: Theme.rowGap) {
+            HeaderRow(title: "Effects", fold: fold) {
                 IconButton(icon: .plus, help: isMixed ? "Replace the different effects with one"
                                               : others.isEmpty ? "Add a shadow, a blur, glass, a skew, a tilt or a bend"
                                               : "Add a shadow, a blur or glass") {
@@ -1391,19 +1410,21 @@ struct EffectsSection: View {
                 }
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { addFrame = $0 }
             }
-            if isMixed {
-                MixedRow().gridBody()
-            } else {
-                ForEach(Array(layer.effects.enumerated()), id: \.element.id) { index, effect in
-                    effectRows(effect, index: index)
-                        .gridBody()
+            if fold.isOpen {
+                if isMixed {
+                    MixedRow().gridBody()
+                } else {
+                    ForEach(Array(layer.effects.enumerated()), id: \.element.id) { index, effect in
+                        effectRows(effect, index: index)
+                            .gridBody()
+                    }
                 }
+                if showsSkew { skewRows.gridBody() }
+                if showsTilt { tiltRows.gridBody() }
+                if showsBend { bendRows.gridBody() }
             }
-            if showsSkew { skewRows.gridBody() }
-            if showsTilt { tiltRows.gridBody() }
-            if showsBend { bendRows.gridBody() }
         }
-        .sectionPadding(empty: layer.effects.isEmpty && !isMixed && !showsSkew && !showsTilt && !showsBend)
+        .sectionPadding(empty: empty || !fold.isOpen)
     }
 
     private func titleRow(_ icon: Icon, _ title: String, remove: @escaping () -> Void) -> some View {
