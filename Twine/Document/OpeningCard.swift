@@ -74,7 +74,7 @@ enum OpeningCard {
         let name: String
 
         var body: some View {
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 Ring().frame(width: Theme.loader, height: Theme.loader)
                 Text("Opening \(name)")
                     .font(ThemeFont.label)

@@ -32,7 +32,7 @@ struct ActionInspector: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HeaderRow(title: actions.count == 1 ? first.name : sameKind ? kindName : "Actions") {}
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: Theme.space10) {
                 TimingFields(controller: controller, actions: actions)
                 // A Play runs at the clip's own speed, and a shake keeps its
                 // jolts' own easing, so neither has any.
@@ -114,7 +114,7 @@ private struct AddAnother: View {
     @State private var newFrame: CGRect = .zero
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: Theme.space6) {
             PanelButton(title: "New Action", icon: .plus, disabled: newActions.isEmpty) {
                 menus.show(newActions, at: CGPoint(x: newFrame.minX, y: newFrame.maxY + 4))
             }
@@ -148,7 +148,7 @@ private struct PresetFields: View {
     private var own: PresetAction { PresetRecipe.defaults(kind) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.space10) {
             // A preset that brings a layer on turns into its twin that takes
             // it off, keeping its settings.
             if let other = kind.reversed {
@@ -170,7 +170,7 @@ private struct PresetFields: View {
         Text("Text animation")
             .font(ThemeFont.labelStrong)
             .foregroundStyle(Theme.textPrimary)
-            .padding(.top, 4)
+            .padding(.top, Theme.space4)
         LabeledRow(label: "Apply to") {
             MenuField(value: Self.title(settings.unit), entries: {
                 ([nil] + TextUnit.allCases.map(Optional.some)).map { unit in
@@ -257,7 +257,7 @@ private struct PresetFields: View {
         switch control {
         case .direction:
             // Its name above, as Easing's is: four choices need the width.
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Theme.space6) {
                 Text(directionLabel)
                     .font(ThemeFont.label)
                     .foregroundStyle(Theme.textSecondary)
@@ -305,7 +305,7 @@ private struct PresetFields: View {
             .help(kind.entering == false ? "Fades out as it goes." : "Fades in as it comes on.")
         case .corner:
             // Its name above, as Direction's is.
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Theme.space6) {
                 Text("Corner")
                     .font(ThemeFont.label)
                     .foregroundStyle(Theme.textSecondary)
@@ -401,7 +401,7 @@ private struct TimingFields: View {
         let first = actions[0]
         // The names sit above the fields, so the fields keep their whole
         // width for the number.
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: Theme.space8) {
             named("Start") {
                 UnitField(value: frames ? Double(rate.frame(at: first.start)) : first.start,
                           decimals: frames ? 0 : 2, suffix: frames ? "f" : "s", accepts: { $0 >= 0 },
@@ -427,7 +427,7 @@ private struct TimingFields: View {
 
     /// A field with its name above it, as a `StackedRow` has.
     private func named(_ label: String, @ViewBuilder field: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.space6) {
             Text(label)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
@@ -451,7 +451,7 @@ private struct MotionBlurFields: View {
     private var amount: Double { actions.first?.motionBlur ?? Action.standardMotionBlur }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.space6) {
             ToggleRow(label: "Motion blur", isOn: isOn) {
                 let on = !isOn
                 controller.editActions(on ? "Motion Blur On" : "Motion Blur Off") { a in
@@ -485,17 +485,17 @@ private struct EasingFields: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.space6) {
             Text("Easing")
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
                 .lineLimit(1)
             // A real button, so a click always lands.
             Button(action: open) {
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space8) {
                     if let shared {
                         EasingPath(easing: shared, low: -0.5, high: 1.5)
-                            .stroke(Theme.textSecondary, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                            .stroke(Theme.textSecondary, style: StrokeStyle(lineWidth: Theme.line, lineCap: .round, lineJoin: .round))
                             .frame(width: 10, height: 20)
                     }
                     Text(shared?.title ?? "Mixed")
@@ -503,10 +503,10 @@ private struct EasingFields: View {
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
                     Spacer(minLength: 0)
-                    IconView(.chevronDown, size: 13)
+                    IconView(.chevronDown, size: Theme.iconSmall)
                         .foregroundStyle(Theme.textTertiary)
                 }
-                .padding(.horizontal, 8)
+                .padding(.horizontal, Theme.space8)
                 .frame(height: Theme.panelRow + 4)
                 .frame(maxWidth: .infinity)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
@@ -517,7 +517,7 @@ private struct EasingFields: View {
             .onHover { hovering = $0 }
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, Theme.space2)
     }
 
     /// The easing card, beside the inspector towards the canvas, level with
@@ -572,7 +572,7 @@ private struct ValueFields: View {
     let inherited: LayerState?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.space10) {
             switch action.spec {
             case .move(let m): move(m)
             case .scale(let s): scale(s)
@@ -961,7 +961,7 @@ private struct ValueFields: View {
             }
         } else {
             if !isometric {
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 OptionalField(unit: "X", value: space.map { $0.vanishingPoint.x * 100 }, placeholder: placeholder.vanishingPoint.x * 100,
                               decimals: 0, suffix: "%") { v in set { $0.vanishingPoint.x = (v ?? placeholder.vanishingPoint.x * 100) / 100 } }
                     .help("Where across the frame the camera looks straight at")
@@ -970,7 +970,7 @@ private struct ValueFields: View {
                     .help("Where down the frame the camera looks straight at")
             }
             }
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 OptionalField(unit: "Orbit X", value: space?.orbit.x, placeholder: placeholder.orbit.x, decimals: 1,
                               suffix: "°") { v in set { $0.orbit.x = v ?? placeholder.orbit.x } }
                     .help("Tips the whole space about the frame's middle")
@@ -978,7 +978,7 @@ private struct ValueFields: View {
                               suffix: "°") { v in set { $0.orbit.y = v ?? placeholder.orbit.y } }
                     .help("Turns the whole space about the frame's middle: 360° spins a ring once")
             }
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 OptionalField(unit: "Fade", value: space.map { $0.depthFade * 100 }, placeholder: placeholder.depthFade * 100,
                               decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
                     set { $0.depthFade = (v ?? placeholder.depthFade * 100) / 100 }
@@ -988,7 +988,7 @@ private struct ValueFields: View {
                               suffix: "px", accepts: { $0 >= 0 }) { v in set { $0.depthBlur = v ?? placeholder.depthBlur } }
                     .help("Depth blur: how much blurrier layers grow behind the frame")
             }
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 OptionalField(unit: "Backs", value: space.map { $0.backOpacity * 100 }, placeholder: placeholder.backOpacity * 100,
                               decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
                     set { $0.backOpacity = (v ?? placeholder.backOpacity * 100) / 100 }

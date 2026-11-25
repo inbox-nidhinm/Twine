@@ -88,46 +88,46 @@ nonisolated final class CanvasOverlay: CALayer {
         for l in [hover, outlines, shapes, union] {
             l.fillColor = nil
             l.strokeColor = Self.accent
-            l.lineWidth = 1
+            l.lineWidth = Theme.hairline
         }
         marquee.fillColor = NSColor(Theme.accent).withAlphaComponent(0.08).cgColor
         marquee.strokeColor = Self.accent
-        marquee.lineWidth = 1
+        marquee.lineWidth = Theme.hairline
         handles.fillColor = Self.handle
         handles.strokeColor = Self.accent
-        handles.lineWidth = 1
+        handles.lineWidth = Theme.hairline
         anchor.fillColor = Self.handle
         anchor.strokeColor = Self.accent
-        anchor.lineWidth = 1
+        anchor.lineWidth = Theme.hairline
         motion.fillColor = nil
         motion.strokeColor = Self.accent
-        motion.lineWidth = 1.5
+        motion.lineWidth = Theme.line
         motion.lineDashPattern = [5, 4]
         motionArms.fillColor = nil
         motionArms.strokeColor = NSColor(Theme.accent).withAlphaComponent(0.6).cgColor
-        motionArms.lineWidth = 1
+        motionArms.lineWidth = Theme.hairline
         motionStart.fillColor = Self.handle
         motionStart.strokeColor = Self.accent
-        motionStart.lineWidth = 1.5
+        motionStart.lineWidth = Theme.line
         motionEnd.fillColor = Self.accent
         motionEnd.strokeColor = Self.handle
-        motionEnd.lineWidth = 1.5
+        motionEnd.lineWidth = Theme.line
         motionHandles.fillColor = Self.handle
         motionHandles.strokeColor = Self.accent
-        motionHandles.lineWidth = 1
+        motionHandles.lineWidth = Theme.hairline
         textSelection.fillColor = NSColor(Theme.accent).withAlphaComponent(0.3).cgColor
         textMarked.fillColor = nil
         textMarked.strokeColor = Self.accent
-        textMarked.lineWidth = 1.5
+        textMarked.lineWidth = Theme.line
         caret.fillColor = Self.accent
         for l in [pathLine, pathRubber] {
             l.fillColor = nil
             l.strokeColor = Self.accent
-            l.lineWidth = 1
+            l.lineWidth = Theme.hairline
         }
         pathArms.fillColor = nil
         pathArms.strokeColor = NSColor(Theme.accent).withAlphaComponent(0.7).cgColor
-        pathArms.lineWidth = 1
+        pathArms.lineWidth = Theme.hairline
         cropPicture.anchorPoint = .zero
         cropPicture.actions = Self.none.merging(["transform": NSNull(), "opacity": NSNull()]) { a, _ in a }
         cropPicture.contentsGravity = .resize
@@ -135,36 +135,36 @@ nonisolated final class CanvasOverlay: CALayer {
         cropHolder.addSublayer(cropPicture)
         cropLine.fillColor = nil
         cropLine.strokeColor = Self.accent
-        cropLine.lineWidth = 1
+        cropLine.lineWidth = Theme.hairline
         cropLine.lineDashPattern = [4, 3]
         cropHandles.fillColor = Self.handle
         cropHandles.strokeColor = Self.accent
-        cropHandles.lineWidth = 1
+        cropHandles.lineWidth = Theme.hairline
         pathHandles.fillColor = Self.handle
         pathHandles.strokeColor = Self.accent
-        pathHandles.lineWidth = 1
+        pathHandles.lineWidth = Theme.hairline
         pathPoints.fillColor = Self.handle
         pathPoints.strokeColor = Self.accent
-        pathPoints.lineWidth = 1.5
+        pathPoints.lineWidth = Theme.line
         pathSelected.fillColor = Self.accent
         pathSelected.strokeColor = Self.handle
-        pathSelected.lineWidth = 1.5
+        pathSelected.lineWidth = Theme.line
         for l in [guides, gapLines] {
             l.fillColor = nil
             l.strokeColor = Self.guide
-            l.lineWidth = 1
+            l.lineWidth = Theme.hairline
         }
         // The gradient's line is white over a soft dark one, so it reads on
         // any colours under it.
         gradientShade.fillColor = nil
         gradientShade.strokeColor = CGColor(gray: 0, alpha: 0.35)
-        gradientShade.lineWidth = 3
+        gradientShade.lineWidth = Theme.lineShade
         gradientLine.fillColor = nil
         gradientLine.strokeColor = Self.handle
-        gradientLine.lineWidth = 1.5
+        gradientLine.lineWidth = Theme.line
         gradientEnds.fillColor = Self.handle
         gradientEnds.strokeColor = Self.accent
-        gradientEnds.lineWidth = 1.5
+        gradientEnds.lineWidth = Theme.line
     }
 
     private static let guide = NSColor(Theme.guide).cgColor

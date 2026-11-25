@@ -64,7 +64,7 @@ struct SceneNameCard: View {
                 .textFieldStyle(.plain)
                 .font(ThemeFont.label)
                 .focused($typing)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, Theme.space8)
                 .frame(height: Theme.control)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
                 .focusRing(typing)

@@ -64,6 +64,7 @@ struct BarButton: View {
         .disabled(disabled)
         .onHover { hovering = $0 }
         .help(help)
+        .accessibilityLabel(help)
     }
 }
 
@@ -79,13 +80,13 @@ struct PanelButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 5) {
+            HStack(spacing: Theme.space5) {
                 if let icon { IconView(icon, size: 16) }
                 Text(title).font(ThemeFont.label)
                 Spacer(minLength: 0)
             }
             .foregroundStyle(disabled ? Theme.textTertiary.opacity(0.45) : Theme.textSecondary)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, Theme.space8)
             .frame(height: Theme.button)
             .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
                 .fill(hovering && !disabled ? Theme.panelRaised : Theme.panelRaised.opacity(0.5)))
@@ -156,5 +157,6 @@ struct IconButton: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help(help)
+        .accessibilityLabel(help)
     }
 }

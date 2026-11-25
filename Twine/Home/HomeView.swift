@@ -118,7 +118,7 @@ struct HomeView: View {
                 .displayTitle(24)
                 .foregroundStyle(Theme.textPrimary)
                 .padding(.horizontal, Theme.panelPad)
-                .padding(.bottom, 12)
+                .padding(.bottom, Theme.space12)
                 .frame(height: titleBlock - Theme.floatInset, alignment: .bottomLeading)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -181,7 +181,7 @@ struct HomeView: View {
     private func sidebarRow(_ title: String, icon: Icon? = nil, dim: Bool = false,
                             on: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 7) {
+            HStack(spacing: Theme.space7) {
                 if let icon { IconView(icon, size: 16) }
                 Text(title)
                     .font(ThemeFont.label)
@@ -275,7 +275,7 @@ struct HomeView: View {
     /// A row lights up while a card is held over it.
     private func dropHighlight(_ url: URL) -> some View {
         RoundedRectangle(cornerRadius: Theme.radiusRow)
-            .strokeBorder(Theme.accent, lineWidth: 1.5)
+            .strokeBorder(Theme.accent, lineWidth: Theme.line)
             .background(RoundedRectangle(cornerRadius: Theme.radiusRow).fill(Theme.rowCurrent))
             .padding(.horizontal, Theme.rowGap)
             .opacity(dropTarget == url ? 1 : 0)
@@ -314,7 +314,7 @@ struct HomeView: View {
             // Wider than the title's own inset: a filled control that close to
             // the edge reads as though it is about to fall off it.
             .padding(.trailing, margin + 10)
-            .padding(.bottom, 12)
+            .padding(.bottom, Theme.space12)
             .frame(height: titleBlock, alignment: .bottom)
             .contentShape(Rectangle())
             .gesture(WindowDragGesture())
@@ -341,8 +341,8 @@ struct HomeView: View {
     private var newProjectTile: some View {
         let side = card - cardPad * 2
         return Button { library.newProject() } label: {
-            VStack(spacing: 8) {
-                IconView(.plus, size: 20)
+            VStack(spacing: Theme.space8) {
+                IconView(.plus, size: Theme.icon)
                 Text("New Project").font(ThemeFont.label)
             }
             .foregroundStyle(Theme.textSecondary)
@@ -373,10 +373,10 @@ struct HomeView: View {
                         .font(ThemeFont.label)
                         .foregroundStyle(Theme.textPrimary)
                         .focused($renameFocused)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, Theme.space6)
                         .frame(height: Theme.panelRow - 2)
                         .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
-                        .padding(.top, 8)
+                        .padding(.top, Theme.space8)
                         .onAppear { DispatchQueue.main.async { renameFocused = true } }
                         .onSubmit { commitRename(item) }
                         .onExitCommand { renaming = nil }
@@ -386,14 +386,14 @@ struct HomeView: View {
                         .font(ThemeFont.label)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
-                        .padding(.top, 10)
+                        .padding(.top, Theme.space10)
                     // The date only; in All Projects, after the folder it is in.
                     Text([library.selectedFolder == nil ? item.folder?.lastPathComponent : nil,
                           item.modified.formatted(date: .abbreviated, time: .omitted)].compactMap { $0 }.joined(separator: " · "))
                         .font(ThemeFont.caption)
                         .foregroundStyle(Theme.textTertiary)
                         .lineLimit(1)
-                        .padding(.top, 3)
+                        .padding(.top, Theme.space3)
                 }
             }
             .padding(.horizontal, captionInset)
@@ -407,6 +407,12 @@ struct HomeView: View {
         .contentShape(Rectangle())
         .onHover { hovered = $0 ? item.url : (hovered == item.url ? nil : hovered) }
         .onTapGesture { if renaming != item.url { library.open(item) } }
+        // A tap gesture, as the card is also dragged into folders: told to
+        // accessibility as a button that opens the project.
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(item.name)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { if renaming != item.url { library.open(item) } }
         .draggable(item.url)
         .rightClickMenu {
             [

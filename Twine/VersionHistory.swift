@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 269
+    static let pushes = 270
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -127,6 +127,9 @@ enum VersionHistory {
             "A project file with two layers or two actions sharing an id is mended as it opens (edits to one used to land on the other, and dragging such a bar stopped the app), as are a scene of no length, an absurd frame rate, and a sound or group marked as a mask. A project whose document is a link or a folder is refused with a message, and a layer named with an enormous number no longer stops the next layer being named.",
             "Moving a folder to the Trash from the home screen asks first when the folder holds anything that is not a Twine project, and says how much: any ordinary folder in the projects folder shows as one of Twine's, and one click sent it and everything in it to the Trash.",
         ], misc: [
+            "Every icon-only control has a name for VoiceOver (its tooltip's words), the anchor's nine points have tooltips, and layer rows and home screen cards can be pressed through accessibility.",
+            "The shortcuts card lists what it left out (the arrow keys in number fields and dragging across them, pinch to zoom, Select All, Delete, Return to finish a path or a crop, clicks in the layers panel) and says which keys are for Design or Animate only. While it is up, keys no longer act on the canvas behind it.",
+            "Every gap, line weight and small icon size in the views now comes from the theme, as colours and corners already did; nothing looks different.",
             "A build made straight from Xcode carries the same version number as one made by the build script; it used to say 1.",
             "Settings is in the Twine menu (⌘,). File > Duplicate is named Duplicate Project, and Home is greyed out on the home screen.",
             "A new, empty project opens in Design, where the drawing tools are; a project with layers still opens in Animate.",
@@ -504,7 +507,7 @@ struct VersionHistoryCard: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: Theme.space6) {
                         Text("Version History")
                             .font(ThemeFont.labelStrong)
                             .foregroundStyle(Theme.textPrimary)
@@ -524,7 +527,7 @@ struct VersionHistoryCard: View {
                     VStack(alignment: .leading, spacing: Theme.readingBlockGap) {
                         ForEach(VersionHistory.builds) { build in
                             VStack(alignment: .leading, spacing: Theme.readingTitleGap) {
-                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                HStack(alignment: .firstTextBaseline, spacing: Theme.space8) {
                                     Text(build.title)
                                         .displayTitle(20)
                                         .foregroundStyle(Theme.textPrimary)
@@ -540,7 +543,7 @@ struct VersionHistoryCard: View {
                                                 .font(ThemeFont.labelStrong)
                                                 .foregroundStyle(Theme.textPrimary)
                                             ForEach(section.items, id: \.self) { change in
-                                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                                HStack(alignment: .firstTextBaseline, spacing: Theme.space8) {
                                                     Circle().fill(Theme.textTertiary).frame(width: 3, height: 3)
                                                         .alignmentGuide(.firstTextBaseline) { $0[.bottom] + 3 }
                                                     Text(change)

@@ -48,7 +48,7 @@ struct LayersPanel: View {
                                 .id(row.id)
                         }
                     }
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, Theme.space4)
                     .padding(.bottom, Theme.panelPad)
                 }
                 .frame(maxHeight: .infinity)
@@ -100,7 +100,7 @@ struct LayersPanel: View {
         let soloed = soloedLayers
         if !soloed.isEmpty {
             Button { controller.perform(.setSoloed(soloed, false)) } label: {
-                IconView(.solo, size: 15)
+                IconView(.solo, size: Theme.iconRow)
                     .foregroundStyle(Theme.textPrimary)
                     .frame(width: Theme.rowIconButton, height: Theme.listRow)
                     .contentShape(Rectangle())
@@ -159,7 +159,7 @@ struct LayersPanel: View {
     // MARK: The file
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: Theme.space2) {
             if renamingFile {
                 TextField("", text: $fileDraft)
                     .textFieldStyle(.plain)
@@ -175,11 +175,11 @@ struct LayersPanel: View {
                     .font(ThemeFont.title)
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
+                    .padding(.horizontal, Theme.space4)
+                    .padding(.vertical, Theme.space1)
                     .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
                         .fill(nameHover ? Theme.rowHover : .clear))
-                    .padding(.horizontal, -4)
+                    .padding(.horizontal, -Theme.space4)
                     .contentShape(Rectangle())
                     .onHover { nameHover = $0 }
                     .help("Rename")
@@ -194,7 +194,7 @@ struct LayersPanel: View {
                 .lineLimit(1)
         }
         .padding(.horizontal, Theme.panelPad)
-        .padding(.top, 44)
+        .padding(.top, Theme.space44)
         .padding(.bottom, Theme.panelPad)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
@@ -250,7 +250,7 @@ private struct LayerRow: View {
 
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Theme.space4) {
             Color.clear.frame(width: CGFloat(row.depth) * 12, height: 1)
             if layer.isGroup {
                 Button(action: toggleExpanded) {
@@ -265,7 +265,7 @@ private struct LayerRow: View {
                 Color.clear.frame(width: Theme.disclosure, height: Theme.hairline)
             }
             // An empty slot reads as a picture still to come.
-            IconView(isMask ? .mask : row.isSlot && layer.slotMedia == nil ? .image : layer.icon, size: 15)
+            IconView(isMask ? .mask : row.isSlot && layer.slotMedia == nil ? .image : layer.icon, size: Theme.iconRow)
                 .opacity(row.isSlot && layer.slotMedia == nil ? 0.45 : 1)
                 .foregroundStyle(selected ? Theme.textPrimary : Theme.textTertiary)
                 .help(isMask ? "A mask: the layers in front of it in its group show only where it draws" : "")
@@ -287,8 +287,8 @@ private struct LayerRow: View {
                 }
             }
         }
-        .padding(.leading, 4)
-        .padding(.trailing, 2)
+        .padding(.leading, Theme.space4)
+        .padding(.trailing, Theme.space2)
         .frame(height: Theme.listRow)
         .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
             .fill(selected ? Theme.rowSelected : lit ? Theme.rowHover : .clear))
@@ -298,7 +298,7 @@ private struct LayerRow: View {
         // result to be guessed.
         .overlay(alignment: dropEdge == .below ? .bottom : .top) {
             switch dropEdge {
-            case .into: RoundedRectangle(cornerRadius: Theme.radiusRow).strokeBorder(Theme.accent, lineWidth: 1.5)
+            case .into: RoundedRectangle(cornerRadius: Theme.radiusRow).strokeBorder(Theme.accent, lineWidth: Theme.line)
             case .above, .below: Capsule().fill(Theme.accent).frame(height: 2)
             case nil: EmptyView()
             }
@@ -317,12 +317,20 @@ private struct LayerRow: View {
         .onTapGesture {
             if (NSApp.currentEvent?.clickCount ?? 1) >= 2 { editor.renaming = layer.id } else { click() }
         }
+        // The row is a tap gesture, not a button (it is also dragged, and
+        // holds buttons of its own), so it is told to accessibility as one:
+        // VoiceOver reads the layer's name and can press it, and so can a
+        // test that presses by accessibility.
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(layer.name)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { click() }
         .rightClickMenu(menu)
         .draggable(dragged.map(\.uuidString).joined(separator: ",")) {
             Text(dragged.count > 1 ? "\(dragged.count) layers" : layer.name)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textPrimary)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, Theme.space8)
                 .frame(height: Theme.control)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
         }
@@ -373,13 +381,14 @@ private struct LayerRow: View {
 
     private func toggle(_ icon: Icon, on: Bool, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            IconView(icon, size: 15)
+            IconView(icon, size: Theme.iconRow)
                 .foregroundStyle(on ? Theme.textPrimary : Theme.textTertiary)
                 .frame(width: Theme.rowIconButton, height: Theme.listRow)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(help)
+        .accessibilityLabel(help)
     }
 
     private func edge(at location: CGPoint) -> DropEdge {

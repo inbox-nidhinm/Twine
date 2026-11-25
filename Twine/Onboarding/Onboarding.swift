@@ -160,14 +160,14 @@ struct OnboardingView: View {
             default: EmptyView()
             }
 
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 OnboardingButton(label: Self.buttons[state.page], filled: true, action: advance)
                 // Only where there is something to go back to.
                 if state.page > 0 {
                     OnboardingButton(label: "Back", filled: false, action: retreat)
                 }
             }
-            .padding(.top, 16)
+            .padding(.top, Theme.space16)
         }
         .padding(Theme.onboardingPad)
         .frame(width: panelWidth, height: card.height, alignment: .topLeading)
@@ -179,8 +179,8 @@ struct OnboardingView: View {
     /// Where projects go. The path is the button.
     private var folderRow: some View {
         Button(action: chooseFolder) {
-            HStack(spacing: 8) {
-                IconView(.folder, size: 15)
+            HStack(spacing: Theme.space8) {
+                IconView(.folder, size: Theme.iconRow)
                     .foregroundStyle(Theme.textTertiary)
                 Text(Self.shortPath(folder))
                     .font(ThemeFont.label)
@@ -195,7 +195,7 @@ struct OnboardingView: View {
             // put their control's left edge where the buttons start.
             .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
                 .fill(folderHover ? Theme.panelHover : Theme.panelRaised)
-                .padding(.horizontal, -8))
+                .padding(.horizontal, -Theme.space8))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -206,13 +206,13 @@ struct OnboardingView: View {
     /// The five features. Clicking one changes the artwork and the sentence;
     /// going straight for the button is a fine way through too.
     private var featureList: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: Theme.space2) {
             ForEach(OnboardingFeature.allCases) { item in
                 Button {
                     withAnimation(.easeOut(duration: 0.2)) { state.feature = item }
                 } label: {
-                    HStack(spacing: 8) {
-                        IconView(item.icon, size: 15)
+                    HStack(spacing: Theme.space8) {
+                        IconView(item.icon, size: Theme.iconRow)
                         Text(item.label)
                             .font(ThemeFont.label)
                             .lineLimit(1)
@@ -223,7 +223,7 @@ struct OnboardingView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
                         .fill(item == state.feature ? Theme.rowSelected : hovered == item ? Theme.rowHover : .clear)
-                        .padding(.horizontal, -8))
+                        .padding(.horizontal, -Theme.space8))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -540,7 +540,7 @@ private struct OnboardingButton: View {
             Text(label)
                 .font(ThemeFont.labelStrong)
                 .foregroundStyle(filled ? Theme.textOnColor : Theme.textSecondary)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, Theme.space14)
                 .frame(height: Theme.onboardingButton)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(fill))
                 .contentShape(Rectangle())

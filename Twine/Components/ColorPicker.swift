@@ -42,7 +42,7 @@ struct ColorPicker: View {
                 .frame(height: Self.squareHeight)
             HueBar(hue: hsb.h, change: { hsb.h = $0; push() }, began: onBegin, ended: onEnd)
             AlphaBar(alpha: alpha, color: hsb.rgba(alpha: 1), change: { alpha = $0; push() }, began: onBegin, ended: onEnd)
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 EyedropperButton(pick: sample)
                 HexField(color: current, commit: take)
             }
@@ -151,7 +151,7 @@ private struct SaturationSquare: View {
                 Rectangle().fill(LinearGradient(colors: [.white, hue], startPoint: .leading, endPoint: .trailing))
                 Rectangle().fill(LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom))
                 Circle()
-                    .strokeBorder(Theme.pickerRing, lineWidth: 2)
+                    .strokeBorder(Theme.pickerRing, lineWidth: Theme.lineHeavy)
                     .background(Circle().fill(hsb.rgba(alpha: 1).opaque))
                     .shadow(color: Theme.pickerRingShadow, radius: 1)
                     .frame(width: ColorPicker.thumb, height: ColorPicker.thumb)
@@ -190,10 +190,10 @@ private struct PickerBar<Track: View>: View {
                 track()
                     .frame(height: ColorPicker.bar)
                     .clipShape(Capsule())
-                    .overlay(Capsule().strokeBorder(Theme.edge, lineWidth: 1))
+                    .overlay(Capsule().strokeBorder(Theme.edge, lineWidth: Theme.hairline))
                     .padding(.horizontal, ColorPicker.thumb / 2)
                 Circle()
-                    .strokeBorder(Theme.pickerRing, lineWidth: 2)
+                    .strokeBorder(Theme.pickerRing, lineWidth: Theme.lineHeavy)
                     .background(Circle().fill(thumbFill))
                     .shadow(color: Theme.pickerRingShadow, radius: 1)
                     .frame(width: ColorPicker.thumb, height: ColorPicker.thumb)
@@ -256,11 +256,11 @@ private struct DocumentSwatches: View {
     static let perRow = 8
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             Text("Document colours")
                 .font(ThemeFont.caption)
                 .foregroundStyle(Theme.textTertiary)
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: Self.perRow), spacing: 6) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Theme.space6), count: Self.perRow), spacing: Theme.space6) {
                 ForEach(Array(colors.enumerated()), id: \.offset) { _, c in
                     Swatch(color: c, isCurrent: c.near(current)) { pick(c) }
                 }
@@ -311,7 +311,7 @@ private struct EyedropperButton: View {
                 MainActor.assumeIsolated { pick(c) }
             }
         } label: {
-            IconView(.eyedropper, size: 15)
+            IconView(.eyedropper, size: Theme.iconRow)
                 .foregroundStyle(Theme.textSecondary)
                 .frame(width: Theme.control, height: Theme.control)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl)

@@ -53,12 +53,13 @@ struct ColorWell: View {
                 // The hairline answers the pointer, not the fill: a hover that
                 // tinted the square would be showing the wrong colour.
                 .overlay(RoundedRectangle(cornerRadius: size >= 40 ? Theme.radiusWell : Theme.radiusControl)
-                    .strokeBorder(hovering ? Theme.edgeHover : Theme.edge, lineWidth: 1))
+                    .strokeBorder(hovering ? Theme.edgeHover : Theme.edge, lineWidth: Theme.hairline))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+        .accessibilityLabel(title)
     }
 }
 
@@ -74,7 +75,7 @@ struct HexField: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: Theme.space7) {
             Text("#")
                 .font(ThemeFont.unit)
                 .foregroundStyle(Theme.textTertiary)
@@ -94,7 +95,7 @@ struct HexField: View {
                 .onAppear { text = color.hex6 }
                 .onChange(of: color) { old, now in if !focused || text == old.hex6 { text = now.hex6 } }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, Theme.space8)
         .frame(height: Theme.control)
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))

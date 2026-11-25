@@ -34,8 +34,8 @@ struct GradientStopsEditor<BarButton: View, FirstRowButton: View>: View {
     @ViewBuilder var firstRowButton: () -> FirstRowButton
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
+            HStack(spacing: Theme.space6) {
                 GradientBar(gradient: gradient, picked: picked, pick: pick, edit: edit)
                 if let picked, gradient.stops.indices.contains(picked) {
                     UnitField(value: gradient.stops[picked].position * 100, decimals: 0, suffix: "%",
@@ -72,7 +72,7 @@ struct GradientStopsEditor<BarButton: View, FirstRowButton: View>: View {
             g.stops[index].color = c
             return g
         }
-        return HStack(spacing: 6) {
+        return HStack(spacing: Theme.space6) {
             ColorWell(color: stop.color, size: Theme.control, title: title,
                       onChange: { edit.live(recoloured($0)) },
                       onBegin: { pick(index); edit.begin("Colour") }, onEnd: edit.end)
@@ -124,7 +124,7 @@ private struct GradientBar: View {
                 }
             }
             .clipShape(shape)
-            .overlay(shape.strokeBorder(Theme.edge, lineWidth: 1))
+            .overlay(shape.strokeBorder(Theme.edge, lineWidth: Theme.hairline))
             .overlay(GradientBarCatcher(positions: gradient.stops.map(\.position), picked: picked, press: press,
                                         drag: drag, release: release))
         }

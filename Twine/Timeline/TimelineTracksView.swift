@@ -521,12 +521,12 @@ final class TimelineTracksView: NSView {
         guard let rect = spanRect(row) else { return }
         ctx.saveGState()
         ctx.clip(to: CGRect(x: gutter, y: row.y, width: bounds.width - gutter, height: TimelineRow.height))
-        let path = CGPath(roundedRect: rect, cornerWidth: 6, cornerHeight: 6, transform: nil)
+        let path = CGPath(roundedRect: rect, cornerWidth: Theme.radiusBar, cornerHeight: Theme.radiusBar, transform: nil)
         ctx.addPath(path)
         ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.timelineScene).cgColor)
         ctx.fillPath()
         // Where each of its actions runs, faintly, inside the span.
-        ctx.setFillColor(NSColor.white.withAlphaComponent(0.18).cgColor)
+        ctx.setFillColor(NSColor(Theme.timelineSceneRun).cgColor)
         for member in row.members where !member.isInstant {
             let x0 = x(for: member.start), x1 = x(for: member.end)
             ctx.fill(CGRect(x: x0, y: rect.maxY - 5, width: max(x1 - x0, 1), height: 2))
@@ -549,7 +549,7 @@ final class TimelineTracksView: NSView {
         ctx.setAlpha(dimmed ? 0.4 : 1)
         // A Show is a dot and a Hide a square, so the two read apart at a glance.
         let shows: Bool = { if case .visibility(let v) = action.spec { return v.isVisible } else { return false } }()
-        let radius = shows ? rect.width / 2 : action.isInstant ? 3 : 6.0
+        let radius = shows ? rect.width / 2 : action.isInstant ? Theme.radiusBar / 2 : Theme.radiusBar
         let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
         ctx.addPath(path)
         ctx.setFillColor(NSColor(selected ? Theme.accent : Theme.panelHover).cgColor)
@@ -1079,6 +1079,7 @@ final class TimelineTracksView: NSView {
     override func keyDown(with event: NSEvent) {
         guard let controller else { return super.keyDown(with: event) }
         if ExportKeys.handle(event, controller) { return }
+        if ShortcutsKeys.handle(event, controller) { return }
         let flags = event.modifierFlags.intersection([.command, .control, .option])
         let step = event.modifierFlags.contains(.shift) ? 10 : 1
         switch event.keyCode {

@@ -27,7 +27,7 @@ struct SettingsPage: View {
                 .displayTitle(21)
                 .foregroundStyle(Theme.textPrimary)
                 .padding(.leading, margin)
-                .padding(.bottom, 12)
+                .padding(.bottom, Theme.space12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(height: titleBlock, alignment: .bottom)
                 .contentShape(Rectangle())
@@ -285,6 +285,7 @@ struct SettingsPage: View {
         }
         .frame(height: Theme.settingsRow)
         .help(help)
+        .accessibilityLabel(help)
     }
 
     private func toggle(_ icon: Icon, _ label: String, isOn: Bool, help: String,
@@ -303,7 +304,7 @@ struct SettingsPage: View {
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, Theme.space8)
                 .frame(maxWidth: .infinity, minHeight: Theme.panelRow + 4, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
                 .help(folder.standardizedFileURL.path)

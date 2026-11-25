@@ -32,11 +32,11 @@ struct TextSection: View {
     private var section: some View {
         let weight = texts.shared(\.fontWeight)
         let sizing = texts.shared(\.sizing)
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Text") {}
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Theme.space8) {
                 fontButton
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space8) {
                     MenuField(value: weight.map(Self.weightName) ?? UnitField.mixedText, entries: weightEntries, height: Theme.control)
                         .help("The font's weight")
                     UnitField(value: text.fontSize, decimals: 1, suffix: "px", accepts: { $0 >= 1 && $0 <= 2000 },
@@ -46,7 +46,7 @@ struct TextSection: View {
                     .frame(width: Theme.textSideColumn)
                     .help("Type size")
                 }
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space8) {
                     alignmentTray
                     MenuField(value: sizing.map { $0 == .autoWidth ? "Auto" : "Fixed" } ?? UnitField.mixedText, entries: {
                         TextSizing.allCases.map { s in
@@ -81,7 +81,7 @@ struct TextSection: View {
     /// Left, centre and right. Justified text, from older files, shows none
     /// of them chosen.
     private var alignmentTray: some View {
-        HStack(spacing: 1) {
+        HStack(spacing: Theme.space1) {
             ForEach([MotionModel.TextAlignment.left, .center, .right], id: \.self) { a in
                 TrayButton(icon: Self.alignmentIcon(a), help: "Align \(Self.alignmentTitle(a).lowercased())",
                            isOn: texts.shared(\.alignment) == a) { edit { $0.alignment = a } }
@@ -104,17 +104,17 @@ struct TextSection: View {
                 }
             }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.space6) {
                 Text(family ?? UnitField.mixedText)
                     .font(ThemeFont.label)
                     .foregroundStyle(installed ? Theme.textPrimary : Theme.textTertiary)
                     .strikethrough(!installed)
                     .lineLimit(1)
                 Spacer(minLength: 0)
-                IconView(.chevronDown, size: 13)
+                IconView(.chevronDown, size: Theme.iconSmall)
                     .foregroundStyle(Theme.textTertiary)
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, Theme.space8)
             .frame(height: Theme.control)
             .frame(maxWidth: .infinity)
             .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
@@ -185,7 +185,7 @@ private struct FontList: View {
                 .textFieldStyle(.plain)
                 .font(ThemeFont.label)
                 .focused($searching)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, Theme.space8)
                 .frame(height: Theme.control)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
                 .focusRing(searching)
@@ -243,8 +243,8 @@ private struct FontRow: View {
 
     var body: some View {
         Button(action: pick) {
-            HStack(spacing: 6) {
-                IconView(.check, size: 13)
+            HStack(spacing: Theme.space6) {
+                IconView(.check, size: Theme.iconSmall)
                     .opacity(isCurrent ? 1 : 0)
                 Text(family)
                     .font(family == TextLayout.systemFamily ? .system(size: 13) : .custom(family, size: 13))
@@ -252,7 +252,7 @@ private struct FontRow: View {
                 Spacer(minLength: 0)
             }
             .foregroundStyle(Theme.textPrimary)
-            .padding(.horizontal, 6)
+            .padding(.horizontal, Theme.space6)
             .frame(height: Theme.control)
             .background(RoundedRectangle(cornerRadius: Theme.radiusRow).fill(hovering || isHighlighted ? Theme.accent : .clear))
             .contentShape(Rectangle())
@@ -316,7 +316,7 @@ struct TextFillSection: View {
         let texts = layers.compactMap(\.textContent)
         if let shown = texts.first?.color {
             let showing = texts.contains(where: \.showsFill)
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Theme.space8) {
                 HeaderRow(title: "Fill") {}
                 PaintEditor(paint: .solid(shown), isEnabled: showing, controller: controller, layer: layers[0],
                             title: "Fill",
@@ -354,7 +354,7 @@ struct TextStrokeSection: View {
     @State private var settingsFrame: CGRect = .zero
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Stroke") {
                 if text.stroke == nil {
                     IconButton(icon: .plus, help: "Add a stroke") {
@@ -365,7 +365,7 @@ struct TextStrokeSection: View {
                 }
             }
             if let stroke = text.stroke {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: Theme.space8) {
                     PaintEditor(paint: .solid(Self.color(of: stroke)), isEnabled: stroke.isEnabled, controller: controller,
                                 layer: layer, title: "Stroke",
                                 change: { paint in
@@ -375,7 +375,7 @@ struct TextStrokeSection: View {
                                 },
                                 toggle: { edit { $0.stroke?.isEnabled.toggle() } },
                                 showsToggle: true)
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.space8) {
                         MenuField(value: stroke.alignment.rawValue.capitalized, entries: {
                             StrokeAlignment.allCases.map { a in
                                 .item(a.rawValue.capitalized, checked: a == stroke.alignment) { edit { $0.stroke?.alignment = a } }
@@ -428,7 +428,7 @@ private struct TextStrokeSettings: View {
 
     var body: some View {
         if let layer = controller.project.layer(withID: layerID), case .text(let text) = layer.content, let stroke = text.stroke {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Theme.space6) {
                 Text("Corners")
                     .font(ThemeFont.label)
                     .foregroundStyle(Theme.textSecondary)

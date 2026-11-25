@@ -23,7 +23,7 @@ struct SliderRow<Accessory: View>: View {
     @ViewBuilder var accessory: () -> Accessory
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.space6) {
             HStack(spacing: 0) {
                 Text(label)
                     .font(ThemeFont.label)
@@ -35,7 +35,7 @@ struct SliderRow<Accessory: View>: View {
             PillTrack(value: value, range: range, readout: readout(value),
                       onChange: onChange, onBegin: onBegin, onEnd: onEnd)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, Theme.space2)
     }
 }
 
@@ -71,7 +71,7 @@ private struct PillTrack: View {
                 RoundedRectangle(cornerRadius: Theme.radiusTrack)
                     .fill(Theme.canvas)
                     .overlay(RoundedRectangle(cornerRadius: Theme.radiusTrack)
-                        .strokeBorder(Theme.edge, lineWidth: 1))
+                        .strokeBorder(Theme.edge, lineWidth: Theme.hairline))
 
                 // Covered area and handle in one shape, so there is no seam
                 // between two whites.
@@ -93,7 +93,7 @@ private struct PillTrack: View {
                     .lineLimit(1)
                     .frame(width: readoutWidth, alignment: .trailing)
                     .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.trailing, 10)
+                    .padding(.trailing, Theme.space10)
                     .allowsHitTesting(false)
             }
             .contentShape(Rectangle())
@@ -133,6 +133,8 @@ extension SliderRow where Accessory == EmptyView {
 /// on in the inspector's grey for chosen things.
 struct PillToggle: View {
     let isOn: Bool
+    /// What it switches, for VoiceOver: the row's name.
+    var label = ""
     let toggle: () -> Void
 
     @State private var hovering = false
@@ -147,7 +149,7 @@ struct PillToggle: View {
                 RoundedRectangle(cornerRadius: Theme.radiusTrack)
                     .fill(isOn ? (hovering ? Theme.chosenHover : Theme.chosen) : Theme.canvas)
                     .overlay(RoundedRectangle(cornerRadius: Theme.radiusTrack)
-                        .strokeBorder(hovering ? Theme.edgeHover : Theme.edge, lineWidth: 1))
+                        .strokeBorder(hovering ? Theme.edgeHover : Theme.edge, lineWidth: Theme.hairline))
                 RoundedRectangle(cornerRadius: Theme.radiusTrack - 1)
                     .fill(Theme.thumb)
                     .frame(width: thumb, height: thumb)
@@ -160,6 +162,8 @@ struct PillToggle: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .accessibilityLabel(label)
+        .accessibilityValue(isOn ? "On" : "Off")
     }
 }
 
@@ -169,12 +173,12 @@ struct ToggleRow: View {
     let toggle: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             Text(label)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
             Spacer(minLength: 0)
-            PillToggle(isOn: isOn, toggle: toggle)
+            PillToggle(isOn: isOn, label: label, toggle: toggle)
         }
         .frame(height: Theme.panelRow + 4)
     }
@@ -192,11 +196,11 @@ struct CheckRow: View {
 
     var body: some View {
         Button(action: toggle) {
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 RoundedRectangle(cornerRadius: Theme.radiusSwatchMark + 1)
                     .fill(isOn ? Theme.textPrimary : .clear)
                     .overlay(RoundedRectangle(cornerRadius: Theme.radiusSwatchMark + 1)
-                        .strokeBorder(isOn ? .clear : hovering ? Theme.edgeHover : Theme.textTertiary, lineWidth: 1))
+                        .strokeBorder(isOn ? .clear : hovering ? Theme.edgeHover : Theme.textTertiary, lineWidth: Theme.hairline))
                     .overlay {
                         if isOn {
                             IconView(.check, size: Theme.checkbox - 2, lineWidth: Theme.checkStroke)
@@ -276,7 +280,7 @@ struct SegmentRow<Value: Hashable>: View {
     @State private var frames: [Int: CGRect] = [:]
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: Theme.space2) {
             ForEach(options.indices, id: \.self) { i in
                 let option = options[i]
                 Segment(title: title(option), icon: icon?(option), isOn: option == selection,
@@ -328,7 +332,7 @@ private struct Segment: View {
         Button(action: action) {
             Group {
                 if let icon {
-                    IconView(icon, size: 15)
+                    IconView(icon, size: Theme.iconRow)
                 } else {
                     Text(title)
                         .font(ThemeFont.label)
@@ -341,6 +345,8 @@ private struct Segment: View {
         }
         .buttonStyle(.plain)
         .help(icon == nil ? "" : title)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }
 
@@ -375,9 +381,9 @@ struct UnitField: View {
     @Environment(\.scrubbing) private var scrubbing
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: Theme.space5) {
             if let icon {
-                IconView(icon, size: 13)
+                IconView(icon, size: Theme.iconSmall)
                     .foregroundStyle(Theme.textTertiary)
             } else if !unit.isEmpty {
                 // Never cut short: the number gives way first.
@@ -420,7 +426,7 @@ struct UnitField: View {
             // The unit stays put at the end, typed or not.
             if !suffix.isEmpty { UnitSuffix(suffix) }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, Theme.space8)
         .frame(height: Theme.control)
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: corner).fill(Theme.panelRaised))
@@ -557,9 +563,9 @@ struct OptionalField: View {
     @Environment(\.scrubbing) private var scrubbing
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: Theme.space5) {
             if let icon {
-                IconView(icon, size: 13)
+                IconView(icon, size: Theme.iconSmall)
                     .foregroundStyle(Theme.textTertiary)
             } else if !unit.isEmpty {
                 // Never cut short: the number gives way first.
@@ -593,7 +599,7 @@ struct OptionalField: View {
                 }
             if !suffix.isEmpty { UnitSuffix(suffix) }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, Theme.space8)
         .frame(height: Theme.control)
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
@@ -678,7 +684,7 @@ struct LabeledRow<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             Text(label)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
@@ -715,8 +721,8 @@ struct StackedRow<Accessory: View, Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: Theme.space6) {
+            HStack(spacing: Theme.space4) {
                 if let menu {
                     MenuLabel(title: label, entries: menu)
                 } else {
@@ -738,7 +744,7 @@ struct StackedRow<Accessory: View, Content: View>: View {
     }
 
     private var fields: some View {
-        HStack(spacing: 8) { content() }
+        HStack(spacing: Theme.space8) { content() }
             .frame(height: Theme.panelRow)
     }
 }
@@ -772,7 +778,7 @@ struct MenuLabel: View {
         Button {
             menus.show(entries, at: CGPoint(x: frame.minX, y: frame.maxY + 4))
         } label: {
-            HStack(spacing: 2) {
+            HStack(spacing: Theme.space2) {
                 Text(title)
                     .font(ThemeFont.label)
                     .lineLimit(1)
@@ -792,7 +798,7 @@ struct ReadoutRow: View {
     let value: String
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             Text(label)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
@@ -831,7 +837,7 @@ struct SectionHeader: View {
     }
 
     private var row: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Theme.space6) {
             Text(title)
                 .font(ThemeFont.labelStrong)
                 .foregroundStyle(Theme.textPrimary)
@@ -857,7 +863,7 @@ struct StepRow: View {
     let commit: (Int) -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             Text(label)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
@@ -888,7 +894,7 @@ private struct StepButton: View {
 
     var body: some View {
         Button(action: action) {
-            IconView(icon, size: 15)
+            IconView(icon, size: Theme.iconRow)
                 .foregroundStyle(disabled ? Theme.textTertiary.opacity(0.4)
                                  : hovering ? Theme.textPrimary : Theme.textSecondary)
                 .frame(width: Theme.rowIconButton, height: Theme.control)
@@ -909,7 +915,7 @@ struct HeaderRow<Accessory: View>: View {
     @ViewBuilder var accessory: () -> Accessory
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: Theme.space2) {
             Text(title)
                 .font(ThemeFont.labelStrong)
                 .foregroundStyle(Theme.textPrimary)
@@ -982,7 +988,7 @@ struct JoinedFields<Content: View>: View {
 
     var body: some View {
         // The one-point gaps show the panel through, which draws the rules.
-        HStack(spacing: 1) { content() }
+        HStack(spacing: Theme.space1) { content() }
             .clipShape(RoundedRectangle(cornerRadius: Theme.radiusControl))
     }
 }
@@ -1007,7 +1013,7 @@ extension View {
     /// so it is plain which one is being typed in.
     func focusRing(_ isFocused: Bool, corner: CGFloat = Theme.radiusControl) -> some View {
         overlay(RoundedRectangle(cornerRadius: corner)
-            .strokeBorder(isFocused ? Theme.accent : .clear, lineWidth: 1))
+            .strokeBorder(isFocused ? Theme.accent : .clear, lineWidth: Theme.hairline))
     }
 }
 

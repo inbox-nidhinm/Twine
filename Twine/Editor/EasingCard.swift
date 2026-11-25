@@ -42,7 +42,7 @@ struct EasingCard: View {
         VStack(spacing: 0) {
             header { Text("Easing") }
             ScrollView {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 10) {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: Theme.space8), GridItem(.flexible(), spacing: Theme.space8)], spacing: Theme.space10) {
                     EasingTile(title: "Custom", easing: nil, chosen: isCustom, hasSettings: true) { pickCustom() }
                         .help("Your own curve, with handles to drag")
                     ForEach(Self.order, id: \.self) { preset in
@@ -99,7 +99,7 @@ struct EasingCard: View {
     @ViewBuilder private func graph(_ easing: Easing) -> some View {
         VStack(spacing: 0) {
             header(back: { showsGraph = false }) { Text(easing.title) }
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.space12) {
                 switch easing {
                 case .custom(let curve):
                     CurveEditor(curve: curve, controller: controller)
@@ -158,7 +158,7 @@ private struct EasingTile: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: Theme.space6) {
                 Color.clear
                     .aspectRatio(1, contentMode: .fit)
                     .overlay {
@@ -171,7 +171,7 @@ private struct EasingTile: View {
                                     // Half the square for 0 to 1, room above and
                                     // below for curves that pass the ends.
                                     EasingPath(easing: easing, low: -0.5, high: 1.5)
-                                        .stroke(Theme.textPrimary, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                                        .stroke(Theme.textPrimary, style: StrokeStyle(lineWidth: Theme.lineHeavy, lineCap: .round, lineJoin: .round))
                                         .frame(width: side * 0.4, height: side * 0.8)
                                 } else {
                                     IconView(.plus, size: Theme.icon + 4)
@@ -183,9 +183,9 @@ private struct EasingTile: View {
                     }
                     .overlay(alignment: .bottom) {
                         if chosen && hovering && hasSettings {
-                            IconView(.settings, size: 15)
+                            IconView(.settings, size: Theme.iconRow)
                                 .foregroundStyle(Theme.textPrimary)
-                                .padding(.bottom, 8)
+                                .padding(.bottom, Theme.space8)
                         }
                     }
                     .background(RoundedRectangle(cornerRadius: Theme.radiusWell)
@@ -262,7 +262,7 @@ private struct EasingGraph: View {
             ZStack {
                 box.frame
                 EasingPath(easing: easing, low: CurveBox.lowest, high: CurveBox.highest)
-                    .stroke(Theme.textPrimary, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                    .stroke(Theme.textPrimary, style: StrokeStyle(lineWidth: Theme.lineHeavy, lineCap: .round, lineJoin: .round))
                     .padding(CurveBox.pad)
             }
         }
@@ -295,11 +295,11 @@ private struct CurveBox {
         Canvas { context, _ in
             let a = point(0, 1), b = point(1, 0)
             context.stroke(Path(CGRect(x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y)),
-                           with: .color(Theme.border), lineWidth: 1)
+                           with: .color(Theme.border), lineWidth: Theme.hairline)
             var diagonal = Path()
             diagonal.move(to: point(0, 0))
             diagonal.addLine(to: point(1, 1))
-            context.stroke(diagonal, with: .color(Theme.border), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+            context.stroke(diagonal, with: .color(Theme.border), style: StrokeStyle(lineWidth: Theme.hairline, dash: [3, 3]))
         }
     }
 }
@@ -323,17 +323,17 @@ private struct CurveEditor: View {
                         let x = Double(i) / 80
                         shape.addLine(to: box.point(x, curve.value(at: x)))
                     }
-                    context.stroke(shape, with: .color(Theme.textPrimary), lineWidth: 2)
+                    context.stroke(shape, with: .color(Theme.textPrimary), lineWidth: Theme.lineHeavy)
 
                     let p1 = box.point(curve.x1, curve.y1), p2 = box.point(curve.x2, curve.y2)
                     var arms = Path()
                     arms.move(to: box.point(0, 0)); arms.addLine(to: p1)
                     arms.move(to: box.point(1, 1)); arms.addLine(to: p2)
-                    context.stroke(arms, with: .color(Theme.textTertiary), lineWidth: 1)
+                    context.stroke(arms, with: .color(Theme.textTertiary), lineWidth: Theme.hairline)
                     for p in [p1, p2] {
                         let dot = Path(ellipseIn: CGRect(x: p.x - 5, y: p.y - 5, width: 10, height: 10))
                         context.fill(dot, with: .color(Theme.thumb))
-                        context.stroke(dot, with: .color(Theme.canvas), lineWidth: 1.5)
+                        context.stroke(dot, with: .color(Theme.canvas), lineWidth: Theme.line)
                     }
                 }
             }
@@ -368,7 +368,7 @@ private struct BezierFields: View {
     let controller: EditorController
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Theme.space6) {
             field(curve.x1, time: true, help: "When the first handle pulls, from 0 to 1") { $0.x1 = $1 }
             field(curve.y1, time: false, help: "How far along the first handle pulls") { $0.y1 = $1 }
             field(curve.x2, time: true, help: "When the second handle pulls, from 0 to 1") { $0.x2 = $1 }
@@ -385,5 +385,6 @@ private struct BezierFields: View {
             controller.editActions("Easing Curve") { $0.easing = .custom(c) }
         }
         .help(help)
+        .accessibilityLabel(help)
     }
 }

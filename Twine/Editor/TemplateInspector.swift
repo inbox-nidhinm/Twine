@@ -14,11 +14,11 @@ struct TemplateSection: View {
     let controller: EditorController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: Templates.name(of: setup.kind)) {
                 IconButton(icon: .plus, help: "Add a slot") { controller.addTemplateSlot(layer.id) }
             }
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: Theme.space10) {
                 cardRows
                 LabeledRow(label: "Rests at") {
                     UnitField(value: setup.pose * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
@@ -50,7 +50,7 @@ struct TemplateSection: View {
             })
         }
         .help("The cards' shape: Auto takes each picture's own.")
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             UnitField(unit: "Radius", value: setup.cornerRadius * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 50 }) { v in
                 controller.editTemplate(layer.id) { $0.cornerRadius = v / 100 }
             }
@@ -77,7 +77,7 @@ struct TemplateSection: View {
         case .choice(let options, let standard):
             let chosen = setup.settings[control.key]?.choice ?? standard
             if options.count <= 3 {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: Theme.space6) {
                     Text(control.name).font(ThemeFont.label).foregroundStyle(Theme.textSecondary)
                     SegmentRow(selection: chosen, options: options.map(\.key),
                                title: { key in options.first { $0.key == key }?.title ?? key }) { key in
@@ -123,9 +123,9 @@ struct TemplateSlotSection: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Theme.radiusWell)
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Slot \(index + 1)") {}
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: Theme.space10) {
                 Button { controller.chooseTemplatePicture(template.id, slot: index) } label: {
                     ZStack {
                         shape.fill(targeted ? Theme.panelHover : Theme.panelRaised)
@@ -138,7 +138,7 @@ struct TemplateSlotSection: View {
                     .frame(maxWidth: .infinity)
                     .aspectRatio(4.0 / 3, contentMode: .fit)
                     .clipShape(shape)
-                    .overlay(shape.strokeBorder(targeted ? Theme.textSecondary : Theme.edge, lineWidth: 1))
+                    .overlay(shape.strokeBorder(targeted ? Theme.textSecondary : Theme.edge, lineWidth: Theme.hairline))
                     .contentShape(shape)
                 }
                 .buttonStyle(.plain)

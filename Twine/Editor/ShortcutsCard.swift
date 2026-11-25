@@ -32,7 +32,7 @@ struct ShortcutsCard: View {
                 ScrollView {
                     HStack(alignment: .top, spacing: pad) {
                         ForEach(Array(Self.columns.enumerated()), id: \.offset) { _, column in
-                            VStack(alignment: .leading, spacing: 20) {
+                            VStack(alignment: .leading, spacing: Theme.space20) {
                                 ForEach(column, id: \.title) { group in
                                     ShortcutGroupView(group: group)
                                 }
@@ -86,8 +86,8 @@ struct ShortcutsCard: View {
                     s("Type into a text layer", "Return"),
                 ]),
                 Group(title: "Points", items: [
-                    s("Edit a shape's points", "Return"),
-                    s("Finish a path, stop editing", "Esc"),
+                    s("Edit a shape's points, in Design", "Return"),
+                    s("Finish a path, stop editing", "Esc", "Return"),
                     s("Sharp or smooth point", "⌘", "click"),
                     s("Pull out handles", "⌘", "drag"),
                     s("Move one handle alone", "⌥", "drag"),
@@ -95,13 +95,14 @@ struct ShortcutsCard: View {
                 ]),
                 Group(title: "Pictures", items: [
                     s("Crop a picture", "double-click"),
-                    s("Finish cropping", "Esc"),
+                    s("Finish cropping", "Esc", "Return"),
                 ]),
                 Group(title: "View", items: [
                     s("Search", "⌘K"),
-                    s("Pan", "Space", "drag"),
+                    s("Pan, in Design", "Space", "drag"),
                     s("Zoom to fit, actual size", "⌘0", "⌥⌘0"),
                     s("Zoom in, out", "⌘=", "⌘-"),
+                    s("Zoom at the pointer", "pinch", "⌘ scroll"),
                     s("Zoom to the selection", "⇧2"),
                     s("Hide layers, inspector", "⌘1", "⌘2"),
                     s("Full screen", "⌃⌘F"),
@@ -116,17 +117,29 @@ struct ShortcutsCard: View {
                     s("Resize from the centre", "⌥", "handle"),
                     s("Move the anchor", "⌘", "anchor"),
                     s("Select inside a group", "⌘", "click"),
-                    s("Nudge \(Self.pixels(AppSettings.shared.nudge)), \(Self.pixels(AppSettings.shared.shiftNudge))", "←→", "⇧←→"),
+                    s("Nudge \(Self.pixels(AppSettings.shared.nudge)), \(Self.pixels(AppSettings.shared.shiftNudge))", "arrows", "⇧ arrows"),
+                    s("Select all, none", "⌘A", "Esc"),
+                    s("Delete", "⌫"),
+                ]),
+                Group(title: "Numbers", items: [
+                    s("Step a number, by eight", "↑↓", "⇧↑↓"),
+                    s("Drag across a number", "drag"),
+                    s("Ten times, a tenth as fast", "⇧", "⌥"),
+                    s("Leave without changing", "Esc"),
+                ]),
+                // Its own group, so "in Design" is said once, in the title:
+                // on each line it left no room for the keys.
+                Group(title: "Align, in Design", items: [
+                    s("Left, centres, right", "⌥A", "⌥H", "⌥D"),
+                    s("Top, middles, bottom", "⌥W", "⌥V", "⌥S"),
+                    s("Distribute across, down", "⌃⌥H", "⌃⌥V"),
+                    s("Copy, paste style", "⌥⌘C", "⌥⌘V"),
                 ]),
                 Group(title: "Arrange", items: [
-                    s("Align left, centres, right", "⌥A", "⌥H", "⌥D"),
-                    s("Align top, middles, bottom", "⌥W", "⌥V", "⌥S"),
-                    s("Distribute across, down", "⌃⌥H", "⌃⌥V"),
                     s("Group", "⌘G"),
                     s("Ungroup groups and frames", "⇧⌘G", "⌘⌫"),
                     s("Frame selection", "⌥⌘G"),
                     s("Use as mask", "⌃⌘M"),
-                    s("Copy, paste style", "⌥⌘C", "⌥⌘V"),
                     s("Forward, backward", "⌘]", "⌘["),
                     s("To front, to back", "⌥⌘]", "⌥⌘["),
                 ]),
@@ -139,7 +152,7 @@ struct ShortcutsCard: View {
             ],
             [
                 Group(title: "Playback", items: [
-                    s("Play or pause", "Space"),
+                    s("Play or pause, in Animate", "Space"),
                     s("Frame back, forward", ",", "."),
                     s("Ten frames", "⇧,", "⇧."),
                     s("Previous, next action edge", "⌥,", "⌥."),
@@ -152,6 +165,7 @@ struct ShortcutsCard: View {
                     s("Trim both ends", "⌥", "drag end"),
                     s("Pan", "⌥", "drag"),
                     s("Zoom", "⌘", "scroll"),
+                    s("Move without snapping", "⌘", "drag"),
                     s("Copy, paste easing", "⇧⌘C", "⇧⌘V"),
                 ]),
                 Group(title: "Project", items: [
@@ -159,6 +173,7 @@ struct ShortcutsCard: View {
                     s("Export, current frame", "⌘E", "⇧⌘E"),
                     s("Duplicate, rename layer", "⌘D", "⌘R"),
                     s("Rename in the layers panel", "double-click"),
+                    s("Add a layer, or the layers between", "⌘ click", "⇧ click"),
                     s("Duplicate project", "⇧⌘S"),
                     s("Home", "⇧⌘H"),
                     s("Close the project", "⌘W"),
@@ -172,12 +187,12 @@ private struct ShortcutGroupView: View {
     let group: ShortcutsCard.Group
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             Text(group.title)
                 .font(ThemeFont.caption)
                 .foregroundStyle(Theme.textTertiary)
             ForEach(group.items, id: \.what) { item in
-                HStack(spacing: 6) {
+                HStack(spacing: Theme.space6) {
                     Text(item.what)
                         .font(ThemeFont.label)
                         .foregroundStyle(Theme.textSecondary)

@@ -18,7 +18,7 @@ struct ActionTiles: View {
     @State private var newFrame: CGRect = .zero
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             BigTile(icon: .plus, title: "New Action", disabled: newActions.isEmpty) {
                 menus.show(newActions, at: CGPoint(x: newFrame.minX, y: newFrame.maxY + 4))
             }
@@ -36,7 +36,7 @@ struct TemplateTile: View {
     let action: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             BigTile(icon: .template, title: "Templates", action: action)
                 .help("Picks a whole scene of cards, a ring, a globe or a tunnel, to fill with your pictures; selected pictures and videos go into its slots.")
             Color.clear.frame(maxWidth: .infinity)
@@ -58,7 +58,7 @@ private struct BigTile: View {
             Color.clear
                 .aspectRatio(1, contentMode: .fit)
                 .overlay {
-                    VStack(spacing: 8) {
+                    VStack(spacing: Theme.space8) {
                         IconView(icon, size: Theme.icon + 4)
                         Text(title)
                             .font(ThemeFont.label)
@@ -87,7 +87,7 @@ struct PresetPicker: View {
     let pick: (Preset) -> Void
     let close: () -> Void
 
-    private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
+    private let columns = [GridItem(.flexible(), spacing: Theme.space8), GridItem(.flexible(), spacing: Theme.space8)]
 
     @State private var search = ""
     @FocusState private var searching: Bool
@@ -119,7 +119,7 @@ struct PresetPicker: View {
                     .textFieldStyle(.plain)
                     .font(ThemeFont.label)
                     .focused($searching)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, Theme.space8)
                     .frame(height: Theme.control)
                     .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
                     .focusRing(searching)
@@ -143,11 +143,11 @@ struct PresetPicker: View {
                 ForEach(groups, id: \.self) { group in
                     let shown = matching.filter { $0.group == group }
                     if !shown.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: Theme.space8) {
                             Text(group.title)
                                 .font(ThemeFont.labelStrong)
                                 .foregroundStyle(Theme.textPrimary)
-                            LazyVGrid(columns: columns, spacing: 10) {
+                            LazyVGrid(columns: columns, spacing: Theme.space10) {
                                 ForEach(shown) { preset in
                                     PresetTile(preset: preset, swapping: swapping) { pick(preset) }
                                 }
@@ -171,7 +171,7 @@ private struct PresetTile: View {
 
     var body: some View {
         Button(action: pick) {
-            VStack(spacing: 6) {
+            VStack(spacing: Theme.space6) {
                 Color.clear
                     .aspectRatio(1, contentMode: .fit)
                     .overlay { PresetThumbnail(preset: preset) }

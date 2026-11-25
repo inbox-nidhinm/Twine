@@ -69,7 +69,7 @@ struct AnimationInspector: View {
                         LayerSoundSection(layer: sound, controller: controller)
                         PanelDivider()
                     }
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: Theme.space8) {
                         HeaderRow(title: "Add to Layer") {}
                         ActionTiles(newActions: actionEntries(controller.availableActions),
                                     hasPresets: !controller.availablePresets.isEmpty,
@@ -78,7 +78,7 @@ struct AnimationInspector: View {
                     }
                     .padding(.bottom, Theme.panelPad)
                     PanelDivider()
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: Theme.space8) {
                         HeaderRow(title: "Templates") {}
                         TemplateTile { pickingTemplate = true }
                             .padding(.horizontal, Theme.panelPad)
@@ -86,7 +86,7 @@ struct AnimationInspector: View {
                     .padding(.bottom, Theme.panelPad)
                 }
             } else {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: Theme.space8) {
                     HeaderRow(title: "Templates") {}
                     TemplateTile { pickingTemplate = true }
                         .padding(.horizontal, Theme.panelPad)

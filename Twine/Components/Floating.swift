@@ -18,7 +18,7 @@ extension View {
                 .grained()
                 .clipShape(RoundedRectangle(cornerRadius: corner)))
             .overlay(RoundedRectangle(cornerRadius: corner)
-                .strokeBorder(Theme.border, lineWidth: 1))
+                .strokeBorder(Theme.border, lineWidth: Theme.hairline))
             .clipShape(RoundedRectangle(cornerRadius: corner))
             .shadow(color: shadow ? Theme.shadow : .clear, radius: shadow ? Theme.shadowRadius : 0, y: shadow ? Theme.shadowY : 0)
     }
@@ -69,7 +69,7 @@ struct PopupCard<Accessory: View, Content: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 Text(title)
                     .font(ThemeFont.labelStrong)
                     .foregroundStyle(Theme.textPrimary)
@@ -80,7 +80,7 @@ struct PopupCard<Accessory: View, Content: View>: View {
             .frame(height: Theme.cardHeader)
             .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: Theme.hairline) }
 
-            VStack(alignment: .leading, spacing: 8) { content() }
+            VStack(alignment: .leading, spacing: Theme.space8) { content() }
                 .padding(Theme.panelPad)
         }
         .frame(width: width)

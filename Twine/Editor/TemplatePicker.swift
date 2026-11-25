@@ -15,7 +15,7 @@ struct TemplatePicker: View {
     var across = 2
     var closeHelp = "Back to actions"
 
-    private var columns: [GridItem] { Array(repeating: GridItem(.flexible(), spacing: 8), count: max(across, 1)) }
+    private var columns: [GridItem] { Array(repeating: GridItem(.flexible(), spacing: Theme.space8), count: max(across, 1)) }
 
     @State private var search = ""
     @FocusState private var searching: Bool
@@ -37,7 +37,7 @@ struct TemplatePicker: View {
                     .textFieldStyle(.plain)
                     .font(ThemeFont.label)
                     .focused($searching)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, Theme.space8)
                     .frame(height: Theme.control)
                     .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
                     .focusRing(searching)
@@ -60,11 +60,11 @@ struct TemplatePicker: View {
                 ForEach(TemplateGroup.allCases, id: \.self) { group in
                     let shown = matching.filter { $0.group == group }
                     if !shown.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: Theme.space8) {
                             Text(group.title)
                                 .font(ThemeFont.labelStrong)
                                 .foregroundStyle(Theme.textPrimary)
-                            LazyVGrid(columns: columns, spacing: 10) {
+                            LazyVGrid(columns: columns, spacing: Theme.space10) {
                                 ForEach(shown) { info in
                                     TemplateChoice(info: info) { pick(info) }
                                 }
@@ -92,7 +92,7 @@ private struct TemplateChoice: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: Theme.space6) {
                 Group {
                     if let image {
                         Image(decorative: image, scale: 2).resizable()
@@ -102,7 +102,7 @@ private struct TemplateChoice: View {
                 }
                 .aspectRatio(Double(TemplatePosters.width) / Double(TemplatePosters.height), contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.radiusWell))
-                .overlay(RoundedRectangle(cornerRadius: Theme.radiusWell).strokeBorder(hovering ? Theme.textTertiary : .clear, lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: Theme.radiusWell).strokeBorder(hovering ? Theme.textTertiary : .clear, lineWidth: Theme.hairline))
                 Text(info.name)
                     .font(ThemeFont.label)
                     .foregroundStyle(hovering ? Theme.textPrimary : Theme.textSecondary)

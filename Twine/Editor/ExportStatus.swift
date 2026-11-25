@@ -14,7 +14,7 @@ struct ExportStatus: View {
     var body: some View {
         Group {
             if let progress = session.progress {
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space8) {
                     ProgressTrack(value: progress)
                     Text("\(Int((progress * 100).rounded(.down)))%")
                         .font(ThemeFont.label)
@@ -25,8 +25,8 @@ struct ExportStatus: View {
                 }
                 .help("Exporting")
             } else if let url = session.finished {
-                HStack(spacing: 8) {
-                    IconView(.check, size: 15)
+                HStack(spacing: Theme.space8) {
+                    IconView(.check, size: Theme.iconRow)
                         .foregroundStyle(Theme.accent)
                     Text(url.lastPathComponent)
                         .font(ThemeFont.label)
@@ -79,7 +79,7 @@ struct NoticeCard: View {
     var hold: (Bool) -> Void = { _ in }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             switch notice.state {
             case .note: EmptyView()
             case .working(let fraction): Loader(fraction: fraction)

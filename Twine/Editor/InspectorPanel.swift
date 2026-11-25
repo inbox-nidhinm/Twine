@@ -69,13 +69,13 @@ struct InspectorPanel: View {
         let shared = alike ? values[0] : values.max() ?? 1
         let blends = Set(layers.map(\.blendMode))
         return VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Theme.space8) {
                 HeaderRow(title: "Position") {}
                 AlignRow(controller: controller)
             }
             .padding(.bottom, Theme.panelPad)
             PanelDivider()
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Theme.space8) {
                 HeaderRow(title: "Appearance") {}
                 BlendOpacityRow(blend: blends.count == 1 ? layers[0].blendMode.title : "Mixed",
                                 entries: { blendEntries(layers) }, opacity: shared,
@@ -124,8 +124,8 @@ struct InspectorPanel: View {
         VStack(alignment: .leading, spacing: 0) {
             SectionHeader(title: "Composition", isOpen: compositionOpen) { compositionOpen.toggle() }
             if compositionOpen {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: Theme.space10) {
+                    HStack(spacing: Theme.space8) {
                         UnitField(unit: "W", value: Double(composition.width), accepts: Self.validDimension) { v in
                             edit { $0.width = Int(v.rounded()) }
                         }
@@ -164,11 +164,11 @@ struct InspectorPanel: View {
     }
 
     private var background: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.space6) {
             Text("Background")
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 ColorWell(color: composition.background.color, title: "Background",
                           onChange: { color in
                               var c = composition
@@ -243,7 +243,7 @@ struct AlignRow: View {
     @State private var distributeFrame: CGRect = .zero
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             tray([.left, .centerX, .right])
             tray([.top, .centerY, .bottom])
         }
@@ -262,7 +262,7 @@ struct AlignRow: View {
     private func tray(_ edges: [MotionEditing.Alignment.Edge]) -> some View {
         // The gaps between the buttons show the panel through them, which
         // draws the rules between them.
-        HStack(spacing: 1) {
+        HStack(spacing: Theme.space1) {
             ForEach(edges, id: \.self) { edge in
                 TrayButton(icon: edge.icon, help: "\(edge.title) (\(edge.shortcut))") { controller.align(edge) }
             }
@@ -285,7 +285,7 @@ struct TrayButton: View {
 
     var body: some View {
         Button(action: action) {
-            IconView(icon, size: 15)
+            IconView(icon, size: Theme.iconRow)
                 .foregroundStyle(isOn || (hovering && isEnabled) ? Theme.textPrimary : Theme.textSecondary)
                 .opacity(isEnabled ? 1 : 0.4)
                 .frame(maxWidth: .infinity)
@@ -296,5 +296,6 @@ struct TrayButton: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help(help)
+        .accessibilityLabel(help)
     }
 }

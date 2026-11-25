@@ -226,12 +226,12 @@ private struct MenuCard: View {
             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                 switch entry.kind {
                 case .separator:
-                    Rectangle().fill(Theme.border).frame(height: Theme.hairline).padding(.vertical, 4)
+                    Rectangle().fill(Theme.border).frame(height: Theme.hairline).padding(.vertical, Theme.space4)
                 case .header(let title):
                     Text(title)
                         .font(ThemeFont.caption)
                         .foregroundStyle(Theme.textTertiary)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, Theme.space6)
                         .frame(height: Theme.control, alignment: .bottomLeading)
                 case let .item(title, icon, checked, disabled, action):
                     // One highlight for the pointer and the arrow keys.
@@ -264,11 +264,11 @@ private struct MenuItemRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.space6) {
                 if let icon {
-                    IconView(icon, size: 15)
+                    IconView(icon, size: Theme.iconRow)
                 } else {
-                    IconView(.check, size: 13)
+                    IconView(.check, size: Theme.iconSmall)
                         .opacity(checked ? 1 : 0)
                 }
                 Text(title)
@@ -277,7 +277,7 @@ private struct MenuItemRow: View {
                 Spacer(minLength: 0)
             }
             .foregroundStyle(disabled ? Theme.textTertiary.opacity(0.6) : Theme.textPrimary)
-            .padding(.horizontal, 6)
+            .padding(.horizontal, Theme.space6)
             .frame(height: Theme.control)
             .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
                 .fill(lit && !disabled ? Theme.accent : .clear))
@@ -300,14 +300,14 @@ struct MenuRow: View {
     var isEnabled = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.space6) {
             Text(label)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
                 .lineLimit(1)
             MenuField(value: value, entries: entries, isEnabled: isEnabled)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, Theme.space2)
     }
 }
 
@@ -333,16 +333,16 @@ struct MenuField: View {
             // menu reads as having come out of it.
             menus.show(entries(), at: CGPoint(x: frame.minX, y: frame.maxY + 4))
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.space6) {
                 Text(value)
                     .font(ThemeFont.label)
                     .foregroundStyle(isEnabled ? Theme.textPrimary : Theme.textTertiary)
                     .lineLimit(1)
                 Spacer(minLength: 0)
-                IconView(.chevronDown, size: 13)
+                IconView(.chevronDown, size: Theme.iconSmall)
                     .foregroundStyle(Theme.textTertiary)
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, Theme.space8)
             .frame(height: height)
             .frame(maxWidth: .infinity)
             .background(RoundedRectangle(cornerRadius: Theme.radiusControl)

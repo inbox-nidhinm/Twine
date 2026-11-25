@@ -121,7 +121,7 @@ final class CanvasNSView: NSView {
         checker.backgroundColor = Self.checkerColor
         frameEdge.fillColor = nil
         frameEdge.strokeColor = NSColor(Theme.edge).cgColor
-        frameEdge.lineWidth = 1
+        frameEdge.lineWidth = Theme.hairline
         // Glass draws what is behind it itself: a backdrop here would show
         // whatever the screen has, other windows and the Dock included.
         renderer.drawsGlassBehind = true
@@ -1550,6 +1550,7 @@ final class CanvasNSView: NSView {
     override func keyDown(with event: NSEvent) {
         guard let controller else { return super.keyDown(with: event) }
         if ExportKeys.handle(event, controller) { return }
+        if ShortcutsKeys.handle(event, controller) { return }
         if textKeyDown(event) { return }
         if pathKeyDown(event) { return }
         if cropKeyDown(event) { return }

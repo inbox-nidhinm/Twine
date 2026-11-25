@@ -190,9 +190,9 @@ struct StyleValueFields: View {
     private func cornerGrid<Field: View>(@ViewBuilder _ field: @escaping (Corner) -> Field) -> some View {
         let rows = [[Corner(icon: .cornerTopLeft, path: \.topLeft), Corner(icon: .cornerTopRight, path: \.topRight)],
                     [Corner(icon: .cornerBottomLeft, path: \.bottomLeft), Corner(icon: .cornerBottomRight, path: \.bottomRight)]]
-        return VStack(spacing: 8) {
+        return VStack(spacing: Theme.space8) {
             ForEach(rows.indices, id: \.self) { i in
-                HStack(spacing: 8) { ForEach(rows[i]) { field($0) } }
+                HStack(spacing: Theme.space8) { ForEach(rows[i]) { field($0) } }
             }
         }
     }
@@ -396,7 +396,7 @@ struct StyleValueFields: View {
         sectionLabel("From") {
             clearButton(v.initial != nil) { editing("Starting Arc", Self.arc { a, _ in a.initial = nil }) }
         }
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             OptionalField(unit: "Start", value: v.initial?.start, placeholder: from.start, decimals: 1, suffix: "°") { x in
                 editing("Starting Arc", Self.arc { a, st in
                     guard let x else { a.initial = nil; return }
@@ -424,7 +424,7 @@ struct StyleValueFields: View {
         }
         .help("The slice it starts as. Empty starts from the ellipse's own.")
         sectionLabel("To", swap: swap)
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             UnitField(unit: "Start", value: v.end.start, decimals: 1, suffix: "°") { x in
                 editing("Arc", Self.arc { a, _ in
                     let sweep = a.end.end - a.end.start
@@ -466,7 +466,7 @@ struct StyleValueFields: View {
         sectionLabel("From") {
             clearButton(v.initial != nil) { editing("Starting Star", Self.star { a, _ in a.initial = nil }) }
         }
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             OptionalField(unit: "Points", value: v.initial.map { Double($0.points) }, placeholder: Double(from.points),
                           accepts: { $0 >= 3 && $0 <= 60 }) { x in
                 editing("Starting Star", Self.star { a, st in
@@ -497,7 +497,7 @@ struct StyleValueFields: View {
         }
         .help("The star it starts as. Empty starts from the star's own shape.")
         sectionLabel("To", swap: swap)
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             UnitField(unit: "Points", value: Double(v.end.points), accepts: { $0 >= 3 && $0 <= 60 }) { x in
                 editing("Star", Self.star { a, _ in a.end.points = Int(x.rounded()) })
             }
@@ -643,7 +643,7 @@ struct StyleValueFields: View {
     /// does, and otherwise sits just inside it.
     private func sectionLabel<Accessory: View>(_ title: String, swap: (() -> Void)? = nil,
                                                @ViewBuilder accessory: () -> Accessory) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             Text(title)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
@@ -668,7 +668,7 @@ struct StyleValueFields: View {
     @ViewBuilder private func optionalStart<Preview: View, Content: View>(
         isSet: Bool, preview: Preview, set: @escaping () -> Void, clear: @escaping () -> Void,
         @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             if isSet {
                 sectionLabel("From") {
                     IconButton(icon: .close, help: "Start from wherever the layer is instead", action: clear)
@@ -708,8 +708,8 @@ private struct WordsField: View {
             .font(ThemeFont.label)
             .lineLimit(1...4)
             .focused($focused)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.horizontal, Theme.space8)
+            .padding(.vertical, Theme.space5)
             .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
             .focusRing(focused)
             .onAppear { draft = text }

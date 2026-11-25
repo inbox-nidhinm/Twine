@@ -25,9 +25,9 @@ struct SelectionColorsSection: View {
         if !entries.isEmpty {
             let shown = showsAll ? entries : Array(entries.prefix(Self.shownAtFirst))
             PanelDivider()
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Theme.space8) {
                 HeaderRow(title: "Selection colours") {}
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: Theme.space8) {
                     ForEach(shown) { entry in
                         switch entry.look {
                         case .color(let color): colorRow(color, places: entry.places)
@@ -47,7 +47,7 @@ struct SelectionColorsSection: View {
     // MARK: Colours
 
     private func colorRow(_ color: RGBA, places: [SelectionColors.Place]) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Theme.space6) {
             ColorWell(color: color, size: Theme.control, title: "Selection Colour",
                       onChange: { c in
                           if let command = SelectionColors.setting(places, to: c, in: controller.project) {
@@ -78,21 +78,21 @@ struct SelectionColorsSection: View {
     @ViewBuilder
     private func gradientRows(_ gradient: MotionModel.Gradient, kind: GradientKind, entry: SelectionColors.Entry) -> some View {
         let isOpen = open == entry.id
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             Button {
                 pickedStop = nil
                 open = isOpen ? nil : entry.id
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: Theme.space6) {
                     PaintSwatch(paint: .gradient(gradient, kind))
                     Text(Paint.gradient(gradient, kind).kindName)
                         .font(ThemeFont.label)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
                     Spacer(minLength: 0)
-                    IconView(isOpen ? .chevronUp : .chevronDown, size: 13)
+                    IconView(isOpen ? .chevronUp : .chevronDown, size: Theme.iconSmall)
                         .foregroundStyle(Theme.textTertiary)
-                        .padding(.trailing, 8)
+                        .padding(.trailing, Theme.space8)
                 }
                 .frame(height: Theme.control)
                 .frame(maxWidth: .infinity)

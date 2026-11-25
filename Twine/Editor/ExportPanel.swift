@@ -109,7 +109,7 @@ struct ExportPanel: View {
                 .padding(.horizontal, Theme.panelPad)
                 // Clear of the window's close, minimise and zoom buttons, as
                 // the layers panel's name is.
-                .padding(.top, 44)
+                .padding(.top, Theme.space44)
             Spacer(minLength: Theme.panelPad)
             Group {
                 PanelDivider()
@@ -133,7 +133,7 @@ struct ExportPanel: View {
     }
 
     private var formatSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             Text("Export format")
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
@@ -148,7 +148,7 @@ struct ExportPanel: View {
                 .help("Any size, as a share of the composition's, up to 4K (3840 × 2160 either way round). "
                       + "Movies round to even numbers of pixels.")
             }
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 MenuField(value: settings.format.shortTitle, entries: formatEntries)
                     .help("H.264, HEVC and ProRes 422 have no transparency, so a transparent background "
                           + "exports as its colour. HEVC with alpha, ProRes 4444, WebM and PNG keep it; a GIF keeps it "
@@ -166,10 +166,10 @@ struct ExportPanel: View {
     }
 
     private var rangeSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             MenuRow(label: "Range", value: session.range == nil ? "Whole animation" : "Part of the animation", entries: rangeEntries)
             if let range = session.range {
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space8) {
                     UnitField(unit: "From", value: range.lowerBound, decimals: 2, suffix: "s",
                               accepts: { $0 >= 0 && $0 < range.upperBound }) { v in
                         // Snapping to a frame can round up to the end.
@@ -189,7 +189,7 @@ struct ExportPanel: View {
     }
 
     private var actions: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Theme.space8) {
             PrimaryButton(title: session.isExporting ? "Cancel" : session.completed != nil ? "Export again" : "Export",
                           quiet: session.isExporting) {
                 if session.isExporting {
@@ -388,6 +388,17 @@ struct ExportPanel: View {
     }
 
     private func snapped(_ seconds: Double) -> Double { composition.frameRate.snapped(max(seconds, 0)) }
+}
+
+/// The keyboard while the shortcuts card is up: Escape closes it, and
+/// nothing reaches the layers or the timeline behind it (Delete used to
+/// delete the selection, and a letter to change the tool).
+enum ShortcutsKeys {
+    static func handle(_ event: NSEvent, _ controller: EditorController) -> Bool {
+        guard controller.editor.showShortcuts else { return false }
+        if event.keyCode == 53 { controller.editor.showShortcuts = false }
+        return true
+    }
 }
 
 /// The keyboard while the export panel is up: Escape closes it, Space plays

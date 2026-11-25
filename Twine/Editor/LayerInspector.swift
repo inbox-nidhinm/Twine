@@ -111,11 +111,11 @@ struct LayerInspector: View {
     /// Where the layer sits: lined up with the composition, its place, its
     /// turn, and the point it turns about.
     private var positionSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Position") {}
             AlignRow(controller: controller)
             Group {
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space8) {
                     number("X", t.position.x) { l, v in
                         l.transform.position = Vec2(v, l.transform.position.y)
                     }
@@ -126,13 +126,13 @@ struct LayerInspector: View {
                 .help("Where the anchor point sits, in pixels")
                 // Z shows in a frame in 3D, and wherever one is set.
                 if t.z != 0 || controller.project.space3D(holding: layer.id) != nil {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.space8) {
                         number("Z", t.z) { l, v in l.transform.z = v }
                             .help("How far towards you it sits, in pixels; negative is further away")
                         Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
                     }
                 }
-                HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .top, spacing: Theme.space8) {
                     UnitField(unit: "R", value: t.rotation, decimals: 1, suffix: "°") { v in
                         controller.edit(layer.id) { l in l.transform.rotation = v }
                     }
@@ -153,12 +153,12 @@ struct LayerInspector: View {
     /// How big the layer is and what shape: its size, its scale, its
     /// corners or points, and for a group or frame, whether it clips.
     private var layoutSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Layout") {}
             Group {
                 // A group's size is only where it was made; a frame's is its own.
                 if !layer.isGroup || layer.isFrame {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.space8) {
                         number("W", layer.size.width, accepts: { $0 >= 0 }) { l, v in l = l.resized(toWidth: v) }
                         number("H", layer.size.height, accepts: { $0 >= 0 }) { l, v in l = l.resized(toHeight: v) }
                     }
@@ -212,7 +212,7 @@ struct LayerInspector: View {
     /// Both ways always, with their own link in the column.
     private var scaleRow: some View {
         let scale = t.scale
-        return HStack(spacing: 8) {
+        return HStack(spacing: Theme.space8) {
             UnitField(unit: "SX", value: scale.x * 100, decimals: 1, suffix: "%") { v in
                 controller.edit(layer.id) { l in
                     let s = l.transform.scale
@@ -241,7 +241,7 @@ struct LayerInspector: View {
     // MARK: Appearance
 
     private var appearanceSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Appearance") {}
             BlendOpacityRow(blend: layer.blendMode.title, entries: blendEntries,
                             opacity: layer.opacity, isGroup: layer.isGroup) { v in
@@ -269,7 +269,7 @@ struct LayerInspector: View {
         switch geometry {
         case .rectangle(let radii):
             let r = radii
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Theme.space8) {
                 cornerRadiusField
                 .rowButton {
                     IconButton(icon: .corners, help: perCorner ? "One radius for every corner" : "A radius for each corner") {
@@ -277,18 +277,18 @@ struct LayerInspector: View {
                     }
                 }
                 if perCorner || !r.isUniform {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.space8) {
                         corner(.cornerTopLeft, r.topLeft) { c, v in c.topLeft = v }
                         corner(.cornerTopRight, r.topRight) { c, v in c.topRight = v }
                     }
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.space8) {
                         corner(.cornerBottomLeft, r.bottomLeft) { c, v in c.bottomLeft = v }
                         corner(.cornerBottomRight, r.bottomRight) { c, v in c.bottomRight = v }
                     }
                 }
             }
         case .polygon(let sides, let corner):
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Theme.space8) {
                 UnitField(unit: "Sides", value: Double(sides), step: 0.2, accepts: { $0 >= 3 && $0 <= 60 }) { v in
                     setGeometry(.polygon(sides: Int(v.rounded()), cornerRadius: corner))
                 }
@@ -296,12 +296,12 @@ struct LayerInspector: View {
                 cornerRadiusField
             }
         case .star(let points, let inner, let corner):
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Theme.space8) {
                 UnitField(unit: "Points", value: Double(points), step: 0.2, accepts: { $0 >= 3 && $0 <= 60 }) { v in
                     setGeometry(.star(points: Int(v.rounded()), innerRadius: inner, cornerRadius: corner))
                 }
                 .help("How many points, from 3 to 60")
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space8) {
                     UnitField(unit: "Inner", value: inner * 100, decimals: 1, suffix: "%", accepts: { $0 >= 0 }) { v in
                         setGeometry(.star(points: points, innerRadius: v / 100, cornerRadius: corner))
                     }
@@ -420,7 +420,8 @@ struct AnchorPicker: View {
                 HStack(spacing: 0) {
                     ForEach(fractions, id: \.self) { fx in
                         if fx > 0 { Spacer(minLength: 0) }
-                        AnchorDot(isChosen: chosen.map { $0.0 == fx && $0.1 == fy } ?? false) { pick(fx, fy) }
+                        AnchorDot(isChosen: chosen.map { $0.0 == fx && $0.1 == fy } ?? false,
+                                  name: "Anchor at the \(fy == 0 ? "top" : fy == 1 ? "bottom" : "middle") \(fx == 0 ? "left" : fx == 1 ? "right" : "centre")") { pick(fx, fy) }
                             .frame(width: cell.width, height: cell.height)
                     }
                 }
@@ -434,6 +435,8 @@ struct AnchorPicker: View {
 
 private struct AnchorDot: View {
     let isChosen: Bool
+    /// Where it puts the anchor, for its tooltip and VoiceOver.
+    let name: String
     let pick: () -> Void
 
     @State private var hovering = false
@@ -448,6 +451,9 @@ private struct AnchorDot: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .help(name)
+        .accessibilityLabel(name)
+        .accessibilityAddTraits(isChosen ? .isSelected : [])
     }
 }
 
@@ -466,7 +472,7 @@ struct BlendOpacityRow: View {
     let setOpacity: (Double) -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space8) {
             MenuField(value: blend, entries: entries, height: Theme.control)
                 .help(isGroup ? "Blend: how the layer mixes with what is behind it. At Normal, what is inside a group or frame blends through it, as Figma's Pass Through does."
                               : "Blend: how the layer mixes with what is behind it")
@@ -509,7 +515,7 @@ private struct SoundSection: View {
     let controller: EditorController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Sound") {}
             SliderRow(label: "Volume", value: min(volume, 1) * 100, range: 0...100, readout: { "\(Int($0.rounded()))%" },
                       onChange: { v in
@@ -555,7 +561,7 @@ private struct FillSection: View {
     let controller: EditorController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Fill") {
                 IconButton(icon: .plus, help: shape.fills.isEmpty ? "Add a fill" : "Add a fill on top") {
                     editShape { s in
@@ -582,7 +588,7 @@ private struct FillSection: View {
         let picture = shape.pictureIndex
         let kinds = picture == nil || picture == i ? ["Solid", "Linear", "Radial", "Angular", "Image"]
                                                    : ["Solid", "Linear", "Radial", "Angular"]
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             InspectorItemTitle(icon: Icon.fillKind(fill.paint.kindName), title: "Fill") {
                 editShape { s in if s.fills.indices.contains(i) { s.fills.remove(at: i) } }
             }
@@ -645,10 +651,10 @@ private struct PictureFields: View {
     let controller: EditorController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
+            HStack(alignment: .top, spacing: Theme.space8) {
                 PictureWell(image: controller.preview(of: paint.mediaID), turns: paint.turns)
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: Theme.space6) {
                     MenuField(value: paint.mode.title, entries: {
                         ImageScaleMode.allCases.map { mode in
                             .item(mode.title, checked: mode == paint.mode) { controller.setPictureMode(layer.id, mode) }
@@ -703,7 +709,7 @@ struct PictureWell: View {
         }
         .frame(width: Theme.pictureWell, height: Theme.pictureWell)
         .clipShape(shape)
-        .overlay(shape.strokeBorder(Theme.edge, lineWidth: 1))
+        .overlay(shape.strokeBorder(Theme.edge, lineWidth: Theme.hairline))
     }
 }
 
@@ -714,11 +720,11 @@ private struct VideoSection: View {
     let controller: EditorController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Video") {}
-            HStack(alignment: .top, spacing: 8) {
+            HStack(alignment: .top, spacing: Theme.space8) {
                 PictureWell(image: controller.preview(of: video.mediaID))
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: Theme.space6) {
                     SegmentRow(selection: video.fit, options: VideoFit.allCases, title: { $0.title }) { fit in
                         controller.edit(layer.id) { l in
                             if case .video(var v) = l.content {
@@ -750,7 +756,7 @@ private struct StrokeSection: View {
     @State private var settingsFrames: [UUID: CGRect] = [:]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Stroke") {
                 IconButton(icon: .plus, help: shape.strokes.isEmpty ? "Add a stroke" : "Add a stroke on top") {
                     editShape { s in
@@ -774,7 +780,7 @@ private struct StrokeSection: View {
     }
 
     @ViewBuilder private func strokeRows(_ stroke: Stroke, index i: Int) -> some View {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: Theme.space8) {
                     InspectorItemTitle(icon: .stroke, title: "Stroke") {
                         editShape { s in if s.strokes.indices.contains(i) { s.strokes.remove(at: i) } }
                     }
@@ -789,7 +795,7 @@ private struct StrokeSection: View {
                                 },
                                 toggle: { editShape { s in if s.strokes.indices.contains(i) { s.strokes[i].isEnabled.toggle() } } },
                                 showsToggle: true)
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.space8) {
                         // An open line has no inside or outside.
                         if shape.geometry.isClosed {
                             MenuField(value: stroke.alignment.rawValue.capitalized, entries: {
@@ -915,7 +921,7 @@ private struct StrokeSettings: View {
             .help("A solid line, dashes, or round dots")
             switch StrokeLine.of(stroke) {
             case .dashed:
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space8) {
                     UnitField(unit: "Dash", value: stroke.dashPattern.first ?? 0, decimals: 1, accepts: { $0 > 0 }) { v in
                         edit { s in s.dashPattern = [v, s.gap] }
                     }
@@ -936,7 +942,7 @@ private struct StrokeSettings: View {
     }
 
     private func titled<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.space6) {
             Text(title)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textSecondary)
@@ -1016,7 +1022,7 @@ struct PaintEditor: View {
     }
 
     private func colorFields(_ color: RGBA, _ make: @escaping (RGBA) -> Paint) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Theme.space6) {
             ColorWell(color: color, size: Theme.control, title: title,
                       onChange: { controller.update(change(make($0))) },
                       onBegin: { controller.begin("Colour") },
@@ -1092,8 +1098,8 @@ struct InspectorItemTitle: View {
     let remove: () -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
-            IconView(icon, size: 15)
+        HStack(spacing: Theme.space6) {
+            IconView(icon, size: Theme.iconRow)
                 .foregroundStyle(Theme.textTertiary)
             Text(title)
                 .font(ThemeFont.label)
@@ -1120,7 +1126,7 @@ private struct SpaceSection: View {
 
     var body: some View {
         let space = layer.space3D
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "3D") {
                 if space == nil {
                     IconButton(icon: .plus, help: "Hold the frame's layers in 3D: each sits at its own depth and turns in one space, seen through one camera, the nearest drawn on top") {
@@ -1138,14 +1144,14 @@ private struct SpaceSection: View {
     }
 
     private func rows(_ space: Space3D) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             SegmentRow(selection: space.isIsometric ? Camera.isometric : .perspective, options: [.perspective, .isometric],
                        title: { $0 == .perspective ? "Perspective" : "Isometric" }) { camera in
                 edit { $0.isIsometric = camera == .isometric }
             }
             .help("Perspective: nearer is larger. Isometric: seen from infinitely far, nothing grows or shrinks with depth.")
             if !space.isIsometric {
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space8) {
                     UnitField(unit: "Distance", value: space.distance, decimals: 0, suffix: "px", accepts: { $0 >= 1 }) { v in
                         edit { $0.distance = v }
                     }
@@ -1171,7 +1177,7 @@ private struct SpaceSection: View {
                 UnitField(unit: "Y", value: space.orbit.y, decimals: 1, suffix: "°") { v in edit { $0.orbit.y = v } }
                     .help("Turns the whole space about the frame's middle, the right going away, as if the camera went round it")
             }
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 UnitField(unit: "Fade", value: space.depthFade * 100, decimals: 0, suffix: "%",
                           accepts: { $0 >= 0 && $0 <= 100 }) { v in
                     edit { $0.depthFade = v / 100 }
@@ -1182,7 +1188,7 @@ private struct SpaceSection: View {
                 }
                 .help("Depth blur: how much blurrier layers grow behind the frame, all of it a frame's length back")
             }
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 UnitField(unit: "Backs", value: space.backOpacity * 100, decimals: 0, suffix: "%",
                           accepts: { $0 >= 0 && $0 <= 100 }) { v in
                     edit { $0.backOpacity = v / 100 }
@@ -1239,7 +1245,7 @@ private struct EffectsSection: View {
     private var showsBend: Bool { canWarp && (addedBend || t.bend != .zero) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Effects") {
                 IconButton(icon: .plus, help: "Add a shadow, a blur, glass, a skew, a tilt or a bend") {
                     var entries: [MenuEntry] = [.item("Drop Shadow", icon: .shadow) { add(.dropShadow(DropShadow())) }]
@@ -1289,12 +1295,12 @@ private struct EffectsSection: View {
     }
 
     private var skewRows: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             titleRow(.skew, "Skew") {
                 addedSkew = false
                 controller.edit(layer.id) { l in l.transform.skew = .zero }
             }
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 UnitField(unit: "X", value: t.skew.x, decimals: 1, suffix: "°") { v in
                     controller.edit(layer.id) { l in l.transform.skew.x = v }
                 }
@@ -1308,12 +1314,12 @@ private struct EffectsSection: View {
     }
 
     private var bendRows: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             titleRow(.bend, "Bend") {
                 addedBend = false
                 controller.edit(layer.id) { l in l.transform.bend = .zero }
             }
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 UnitField(unit: "X", value: t.bend.x, decimals: 1, suffix: "°") { v in
                     controller.edit(layer.id) { l in l.transform.bend.x = v }
                 }
@@ -1327,12 +1333,12 @@ private struct EffectsSection: View {
     }
 
     private var tiltRows: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             titleRow(.tilt, "Tilt") {
                 addedTilt = false
                 controller.edit(layer.id) { l in l.transform.tilt = .none }
             }
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 UnitField(unit: "X", value: t.tilt.x, decimals: 1, suffix: "°") { v in
                     controller.edit(layer.id) { l in l.transform.tilt.x = v }
                 }
@@ -1354,13 +1360,13 @@ private struct EffectsSection: View {
     }
 
     @ViewBuilder private func effectRows(_ effect: Effect, index: Int) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             titleRow(effect.icon, effect.title) {
                 controller.edit(layer.id) { l in l.effects.remove(at: index) }
             }
             switch effect.kind {
             case .dropShadow(let s), .innerShadow(let s):
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space8) {
                     ColorWell(color: s.color, size: Theme.control, title: "Shadow",
                               onChange: { c in controller.update([withShadow(index) { $0.color = c }]) },
                               onBegin: { controller.begin("Shadow Colour") },
@@ -1376,7 +1382,7 @@ private struct EffectsSection: View {
                     .help("Shadow opacity")
                 }
                 .rowButton { eyeButton(effect, index) }
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space8) {
                     field(index, "X", s.offset.x) { sh, v in
                         sh.offset = Vec2(v, sh.offset.y)
                     }
@@ -1384,7 +1390,7 @@ private struct EffectsSection: View {
                         sh.offset = Vec2(sh.offset.x, v)
                     }
                 }
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space8) {
                     field(index, "Blur", s.blur, min: 0) { sh, v in sh.blur = v }
                     field(index, "Spread", s.spread) { sh, v in sh.spread = v }
                         .help("Grows the shadow past the shape before it is blurred, or shrinks it with a negative number. Shapes only.")
@@ -1402,7 +1408,7 @@ private struct EffectsSection: View {
                 }
                 .rowButton { eyeButton(effect, index) }
             case .backgroundBlur(let b):
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space8) {
                     UnitField(unit: "Blur", value: b.radius, decimals: 1, accepts: { $0 >= 0 }) { v in
                         editBackgroundBlur(index) { $0.radius = v }
                     }

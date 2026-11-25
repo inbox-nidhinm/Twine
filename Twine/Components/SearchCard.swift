@@ -101,7 +101,7 @@ struct SearchCard: View {
     // MARK: The search box
 
     private var field: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Theme.space10) {
             IconView(isNaming ? .text : .search, size: 18)
                 .foregroundStyle(Theme.textTertiary)
             if let title = stepTitle {
@@ -109,7 +109,7 @@ struct SearchCard: View {
                     .font(ThemeFont.label)
                     .foregroundStyle(Theme.textSecondary)
                     .lineLimit(1)
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, Theme.space6)
                     .frame(height: Theme.control - 4)
                     .background(RoundedRectangle(cornerRadius: Theme.radiusRow).fill(Theme.panelRaised))
                     .fixedSize()
@@ -236,7 +236,7 @@ struct SearchCard: View {
         let lit = index == highlighted
         return ZStack(alignment: .trailing) {
             Button { choose(item) } label: {
-                HStack(spacing: 10) {
+                HStack(spacing: Theme.space10) {
                     if let thumbnail = item.thumbnail {
                         Image(nsImage: thumbnail)
                             .resizable()
@@ -246,7 +246,7 @@ struct SearchCard: View {
                     } else if let swatch = item.swatch {
                         RoundedRectangle(cornerRadius: Theme.radiusSwatchMark)
                             .fill(swatch)
-                            .overlay(RoundedRectangle(cornerRadius: Theme.radiusSwatchMark).strokeBorder(Theme.edge, lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: Theme.radiusSwatchMark).strokeBorder(Theme.edge, lineWidth: Theme.hairline))
                             .frame(width: Theme.searchThumb.width, height: Theme.searchThumb.height)
                     } else {
                         Group {
@@ -269,13 +269,13 @@ struct SearchCard: View {
                     }
                     Spacer(minLength: 8)
                     if item.isOn {
-                        IconView(.check, size: 13).foregroundStyle(Theme.textSecondary)
+                        IconView(.check, size: Theme.iconSmall).foregroundStyle(Theme.textSecondary)
                     }
                     if let shortcut = item.shortcut {
                         Text(shortcut)
                             .font(ThemeFont.label)
                             .foregroundStyle(Theme.textSecondary)
-                            .padding(.horizontal, 5)
+                            .padding(.horizontal, Theme.space5)
                             .frame(minWidth: 20, minHeight: 20)
                             .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
                     }

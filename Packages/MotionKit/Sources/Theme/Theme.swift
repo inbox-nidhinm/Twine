@@ -71,6 +71,8 @@ public enum Theme {
     /// rows (#2E5575, the user's choice), a deep blue apart from the light
     /// blue of a selection. Scenes have no row colour: the bar is enough.
     public static let timelineScene = Color(red: 0x2E / 255, green: 0x55 / 255, blue: 0x75 / 255)
+    /// Where each of a scene's actions runs, shown faintly inside its bar.
+    public static let timelineSceneRun = Color.white.opacity(0.18)
 
     // MARK: Text (text/*)
 
@@ -199,12 +201,49 @@ public enum Theme {
     public static let radiusMenu: CGFloat = 8
     public static let radiusWell: CGFloat = 8
     public static let radiusSwatchMark: CGFloat = 2
+    /// A bar in the timeline: an action's, or a scene's span.
+    public static let radiusBar: CGFloat = 6
 
     /// A button's corner, scaled with its box so buttons of different sizes
     /// still look like one family.
     public static func radius(forButton size: CGFloat) -> CGFloat { max(radiusControl, size * 0.2) }
 
     // MARK: Spacing (space/*)
+
+    /// The spacing scale: gaps and insets that have no role of their own,
+    /// named by their size in points. Views take these in place of bare
+    /// numbers, so every gap in the app is one of a known few (26 November
+    /// 2026, when about two hundred were still written as numbers). A gap
+    /// with a role (a panel's inset, a bar's, a tray's) has its own name
+    /// below.
+    public static let space1: CGFloat = 1
+    public static let space2: CGFloat = 2
+    public static let space3: CGFloat = 3
+    public static let space4: CGFloat = 4
+    public static let space5: CGFloat = 5
+    public static let space6: CGFloat = 6
+    public static let space7: CGFloat = 7
+    public static let space8: CGFloat = 8
+    public static let space10: CGFloat = 10
+    public static let space12: CGFloat = 12
+    public static let space14: CGFloat = 14
+    public static let space16: CGFloat = 16
+    public static let space20: CGFloat = 20
+    public static let space44: CGFloat = 44
+
+    /// Line weights: `hairline` (1) for edges and rules, `line` for outlines
+    /// that must be seen (a focus ring, a drop target, the canvas's own
+    /// handles), `lineHeavy` for marks and rings, `lineShade` for the dark
+    /// line under a gradient's.
+    public static let line: CGFloat = 1.5
+    public static let lineHeavy: CGFloat = 2
+    public static let lineShade: CGFloat = 3
+
+    /// Icon boxes smaller than `icon`: in rows and lists, and the smallest,
+    /// for ticks and chevrons.
+    public static let iconRow: CGFloat = 15
+    public static let iconSmall: CGFloat = 13
+
 
     /// What every panel insets its contents by.
     public static let panelPad: CGFloat = 12

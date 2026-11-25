@@ -24,7 +24,7 @@ struct PaintControls: View {
     @State private var picked: Int?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             if allowsGradients {
                 SegmentRow(selection: paint.kindName, options: ["Solid", "Linear", "Radial", "Angular"], title: { $0 },
                            icon: Icon.fillKind) { kind in
@@ -60,7 +60,7 @@ struct ColorRow: View {
     let edit: EditCallbacks<RGBA>
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Theme.space6) {
             ColorWell(color: color, size: Theme.control, title: title,
                       onChange: edit.live, onBegin: edit.begin, onEnd: edit.end)
             HexField(color: color) { edit.commit($0) }
@@ -81,8 +81,8 @@ struct ShadowControls: View {
     let edit: EditCallbacks<DropShadow>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
+            HStack(spacing: Theme.space6) {
                 ColorWell(color: shadow.color, size: Theme.control, title: "Shadow",
                           onChange: { c in edit.live(with { $0.color = c }) }, onBegin: edit.begin, onEnd: edit.end)
                 HexField(color: shadow.color) { c in edit.commit(with { $0.color = c }) }
@@ -92,11 +92,11 @@ struct ShadowControls: View {
                 .frame(width: Theme.labelWidth)
                 .help("Shadow opacity")
             }
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 UnitField(unit: "X", value: shadow.offset.x, decimals: 1) { v in edit.commit(with { $0.offset.x = v }) }
                 UnitField(unit: "Y", value: shadow.offset.y, decimals: 1) { v in edit.commit(with { $0.offset.y = v }) }
             }
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space8) {
                 UnitField(unit: "Blur", value: shadow.blur, decimals: 1, accepts: { $0 >= 0 }) { v in
                     edit.commit(with { $0.blur = v })
                 }
@@ -126,9 +126,9 @@ struct GlassControls<Button: View>: View {
     @ViewBuilder var button: () -> Button
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space8) {
             LabeledRow(label: "Light") {
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space8) {
                     UnitField(value: glass.lightAngle, decimals: 0, suffix: "°") { v in edit.commit(with { $0.lightAngle = v }) }
                         .help("Where the light comes from: 0° is the top, -45° the top left")
                     UnitField(value: glass.lightIntensity * 100, decimals: 0, suffix: "%", accepts: Self.percent) { v in
@@ -153,6 +153,7 @@ struct GlassControls<Button: View>: View {
             UnitField(value: value * 100, decimals: 0, suffix: "%", accepts: Self.percent) { v in edit.commit(with { set(&$0, v / 100) }) }
         }
         .help(help)
+        .accessibilityLabel(help)
     }
 
     /// A number of pixels from 0; one typed past `most` is taken as `most`.
@@ -164,6 +165,7 @@ struct GlassControls<Button: View>: View {
             }
         }
         .help(help)
+        .accessibilityLabel(help)
     }
 
     private func with(_ change: (inout Glass) -> Void) -> Glass {
@@ -208,7 +210,7 @@ struct PaintSwatch: View {
         }
         .frame(width: size, height: size)
         .clipShape(shape)
-        .overlay(shape.strokeBorder(Theme.edge, lineWidth: 1))
+        .overlay(shape.strokeBorder(Theme.edge, lineWidth: Theme.hairline))
     }
 }
 
