@@ -253,8 +253,8 @@ struct AlignRow: View {
         .rowButton {
             IconButton(icon: .distributeV, help: "Distribute: equal spaces between three or more layers") {
                 menus.show([
-                    .item("Distribute Horizontally  ⌃⌥H", disabled: !controller.canDistribute) { controller.distribute(.x) },
-                    .item("Distribute Vertically  ⌃⌥V", disabled: !controller.canDistribute) { controller.distribute(.y) },
+                    .item("Distribute Horizontally", disabled: !controller.canDistribute, shortcut: "⌃⌥H") { controller.distribute(.x) },
+                    .item("Distribute Vertically", disabled: !controller.canDistribute, shortcut: "⌃⌥V") { controller.distribute(.y) },
                 ], at: CGPoint(x: distributeFrame.maxX - Theme.menuMinWidth, y: distributeFrame.maxY + 4))
             }
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { distributeFrame = $0 }

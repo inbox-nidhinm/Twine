@@ -62,8 +62,19 @@ final class Library {
 
     /// What the shelf shows: everything, or one folder's projects.
     var shownItems: [Item] {
-        guard let selectedFolder else { return items }
-        return items.filter { $0.folder == selectedFolder }
+        var shown = selectedFolder.map { folder in items.filter { $0.folder == folder } } ?? items
+        let wanted = filter.trimmingCharacters(in: .whitespaces)
+        if !wanted.isEmpty { shown = shown.filter { $0.name.localizedCaseInsensitiveContains(wanted) } }
+        // `items` is newest first already.
+        if sortsByName { shown.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending } }
+        return shown
+    }
+
+    /// What is typed in the shelf's search field.
+    var filter = ""
+    /// The shelf by name rather than newest first, kept between launches.
+    var sortsByName = UserDefaults.standard.bool(forKey: "homeSortsByName") {
+        didSet { UserDefaults.standard.set(sortsByName, forKey: "homeSortsByName") }
     }
 
     func count(in folder: Folder) -> Int { items.filter { $0.folder == folder.url }.count }

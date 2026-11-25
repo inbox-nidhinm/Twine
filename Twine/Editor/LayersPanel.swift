@@ -34,14 +34,24 @@ struct LayersPanel: View {
             header
             PanelDivider()
             SectionHeader(title: "Layers")
-                .overlay(alignment: .trailing) { soloSwitch }
+                .overlay(alignment: .trailing) {
+                    HStack(spacing: 0) {
+                        soloSwitch
+                        if !expanded.isEmpty {
+                            IconButton(icon: .chevronUp, help: "Close every group and frame") { expanded = [] }
+                        }
+                    }
+                    .padding(.trailing, Theme.buttonInset)
+                }
             ScrollViewReader { list in
                 ScrollView {
                     // Worked out once, not by every row scanning every layer.
                     let masks = controller.project.maskIDs
+                    let animated = animatedLayers
                     LazyVStack(spacing: 0) {
                         ForEach(rows) { row in
                             LayerRow(row: row, editor: editor, controller: controller, isMask: masks.contains(row.id),
+                                     isAnimated: animated.contains(row.id),
                                      isExpanded: expanded.contains(row.id),
                                      toggleExpanded: { toggle(row.id) },
                                      click: { click(row.id, NSEvent.modifierFlags) })
@@ -107,8 +117,23 @@ struct LayersPanel: View {
             }
             .buttonStyle(.plain)
             .help("Only soloed layers are showing. Click to show them all")
-            .padding(.trailing, Theme.buttonInset)
         }
+    }
+
+    /// Every layer with an action of its own, and every group or frame
+    /// holding one, so a closed group still shows there is movement inside.
+    /// One pass over the actions and one map of parents, never a search a row.
+    private var animatedLayers: Set<UUID> {
+        let project = store.project
+        guard !project.actions.isEmpty else { return [] }
+        let parents = project.parents
+        var ids: Set<UUID> = []
+        for action in project.actions {
+            var current: UUID? = action.targetLayerID
+            // Stops at the first one already in: its way up is in too.
+            while let id = current, ids.insert(id).inserted { current = parents[id] }
+        }
+        return ids
     }
 
     private var soloedLayers: Set<UUID> {
@@ -232,6 +257,8 @@ private struct LayerRow: View {
     let controller: EditorController
     /// Used as another layer's mask.
     let isMask: Bool
+    /// It has actions, or holds a layer that does.
+    var isAnimated = false
     let isExpanded: Bool
     let toggleExpanded: () -> Void
     let click: () -> Void
@@ -271,6 +298,14 @@ private struct LayerRow: View {
                 .help(isMask ? "A mask: the layers in front of it in its group show only where it draws" : "")
             name
             Spacer(minLength: 0)
+            if isAnimated {
+                Circle()
+                    .fill(selected ? Theme.textPrimary : Theme.textTertiary)
+                    .frame(width: Theme.space5, height: Theme.space5)
+                    .frame(width: Theme.space12, height: Theme.listRow)
+                    .help(layer.isGroup ? "Has actions, or holds a layer that does" : "Has actions")
+                    .accessibilityLabel("Animated")
+            }
             if layer.isSoloed || lit {
                 toggle(.solo, on: layer.isSoloed, help: layer.isSoloed ? "Unsolo" : "Solo: show only this") {
                     controller.perform(.setSoloed(switched, !layer.isSoloed))
@@ -428,29 +463,31 @@ extension EditorController {
     func layerMenu(for layer: Layer) -> [MenuEntry] {
         var entries: [MenuEntry] = [
             // The name is edited in its row, so the panel is shown first.
-            .item("Rename") {
+            .item("Rename", shortcut: "⌘R") {
                 self.editor.showLayers = true
                 self.editor.renaming = layer.id
             },
-            .item("Duplicate") { self.duplicateSelectedLayers() },
+            .item("Duplicate", shortcut: "⌘D") { self.duplicateSelectedLayers() },
             .separator,
-            .item("Cut") { self.copySelectedLayers(); self.deleteSelectedLayers() },
-            .item("Copy") { self.copySelectedLayers() },
-            .item("Paste", disabled: !canPaste) { self.paste() },
+            .item("Cut", shortcut: "⌘X") { self.copySelectedLayers(); self.deleteSelectedLayers() },
+            .item("Copy", shortcut: "⌘C") { self.copySelectedLayers() },
+            .item("Paste", disabled: !canPaste, shortcut: "⌘V") { self.paste() },
             .separator,
-            .item("Bring to Front") { self.restack(.front) },
-            .item("Send to Back") { self.restack(.back) },
+            .item("Bring to Front", shortcut: "⌥⌘]") { self.restack(.front) },
+            .item("Bring Forward", shortcut: "⌘]") { self.restack(.forward) },
+            .item("Send Backward", shortcut: "⌘[") { self.restack(.backward) },
+            .item("Send to Back", shortcut: "⌥⌘[") { self.restack(.back) },
             .separator,
-            .item("Group Selection") { self.groupSelection() },
-            .item("Frame Selection") { self.frameSelection() },
+            .item("Group Selection", shortcut: "⌘G") { self.groupSelection() },
+            .item("Frame Selection", shortcut: "⌥⌘G") { self.frameSelection() },
         ]
-        if layer.isGroup { entries.append(.item("Ungroup") { self.ungroupSelection() }) }
+        if layer.isGroup { entries.append(.item("Ungroup", shortcut: "⇧⌘G") { self.ungroupSelection() }) }
         entries.append(layer.isMask ? .item("Remove Mask") { self.removeMask(layer.id) }
-                                    : .item("Use as Mask") { self.useSelectionAsMask() })
+                                    : .item("Use as Mask", shortcut: "⌃⌘M") { self.useSelectionAsMask() })
         // Style is the design's, so it is copied and pasted in Design.
         if editor.mode == .design, LayerStyle.takes(layer) {
-            entries += [.separator, .item("Copy Style") { self.copyStyle(of: layer) }]
-            if canPasteStyle { entries.append(.item("Paste Style") { self.pasteStyle() }) }
+            entries += [.separator, .item("Copy Style", shortcut: "⌥⌘C") { self.copyStyle(of: layer) }]
+            if canPasteStyle { entries.append(.item("Paste Style", shortcut: "⌥⌘V") { self.pasteStyle() }) }
         }
         // Copied actions go onto this layer, or every selected one it is among.
         if editor.mode == .animate, canPasteActions {
@@ -466,7 +503,7 @@ extension EditorController {
             .item(layer.isLocked ? "Unlock" : "Lock") { self.perform(.setLocked(ids, !layer.isLocked)) },
             .item(layer.isVisible ? "Hide" : "Show") { self.perform(.setVisible(ids, !layer.isVisible)) },
             .separator,
-            .item("Delete") { self.deleteSelectedLayers() },
+            .item("Delete", shortcut: "⌫") { self.deleteSelectedLayers() },
         ]
         return entries
     }

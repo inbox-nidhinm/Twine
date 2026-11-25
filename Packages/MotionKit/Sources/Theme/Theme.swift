@@ -81,6 +81,9 @@ public enum Theme {
     public static let textSecondary = Color(white: 0.70)
     /// Placeholders, units, readouts, disabled.
     public static let textTertiary = Color(white: 0.50)
+    /// A field's name and unit inside its box (X, W, px, %): a step brighter
+    /// than `textTertiary`, which on the raised box was hard to read.
+    public static let fieldLabel = Color(white: 0.62)
     /// Text drawn on a white fill, such as a slider readout once the fill
     /// reaches it.
     public static let textOnFill = Color(white: 0.32)
@@ -191,6 +194,12 @@ public enum Theme {
     public static let gradientMarkerPicked: CGFloat = 16
     /// The picked gradient stop's place, beside the gradient bar.
     public static let stopField: CGFloat = 52
+    /// The card the anchor button raises, and a dot of the nine on the button.
+    public static let anchorCard: CGFloat = 132
+    public static let anchorDot: CGFloat = 3
+    /// Home's search field and sort menu, beside the New buttons.
+    public static let homeSearch: CGFloat = 168
+    public static let homeSort: CGFloat = 112
     /// The opacity joined to a fill's or stroke's hex on its one row.
     public static let paintOpacity: CGFloat = 56
 

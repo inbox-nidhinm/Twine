@@ -454,7 +454,7 @@ final class CanvasNSView: NSView {
 
         var handles: [CGPoint] = []
         var anchor: CGPoint?
-        var union: [CGPoint]?
+        let union: [CGPoint]? = nil
         // A selected Resize or Scale shows its handles at its end, to set it;
         // otherwise the layer's own, in Animate too (5 October 2026), where
         // they change its design and its animation follows.
@@ -469,14 +469,10 @@ final class CanvasNSView: NSView {
             // would not, so it is sized in the inspector.
             if !isTilted(id, in: scene) { handles = CanvasHandles.positions(for: view, isLine: isLine(layer)) }
             if !animating, let a = world.apply(layer.anchor) { anchor = compositionToView(a) }
-        } else if selection.count > 1 {
-            let points = outlines.flatMap { $0 }
-            if let first = points.first {
-                let box = points.dropFirst().reduce(CGRect(origin: first, size: .zero)) { $0.union(CGRect(origin: $1, size: .zero)) }
-                union = [CGPoint(x: box.minX, y: box.minY), CGPoint(x: box.maxX, y: box.minY),
-                         CGPoint(x: box.maxX, y: box.maxY), CGPoint(x: box.minX, y: box.maxY)]
-            }
         }
+        // Several layers show their own boxes and no box round them all
+        // (26 November 2026): without handles it only looked resizable. It
+        // comes back, with handles, when several can be resized together.
 
         // A selected layer shows only its box: no wash under the pointer,
         // as the user asked.
@@ -1538,10 +1534,10 @@ final class CanvasNSView: NSView {
         } else {
             controller.deselectAll()
             menus.show([
-                .item("Paste", disabled: !controller.canPaste) { controller.paste() },
-                .item("Select All", disabled: controller.project.layers.isEmpty) { controller.selectAll() },
+                .item("Paste", disabled: !controller.canPaste, shortcut: "⌘V") { controller.paste() },
+                .item("Select All", disabled: controller.project.layers.isEmpty, shortcut: "⌘A") { controller.selectAll() },
                 .separator,
-                .item("Zoom to Fit") { [weak self] in self?.fitToWindow(animated: true) },
+                .item("Zoom to Fit", shortcut: "⌘0") { [weak self] in self?.fitToWindow(animated: true) },
             ], at: origin)
         }
     }

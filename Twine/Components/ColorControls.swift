@@ -83,7 +83,7 @@ struct HexField: View {
             if showsHash {
                 Text("#")
                     .font(ThemeFont.unit)
-                    .foregroundStyle(Theme.textTertiary)
+                    .foregroundStyle(Theme.fieldLabel)
             }
             TextField("", text: $text)
                 .textFieldStyle(.plain)

@@ -110,7 +110,9 @@ struct ExportPanel: View {
                 // Clear of the window's close, minimise and zoom buttons, as
                 // the layers panel's name is.
                 .padding(.top, Theme.space44)
-            Spacer(minLength: Theme.panelPad)
+                .padding(.bottom, Theme.panelPad)
+            // The settings under the name, where the eye lands; Export at
+            // the foot (26 November 2026: all of it sat at the foot before).
             Group {
                 PanelDivider()
                 formatSection
@@ -127,6 +129,8 @@ struct ExportPanel: View {
             }
             .disabled(session.isExporting)
             .opacity(session.isExporting ? 0.5 : 1)
+            PanelDivider()
+            Spacer(minLength: Theme.panelPad)
             PanelDivider()
             actions
         }

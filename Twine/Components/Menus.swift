@@ -16,10 +16,13 @@ struct MenuEntry: Identifiable {
 
     let id = UUID()
     let kind: Kind
+    /// An item's keys, shown at its end, as a system menu shows them.
+    var shortcut: String? = nil
 
     static func item(_ title: String, icon: Icon? = nil, checked: Bool = false, disabled: Bool = false,
-                     _ action: @escaping () -> Void) -> MenuEntry {
-        MenuEntry(kind: .item(title: title, icon: icon, checked: checked, disabled: disabled, action: action))
+                     shortcut: String? = nil, _ action: @escaping () -> Void) -> MenuEntry {
+        MenuEntry(kind: .item(title: title, icon: icon, checked: checked, disabled: disabled, action: action),
+                  shortcut: shortcut)
     }
 
     static let separator = MenuEntry(kind: .separator)
@@ -252,7 +255,7 @@ private struct MenuCard: View {
                         .frame(height: Theme.control, alignment: .bottomLeading)
                 case let .item(title, icon, checked, disabled, action):
                     // One highlight for the pointer and the arrow keys.
-                    MenuItemRow(title: title, icon: icon, checked: checked, disabled: disabled,
+                    MenuItemRow(title: title, icon: icon, checked: checked, disabled: disabled, shortcut: entry.shortcut,
                                 lit: menus.highlighted == index,
                                 hover: { inside in
                                     if inside { menus.highlighted = index } else if menus.highlighted == index { menus.highlighted = nil }
@@ -274,6 +277,7 @@ private struct MenuItemRow: View {
     let icon: Icon?
     let checked: Bool
     let disabled: Bool
+    var shortcut: String? = nil
     /// Whether the pointer or the arrow keys are on this row.
     var lit = false
     var hover: (Bool) -> Void = { _ in }
@@ -291,7 +295,14 @@ private struct MenuItemRow: View {
                 Text(title)
                     .font(ThemeFont.label)
                     .lineLimit(1)
-                Spacer(minLength: 0)
+                Spacer(minLength: shortcut == nil ? 0 : Theme.space20)
+                if let shortcut {
+                    Text(shortcut)
+                        .font(ThemeFont.label)
+                        .foregroundStyle(lit && !disabled ? Theme.textPrimary.opacity(0.8) : Theme.textTertiary)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
             }
             .foregroundStyle(disabled ? Theme.textTertiary.opacity(0.6) : Theme.textPrimary)
             .padding(.horizontal, Theme.space6)

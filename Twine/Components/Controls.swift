@@ -384,12 +384,12 @@ struct UnitField: View {
         HStack(spacing: Theme.space5) {
             if let icon {
                 IconView(icon, size: Theme.iconSmall)
-                    .foregroundStyle(Theme.textTertiary)
+                    .foregroundStyle(Theme.fieldLabel)
             } else if !unit.isEmpty {
                 // Never cut short: the number gives way first.
                 Text(unit)
                     .font(ThemeFont.unit)
-                    .foregroundStyle(Theme.textTertiary)
+                    .foregroundStyle(Theme.fieldLabel)
                     .fixedSize()
             }
             TextField("", text: $text)
@@ -566,12 +566,12 @@ struct OptionalField: View {
         HStack(spacing: Theme.space5) {
             if let icon {
                 IconView(icon, size: Theme.iconSmall)
-                    .foregroundStyle(Theme.textTertiary)
+                    .foregroundStyle(Theme.fieldLabel)
             } else if !unit.isEmpty {
                 // Never cut short: the number gives way first.
                 Text(unit)
                     .font(ThemeFont.unit)
-                    .foregroundStyle(Theme.textTertiary)
+                    .foregroundStyle(Theme.fieldLabel)
                     .fixedSize()
             }
             TextField("", text: $text, prompt: Text(mixed ? UnitField.mixedText : format(placeholder)).foregroundStyle(Theme.textTertiary))
@@ -1002,7 +1002,7 @@ struct UnitSuffix: View {
     var body: some View {
         Text(text)
             .font(ThemeFont.label)
-            .foregroundStyle(Theme.textTertiary)
+            .foregroundStyle(Theme.fieldLabel)
             .lineLimit(1)
             .fixedSize()
     }

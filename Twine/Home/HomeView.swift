@@ -139,14 +139,14 @@ struct HomeView: View {
                         }
                     ForEach(library.folders) { folder in folderRow(folder) }
 
-                    // Under the folders: a dim row that turns into the new one's name.
+                    // Under the folders: a row that turns into the new one's name.
                     if addingFolder {
                         nameField(placeholder: "Folder name", onSubmit: endNewFolder, onCancel: {
                             folderDraft = ""
                             addingFolder = false
                         })
                     } else {
-                        sidebarRow("New Folder", dim: true) {
+                        sidebarRow("New Folder", icon: .plus) {
                             folderDraft = ""
                             renamingFolder = nil
                             addingFolder = true
@@ -303,6 +303,13 @@ struct HomeView: View {
                     .displayTitle(21)
                     .foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 0)
+                searchField
+                MenuField(value: library.sortsByName ? "Name" : "Last edited", entries: {
+                    [.item("Last edited", checked: !library.sortsByName) { library.sortsByName = false },
+                     .item("Name", checked: library.sortsByName) { library.sortsByName = true }]
+                }, height: Theme.button)
+                .frame(width: Theme.homeSort)
+                .help("The order the projects are shown in")
                 PanelButton(title: "New from Template", icon: .template) { library.pickingTemplate = true }
                     .fixedSize()
                     .help("A new project holding a template, as long as one loop of it")
@@ -327,13 +334,35 @@ struct HomeView: View {
                           alignment: .leading, spacing: gutter) {
                     // An empty shelf shows where a project starts, in the
                     // place the first card will take.
-                    if library.shownItems.isEmpty { newProjectTile }
+                    if library.shownItems.isEmpty && library.filter.isEmpty { newProjectTile }
                     ForEach(library.shownItems) { item in projectCard(item) }
                 }
                 .padding(margin)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Narrows the shelf to the projects whose names hold what is typed;
+    /// Escape empties it.
+    private var searchField: some View {
+        HStack(spacing: Theme.space6) {
+            IconView(.search, size: Theme.iconRow)
+                .foregroundStyle(Theme.textTertiary)
+            TextField("Search", text: $library.filter)
+                .textFieldStyle(.plain)
+                .font(ThemeFont.label)
+                .foregroundStyle(Theme.textPrimary)
+                .autocorrectionDisabled()
+                .onExitCommand {
+                    library.filter = ""
+                    MainWindow.window.makeFirstResponder(nil)
+                }
+        }
+        .padding(.horizontal, Theme.space8)
+        .frame(width: Theme.homeSearch, height: Theme.button)
+        .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised.opacity(0.5)))
+        .help("Show only the projects whose names hold this")
     }
 
     /// A card's worth of dashed outline with a plus: New Project, on an

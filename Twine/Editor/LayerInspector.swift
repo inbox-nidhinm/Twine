@@ -108,8 +108,9 @@ struct LayerInspector: View {
 
     // MARK: Position
 
-    /// Where the layer sits: lined up with the composition, its place, its
-    /// turn, and the point it turns about.
+    /// Where the layer sits: lined up with the composition, its place, and,
+    /// from the button beside it, the point it turns about. Its turn is in
+    /// Layout, beside its corners.
     private var positionSection: some View {
         VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Position") {}
@@ -124,6 +125,7 @@ struct LayerInspector: View {
                     }
                 }
                 .help("Where the anchor point sits, in pixels")
+                .rowButton { AnchorButton(layer: layer, controller: controller) }
                 // Z shows in a frame in 3D, and wherever one is set.
                 if t.z != 0 || controller.project.space3D(holding: layer.id) != nil {
                     HStack(spacing: Theme.space8) {
@@ -131,16 +133,6 @@ struct LayerInspector: View {
                             .help("How far towards you it sits, in pixels; negative is further away")
                         Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
                     }
-                }
-                HStack(alignment: .top, spacing: Theme.space8) {
-                    UnitField(unit: "R", value: t.rotation, decimals: 1, suffix: "°") { v in
-                        controller.edit(layer.id) { l in l.transform.rotation = v }
-                    }
-                    .help("Rotation in degrees, clockwise")
-                    AnchorPicker(chosen: anchorFraction) { fx, fy in
-                        controller.edit(layer.id) { l in moveAnchor(&l, x: l.size.width * fx, y: l.size.height * fy) }
-                    }
-                    .help("The point the layer turns and scales about: a corner, the middle of an edge, or the centre")
                 }
             }
             .gridBody()
@@ -165,7 +157,8 @@ struct LayerInspector: View {
                     .rowButton { widthHeightLink }
                 }
                 scaleRow
-                if let geometry = layer.look?.geometry { shapeFields(geometry) }
+                // The turn, beside the corners where the shape has them.
+                if let geometry = layer.look?.geometry { shapeFields(geometry) } else { rotationAlone }
                 if case .group(let group) = layer.content {
                     CheckRow(label: "Clip content", isOn: group.clipsContent) {
                         controller.edit(layer.id) { l in
@@ -198,15 +191,26 @@ struct LayerInspector: View {
         }
     }
 
-    /// Where the anchor sits as fractions of the box, when it is on one of
-    /// the nine points the picker offers.
-    private var anchorFraction: (Double, Double)? {
-        let size = layer.size
-        guard size.width > 0, size.height > 0 else { return nil }
-        let fx = t.anchor.x / size.width, fy = t.anchor.y / size.height
-        func snapped(_ f: Double) -> Double? { [0, 0.5, 1].first { abs($0 - f) < 1e-6 } }
-        guard let x = snapped(fx), let y = snapped(fy) else { return nil }
-        return (x, y)
+    private var rotationField: some View {
+        UnitField(unit: "R", value: t.rotation, decimals: 1, suffix: "°") { v in
+            controller.edit(layer.id) { l in l.transform.rotation = v }
+        }
+        .help("Rotation in degrees, clockwise")
+    }
+
+    /// The turn in half a row, where the shape has no corners to sit beside.
+    private var rotationAlone: some View {
+        HStack(spacing: Theme.space8) {
+            rotationField
+            Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+        }
+    }
+
+    private var rotationAndRadius: some View {
+        HStack(spacing: Theme.space8) {
+            rotationField
+            cornerRadiusField
+        }
     }
 
     /// Both ways always, with their own link in the column.
@@ -253,16 +257,6 @@ struct LayerInspector: View {
     }
 
 
-    /// Typing an anchor moves the anchor, not the layer.
-    private func moveAnchor(_ l: inout Layer, x: Double? = nil, y: Double? = nil) {
-        let anchor = l.transform.anchor
-        let target = Vec2(x ?? anchor.x, y ?? anchor.y)
-        let old = Affine.layer(position: l.transform.position, anchor: anchor,
-                               scale: l.transform.scale, rotation: l.transform.rotation, skew: l.transform.skew)
-        l.transform.anchor = target
-        l.transform.position = old.apply(target)
-    }
-
     // MARK: Shape
 
     @ViewBuilder private func shapeFields(_ geometry: ShapeGeometry) -> some View {
@@ -270,7 +264,7 @@ struct LayerInspector: View {
         case .rectangle(let radii):
             let r = radii
             VStack(alignment: .leading, spacing: Theme.space8) {
-                cornerRadiusField
+                rotationAndRadius
                 .rowButton {
                     IconButton(icon: .corners, help: perCorner ? "One radius for every corner" : "A radius for each corner") {
                         perCorner.toggle()
@@ -289,27 +283,28 @@ struct LayerInspector: View {
             }
         case .polygon(let sides, let corner):
             VStack(alignment: .leading, spacing: Theme.space8) {
+                rotationAndRadius
                 UnitField(unit: "Sides", value: Double(sides), step: 0.2, accepts: { $0 >= 3 && $0 <= 60 }) { v in
                     setGeometry(.polygon(sides: Int(v.rounded()), cornerRadius: corner))
                 }
                 .help("How many sides, from 3 to 60")
-                cornerRadiusField
             }
         case .star(let points, let inner, let corner):
             VStack(alignment: .leading, spacing: Theme.space8) {
-                UnitField(unit: "Points", value: Double(points), step: 0.2, accepts: { $0 >= 3 && $0 <= 60 }) { v in
-                    setGeometry(.star(points: Int(v.rounded()), innerRadius: inner, cornerRadius: corner))
-                }
-                .help("How many points, from 3 to 60")
+                rotationAndRadius
                 HStack(spacing: Theme.space8) {
+                    UnitField(unit: "Points", value: Double(points), step: 0.2, accepts: { $0 >= 3 && $0 <= 60 }) { v in
+                        setGeometry(.star(points: Int(v.rounded()), innerRadius: inner, cornerRadius: corner))
+                    }
+                    .help("How many points, from 3 to 60")
                     UnitField(unit: "Inner", value: inner * 100, decimals: 1, suffix: "%", accepts: { $0 >= 0 }) { v in
                         setGeometry(.star(points: points, innerRadius: v / 100, cornerRadius: corner))
                     }
                     .help("How far in the inner points sit, as a share of the outer ones")
-                    cornerRadiusField
                 }
             }
         case .ellipse(let arc):
+            rotationAlone
             // One joined field, as Figma has it: where the slice starts, how
             // much of a full turn it sweeps, and the hole in the middle.
             JoinedFields {
@@ -330,9 +325,9 @@ struct LayerInspector: View {
                 .help("Ratio: the hole in the middle, as a share of the ellipse. 0% is solid, 80% a thin ring.")
             }
         case .path:
-            cornerRadiusField
+            rotationAndRadius
         case .line:
-            EmptyView()
+            rotationAlone
         }
     }
 
@@ -353,7 +348,7 @@ struct LayerInspector: View {
             radii = [r.topLeft, r.topRight, r.bottomRight, r.bottomLeft]
         }
         let shared = radii.allSatisfy { $0 == radii.first } ? radii.first : nil
-        return OptionalField(unit: "Radius", value: shared, placeholder: radii.max() ?? 0, decimals: 1,
+        return OptionalField(icon: .cornerTopLeft, value: shared, placeholder: radii.max() ?? 0, decimals: 1,
                              accepts: { $0 >= 0 }) { v in
             guard let v else { return }
             if CornerEditing.hasCorners(layer) {
@@ -399,6 +394,90 @@ struct LayerInspector: View {
 }
 
 // MARK: - Anchor
+
+extension Layer {
+    /// Where the anchor sits as fractions of the box, when it is on one of
+    /// the nine points the picker offers.
+    var anchorFraction: (Double, Double)? {
+        guard size.width > 0, size.height > 0 else { return nil }
+        let fx = transform.anchor.x / size.width, fy = transform.anchor.y / size.height
+        func snapped(_ f: Double) -> Double? { [0, 0.5, 1].first { abs($0 - f) < 1e-6 } }
+        guard let x = snapped(fx), let y = snapped(fy) else { return nil }
+        return (x, y)
+    }
+
+    /// Moves the anchor, not the layer: its position follows, so it stays
+    /// where it is drawn.
+    mutating func moveAnchor(to target: Vec2) {
+        let old = Affine.layer(position: transform.position, anchor: transform.anchor,
+                               scale: transform.scale, rotation: transform.rotation, skew: transform.skew)
+        transform.anchor = target
+        transform.position = old.apply(target)
+    }
+}
+
+/// The anchor in the button column beside X and Y (26 November 2026; a box
+/// of nine points across half the panel before): nine dots, the anchor's
+/// lit, which raise the picker on a card.
+private struct AnchorButton: View {
+    let layer: Layer
+    let controller: EditorController
+
+    @Environment(MenuHost.self) private var menus
+    @State private var frame: CGRect = .zero
+    @State private var hovering = false
+
+    private let fractions: [Double] = [0, 0.5, 1]
+
+    var body: some View {
+        let chosen = layer.anchorFraction
+        Button {
+            let id = layer.id
+            // Under the button, its right edge on the button's.
+            menus.showPopup(at: CGPoint(x: frame.maxX - Theme.anchorCard, y: frame.maxY + Theme.space4)) {
+                AnchorCard(layerID: id, controller: controller)
+            }
+        } label: {
+            VStack(spacing: Theme.space3) {
+                ForEach(fractions, id: \.self) { fy in
+                    HStack(spacing: Theme.space3) {
+                        ForEach(fractions, id: \.self) { fx in
+                            Circle()
+                                .fill(chosen.map { $0.0 == fx && $0.1 == fy } ?? false ? Theme.textPrimary
+                                      : hovering ? Theme.textSecondary : Theme.textTertiary)
+                                .frame(width: Theme.anchorDot, height: Theme.anchorDot)
+                        }
+                    }
+                }
+            }
+            .frame(width: Theme.control, height: Theme.control)
+            .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(hovering ? Theme.panelRaised : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+        .help("Anchor: the point the layer turns and scales about")
+        .accessibilityLabel("Anchor")
+    }
+}
+
+/// The nine anchor points on a card, reading the layer afresh so the lit
+/// point follows each pick.
+private struct AnchorCard: View {
+    let layerID: UUID
+    let controller: EditorController
+
+    var body: some View {
+        PopupCard(title: "Anchor", width: Theme.anchorCard) {
+            if let layer = controller.project.layer(withID: layerID) {
+                AnchorPicker(chosen: layer.anchorFraction) { fx, fy in
+                    controller.edit(layerID) { l in l.moveAnchor(to: Vec2(l.size.width * fx, l.size.height * fy)) }
+                }
+            }
+        }
+    }
+}
 
 /// The nine places an anchor can go, as a small box: its corners, the
 /// middles of its edges and its centre. The chosen one is filled; an anchor
