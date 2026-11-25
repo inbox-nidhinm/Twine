@@ -184,6 +184,14 @@ struct MenuLayer: View {
                             .onTapGesture { menus.dismiss() }
                     }
 
+                    // A card alone still needs something the size of the
+                    // window beside it: alignment guides place a view
+                    // against its siblings, and with none the card sat in
+                    // the window's top-left corner (since cards began
+                    // letting presses through, v0.2.63). It takes no presses.
+                    if menus.popup != nil && menus.entries.isEmpty {
+                        Color.clear.allowsHitTesting(false)
+                    }
                     if let popup = menus.popup {
                         placed(AnyView(popup.onGeometryChange(for: CGRect.self) { $0.frame(in: .global) }
                                            action: { menus.popupFrame = $0 }),
