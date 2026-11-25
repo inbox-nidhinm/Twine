@@ -76,9 +76,14 @@ public enum Theme {
     /// A template's tile on Home's New from Template screen, and under the pointer.
     public static let templateTile = Color(red: 0x41 / 255, green: 0x41 / 255, blue: 0x41 / 255)
     public static let templateTileHover = Color(red: 0x4A / 255, green: 0x4A / 255, blue: 0x4A / 255)
-    /// The playhead: its line down the timeline and the pill in the ruler
-    /// that carries the time. Teal, so it never reads as a selection.
-    public static let playhead = Color(red: 0x2B / 255, green: 0x88 / 255, blue: 0x85 / 255)
+    /// The playhead: its line down the timeline and its handle in the
+    /// ruler, white as DialKit's slider handle, so it never reads as a
+    /// selection. The time it is at sits beside the play controls.
+    public static let playhead = Color.white.opacity(0.95)
+    /// The ruler's ticks between its numbers (dial/border-hover).
+    public static let rulerTick = Color.white.opacity(0.15)
+    /// A timeline track: the strip each row's bars run along (dial/surface).
+    public static let track = Color.white.opacity(0.05)
     /// The stand-in shape that plays each preset in the preset picker: light,
     /// as a layer on the canvas would be, on the tile's raised grey.
     public static let previewShape = Color(white: 0.86)
@@ -223,7 +228,7 @@ public enum Theme {
     /// The box of a check mark.
     public static let checkbox: CGFloat = 14
     /// Slider tracks: the whole row.
-    public static let track: CGFloat = control
+    public static let trackHeight: CGFloat = control
     /// A picture's thumbnail in the inspector: as tall as two rows of
     /// controls with the gap between them.
     public static let pictureWell: CGFloat = panelRow + rowGap + button

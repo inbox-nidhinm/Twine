@@ -82,8 +82,8 @@ struct SceneNameCard: View {
 
 // MARK: - Transport
 
-/// The play controls, centred over the labels. The time itself rides in the
-/// playhead's pill in the ruler.
+/// The play controls over the labels, and at their right the time the
+/// playhead is at, as the DialKit screens have them.
 private struct TransportBar: View {
     let controller: EditorController
     @Bindable var editor: EditorModel
@@ -100,7 +100,11 @@ private struct TransportBar: View {
             BarButton(icon: .loop, help: editor.loops ? "Looping: playback starts over at the end" : "Stops at the end",
                       isOn: editor.loops, size: Theme.transportButton, iconBox: Theme.transportIcon, hoverFill: .clear,
                       onFill: Theme.chosen, hoverLights: true) { editor.loops.toggle() }
+            Spacer(minLength: 0)
+            PlayheadTime(controller: controller, editor: editor)
         }
+        .padding(.leading, Theme.panelPad + Theme.space6)
+        .padding(.trailing, Theme.panelPad)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -108,5 +112,22 @@ private struct TransportBar: View {
     private func button(_ icon: Icon, _ help: String, lit: Bool = false, _ action: @escaping () -> Void) -> some View {
         BarButton(icon: icon, help: help, size: Theme.transportButton, iconBox: Theme.transportIcon, hoverFill: .clear,
                   lit: lit, hoverLights: true, action: action)
+    }
+}
+
+/// The playhead's time, in seconds to two places or in frames, as the
+/// ruler counts. A view of its own, so playing redraws only it.
+private struct PlayheadTime: View {
+    let controller: EditorController
+    let editor: EditorModel
+
+    var body: some View {
+        let t = editor.time
+        Text(editor.showsFrames ? "\(controller.frameRate.frame(at: t)) f" : TimelineRulerView.pillFormat(t) + " s")
+            .font(ThemeFont.label)
+            .monospacedDigit()
+            .foregroundStyle(Theme.textPrimary)
+            .lineLimit(1)
+            .fixedSize()
     }
 }

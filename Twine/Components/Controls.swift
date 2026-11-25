@@ -150,7 +150,7 @@ private struct PillTrack: View {
                     // The value's own button, over the track's drag.
                     Button { typing = true } label: {
                         Color.clear
-                            .frame(width: Theme.paintOpacity, height: Theme.track)
+                            .frame(width: Theme.paintOpacity, height: Theme.trackHeight)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -159,7 +159,7 @@ private struct PillTrack: View {
                 }
             }
         }
-        .frame(height: Theme.track)
+        .frame(height: Theme.trackHeight)
     }
 
     /// The readout's number, its unit left off.

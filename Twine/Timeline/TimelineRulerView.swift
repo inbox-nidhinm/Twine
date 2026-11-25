@@ -54,10 +54,10 @@ final class TimelineRulerView: NSView {
         let minor = step / 5
         var t = (viewport.start / minor).rounded(.down) * minor
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular),
+            .font: NSFont.monospacedDigitSystemFont(ofSize: Self.labelSize, weight: .medium),
             .foregroundColor: NSColor(Theme.textTertiary),
         ]
-        ctx.setFillColor(NSColor(Theme.textTertiary).withAlphaComponent(0.7).cgColor)
+        ctx.setFillColor(NSColor(Theme.rulerTick).cgColor)
         while viewport.x(for: t) <= bounds.width + 40 {
             let x = viewport.x(for: t)
             let major = abs((t / step).rounded() * step - t) < minor / 10
@@ -66,8 +66,13 @@ final class TimelineRulerView: NSView {
                     let label = (controller.editor.showsFrames ? "\(rate.frame(at: t))" : Self.format(t)) as NSString
                     let size = label.size(withAttributes: attributes)
                     label.draw(at: CGPoint(x: x - size.width / 2, y: mid - size.height / 2), withAttributes: attributes)
-                } else {
-                    ctx.fillEllipse(in: CGRect(x: x - 1.25, y: mid - 1.25, width: 2.5, height: 2.5))
+                } else if abs(x - viewport.x(for: (t / step).rounded() * step)) >= Self.tickClearance {
+                    // DialKit's hashmarks: short upright ticks, kept clear
+                    // of the numbers.
+                    let tick = CGRect(x: x - Theme.hairline / 2, y: mid - Self.tickHeight / 2,
+                                      width: Theme.hairline, height: Self.tickHeight)
+                    ctx.addPath(CGPath(roundedRect: tick, cornerWidth: Theme.hairline / 2, cornerHeight: Theme.hairline / 2, transform: nil))
+                    ctx.fillPath()
                 }
             }
             t += minor
@@ -78,29 +83,32 @@ final class TimelineRulerView: NSView {
         ctx.setFillColor(NSColor(Theme.textTertiary).cgColor)
         ctx.fill(CGRect(x: ex - 0.5, y: 0, width: 1, height: bounds.height))
 
-        // The playhead: its line, and a pill carrying the time.
+        // The playhead: its line, and a handle as DialKit's slider has,
+        // white; the time it is at sits beside the play controls.
         let px = viewport.x(for: controller.editor.time).rounded() + 0.5
-        let teal = NSColor(Theme.playhead).cgColor
-        ctx.setFillColor(teal)
+        ctx.setFillColor(NSColor(Theme.playhead).cgColor)
         ctx.fill(CGRect(x: px - 0.5, y: mid, width: 1, height: bounds.height - mid))
-        let time = (controller.editor.showsFrames ? "\(rate.frame(at: controller.editor.time))"
-                                                   : Self.pillFormat(controller.editor.time)) as NSString
-        let pillText: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
-            .foregroundColor: NSColor(Theme.textOnColor),
-        ]
-        let size = time.size(withAttributes: pillText)
-        var pill = CGRect(x: px - (size.width + 22) / 2, y: mid - 11, width: size.width + 22, height: 22)
-        // Whole while the playhead is in view: at either end the pill is
+        var handle = CGRect(x: px - Self.handleWidth / 2, y: mid - Self.handleHeight / 2,
+                            width: Self.handleWidth, height: Self.handleHeight)
+        // Whole while the playhead is in view: at either end the handle is
         // pushed in, and the line still marks the time.
         if px >= 0, px <= bounds.width {
-            pill.origin.x = min(max(pill.minX, 0), bounds.width - pill.width)
+            handle.origin.x = min(max(handle.minX, 0), bounds.width - handle.width)
         }
-        pillRect = pill
-        ctx.addPath(CGPath(roundedRect: pill, cornerWidth: 11, cornerHeight: 11, transform: nil))
+        ctx.addPath(CGPath(roundedRect: handle, cornerWidth: Self.handleWidth / 2, cornerHeight: Self.handleWidth / 2, transform: nil))
         ctx.fillPath()
-        time.draw(at: CGPoint(x: pill.midX - size.width / 2, y: pill.midY - size.height / 2), withAttributes: pillText)
+        // Grabbed by a wider box than it is drawn.
+        pillRect = handle.insetBy(dx: -Self.handleGrab, dy: 0)
     }
+
+    /// The ruler's numbers, its ticks, and the playhead's handle and the
+    /// reach either side of it that grabs it.
+    static let labelSize: CGFloat = 11
+    static let tickHeight: CGFloat = 8
+    static let tickClearance: CGFloat = 18
+    static let handleWidth: CGFloat = 3
+    static let handleHeight: CGFloat = 20
+    static let handleGrab: CGFloat = 6
 
     /// The playhead's time in its pill: seconds to two places, as `1.18`,
     /// and minutes and seconds past a minute.
@@ -118,7 +126,7 @@ final class TimelineRulerView: NSView {
     }
 
     static func format(_ t: Double) -> String {
-        t >= 60 ? TimeFormat.clock(t) : "\(Int(t.rounded()))s"
+        t >= 60 ? TimeFormat.clock(t) : "\(Int(t.rounded())) s"
     }
 
     // MARK: Scrubbing

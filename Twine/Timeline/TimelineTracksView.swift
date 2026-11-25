@@ -100,7 +100,13 @@ final class TimelineTracksView: NSView {
     /// The eye's square at the right of a label.
     static let eyeBox = 22.0
     /// Where a label's words start, leaving room for the fold chevron.
-    static let labelInset = 18.0
+    static let labelInset = 20.0
+    /// The labels' type and its line, as the panels' rows (13 pt).
+    static let labelSize = 13.0
+    static let labelLine = 16.0
+    /// An action's name on its bar (Dial/Small), and how far in it starts.
+    static let barTextSize = 11.0
+    static let barTextInset = 8.0
     /// How much further in a scene's rows start, under their scene's line.
     static let sceneIndent = 10.0
     static let chevronSize = 12.0
@@ -401,30 +407,24 @@ final class TimelineTracksView: NSView {
         let action = row.action
         // A folded row counts as selected when any of its actions is.
         let selected = row.actions.contains { selectedActions.contains($0.id) }
-        let full = CGRect(x: 0, y: row.y, width: bounds.width, height: TimelineRow.height)
         let label = CGRect(x: 0, y: row.y, width: gutter, height: TimelineRow.height)
 
-        // The row: a selected row's colour on its label when its action is
-        // selected, as a layers panel row has, and fainter across its
-        // track, where the bar itself takes the accent; a tint when only
-        // its layer is.
-        if selected {
-            ctx.setFillColor(NSColor(Theme.rowSelected).withAlphaComponent(0.4).cgColor)
-            ctx.fill(full)
-            ctx.setFillColor(NSColor(Theme.rowSelected).cgColor)
-            ctx.fill(label)
-        } else if layerSelected {
-            ctx.setFillColor(NSColor(Theme.rowHover).cgColor)
-            ctx.fill(full)
+        // The track: a DialKit row's strip, its bars running along it.
+        let edge = TimelineRow.trackInset
+        let track = CGRect(x: gutter + edge, y: row.y + edge,
+                           width: max(bounds.width - gutter - edge * 2, 0), height: TimelineRow.height - edge * 2)
+        ctx.addPath(CGPath(roundedRect: track, cornerWidth: Theme.radiusRow, cornerHeight: Theme.radiusRow, transform: nil))
+        ctx.setFillColor(NSColor(Theme.track).cgColor)
+        ctx.fillPath()
+        // The label: a selected row's blue when its action is selected, as
+        // a layers panel row has, rounded as a DialKit row; a tint when only
+        // its layer is, or under the pointer.
+        let pill = label.insetBy(dx: Theme.space4, dy: edge)
+        if selected || layerSelected || hoveredLabel == index {
+            ctx.addPath(CGPath(roundedRect: pill, cornerWidth: Theme.radiusRow, cornerHeight: Theme.radiusRow, transform: nil))
+            ctx.setFillColor(NSColor(selected ? Theme.rowSelected : Theme.rowHover).cgColor)
+            ctx.fillPath()
         }
-        // Under the pointer, the label lights up as a layers panel row does.
-        if hoveredLabel == index, !selected {
-            ctx.setFillColor(NSColor(Theme.rowHover).cgColor)
-            ctx.fill(label)
-        }
-        // The faint line under every row.
-        ctx.setFillColor(NSColor(Theme.border).withAlphaComponent(0.45).cgColor)
-        ctx.fill(CGRect(x: 0, y: row.y + TimelineRow.height - 1, width: bounds.width, height: 1))
         // Down the left of a scene's rows, its line.
         if row.inScene != nil {
             ctx.setFillColor(NSColor(Theme.timelineScene).cgColor)
@@ -435,7 +435,7 @@ final class TimelineTracksView: NSView {
         // The label: layer, then action.
         let dimmed = row.folded == nil ? !action.isEnabled : row.actions.allSatisfy { !$0.isEnabled }
         let primary = NSColor(selected ? Theme.textPrimary : dimmed ? Theme.textTertiary : Theme.textPrimary)
-        let secondary = NSColor(selected ? Theme.textPrimary : Theme.textTertiary).withAlphaComponent(selected ? 0.75 : 1)
+        let secondary = NSColor(selected ? Theme.textPrimary : Theme.textSecondary).withAlphaComponent(selected ? 0.75 : 0.85)
         // Under the pointer, and always, crossed out, on an action switched
         // off, as a hidden layer's row shows in the layers panel, so what is
         // off is never missed.
@@ -453,25 +453,22 @@ final class TimelineTracksView: NSView {
         ctx.clip(to: CGRect(x: inset, y: row.y, width: max(room, 0), height: TimelineRow.height))
         let truncating = NSMutableParagraphStyle()
         truncating.lineBreakMode = .byTruncatingTail
-        let layerAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12, weight: .medium),
+        let layerAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: Self.labelSize, weight: .medium),
                                                               .foregroundColor: primary, .paragraphStyle: truncating]
-        let actionAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: secondary,
-                                                               .paragraphStyle: truncating]
+        let actionAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: Self.labelSize),
+                                                               .foregroundColor: secondary, .paragraphStyle: truncating]
         let layerName = row.layerName as NSString
         let actionName = (row.folded.map { "\($0.count) actions" } ?? action.name) as NSString
-        let textY = row.y + (TimelineRow.height - 15) / 2
+        let textY = row.y + (TimelineRow.height - Self.labelLine) / 2
         // The action's name always shows: a long layer name gives way to
         // it, cut short, though never to less than a third of the room.
-        let dotGap = 17.0
+        let nameGap = Theme.space6
         let actionWidth = ceil(actionName.size(withAttributes: actionAttributes).width)
         let layerWidth = min(ceil(layerName.size(withAttributes: layerAttributes).width),
-                             max(room - dotGap - actionWidth, room * 0.35))
-        layerName.draw(in: CGRect(x: inset, y: textY, width: layerWidth, height: 17), withAttributes: layerAttributes)
-        var cursor = inset + layerWidth + 7
-        ctx.setFillColor(secondary.cgColor)
-        ctx.fillEllipse(in: CGRect(x: cursor, y: row.y + TimelineRow.height / 2 - 1.5, width: 3, height: 3))
-        cursor += 10
-        actionName.draw(in: CGRect(x: cursor, y: textY, width: max(inset + room - cursor, 0), height: 17),
+                             max(room - nameGap - actionWidth, room * 0.35))
+        layerName.draw(in: CGRect(x: inset, y: textY, width: layerWidth, height: Self.labelLine + 2), withAttributes: layerAttributes)
+        let cursor = inset + layerWidth + nameGap
+        actionName.draw(in: CGRect(x: cursor, y: textY, width: max(inset + room - cursor, 0), height: Self.labelLine + 2),
                         withAttributes: actionAttributes)
         ctx.restoreGState()
         if showsEye {
@@ -565,8 +562,10 @@ final class TimelineTracksView: NSView {
         } else if case .play(let play) = action.spec {
             drawWaveform(action, play: play, in: rect, selected: selected, ctx: ctx)
         }
-        // Under the pointer, a handle at each end says the ends drag.
-        if hoveredBar == action.id, !action.isInstant, rect.width >= Self.edgeReach * 2.4 {
+        // Selected or under the pointer, a handle at each end says the
+        // ends drag, as the DialKit screens draw a chosen clip.
+        let handles = (hoveredBar == action.id || selected) && !action.isInstant && rect.width >= Self.edgeReach * 2.4
+        if handles {
             let size = Self.handleSize
             ctx.setFillColor(NSColor(Theme.handle).cgColor)
             for x in [rect.minX + Self.handleInset, rect.maxX - Self.handleInset - size.width] {
@@ -574,6 +573,25 @@ final class TimelineTracksView: NSView {
                 ctx.addPath(CGPath(roundedRect: handle, cornerWidth: size.width / 2, cornerHeight: size.width / 2, transform: nil))
             }
             ctx.fillPath()
+        }
+        // The action's name on its bar, where it has room: not on a folded
+        // row, whose bars overlap, nor on an instant one.
+        if row.folded == nil, row.header == nil, !action.isInstant {
+            let lead = handles ? Self.handleInset + Self.handleSize.width + Theme.space5 : Self.barTextInset
+            let room = rect.width - lead - (handles ? Self.handleInset + Self.handleSize.width + Theme.space4 : Self.barTextInset)
+            if room >= Theme.space20 {
+                let truncating = NSMutableParagraphStyle()
+                truncating.lineBreakMode = .byTruncatingTail
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: NSFont.systemFont(ofSize: Self.barTextSize, weight: .medium),
+                    .foregroundColor: NSColor(selected ? Theme.textOnColor : Theme.textPrimary),
+                    .paragraphStyle: truncating,
+                ]
+                let name = action.name as NSString
+                let height = ceil(name.size(withAttributes: attributes).height)
+                name.draw(in: CGRect(x: rect.minX + lead, y: rect.midY - height / 2, width: room, height: height),
+                          withAttributes: attributes)
+            }
         }
         ctx.restoreGState()
     }

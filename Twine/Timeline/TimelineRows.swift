@@ -28,8 +28,11 @@ struct TimelineRow {
     /// layer's actions, or the row's own.
     var actions: [Action] { header != nil ? members : folded ?? [action] }
 
-    /// A row, a little taller than a panel row so a bar is easy to grab.
-    static let height: CGFloat = 34
+    /// A row: one DialKit row, its track inset a little top and bottom.
+    static let height: CGFloat = Theme.control
+    /// How far a track and a selected label sit in from the row's top and
+    /// bottom, leaving the gap between rows.
+    static let trackInset: CGFloat = Theme.space2
     /// The bar inside it.
     static let barHeight: CGFloat = 24
     /// The column of labels down the left, which the transport sits over.
