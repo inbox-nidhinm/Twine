@@ -190,6 +190,12 @@ public enum Theme {
     /// A small glyph button in a row or a header (add, remove, the eye), and
     /// the colour well beside a hex.
     public static let glyph: CGFloat = 24
+    /// The small curve beside an easing's name.
+    public static let easingGlyph = CGSize(width: 10, height: 20)
+    /// The swatch at the right of a fill's or a stroke's row.
+    public static let swatch: CGFloat = 20
+    /// A hex typed into a fill's or a stroke's row, at its right.
+    public static let hexField: CGFloat = 64
     /// The round button a folded panel leaves at the window's corner.
     public static let foldedPanel: CGFloat = 44
     /// A DialKit switch: its track and the round thumb inside it.
@@ -478,7 +484,10 @@ public enum ThemeFont {
         case extraLight = 200
     }
 
-    /// The display face. AA Bridge Slab is one variable font, set here to the
+    /// The display face. On the dialkit branch every title is SF Pro, as the
+    /// DialKit page sets them (Dial/Page Title, Semibold): `light` titles
+    /// are Semibold, the export counter's `extraLight` is Light. On main,
+    /// AA Bridge Slab is one variable font, set here to the
     /// weight and to the optical size matching the size it is drawn at, as a
     /// browser does, so large titles get its finer display cut. It ships
     /// inside this package's resource bundle and is registered with the
@@ -487,14 +496,13 @@ public enum ThemeFont {
     /// default instance is no weight Twine uses. If that fails, the system's
     /// serif shows, which costs a different-looking title rather than a crash.
     public static func display(_ size: CGFloat, _ weight: DisplayWeight = .light) -> Font {
-        guard let font = nsFont(size, weight) else { return .system(size: size, weight: .light, design: .serif) }
-        return Font(font as CTFont)
+        Font(nsFont(size, weight) as CTFont)
     }
 
     /// The widest digit of the display face at `size`, so a counter's
     /// digit keeps one width whichever digit shows.
     public static func displayDigitWidth(_ size: CGFloat, _ weight: DisplayWeight = .light) -> CGFloat {
-        guard let font = nsFont(size, weight) else { return size * 0.62 }
+        let font = nsFont(size, weight)
         return (0...9).map { ("\($0)" as NSString).size(withAttributes: [.font: font]).width }.max() ?? size * 0.62
     }
 
@@ -502,7 +510,7 @@ public enum ThemeFont {
     /// move a line of them down so the figures, not the line, sit centred in
     /// a box of that height.
     public static func displayFigures(_ size: CGFloat, _ weight: DisplayWeight = .light) -> (height: CGFloat, nudge: CGFloat) {
-        guard let font = nsFont(size, weight) else { return (size * 0.72, 0) }
+        let font = nsFont(size, weight)
         // Measured down from the top of a line's box, which runs from the
         // ascender to the descender: the box's middle, and the middle of the
         // figures, which stand from the baseline to the cap height.
@@ -513,14 +521,19 @@ public enum ThemeFont {
 
     /// The gap to add between lines so the display face sits on 130% leading.
     public static func displayLeading(_ size: CGFloat) -> CGFloat {
-        guard let font = nsFont(size, .light) else { return size * 0.3 }
+        let font = nsFont(size, .light)
         let natural = font.ascender - font.descender + font.leading
         return max(0, size * 1.3 - natural)
     }
 
-    /// The display face at `size` and `weight`, or nil when it could not be
-    /// loaded.
-    private static func nsFont(_ size: CGFloat, _ weight: DisplayWeight) -> NSFont? {
+    /// The title face at `size` and `weight`: SF Pro.
+    private static func nsFont(_ size: CGFloat, _ weight: DisplayWeight) -> NSFont {
+        NSFont.systemFont(ofSize: size, weight: weight == .light ? .semibold : .light)
+    }
+
+    /// AA Bridge Slab at `size` and `weight`, as main draws its titles, kept
+    /// for going back to it; nil when it could not be loaded.
+    private static func slabFont(_ size: CGFloat, _ weight: DisplayWeight) -> NSFont? {
         guard let face else { return nil }
         // The axes by their four-letter tags, which Core Text keys by number.
         // The optical size axis runs from 16 to 144.

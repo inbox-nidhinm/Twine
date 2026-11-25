@@ -52,12 +52,7 @@ struct PaintRow: View {
 
     var body: some View {
         HStack(spacing: Theme.space6) {
-            Button(action: open) { swatch }
-                .buttonStyle(.plain)
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
-                .help("Solid colour, gradient or picture")
-                .accessibilityLabel(target.title)
-            fields
+            row
                 .opacity(isEnabled ? 1 : 0.5)
             IconButton(icon: isEnabled ? .eye : .eyeSlash, help: isEnabled ? "Hide the \(name)" : "Show the \(name)",
                        action: toggle)
@@ -65,68 +60,69 @@ struct PaintRow: View {
         .rowButton { IconButton(icon: .minus, help: "Remove the \(name)", action: remove) }
     }
 
+    /// DialKit's colour row: the paint's kind at the left, then its hex (or
+    /// a picture's opacity), and the swatch at the right. The kind and the
+    /// swatch raise the card; the hex is typed in place.
+    private var row: some View {
+        HStack(spacing: Theme.space8) {
+            Button(action: open) {
+                HStack(spacing: 0) {
+                    Text(paint.kindName)
+                        .font(ThemeFont.label)
+                        .foregroundStyle(hovering ? Theme.textPrimary : Theme.fieldLabel)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering = $0 }
+            .help("Solid colour, gradient or picture")
+            value
+            Button(action: open) { swatch }
+                .buttonStyle(.plain)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+                .help("Solid colour, gradient or picture")
+                .accessibilityLabel(target.title)
+        }
+        .padding(.leading, Theme.labelInset)
+        .padding(.trailing, Theme.space8)
+        .frame(height: Theme.control)
+        .background(RoundedRectangle(cornerRadius: Theme.radiusControl)
+            .fill(hovering ? Theme.panelHover : Theme.panelRaised))
+    }
+
     @ViewBuilder private var swatch: some View {
-        let shape = RoundedRectangle(cornerRadius: Theme.radiusControl)
+        let shape = RoundedRectangle(cornerRadius: Theme.radiusSwatchMark * 2)
         if let picture = paint.imagePaint, let image = controller.preview(of: picture.mediaID) {
             Image(decorative: image, scale: 1)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
-                .frame(width: Theme.control, height: Theme.control)
+                .frame(width: Theme.swatch, height: Theme.swatch)
                 .clipShape(shape)
                 .overlay(shape.strokeBorder(Theme.edge, lineWidth: Theme.hairline))
         } else {
-            PaintSwatch(paint: paint)
+            PaintSwatch(paint: paint, size: Theme.swatch)
         }
     }
 
-    @ViewBuilder private var fields: some View {
+    /// A colour's hex, or a picture's opacity; a gradient shows its kind alone.
+    @ViewBuilder private var value: some View {
         if case .solid(let color) = paint {
-            JoinedFields {
-                HexField(color: color, corner: 0, showsHash: false) { commit(.solid($0)) }
-                    .help("The colour as six hex digits")
-                UnitField(corner: 0, value: color.a * 100, decimals: 0, suffix: "%", accepts: { $0 >= 0 && $0 <= 100 }) { v in
-                    var c = color
-                    c.a = v / 100
-                    commit(.solid(c))
-                }
-                .frame(width: Theme.paintOpacity)
-                .help("Opacity of this colour")
-            }
+            HexField(color: color, showsHash: false, bare: true) { commit(.solid($0)) }
+                .frame(width: Theme.hexField)
+                .help("The colour as six hex digits; its opacity is on the card")
         } else if let picture = paint.imagePaint {
-            JoinedFields {
-                kindButton
-                UnitField(corner: 0, value: picture.opacity * 100, decimals: 0, suffix: "%",
-                          accepts: { $0 >= 0 && $0 <= 100 }) { v in
-                    guard let fresh = controller.project.layer(withID: layer.id) else { return }
-                    let edited = PictureEditing.editingPicture(fresh) { $0.opacity = v / 100 }
-                    controller.perform(.batch([.updateLayers([edited])], name: "Image Opacity"))
-                }
-                .frame(width: Theme.paintOpacity)
-                .help("Opacity of the picture")
+            UnitField(value: picture.opacity * 100, decimals: 0, suffix: "%",
+                      accepts: { $0 >= 0 && $0 <= 100 }) { v in
+                guard let fresh = controller.project.layer(withID: layer.id) else { return }
+                let edited = PictureEditing.editingPicture(fresh) { $0.opacity = v / 100 }
+                controller.perform(.batch([.updateLayers([edited])], name: "Image Opacity"))
             }
-        } else {
-            kindButton
-                .clipShape(RoundedRectangle(cornerRadius: Theme.radiusControl))
+            .frame(width: Theme.paintOpacity)
+            .help("Opacity of the picture")
         }
-    }
-
-    /// A gradient's or a picture's kind, where a colour has its hex: a
-    /// button that raises the card, as the swatch does.
-    private var kindButton: some View {
-        Button(action: open) {
-            Text(paint.kindName)
-                .font(ThemeFont.label)
-                .foregroundStyle(Theme.textPrimary)
-                .lineLimit(1)
-                .padding(.horizontal, Theme.space8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: Theme.control)
-                .background(hovering ? Theme.panelHover : Theme.panelRaised)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .help("Change the gradient or the picture")
     }
 
     /// One finished change, made to the layer as it is in the project now.

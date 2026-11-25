@@ -73,6 +73,9 @@ struct HexField: View {
     var corner: CGFloat = Theme.radiusControl
     /// Left out where the row is short of room, as on a fill's row.
     var showsHash = true
+    /// Without its own ground, its digits at the right: inside a row
+    /// that is the field, as a fill's.
+    var bare = false
     let commit: (RGBA) -> Void
 
     @State private var text = ""
@@ -89,6 +92,7 @@ struct HexField: View {
                 .textFieldStyle(.plain)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textPrimary)
+                .multilineTextAlignment(bare ? .trailing : .leading)
                 .autocorrectionDisabled()
                 .liftedFieldText()
                 .focused($focused)
@@ -101,11 +105,17 @@ struct HexField: View {
                 .onAppear { text = color.hex6 }
                 .onChange(of: color) { old, now in if !focused || text == old.hex6 { text = now.hex6 } }
         }
-        .padding(.horizontal, Theme.space8)
+        .padding(.horizontal, bare ? 0 : Theme.space8)
         .frame(height: Theme.control)
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: corner).fill(Theme.panelRaised))
-        .focusRing(focused, corner: corner)
+        .background(RoundedRectangle(cornerRadius: corner).fill(bare ? .clear : Theme.panelRaised))
+        .focusRing(focused && !bare, corner: corner)
+        .overlay(alignment: .bottom) {
+            // Typed into in place, underlined as DialKit's values are.
+            if bare && focused {
+                Rectangle().fill(Theme.fieldLabel).frame(height: Theme.hairline).offset(y: -Theme.space8)
+            }
+        }
         .overlay {
             if !focused { ClickToType { ScrubSurface.focus { focused = true } } }
         }

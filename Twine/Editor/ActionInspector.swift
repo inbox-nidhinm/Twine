@@ -467,24 +467,29 @@ private struct EasingFields: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.space6) {
-            // A real button, so a click always lands. Unnamed: the curve
-            // and its name say what it is.
+            // A real button, so a click always lands. A DialKit select: its
+            // name at the left, the curve and its name at the right.
             Button(action: open) {
                 HStack(spacing: Theme.space8) {
+                    Text("Easing")
+                        .font(ThemeFont.label)
+                        .foregroundStyle(Theme.fieldLabel)
+                        .lineLimit(1)
+                        .fixedSize()
+                    Spacer(minLength: 0)
                     if let shared {
                         EasingPath(easing: shared, low: -0.5, high: 1.5)
                             .stroke(Theme.textSecondary, style: StrokeStyle(lineWidth: Theme.line, lineCap: .round, lineJoin: .round))
-                            .frame(width: 10, height: 20)
+                            .frame(width: Theme.easingGlyph.width, height: Theme.easingGlyph.height)
                     }
                     Text(shared?.title ?? "Mixed")
                         .font(ThemeFont.label)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
-                    Spacer(minLength: 0)
                     IconView(.chevronDown, size: Theme.iconSmall)
-                        .foregroundStyle(Theme.textTertiary)
+                        .foregroundStyle(Theme.textSecondary)
                 }
-                .padding(.horizontal, Theme.space8)
+                .padding(.horizontal, Theme.labelInset)
                 .frame(height: Theme.panelRow)
                 .frame(maxWidth: .infinity)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl)

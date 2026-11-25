@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 283
+    static let pushes = 284
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -45,6 +45,7 @@ enum VersionHistory {
             "The DialKit panel heads: the inspector names what is selected (a layer with its kind and size, an action with its layer and when it runs, the composition with nothing selected) over the Design and Animate switch and a blue Export. Each panel's chevron folds it away to a round button at the window's corner, which brings it back.",
             "Design's rows as the DialKit screens draw them: Rotation and an Anchor menu join X and Y in Position; Radius and Scale are sliders in Layout (Scale splits into SX and SY when unlinked); Blend is a menu row and Opacity a slider in Appearance. A slider's value can be clicked and typed. Every Design section folds from its chevron and stays folded from layer to layer. Animate's first section is Timing, the action's name having moved to the head.",
             "The DialKit timeline: 36 pt rows, each a rounded grey track, with a selected row's label a rounded blue pill; each action's name on its bar, a selected bar showing its end handles; the ruler's numbers with DialKit's thin ticks between them; a white playhead with a thin handle in place of the teal pill, and the time it is at beside the play controls.",
+            "The DialKit finish: a fill's or a stroke's row is one DialKit row, its kind at the left, its hex typed in place and its swatch at the right (a colour's opacity is on its card). Easing is a named row with its curve beside its name. The export panel's Format, Frame rate and Size are named rows. Titles on Home, Settings and the export panel are SF Pro Semibold, as the DialKit page sets them, in place of AA Bridge Slab.",
             "Fills and strokes take one row each in Design, as Figma's do: the swatch, then a colour's hex and opacity, a gradient's kind or a picture's opacity, then show or hide and remove. Clicking the swatch raises a card with the kinds along its top (Solid, Linear, Radial, Angular and, for a fill, Image) and that kind's controls under them: the colour picker, a gradient's bar of stops over the picker for the picked stop, or a picture's mode, turn and Replace. A gradient's card stays up while you drag its line on the canvas. Strokes can be made gradients here too.",
             "Export sits beside the Animate and Design switch at the top of the inspector, a quiet button always in sight, in place of the blue bar along the panel's foot.",
             "Animate's inspector is laid out the same way whatever is selected. With nothing selected it shows the composition, as Design does. With layers selected it lists their actions, each with when it runs, a click selecting it; then New Action, Select Preset and Templates as small buttons, where an action's settings have them too. The big tiles are gone.",

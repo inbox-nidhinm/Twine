@@ -137,12 +137,10 @@ struct ExportPanel: View {
     }
 
     private var formatSection: some View {
-        VStack(alignment: .leading, spacing: Theme.space8) {
-            Text("Export format")
-                .font(ThemeFont.label)
-                .foregroundStyle(Theme.textSecondary)
+        // DialKit's rows, each named inside: Format, Frame rate, Size.
+        VStack(alignment: .leading, spacing: Theme.rowGap) {
             if !settings.format.isLottie {
-                MenuField(value: sizeTitle, entries: sizeEntries)
+                MenuField(label: "Size", value: sizeTitle, entries: sizeEntries)
             }
             if typesSize && !settings.format.isLottie {
                 UnitField(unit: "Scale", value: shownPercent, decimals: 1, suffix: "%",
@@ -152,8 +150,8 @@ struct ExportPanel: View {
                 .help("Any size, as a share of the composition's, up to 4K (3840 × 2160 either way round). "
                       + "Movies round to even numbers of pixels.")
             }
-            HStack(spacing: Theme.space8) {
-                MenuField(value: settings.format.shortTitle, entries: formatEntries)
+            Group {
+                MenuField(label: "Format", value: settings.format.shortTitle, entries: formatEntries)
                     .help("H.264, HEVC and ProRes 422 have no transparency, so a transparent background "
                           + "exports as its colour. HEVC with alpha, ProRes 4444, WebM and PNG keep it; a GIF keeps it "
                           + "only fully or not at all, and has no sound. WebM is made by ffmpeg. "
@@ -161,7 +159,7 @@ struct ExportPanel: View {
                           + "blur, shadows, glass, video and 3D are left out of them. "
                           + "A PNG is the frame under the playhead, or in Design, the layout as designed.")
                 if isMovie {
-                    MenuField(value: "\(exportRate.label) fps", entries: rateEntries)
+                    MenuField(label: "Frame rate", value: "\(exportRate.label) fps", entries: rateEntries)
                         .help("The movie's frame rate. The animation is the same; a lower rate shows it less often.")
                 }
             }
@@ -170,7 +168,7 @@ struct ExportPanel: View {
     }
 
     private var rangeSection: some View {
-        VStack(alignment: .leading, spacing: Theme.space8) {
+        VStack(alignment: .leading, spacing: Theme.rowGap) {
             MenuRow(label: "Range", value: session.range == nil ? "Whole animation" : "Part of the animation", entries: rangeEntries)
             if let range = session.range {
                 HStack(spacing: Theme.space8) {
