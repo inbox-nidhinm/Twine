@@ -12,6 +12,12 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 APP="$HERE/../../build/TwineTest.app"
 OUTROOT=${TWINE_TEST_OUT:-${TMPDIR%/}/twine-selftest}
 PROJECT=$1; NAME=$2
+# Without a name the run's folder would be the whole output folder, and the
+# step below would move all of it to the Bin.
+if [[ -z $PROJECT || -z $NAME ]]; then
+    echo 'Usage: run.sh PROJECT NAME "step;step;..."'
+    exit 1
+fi
 [[ -d $PROJECT ]] && SRC=$PROJECT || SRC=$HERE/Projects/$PROJECT.twine
 FILE=$(basename $SRC)
 OUT=$OUTROOT/$NAME; LOG=$OUTROOT/$NAME.log
@@ -19,7 +25,7 @@ N="Twine""Test"
 # Asked to quit, so an open project saves first; forced only if it will not.
 if pgrep -x "$N" >/dev/null; then
     osascript -e 'quit app id "com.nidhin.twine.selftest"' >/dev/null 2>&1
-    for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x "$N" >/dev/null || break; sleep 0.5; done
+    for _ in {1..30}; do pgrep -x "$N" >/dev/null || break; sleep 0.5; done
     pkill -x "$N"
 fi
 sleep 1

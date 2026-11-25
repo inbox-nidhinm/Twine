@@ -25,12 +25,12 @@ A project file (`Name.twine`) is a folder that the Finder shows as one file.
 Name.twine/
     document.json    the project, with a formatVersion
     media/           imported images, video and audio
-    thumbnail.png    for the home screen (from milestone 2)
+    thumbnail.png    for the home screen
 ```
 
 ## Status
 
-Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then all 8 redesign milestones and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, MP4, MOV and PNG export, Style and Blur actions, text layers with Text and Shape actions, and pictures, video and sound with Play bars. After those: masks; snapping and alignment; hover, cursors and timeline polish; exporting part of the scene; the ⌘/ shortcuts card; presets made of actions; and a performance pass. Then the pen tool with point editing and the Path action, and the Volume action for fading sound. And any export size, as a percentage, up to 4K. Twine is for internal use only, never the App Store. See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.
+Original milestones 1 to 4 (foundation, evaluation and rendering, canvas and shapes, timeline and playback), then all 8 redesign milestones and export: the action model and its evaluation, separate Design and Animate modes, the action timeline, editing actions in the inspector and on the canvas, MP4, MOV and PNG export, Style and Blur actions, text layers with Text and Shape actions, and pictures, video and sound with Play bars. After those: masks; snapping and alignment; hover, cursors and timeline polish; exporting part of the scene; the ⌘/ shortcuts card; presets made of actions; and a performance pass. Then the pen tool with point editing and the Path action, and the Volume action for fading sound. And any export size, as a percentage, up to 4K. Twine is for internal use only, never the App Store. Since then: a Figma plugin (`FigmaPlugin/`) and an SVG reader, with frames, blend modes and several shadows to hold what they bring in; templates, 69 scenes of cards in 3D that can be split into layers, and frames in 3D; the Glass effect; GIF, WebM, Lottie and dotLottie export; and a connection for AI apps through MCP (`docs/mcp.md`). In November 2026 the whole codebase was audited and the findings worked through (`docs/audit-2026-11-24.md`). See `docs/brief.md` for the original plan, `docs/redesign.md` and `docs/redesign-decisions.md` for the redesign, and Version History on the home screen for what each build changed.
 
 ## License
 

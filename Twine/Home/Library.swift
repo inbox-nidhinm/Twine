@@ -166,7 +166,27 @@ final class Library {
 
     /// The folder and the projects in it go to the Trash, where they can
     /// still be put back.
+    ///
+    /// Any ordinary folder in the projects folder shows as one of Twine's,
+    /// and the menu's count is of projects only. One holding anything else
+    /// (the projects folder set to Documents, say) asks first, saying how
+    /// much else is in it.
     func moveToTrash(_ folder: Folder) {
+        let inside = (try? FileManager.default.contentsOfDirectory(at: folder.url, includingPropertiesForKeys: nil,
+                                                                   options: [.skipsHiddenFiles])) ?? []
+        let others = inside.filter { !ProjectFormat.readableExtensions.contains($0.pathExtension) }.count
+        guard others > 0 else { return trash(folder) }
+        let alert = NSAlert()
+        alert.messageText = "\u{201C}\(folder.name)\u{201D} holds \(others) other item\(others == 1 ? "" : "s") that \(others == 1 ? "is not a Twine project" : "are not Twine projects")."
+        alert.informativeText = "Everything in the folder goes to the Trash with it, where it can be put back."
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Move to Trash")
+        alert.beginSheetModal(for: MainWindow.window) { [weak self] response in
+            if response == .alertSecondButtonReturn { self?.trash(folder) }
+        }
+    }
+
+    private func trash(_ folder: Folder) {
         do { try FileManager.default.trashItem(at: folder.url, resultingItemURL: nil) } catch { NSApp.presentError(error) }
         refresh()
     }

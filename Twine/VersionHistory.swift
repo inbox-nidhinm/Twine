@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 267
+    static let pushes = 269
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -125,7 +125,9 @@ enum VersionHistory {
             "A long export no longer holds on to memory from every frame until it ends.",
             "Files made to break Twine, or damaged by hand or by another tool, are read safely. An SVG can no longer slip past the two checks made before it is read (an entity hidden behind a quoted bracket, which could grow a few hundred bytes into gigabytes, and nesting hidden behind stray closing tags, which stopped the app); a clip path of thousands of shapes used by thousands of elements, and a paint made of thousands of fallbacks, are held to the reader's limits.",
             "A project file with two layers or two actions sharing an id is mended as it opens (edits to one used to land on the other, and dragging such a bar stopped the app), as are a scene of no length, an absurd frame rate, and a sound or group marked as a mask. A project whose document is a link or a folder is refused with a message, and a layer named with an enormous number no longer stops the next layer being named.",
+            "Moving a folder to the Trash from the home screen asks first when the folder holds anything that is not a Twine project, and says how much: any ordinary folder in the projects folder shows as one of Twine's, and one click sent it and everything in it to the Trash.",
         ], misc: [
+            "A build made straight from Xcode carries the same version number as one made by the build script; it used to say 1.",
             "Settings is in the Twine menu (⌘,). File > Duplicate is named Duplicate Project, and Home is greyed out on the home screen.",
             "A new, empty project opens in Design, where the drawing tools are; a project with layers still opens in Animate.",
             "⌘W in a project closes the project and goes Home (File > Close Project), where it used to quit Twine. On the home screen it closes the window, which quits, as the red button does.",

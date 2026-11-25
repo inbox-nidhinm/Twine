@@ -9,7 +9,8 @@
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUTROOT=${TWINE_TEST_OUT:-${TMPDIR%/}/twine-selftest}
 N="Twine""Test"
-pkill -x "$N"; sleep 2
+# run.sh asks a test copy already open to quit, so it saves, before forcing
+# it. (This used to kill it outright first, with no save.)
 $HERE/run.sh $1 $2 "$3" >/dev/null 2>&1 &
 sleep 4
 for i in {1..60}; do P=$(pgrep -x "$N"); [[ -n $P ]] && break; sleep 0.5; done

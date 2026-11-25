@@ -18,6 +18,13 @@ esac
 
 VERSION=$(grep -c '^        \.init(date:' Twine/VersionHistory.swift)
 
+# The project file is kept at the same number, so a build made straight from
+# Xcode says the same version (it used to say 1). It changes only when a new
+# build is cut, and is committed with it.
+if ! grep -q "MARKETING_VERSION = $VERSION;" Twine.xcodeproj/project.pbxproj; then
+    sed -i '' -E "s/(MARKETING_VERSION|CURRENT_PROJECT_VERSION) = [0-9]+;/\1 = $VERSION;/" Twine.xcodeproj/project.pbxproj
+fi
+
 # The test driver (Tools/SelfTest) is compiled only into the test copy,
 # which make-test-app.sh builds with TWINE_SELFTEST_BUILD=1. Any other build
 # refuses while it is installed, so it can never ship by being forgotten.

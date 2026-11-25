@@ -8,3 +8,10 @@ DerivedData/
 
 # The test driver is installed into the app only while testing.
 Twine/App/SelfTest.swift
+
+# Not part of the app: Claude's own settings and the worktree copies its
+# sessions make, exported movies, and the website's files. Several sessions
+# commit in this folder, and one "add everything" would have taken them all.
+.claude/
+Exports/
+Website/
