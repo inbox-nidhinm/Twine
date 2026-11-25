@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 277
+    static let pushes = 278
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -50,7 +50,6 @@ enum VersionHistory {
             "Rotation sits beside the corner radius in Layout, on one row, the radius marked by a corner in place of its word. The anchor is a small button of nine dots beside X and Y, the anchor's lit, which opens the nine points on a card; the box of points that took half the panel is gone.",
             "The layers panel marks what is animated: a dot at the end of a row whose layer has actions, and of a group or frame that holds one, so movement inside a closed group still shows. A button in the Layers header closes every group and frame at once.",
             "Right-click menus show each item's shortcut at its end, on layers and on the empty canvas. Bring Forward and Send Backward join Bring to Front and Send to Back.",
-            "Several layers selected show their own outlines and no box round them all, which had no handles and only looked as if it could be resized.",
             "Home has a search field that narrows the projects shown to those whose names hold what you type (Escape empties it) and a menu to order them by Last edited or by Name, which it remembers. New Folder is a row with a plus, no longer greyed like something switched off.",
             "The export screen's settings sit under the project's name at the top of their column, with Export alone at the foot.",
             "Several layers can be changed together in Design. With more than one selected, the inspector shows X and Y, width and height, scale, rotation and corner radius: each field reads the number the layers share, or Mixed, and a number typed goes to all of them. Groups and frames selected together share Clip content.",
@@ -65,6 +64,10 @@ enum VersionHistory {
             "Flip Horizontal and Flip Vertical, on Shift-H and Shift-V in Design and in the right-click menu: each selected layer is mirrored where it stands.",
             "Duplicate repeats a move: duplicate a layer, move the copy, and duplicate again, and the next copy lands as far on again, for a row of evenly spaced copies.",
             "Paste lands beside the selection: with layers in a group or frame selected, what is pasted goes into it, just in front of them and where it was copied from, not out at the top level.",
+            "Several layers resize and turn together, in Design. With more than one selected, the box round them all has handles: drag one and every layer grows and keeps its place within the box, with Shift keeping the proportions and Option growing from the middle; drag just past a corner and they all turn about the middle of the box, with Shift in steps of 15°. A text keeps its letters' size and takes the new width; a layer lying at an angle grows evenly both ways.",
+            "Drag a layer into a frame, or out of one. Let go of a dragged layer over another frame and it goes into it, staying where you dropped it; let go outside its frame and it comes out to the top level. The frame it would land in is outlined as you drag. A layer inside a group stays the group's.",
+            "Distances, as in Figma: with something selected, hold Option and point at another layer to see how far apart they are, across the gap between them, or from edge to matching edge where they overlap.",
+            "The Text tool drags out a box: drag with it and the text is that wide, wrapping inside it; a click still makes a text that grows as you type.",
         ], fixes: [
             "Cards open beside the control that raises them again. The colour picker, a fill's or stroke's card, the stroke settings and the easing card had all been landing in the window's top-left corner since cards began letting clicks through to what is behind them.",
         ]),

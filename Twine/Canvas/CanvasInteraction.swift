@@ -39,6 +39,22 @@ enum CanvasDrag {
         var design: Layer? = nil
     }
 
+    /// The Text tool dragged out: a box as wide as the text is to be.
+    struct TextBox {
+        var start: CGPoint
+        var current: CGPoint
+        var parentID: UUID?
+    }
+
+    /// Several layers resized or turned together from the box round them.
+    struct Many {
+        let originals: [Layer]
+        /// The box round them at the press, in the composition's space.
+        let box: Box
+        let handle: Int
+        let start: Vec2
+    }
+
     struct Edit {
         let layer: Layer
         let start: Vec2
@@ -181,6 +197,9 @@ enum CanvasDrag {
     case move(Move)
     case resize(Resize)
     case rotate(Edit)
+    case resizeMany(Many)
+    case rotateMany(Many)
+    case textBox(TextBox)
     case anchor(Edit)
     case marquee(Marquee)
     case action(ActionEdit)
@@ -193,6 +212,9 @@ enum CanvasDrag {
         case .marquee(let m):
             return CGRect(x: min(m.start.x, m.current.x), y: min(m.start.y, m.current.y),
                           width: abs(m.current.x - m.start.x), height: abs(m.current.y - m.start.y))
+        case .textBox(let t):
+            return CGRect(x: min(t.start.x, t.current.x), y: min(t.start.y, t.current.y),
+                          width: abs(t.current.x - t.start.x), height: abs(t.current.y - t.start.y))
         case .path(let p):
             guard case .marquee(let a, let b, _) = p.part else { return nil }
             return CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(b.x - a.x), height: abs(b.y - a.y))

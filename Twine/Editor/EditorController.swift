@@ -1338,15 +1338,17 @@ final class EditorController {
     /// `parentWorld` is the frame as it shows, in Animate (see
     /// `Arrangement.placed(_:into:parentWorld:)`); nil places it in the
     /// frame as designed.
-    func addText(at point: Vec2, in parentID: UUID? = nil, parentWorld: Affine? = nil) -> UUID? {
+    func addText(at point: Vec2, in parentID: UUID? = nil, parentWorld: Affine? = nil, width: Double? = nil) -> UUID? {
         // Dark on a light ground, light on a dark one: the frame it goes in,
         // when that has a colour, or the composition's background.
         let background = project.composition.background
         var ground: RGBA? = background.isTransparent ? nil : background.color
         if let parentID, case .solid(let c)? = project.layer(withID: parentID)?.look?.fills.last?.paint { ground = c }
         let light = ground.map { ($0.r + $0.g + $0.b) / 3 > 0.5 } ?? true
-        let made = LayerFactory.text(at: point, name: LayerFactory.nextName("Text", in: project),
+        var made = LayerFactory.text(at: point, name: LayerFactory.nextName("Text", in: project),
                                      color: light ? LayerFactory.defaultStroke : .white)
+        // Dragged out with the Text tool: that wide, wrapping inside it.
+        if let width, width >= 1 { made = made.resized(width: width) }
         let layer = parentWorld != nil ? Arrangement.placed(made, into: parentID, parentWorld: parentWorld)
                                        : Arrangement.placed(made, into: parentID, in: project)
         guard perform(.insertLayers([layer], parentID: parentID, index: nil)) else { return nil }

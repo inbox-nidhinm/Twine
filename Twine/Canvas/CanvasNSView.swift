@@ -85,6 +85,12 @@ final class CanvasNSView: NSView {
     var snapTargets: [Box] = []
     /// A move's boxes when it began, all together.
     private var snapBox: Box?
+    /// Where the layers being dragged would be dropped, when that is
+    /// somewhere new: a frame, or `.some(nil)` for the top level.
+    private var dropTarget: UUID??
+    /// Option is down: distances show from the selection to the layer
+    /// under the pointer.
+    private(set) var measuring = false
     /// Typing into a text layer on the canvas, when it is happening.
     var textSession: TextSession?
     /// Blinks the caret while typing.
@@ -454,7 +460,6 @@ final class CanvasNSView: NSView {
 
         var handles: [CGPoint] = []
         var anchor: CGPoint?
-        let union: [CGPoint]? = nil
         // A selected Resize or Scale shows its handles at its end, to set it;
         // otherwise the layer's own, in Animate too (5 October 2026), where
         // they change its design and its animation follows.
@@ -470,15 +475,26 @@ final class CanvasNSView: NSView {
             if !isTilted(id, in: scene) { handles = CanvasHandles.positions(for: view, isLine: isLine(layer)) }
             if !animating, let a = world.apply(layer.anchor) { anchor = compositionToView(a) }
         }
-        // Several layers show their own boxes and no box round them all
-        // (26 November 2026): without handles it only looked resizable. It
-        // comes back, with handles, when several can be resized together.
+        // Several layers have a box round them all, with handles that
+        // resize and turn them together (26 November 2026; for a while
+        // that day the box was not drawn, as it had no handles).
+        var union: [CGPoint]?
+        if endBox == nil, textSession == nil, !isCropping, let box = box(around: manyLayers) {
+            let corners = viewCorners(of: box)
+            union = corners
+            handles = CanvasHandles.positions(for: corners, isLine: false)
+        }
 
         // A selected layer shows only its box: no wash under the pointer,
         // as the user asked.
         var hover: CGPath?
         if let hovered, drag == nil, hovered != editingPoints, !selection.contains(hovered) {
             hover = hoverOutline(of: hovered, in: scene)
+        }
+
+        // A frame the dragged layers would be dropped into is outlined.
+        if case .move = drag, pastDeadZone, let target = dropTarget, let frame = target {
+            hover = hoverOutline(of: frame, in: scene)
         }
 
         // While typing, the box shows without handles: the letters are
@@ -497,7 +513,7 @@ final class CanvasNSView: NSView {
                        marquee: drag?.marqueeRect, motion: motionOverlay())
         overlay.updateShapes(selectedShapeOutlines(in: scene, skipping: editingPoints))
         let marks = snapMarks()
-        overlay.updateSnap(lines: marks.lines, gaps: marks.gaps)
+        overlay.updateSnap(lines: marks.lines, gaps: marks.gaps + measureMarks())
         updateTextOverlay()
         overlay.updatePath(pathSession == nil ? nil : pathMarks())
         overlay.updateCrop(isCropping ? cropMarks() : nil)
@@ -781,10 +797,16 @@ final class CanvasNSView: NSView {
                 controller.select([hit])
                 return beginTextEditing(hit, selectAll: false, at: point)
             }
-            let parent = frame(under: point)
-            if let id = controller.addText(at: point, in: parent, parentWorld: animating ? parentWorld(parent) : nil) {
-                beginTextEditing(id, selectAll: true)
-            }
+            // The text is made when the press is let go: a click puts it
+            // there, growing as it is typed; a drag gives it that width.
+            drag = .textBox(CanvasDrag.TextBox(start: viewPoint, current: viewPoint, parentID: frame(under: point)))
+            return
+        }
+
+        // The box round several layers: its handles resize them all, and
+        // just past a corner turns them.
+        if beginManyEdit(at: viewPoint, point: point) {
+            redrawOverlay()
             return
         }
 
@@ -922,7 +944,7 @@ final class CanvasNSView: NSView {
         // and a click with a shape tool drew a one-pixel shape.
         if !pastDeadZone {
             switch drag {
-            case .create, .move, .resize, .rotate, .anchor, .action:
+            case .create, .move, .resize, .rotate, .resizeMany, .rotateMany, .anchor, .action:
                 guard hypot(viewPoint.x - pressViewPoint.x, viewPoint.y - pressViewPoint.y) > CanvasHandles.clickReach else { return }
             default: break
             }
@@ -970,6 +992,19 @@ final class CanvasNSView: NSView {
                 snap = result
             }
             controller.update(move.originals.map { $0.translated(by: controller.parentDelta(delta, for: $0.id, in: scene)) })
+            // The frame under the pointer lights up when letting go would
+            // put the layers into it.
+            dropTarget = animating ? nil : dropChange(at: point, moving: move.originals)
+
+        case .resizeMany(let many):
+            controller.update(resizedMany(many, pointer: point, keepAspect: shift, fromCenter: option))
+
+        case .rotateMany(let many):
+            controller.update(rotatedMany(many, pointer: point, stepped: shift))
+
+        case .textBox(var box):
+            box.current = viewPoint
+            self.drag = .textBox(box)
 
         case .resize(let resize):
             guard let parentInverse = parentInverse(of: resize.layer.id) else { return }
@@ -1055,6 +1090,7 @@ final class CanvasNSView: NSView {
         guard let controller, let drag else { return }
         self.drag = nil
         snap = nil
+        dropTarget = nil
         switch drag {
         case .create(let create):
             if create.layerID == nil {
@@ -1091,8 +1127,25 @@ final class CanvasNSView: NSView {
             // selection, and any wobble of the press is taken back.
             controller.cancel()
             if let id = move.deselectsOnClick { controller.select([id], extending: true) }
-        case .move, .resize, .rotate, .anchor, .action:
+        case .move(let move):
+            // Let go over another frame, or out of its own: it goes there,
+            // staying where it is drawn, in the same undo step as the move.
+            if pastDeadZone, !animating,
+               let target = dropChange(at: viewToComposition(convert(event.locationInWindow, from: nil)), moving: move.originals) {
+                controller.update(Arrangement.move(move.originals.map(\.id), to: target, index: nil, in: controller.project))
+            }
             controller.end()
+        case .resize, .rotate, .resizeMany, .rotateMany, .anchor, .action:
+            controller.end()
+        case .textBox(let box):
+            let a = viewToComposition(box.start), b = viewToComposition(box.current)
+            // Dragged far enough to mean a width, in screen points.
+            let dragged = abs(box.current.x - box.start.x) > CanvasHandles.hitRadius * 2
+            let at = dragged ? Vec2(min(a.x, b.x), min(a.y, b.y)) : a
+            if let id = controller.addText(at: at, in: box.parentID, parentWorld: animating ? parentWorld(box.parentID) : nil,
+                                           width: dragged ? abs(b.x - a.x) : nil) {
+                beginTextEditing(id, selectAll: true)
+            }
         case .marquee(let marquee):
             // Never dragged: a click on a frame's ground selects the frame.
             if let frame = marquee.clickSelects, marquee.current == marquee.start { controller.select([frame]) }
@@ -1418,10 +1471,28 @@ final class CanvasNSView: NSView {
         }
         setHover(layer(at: viewToComposition(viewPoint), deep: event.modifierFlags.contains(.command)))
         updateCursor(at: viewPoint)
+        // Read here too: the key may have gone down while another view had
+        // the keyboard.
+        let held = event.modifierFlags.contains(.option)
+        if held != measuring {
+            measuring = held
+            redrawOverlay()
+        }
     }
 
     override func mouseExited(with event: NSEvent) {
         setHover(nil)
+    }
+
+    /// Option going down or up shows or hides the distances at once,
+    /// without waiting for the pointer to move.
+    override func flagsChanged(with event: NSEvent) {
+        let held = event.modifierFlags.contains(.option)
+        if held != measuring {
+            measuring = held
+            redrawOverlay()
+        }
+        super.flagsChanged(with: event)
     }
 
     func setHover(_ id: UUID?) {
@@ -1432,6 +1503,10 @@ final class CanvasNSView: NSView {
     }
 
     private func updateCursor(at viewPoint: CGPoint) {
+        // Several layers: the handles of the box round them.
+        if let box = box(around: manyLayers) {
+            return cursor(at: viewPoint, box: viewCorners(of: box), isLine: false).set()
+        }
         guard let scene, let controller, selection.count == 1, let id = selection.first, !controller.isLocked(id) else {
             return Cursors.arrow.set()
         }

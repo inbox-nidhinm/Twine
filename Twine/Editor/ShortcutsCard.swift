@@ -115,6 +115,7 @@ struct ShortcutsCard: View {
                     s("Duplicate as you drag", "⌥", "drag"),
                     s("Place without snapping", "⌘", "drag"),
                     s("Resize from the centre", "⌥", "handle"),
+                    s("Distance to another layer", "⌥", "hover"),
                     s("Move the anchor", "⌘", "anchor"),
                     s("Select inside a group", "⌘", "click"),
                     s("Go in to a group's layers, out", "Return", "⇧Return"),

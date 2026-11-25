@@ -189,7 +189,7 @@ enum SelfTest {
                 findRuler(window.contentView!)?.mouseMoved(with: e)
             case "chover":
                 let p = NSPoint(x: n[0], y: window.contentView!.bounds.height - n[1])
-                let e = NSEvent.mouseEvent(with: .mouseMoved, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                let e = NSEvent.mouseEvent(with: .mouseMoved, location: p, modifierFlags: held.flags, timestamp: ProcessInfo.processInfo.systemUptime,
                                            windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 0, pressure: 0)!
                 func findCanvas(_ v: NSView) -> NSView? {
                     if v is CanvasNSView { return v }
