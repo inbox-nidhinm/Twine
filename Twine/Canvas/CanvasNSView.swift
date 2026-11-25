@@ -833,6 +833,21 @@ final class CanvasNSView: NSView {
 
         let deep = event.modifierFlags.contains(.command)
         if let hit = layer(at: point, deep: deep) {
+            // A press on a frame's own ground, with nothing of its own
+            // under the pointer, draws a selection box among its layers,
+            // as in Figma (26 November 2026): with a whole scene in one
+            // frame, every press used to drag the frame, and a box could
+            // never be started. A click there still selects the frame, and
+            // a selected frame still drags.
+            if !deep, !shift, event.clickCount == 1, !event.modifierFlags.contains(.option), !selection.contains(hit),
+               let frame = controller.project.layer(withID: hit), frame.isFrame, !frame.isTemplate, !frame.children.isEmpty,
+               layer(at: point, deep: true) == hit {
+                controller.deselectAll()
+                drag = .marquee(CanvasDrag.Marquee(start: viewPoint, current: viewPoint, additive: false, base: [],
+                                                   clickSelects: hit))
+                redrawOverlay()
+                return
+            }
             // Shift on a layer already selected takes it out only once the
             // press turns out to be a click, as in Figma (4 October 2026):
             // taken out at the press, a Shift-drag to keep a move level or
@@ -1078,8 +1093,9 @@ final class CanvasNSView: NSView {
             if let id = move.deselectsOnClick { controller.select([id], extending: true) }
         case .move, .resize, .rotate, .anchor, .action:
             controller.end()
-        case .marquee:
-            break
+        case .marquee(let marquee):
+            // Never dragged: a click on a frame's ground selects the frame.
+            if let frame = marquee.clickSelects, marquee.current == marquee.start { controller.select([frame]) }
         case .path(let edit):
             pathMouseUp(edit, event: event)
         case .crop(let edit):
@@ -1348,9 +1364,14 @@ final class CanvasNSView: NSView {
         guard let scene, let controller, let project else { return }
         let a = viewToComposition(marquee.start), b = viewToComposition(marquee.current)
         let box = Box(minX: min(a.x, b.x), minY: min(a.y, b.y), maxX: max(a.x, b.x), maxY: max(a.y, b.y))
-        let hits = project.layers.filter { layer in
-            guard !layer.isLocked, let corners = scene.worldCorners(of: layer.id),
-                  let bounds = Box(around: corners) else { return false }
+        func bounds(_ layer: Layer) -> Box? { scene.worldCorners(of: layer.id).flatMap { Box(around: $0) } }
+        // A box begun on a frame's ground picks among that frame's layers
+        // (26 November 2026, as Figma's does: with everything in one
+        // frame, a box only ever picked the frame). Begun on the empty
+        // canvas, it picks among the top level's, as before.
+        let pool = marquee.clickSelects.flatMap { project.layer(withID: $0)?.children } ?? project.layers
+        let hits = pool.filter { layer in
+            guard !layer.isLocked, let bounds = bounds(layer) else { return false }
             return bounds.intersects(box)
         }.map(\.id)
         controller.editor.selection = marquee.base.union(hits)
@@ -1549,6 +1570,7 @@ final class CanvasNSView: NSView {
         if ExportKeys.handle(event, controller) { return }
         if ShortcutsKeys.handle(event, controller) { return }
         if textKeyDown(event) { return }
+        if hierarchyKeyDown(event, controller) { return }
         if pathKeyDown(event) { return }
         if cropKeyDown(event) { return }
         if gradientKeyDown(event) { return }
@@ -1600,6 +1622,11 @@ final class CanvasNSView: NSView {
             let flags = event.modifierFlags.intersection([.command, .control, .option])
             // Shift-2 zooms to the selection, as in Figma.
             if flags.isEmpty, event.keyCode == 19, event.modifierFlags.contains(.shift) { return zoomToSelection() }
+            // Shift-H and Shift-V flip it, in Design.
+            if flags.isEmpty, !animating, event.modifierFlags.contains(.shift),
+               let letter = event.charactersIgnoringModifiers?.lowercased(), letter == "h" || letter == "v" {
+                return controller.flipSelection(horizontal: letter == "h")
+            }
             // The tools' keys work in Animate too, where there is no bar.
             if flags.isEmpty, let key = event.charactersIgnoringModifiers, let tool = Tool.forKey(key) {
                 controller.editor.tool = tool
@@ -1607,6 +1634,27 @@ final class CanvasNSView: NSView {
             } else {
                 super.keyDown(with: event)
             }
+        }
+    }
+
+    /// Return goes in to the selected groups' and frames' layers,
+    /// Shift-Return out to what holds the selection, and Tab and Shift-Tab
+    /// to the layer after or before it, as in Figma. Before the keys that
+    /// mean something for one shape (Return shows its points): a frame is a
+    /// shape too, and Return on it should go in.
+    private func hierarchyKeyDown(_ event: NSEvent, _ controller: EditorController) -> Bool {
+        guard !isDrawingPath, !isEditingPoints, !isCropping, drag == nil, !selection.isEmpty,
+              event.modifierFlags.intersection([.command, .control, .option]).isEmpty else { return false }
+        let shift = event.modifierFlags.contains(.shift)
+        switch event.keyCode {
+        case 36, 76:
+            if shift {
+                controller.selectParents()
+                return true
+            }
+            return controller.selectChildren()
+        case 48: return controller.selectSibling(forward: !shift)
+        default: return false
         }
     }
 

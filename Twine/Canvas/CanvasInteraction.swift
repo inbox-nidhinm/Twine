@@ -50,6 +50,9 @@ enum CanvasDrag {
         var current: CGPoint
         var additive: Bool
         var base: Set<UUID>
+        /// The frame the press landed on the ground of: a click selects it,
+        /// a drag draws the box among its layers.
+        var clickSelects: UUID? = nil
     }
 
     /// Editing the selected action from the canvas, in Animate.

@@ -13,6 +13,9 @@ import MotionImport
 @MainActor
 final class EditorController {
     let store: ProjectStore
+    /// The copies Duplicate last made and where their originals stood, so
+    /// duplicating a copy that has been moved repeats the move.
+    private var lastDuplicate: (copies: Set<UUID>, from: [UUID: Vec2])?
     let editor: EditorModel
     weak var canvas: CanvasNSView?
     /// The document, for reading and storing imported files.
@@ -1416,10 +1419,23 @@ final class EditorController {
         let layers = topmost(selectedLayers)
         guard !layers.isEmpty else { return }
         // Duplicates land just in front of their originals, nudged so they
-        // can be seen, the way Figma and Flip do it.
-        let (command, copies) = duplicates(of: layers, offset: Vec2(10, 10))
+        // can be seen, the way Figma and Flip do it. Duplicating the copies
+        // just made, after moving them, repeats the move instead (26
+        // November 2026, as Figma's does): a row of evenly spaced copies.
+        var offset = Vec2(10, 10)
+        if let last = lastDuplicate, last.copies == Set(layers.map(\.id)),
+           let first = layers.first, let from = last.from[first.id] {
+            let moved = first.transform.position - from
+            if moved != .zero { offset = moved }
+        }
+        let (command, copies) = duplicates(of: layers, offset: offset)
         if perform(.batch([command], name: layers.count == 1 ? "Duplicate Layer" : "Duplicate Layers")) {
             editor.selection = Set(copies.map(\.id))
+            // `duplicates` returns a copy for each layer, in order.
+            if copies.count == layers.count {
+                lastDuplicate = (Set(copies.map(\.id)),
+                                 Dictionary(uniqueKeysWithValues: zip(copies.map(\.id), layers.map(\.transform.position))))
+            }
         }
     }
 
@@ -1700,7 +1716,10 @@ final class EditorController {
         return board.canReadItem(withDataConformingToTypes: [UTType.image.identifier])
     }
 
-    /// Pastes in place, in front of everything at the top level. Every pasted
+    /// Pastes in place: beside the selection, just in front of it in its
+    /// group or frame, when it is all in one (26 November 2026; a copy made
+    /// inside a frame used to land outside it), else in front of everything
+    /// at the top level. Every pasted
     /// layer is a new layer with new ids, however many times it is pasted.
     /// Files copied in the Finder are imported, and a copied picture comes in
     /// as an imported one does. `board` is the clipboard, or the test kit's own.
@@ -1772,9 +1791,27 @@ final class EditorController {
         let actions = pairs.map(\.copy)
         let scenes = Scenes.copying(pairs.map { ($0.original, $0.copy.id, nil) }, whole: clipboard.scenes ?? [],
                                     in: project.scenes)
-        if perform(.batch(media.map { .addMedia($0) } + [.insertLayers(copies, parentID: nil, index: nil), .insertActions(actions)]
-                          + sceneChange(scenes),
-                          name: copies.count == 1 ? "Paste Layer" : "Paste Layers")) {
+        // Where the selection is, if it is all in one place.
+        var parentID: UUID?
+        var index: Int?
+        let places = selectedLayers.compactMap { project.location(of: $0.id) }
+        if let first = places.first, places.allSatisfy({ $0.parentID == first.parentID }), first.parentID != nil {
+            parentID = first.parentID
+            index = (places.map(\.index).max() ?? 0) + 1
+        }
+        // Copied layers stand as they would at the top level, so they go
+        // in there and are then moved into the group or frame as a drag in
+        // the layers panel moves them: they stay where they are drawn, and
+        // their actions follow.
+        var commands: [EditorCommand] = media.map { .addMedia($0) }
+            + [.insertLayers(copies, parentID: nil, index: nil), .insertActions(actions)] + sceneChange(scenes)
+        if let parentID {
+            var staged = project
+            if (try? EditorCommand.batch(commands, name: "Paste").apply(to: &staged)) != nil {
+                commands.append(Arrangement.move(copies.map(\.id), to: parentID, index: index, in: staged))
+            }
+        }
+        if perform(.batch(commands, name: copies.count == 1 ? "Paste Layer" : "Paste Layers")) {
             editor.selection = Set(copies.map(\.id))
         }
     }

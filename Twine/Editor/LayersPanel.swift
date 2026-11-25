@@ -478,6 +478,9 @@ extension EditorController {
             .item("Send Backward", shortcut: "⌘[") { self.restack(.backward) },
             .item("Send to Back", shortcut: "⌥⌘[") { self.restack(.back) },
             .separator,
+            .item("Flip Horizontal", shortcut: "⇧H") { self.flipSelection(horizontal: true) },
+            .item("Flip Vertical", shortcut: "⇧V") { self.flipSelection(horizontal: false) },
+            .separator,
             .item("Group Selection", shortcut: "⌘G") { self.groupSelection() },
             .item("Frame Selection", shortcut: "⌥⌘G") { self.frameSelection() },
         ]

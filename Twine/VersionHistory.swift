@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 276
+    static let pushes = 277
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -60,6 +60,11 @@ enum VersionHistory {
             "Effects for several layers. Layers selected together show their Effects: + adds a shadow, a blur or glass to all of them; while they have the same effects, each field, the colour, show and hide and remove change that effect on every layer; while they differ the section reads Mixed, and + puts the one you pick in place of them all. Skew, Tilt and Bend stay one layer's.",
             "A stroke for several texts: texts selected together show their Stroke, added, changed and removed on all of them at once, or reading Mixed while their strokes differ.",
             "Several actions of one kind show Mixed in a number they do not share, for Move, Scale, Rotate, Opacity and Resize, in From and in To; before, the field showed the first action's number as if it were everyone's. Typing a number still sets it on all of them, and only that number.",
+            "A selection box inside a frame. Press on a frame's own ground, where nothing of its is under the pointer, and drag: the box picks among that frame's layers, where every press used to drag the whole frame, so with a scene in one frame a box could never be drawn. A click there still selects the frame, and a selected frame still drags.",
+            "Through the layers from the keyboard, as in Figma: Return goes in to the selected group's or frame's layers, Shift-Return out to what holds the selection, and Tab and Shift-Tab to the next layer down the panel or the one above.",
+            "Flip Horizontal and Flip Vertical, on Shift-H and Shift-V in Design and in the right-click menu: each selected layer is mirrored where it stands.",
+            "Duplicate repeats a move: duplicate a layer, move the copy, and duplicate again, and the next copy lands as far on again, for a row of evenly spaced copies.",
+            "Paste lands beside the selection: with layers in a group or frame selected, what is pasted goes into it, just in front of them and where it was copied from, not out at the top level.",
         ], fixes: [
             "Cards open beside the control that raises them again. The colour picker, a fill's or stroke's card, the stroke settings and the easing card had all been landing in the window's top-left corner since cards began letting clicks through to what is behind them.",
         ]),

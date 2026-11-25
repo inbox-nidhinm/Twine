@@ -117,6 +117,9 @@ struct ShortcutsCard: View {
                     s("Resize from the centre", "⌥", "handle"),
                     s("Move the anchor", "⌘", "anchor"),
                     s("Select inside a group", "⌘", "click"),
+                    s("Go in to a group's layers, out", "Return", "⇧Return"),
+                    s("Next layer, previous", "Tab", "⇧Tab"),
+                    s("Flip across, down", "⇧H", "⇧V"),
                     s("Nudge \(Self.pixels(AppSettings.shared.nudge)), \(Self.pixels(AppSettings.shared.shiftNudge))", "arrows", "⇧ arrows"),
                     s("Select all, none", "⌘A", "Esc"),
                     s("Delete", "⌫"),
@@ -124,6 +127,7 @@ struct ShortcutsCard: View {
                 Group(title: "Numbers", items: [
                     s("Step a number, by eight", "↑↓", "⇧↑↓"),
                     s("Drag across a number", "drag"),
+                    s("Sums, and changes to a number", "100+20", "*2"),
                     s("Ten times, a tenth as fast", "⇧", "⌥"),
                     s("Leave without changing", "Esc"),
                 ]),
