@@ -213,4 +213,75 @@ extension CanvasNSView {
         }
         return marks
     }
+
+    // MARK: Quick keys
+
+    /// Keys that act at once on the selection or the view, as Figma's do
+    /// (26 November 2026): number keys set opacity, ] and [ send to the
+    /// front and back, I picks a colour from the screen, Shift-X swaps
+    /// fill and stroke, Option-/ and Shift-/ take fills and strokes away,
+    /// and Shift-1 and Shift-0 fit the view and show it at actual size.
+    /// What changes a layer's design works in Design only.
+    func quickKeyDown(_ event: NSEvent, _ controller: EditorController) -> Bool {
+        let flags = event.modifierFlags.intersection([.command, .control, .option])
+        let shift = event.modifierFlags.contains(.shift)
+        // The slash key, by its place: Option and Shift change what it types.
+        if event.keyCode == 44, !animating {
+            if flags == [.option], !shift {
+                controller.removePaints(fills: true)
+                return true
+            }
+            if flags.isEmpty, shift {
+                controller.removePaints(fills: false)
+                return true
+            }
+        }
+        guard flags.isEmpty else { return false }
+        if shift {
+            // By their places too, as Shift turns 1 and 0 into ! and ).
+            if event.keyCode == 18 {
+                fitToWindow(animated: true)
+                return true
+            }
+            if event.keyCode == 29 {
+                zoomToActualSize()
+                return true
+            }
+            if !animating, event.charactersIgnoringModifiers?.lowercased() == "x" {
+                controller.swapFillAndStroke()
+                return true
+            }
+            return false
+        }
+        guard let key = event.charactersIgnoringModifiers else { return false }
+        switch key {
+        case "]":
+            controller.restack(.front)
+            return true
+        case "[":
+            controller.restack(.back)
+            return true
+        case "i" where !animating:
+            controller.pickFillFromScreen()
+            return true
+        default:
+            break
+        }
+        if !animating, !selection.isEmpty, key.count == 1, let digit = Int(key) {
+            // One digit is tens of a percent (4 is 40%, 0 is 100%); a
+            // second straight after makes it exact (4 then 5 is 45%, 0
+            // then 0 is 0%).
+            let value: Int
+            if let last = opacityKey, event.timestamp - last.at < 0.6 {
+                value = last.digit * 10 + digit
+                opacityKey = nil
+            } else {
+                value = digit == 0 ? 100 : digit * 10
+                opacityKey = (digit, event.timestamp)
+            }
+            controller.setOpacity(Double(value) / 100)
+            return true
+        }
+        return false
+    }
 }

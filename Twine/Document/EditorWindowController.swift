@@ -166,6 +166,10 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     @objc func sendBackward(_ sender: Any?) { controller.restack(.backward) }
     @objc func bringToFront(_ sender: Any?) { controller.restack(.front) }
     @objc func sendToBack(_ sender: Any?) { controller.restack(.back) }
+    @objc func toggleLock(_ sender: Any?) { controller.toggleLockSelection() }
+    @objc func toggleHide(_ sender: Any?) { controller.toggleHideSelection() }
+    @objc func flipHorizontal(_ sender: Any?) { controller.flipSelection(horizontal: true) }
+    @objc func flipVertical(_ sender: Any?) { controller.flipSelection(horizontal: false) }
 
     // MARK: Playback menu
 
@@ -230,7 +234,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         case #selector(exportFile(_:)), #selector(exportFrame(_:)):
             return !editor.exports.isExporting
         case #selector(delete(_:)), #selector(copy(_:)), #selector(cut(_:)), #selector(duplicateLayers(_:)),
-             #selector(groupLayers(_:)), #selector(frameLayers(_:)), #selector(useAsMask(_:)), #selector(bringForward(_:)), #selector(sendBackward(_:)),
+             #selector(groupLayers(_:)), #selector(frameLayers(_:)), #selector(useAsMask(_:)), #selector(toggleLock(_:)), #selector(toggleHide(_:)),
+             #selector(flipHorizontal(_:)), #selector(flipVertical(_:)), #selector(bringForward(_:)), #selector(sendBackward(_:)),
              #selector(bringToFront(_:)), #selector(sendToBack(_:)):
             return hasSelection
         case #selector(zoomToSelection(_:)):

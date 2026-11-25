@@ -105,6 +105,8 @@ enum MainMenu {
         menu.addItem(item("Ungroup", #selector(EditorWindowController.ungroupLayers(_:)), "g", [.command, .shift]))
         menu.addItem(item("Frame Selection", #selector(EditorWindowController.frameLayers(_:)), "g", [.command, .option]))
         menu.addItem(item("Use as Mask", #selector(EditorWindowController.useAsMask(_:)), "m", [.command, .control]))
+        menu.addItem(item("Lock or Unlock", #selector(EditorWindowController.toggleLock(_:)), "l", [.command, .shift]))
+        menu.addItem(item("Hide or Show", #selector(EditorWindowController.toggleHide(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Bring Forward", #selector(EditorWindowController.bringForward(_:)), "]"))
         menu.addItem(item("Send Backward", #selector(EditorWindowController.sendBackward(_:)), "["))
@@ -126,6 +128,9 @@ enum MainMenu {
         menu.addItem(.separator())
         menu.addItem(item("Distribute Horizontally    ⌃⌥H", #selector(EditorWindowController.distributeHorizontally(_:))))
         menu.addItem(item("Distribute Vertically    ⌃⌥V", #selector(EditorWindowController.distributeVertically(_:))))
+        menu.addItem(.separator())
+        menu.addItem(item("Flip Horizontal    ⇧H", #selector(EditorWindowController.flipHorizontal(_:))))
+        menu.addItem(item("Flip Vertical    ⇧V", #selector(EditorWindowController.flipVertical(_:))))
         return menu
     }
 

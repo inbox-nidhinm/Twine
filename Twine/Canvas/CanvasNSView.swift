@@ -91,6 +91,9 @@ final class CanvasNSView: NSView {
     /// Option is down: distances show from the selection to the layer
     /// under the pointer.
     private(set) var measuring = false
+    /// The number key last pressed for opacity and when, so a second one
+    /// straight after makes two digits.
+    var opacityKey: (digit: Int, at: TimeInterval)?
     /// Typing into a text layer on the canvas, when it is happening.
     var textSession: TextSession?
     /// Blinks the caret while typing.
@@ -1694,6 +1697,7 @@ final class CanvasNSView: NSView {
         case 125: controller.nudge(by: Vec2(0, step))
         case 126: controller.nudge(by: Vec2(0, -step))
         default:
+            if quickKeyDown(event, controller) { return }
             let flags = event.modifierFlags.intersection([.command, .control, .option])
             // Shift-2 zooms to the selection, as in Figma.
             if flags.isEmpty, event.keyCode == 19, event.modifierFlags.contains(.shift) { return zoomToSelection() }
