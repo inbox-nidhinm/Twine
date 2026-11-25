@@ -51,18 +51,38 @@ final class MenuHost {
     private(set) var popupOrigin: CGPoint = .zero
     var isOpen: Bool { !entries.isEmpty || popup != nil }
 
-    /// A menu, over the card that is up if any: nothing outside the card
-    /// can be clicked while it is up, so a menu then comes from the card.
+    /// The row of the open menu that the pointer or the arrow keys are on,
+    /// as its place in `entries`: the one Return picks.
+    var highlighted: Int?
+
+    /// The card's frame in the window, from its top-left, told by the layer
+    /// that draws it. Not watched: nothing is drawn from it.
+    @ObservationIgnored var popupFrame: CGRect = .zero
+    /// Where the card just closed by a press outside it had been raised, so
+    /// the control that raised it, if the press was on it, does not raise
+    /// it straight back.
+    @ObservationIgnored private var justClosed: CGPoint?
+
+    /// A menu, over the card that is up if any: nothing outside a menu can
+    /// be clicked while it is up, as with a system menu.
     func show(_ entries: [MenuEntry], at origin: CGPoint, growsUp: Bool = false) {
         self.entries = entries
         self.origin = origin
         self.growsUp = growsUp
+        highlighted = nil
     }
 
     func showPopup<Content: View>(at origin: CGPoint, @ViewBuilder _ content: () -> Content) {
+        // The press that closed the card was on the control that raises
+        // it: the click closes it, as a second click on a control should.
+        if let closed = justClosed, closed == origin {
+            justClosed = nil
+            return
+        }
         entries = []
         popup = AnyView(content())
         popupOrigin = origin
+        popupFrame = .zero
     }
 
     /// Puts the menu away, and the card under it if there is no menu.
@@ -75,6 +95,61 @@ final class MenuHost {
     /// Puts only the menu away, leaving any card it came from.
     func closeMenu() {
         entries = []
+        highlighted = nil
+    }
+
+    /// A press in the window at `point` (from its top-left), before it is
+    /// handled. A card with no menu over it goes away when the press is
+    /// outside it, and the press carries on to whatever it landed on: with
+    /// a colour picker open, a click on another swatch, another layer or a
+    /// number used to do nothing but close the picker, and took a second
+    /// click. A menu still takes the click that closes it, as menus do.
+    func pressed(at point: CGPoint) {
+        justClosed = nil
+        guard popup != nil, entries.isEmpty, popupFrame != .zero, !popupFrame.contains(point) else { return }
+        justClosed = popupOrigin
+        popup = nil
+    }
+
+    /// A key pressed while a menu is up: the arrows move through it, Return
+    /// or Space picks, a letter goes to the next item starting with it, and
+    /// Escape closes it. Every key is the menu's while it is up, so none
+    /// reaches the canvas behind it (Delete used to delete the selection).
+    /// False when no menu is up, and the key is someone else's.
+    func key(_ event: NSEvent) -> Bool {
+        guard !entries.isEmpty else { return false }
+        switch event.keyCode {
+        case 125: move(1)
+        case 126: move(-1)
+        case 36, 76, 49:
+            if let at = highlighted, entries.indices.contains(at), case .item(_, _, _, false, let action) = entries[at].kind {
+                dismiss()
+                action()
+            }
+        case 53: dismiss()
+        default:
+            if let letter = event.charactersIgnoringModifiers?.lowercased(), letter.count == 1, letter != " " {
+                let order = Array((highlighted ?? -1) + 1 ..< entries.count) + Array(0 ..< min((highlighted ?? -1) + 1, entries.count))
+                highlighted = order.first { title(at: $0)?.lowercased().hasPrefix(letter) == true } ?? highlighted
+            }
+        }
+        return true
+    }
+
+    /// The title of the item at `index` when it can be picked.
+    private func title(at index: Int) -> String? {
+        guard entries.indices.contains(index), case .item(let title, _, _, false, _) = entries[index].kind else { return nil }
+        return title
+    }
+
+    private func move(_ by: Int) {
+        let pickable = entries.indices.filter { title(at: $0) != nil }
+        guard !pickable.isEmpty else { return }
+        guard let now = highlighted, let at = pickable.firstIndex(of: now) else {
+            highlighted = by > 0 ? pickable.first : pickable.last
+            return
+        }
+        highlighted = pickable[(at + by + pickable.count) % pickable.count]
     }
 }
 
@@ -90,14 +165,20 @@ struct MenuLayer: View {
                 // not reach back into the host or the proxy.
                 let bounds = geo.size
                 ZStack(alignment: .topLeading) {
-                    // A click anywhere outside the card puts the menu away and
-                    // does nothing else, as a system menu would.
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture { menus.dismiss() }
+                    // A click anywhere outside a menu puts it away and does
+                    // nothing else, as a system menu would. A card alone has
+                    // no such ground: a press outside it closes it from the
+                    // window (`MenuHost.pressed`) and carries on.
+                    if !menus.entries.isEmpty && menus.popup == nil {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { menus.dismiss() }
+                    }
 
                     if let popup = menus.popup {
-                        placed(popup, at: menus.popupOrigin, growsUp: false, in: bounds)
+                        placed(AnyView(popup.onGeometryChange(for: CGRect.self) { $0.frame(in: .global) }
+                                           action: { menus.popupFrame = $0 }),
+                               at: menus.popupOrigin, growsUp: false, in: bounds)
                     }
                     if !menus.entries.isEmpty {
                         if menus.popup != nil {
@@ -138,9 +219,11 @@ private struct MenuCard: View {
     let entries: [MenuEntry]
     let close: () -> Void
 
+    @Environment(MenuHost.self) private var menus
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(entries) { entry in
+            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                 switch entry.kind {
                 case .separator:
                     Rectangle().fill(Theme.border).frame(height: Theme.hairline).padding(.vertical, 4)
@@ -151,7 +234,12 @@ private struct MenuCard: View {
                         .padding(.horizontal, 6)
                         .frame(height: Theme.control, alignment: .bottomLeading)
                 case let .item(title, icon, checked, disabled, action):
-                    MenuItemRow(title: title, icon: icon, checked: checked, disabled: disabled) {
+                    // One highlight for the pointer and the arrow keys.
+                    MenuItemRow(title: title, icon: icon, checked: checked, disabled: disabled,
+                                lit: menus.highlighted == index,
+                                hover: { inside in
+                                    if inside { menus.highlighted = index } else if menus.highlighted == index { menus.highlighted = nil }
+                                }) {
                         close()
                         action()
                     }
@@ -169,9 +257,10 @@ private struct MenuItemRow: View {
     let icon: Icon?
     let checked: Bool
     let disabled: Bool
+    /// Whether the pointer or the arrow keys are on this row.
+    var lit = false
+    var hover: (Bool) -> Void = { _ in }
     let action: () -> Void
-
-    @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
@@ -191,12 +280,12 @@ private struct MenuItemRow: View {
             .padding(.horizontal, 6)
             .frame(height: Theme.control)
             .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
-                .fill(hovering && !disabled ? Theme.accent : .clear))
+                .fill(lit && !disabled ? Theme.accent : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(disabled)
-        .onHover { hovering = $0 }
+        .onHover(perform: hover)
     }
 }
 

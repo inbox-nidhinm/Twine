@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 262
+    static let pushes = 263
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -67,6 +67,9 @@ enum VersionHistory {
             "Right-click on a layer offers Cut, Copy, Paste, Bring to Front and Send to Back, and its Solo, Lock and Hide (and a row's own switches) change every selected layer when the one clicked is among them. Right-click on empty canvas offers Paste, Select All and Zoom to Fit.",
             "A polygon's Sides and a star's Points can be typed, dragged and stepped like any number.",
             "The font list takes the keyboard: Return picks the first match, the arrows move through it, and it opens at the font in use.",
+            "The app's menus take the keyboard: the arrows move through one, Return or Space picks, a letter goes to the next item starting with it, and Escape closes it. Keys pressed while a menu is open no longer reach the canvas behind it, where Delete deleted the selection.",
+            "Several selected layers drag together in the layers panel, and a line shows where they will land: along the top of a row for in front of it, along the bottom for behind, the row outlined for inside a group.",
+            "Files dropped anywhere in a project's window are imported, at the middle of the composition; only the canvas used to take them, so a sound dragged onto the timeline slid back.",
         ], fixes: [
             "Several texts can be changed at once. With more than one text selected in Design, the inspector showed only alignment, blend and opacity, so their font, weight, size, alignment, sizing, spacing and colour could not be changed together. The Text and Fill sections now show for them, every change going to all of them as one step of undo, and anything they do not share reads Mixed.",
             "Twine no longer opens by itself. Every Claude session (including ones Claude starts in the background, ready for your next chat) says hello to Twine as it starts, and Twine opened to answer, so it kept reopening after you quit it. Twine now opens only when an AI app actually uses it, to read or change a project.",
@@ -105,6 +108,7 @@ enum VersionHistory {
             "The layers panel remembers which groups were open when it is hidden and shown, and scrolls to a layer picked on the canvas. Rename from a right-click shows the panel first.",
             "A file that will not import, an SVG or a Figma copy that cannot be read, and a name already taken by another project or folder each say so in a note, where there was only a beep. SVG imports and Figma pastes show that they are under way.",
             "Notes stay up longer the more they say, and for as long as the pointer rests on them.",
+            "With a colour picker, the easing card or any other card open, a click elsewhere now closes the card and does what it was aimed at: picking another swatch, another layer or a number took two clicks, the first only closing the card. A second click on the control that raised a card closes it.",
         ], misc: [
             "Settings is in the Twine menu (⌘,). File > Duplicate is named Duplicate Project, and Home is greyed out on the home screen.",
             "A new, empty project opens in Design, where the drawing tools are; a project with layers still opens in Animate.",

@@ -223,7 +223,8 @@ private struct LayerRow: View {
 
     @State private var hovering = false
     @State private var draft = ""
-    @State private var dropTargeted = false
+    /// Where a drag over this row would land, while one is.
+    @State private var dropEdge: DropEdge?
     @FocusState private var nameFocused: Bool
 
     private var layer: Layer { row.layer }
@@ -232,7 +233,6 @@ private struct LayerRow: View {
     /// state, switches and all.
     private var lit: Bool { hovering || editor.hoveredLayer == layer.id }
 
-    enum DropEdge { case above, into, below }
 
     var body: some View {
         HStack(spacing: 4) {
@@ -277,9 +277,15 @@ private struct LayerRow: View {
         .frame(height: Theme.listRow)
         .background(RoundedRectangle(cornerRadius: Theme.radiusRow)
             .fill(selected ? Theme.rowSelected : lit ? Theme.rowHover : .clear))
-        .overlay {
-            if dropTargeted {
-                RoundedRectangle(cornerRadius: Theme.radiusRow).strokeBorder(Theme.accent, lineWidth: 1.5)
+        // Where a dragged layer will land: a line along the top for in
+        // front of this row, along the bottom for behind it, and the row
+        // outlined for inside a group. One outline for all three left the
+        // result to be guessed.
+        .overlay(alignment: dropEdge == .below ? .bottom : .top) {
+            switch dropEdge {
+            case .into: RoundedRectangle(cornerRadius: Theme.radiusRow).strokeBorder(Theme.accent, lineWidth: 1.5)
+            case .above, .below: Capsule().fill(Theme.accent).frame(height: 2)
+            case nil: EmptyView()
             }
         }
         .opacity(layer.isVisible ? 1 : 0.5)
@@ -297,18 +303,23 @@ private struct LayerRow: View {
             if (NSApp.currentEvent?.clickCount ?? 1) >= 2 { editor.renaming = layer.id } else { click() }
         }
         .rightClickMenu(menu)
-        .draggable(layer.id.uuidString) {
-            Text(layer.name)
+        .draggable(dragged.map(\.uuidString).joined(separator: ",")) {
+            Text(dragged.count > 1 ? "\(dragged.count) layers" : layer.name)
                 .font(ThemeFont.label)
                 .foregroundStyle(Theme.textPrimary)
                 .padding(.horizontal, 8)
                 .frame(height: Theme.control)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusControl).fill(Theme.panelRaised))
         }
-        .dropDestination(for: String.self) { items, location in
-            dropTargeted = false
-            return drop(items.compactMap(UUID.init(uuidString:)), edge: edge(at: location))
-        } isTargeted: { dropTargeted = $0 }
+        .onDrop(of: [.utf8PlainText], delegate: RowDrop(edge: { edge(at: $0) }, shown: $dropEdge) { ids, edge in
+            _ = drop(ids, edge: edge)
+        })
+    }
+
+    /// What a drag of this row carries: every selected layer when the row
+    /// is one of them, otherwise the row's own.
+    private var dragged: [UUID] {
+        selected && editor.selection.count > 1 ? controller.selectedLayers.map(\.id) : [layer.id]
     }
 
     @ViewBuilder private var name: some View {
@@ -482,5 +493,39 @@ enum TimeFormat {
         let minutes = Int(t / 60)
         let rest = t - Double(minutes * 60)
         return String(format: "%d:%05.2f", minutes, rest)
+    }
+}
+
+/// Where a layer dropped on a row lands: in front of it, inside it (a
+/// group), or behind it.
+private enum DropEdge: Sendable { case above, into, below }
+
+/// A drag of layers over a row: says where it would land as the pointer
+/// moves (a plain drop destination only says that it is over the row), and
+/// hands over the layers when it is let go.
+private struct RowDrop: DropDelegate {
+    let edge: (CGPoint) -> DropEdge
+    @Binding var shown: DropEdge?
+    let perform: @MainActor @Sendable ([UUID], DropEdge) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool { info.hasItemsConforming(to: [.utf8PlainText]) }
+    func dropEntered(info: DropInfo) { shown = edge(info.location) }
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        let now = edge(info.location)
+        if shown != now { shown = now }
+        return DropProposal(operation: .move)
+    }
+    func dropExited(info: DropInfo) { shown = nil }
+
+    func performDrop(info: DropInfo) -> Bool {
+        let at = edge(info.location)
+        shown = nil
+        guard let provider = info.itemProviders(for: [.utf8PlainText]).first else { return false }
+        let perform = perform
+        _ = provider.loadObject(ofClass: NSString.self) { text, _ in
+            let ids = ((text as? String) ?? "").split(separator: ",").compactMap { UUID(uuidString: String($0)) }
+            Task { @MainActor in perform(ids, at) }
+        }
+        return true
     }
 }

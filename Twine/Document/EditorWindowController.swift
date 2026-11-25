@@ -19,6 +19,10 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         let window = MainWindow.take { HomeWindowController.shared.library.refresh() }
         super.init(window: window)
         window.windowController = self
+        window.menus = menus
+        // Files dropped anywhere in the window come in, not only on the
+        // canvas: a sound dragged onto the timeline used to slide back.
+        window.registerForDraggedTypes([.fileURL])
 
         let root = EditorView(document: document, store: store, editor: editor, controller: controller)
             .environment(menus)
@@ -50,6 +54,28 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         window = nil
         document?.removeWindowController(self)
         if let document { document.closeAfterSaving(then: then) } else { then() }
+    }
+
+    // MARK: Dropped files
+
+    /// Pictures, video, sound and SVGs dropped on the timeline or a panel
+    /// come in at the middle of the composition. The canvas takes its own
+    /// drops, where they land. (The window hands these to its delegate.)
+    @objc func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        droppedFiles(sender).isEmpty ? [] : .copy
+    }
+
+    @objc func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let urls = droppedFiles(sender)
+        guard !urls.isEmpty else { return false }
+        controller.importMedia(urls)
+        return true
+    }
+
+    private func droppedFiles(_ info: NSDraggingInfo) -> [URL] {
+        let urls = info.draggingPasteboard.readObjects(forClasses: [NSURL.self],
+                                                       options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        return urls.filter { MediaImport.kind(of: $0) != nil }
     }
 
     // MARK: NSWindowDelegate

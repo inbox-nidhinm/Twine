@@ -24,6 +24,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
             let window = MainWindow.take { [weak self] in self?.library.refresh() }
             self.window = window
             window.windowController = self
+            window.menus = menus
             window.delegate = self
             window.title = "Twine"
             // `present` keeps the window from sizing itself to the home screen.

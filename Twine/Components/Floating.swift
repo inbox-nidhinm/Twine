@@ -219,9 +219,20 @@ final class ChromelessWindow: NSWindow {
         return super.performKeyEquivalent(with: event)
     }
 
+    /// The menus and cards of whatever the window is showing (the editor or
+    /// the home screen), set by its controller.
+    weak var menus: MenuHost?
+
     override func sendEvent(_ event: NSEvent) {
         if event.type == .leftMouseDown { closeStaleDrag() }
         if event.type == .keyDown, event.keyCode != 53, holdsDrag { return }
+        // An open card closes on a press outside it, which then carries on;
+        // an open menu takes every key.
+        if event.type == .leftMouseDown || event.type == .rightMouseDown, let menus, let content = contentView {
+            let p = content.convert(event.locationInWindow, from: nil)
+            menus.pressed(at: CGPoint(x: p.x, y: content.isFlipped ? p.y : content.bounds.height - p.y))
+        }
+        if event.type == .keyDown, let menus, menus.key(event) { return }
         if event.type == .leftMouseDown || event.type == .rightMouseDown,
            let fieldEditor = firstResponder as? NSText,
            let field = fieldEditor.delegate as? NSView {
