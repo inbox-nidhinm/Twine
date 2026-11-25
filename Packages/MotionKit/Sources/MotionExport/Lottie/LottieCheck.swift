@@ -22,6 +22,9 @@ struct LottieOmissions {
         switch layer.content {
         case .video: found.insert(.video)
         case .text(let t):
+            // Text goes out as its letters' outlines, and emoji are little
+            // pictures with none, so they vanish from the Lottie.
+            if t.text.unicodeScalars.contains(where: { $0.properties.isEmojiPresentation }) { found.insert(.emoji) }
             for unit in t.units {
                 if unit.blur > 0 { found.insert(.blur) }
                 if unit.motion != .none { found.insert(.motionBlur) }

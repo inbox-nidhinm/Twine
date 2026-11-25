@@ -209,7 +209,10 @@ final class AppAgentHost: AgentHost {
         for id in TemplateSampleFiles.ids { media[id] = TemplateSampleFiles.url(for: id) }
         let time = request.time ?? 0
         let work = controller.editor.beginWork("Exporting \(url.lastPathComponent)", after: 0.4)
-        defer { controller.editor.finishWork(work, done: "Exported \(url.lastPathComponent)") }
+        // Said to be done only when it was: a failed export used to show
+        // the same tick as a finished one.
+        var finished = false
+        defer { controller.editor.finishWork(work, done: finished ? "Exported \(url.lastPathComponent)" : nil) }
         try await withCheckedThrowingContinuation { [project, settings, media] (done: CheckedContinuation<Void, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 done.resume(with: Result {
@@ -217,6 +220,7 @@ final class AppAgentHost: AgentHost {
                 })
             }
         }
+        finished = true
         return url
     }
 }

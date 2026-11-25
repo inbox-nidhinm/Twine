@@ -110,6 +110,15 @@ final class VideoFrames {
     private var pending: (time: Double, buffer: CVPixelBuffer)?
     private var image: CGImage?
     private var readFrom = 0.0
+    /// Whether `current` is the first frame the reader gave since it was
+    /// last started: with nothing before it back to `readFrom`.
+    private var currentIsFirst = false
+    /// Set once looking further back has found nothing before that first
+    /// frame, so it is the one to show for any time between.
+    private var settledOnFirst = false
+    /// How many times a reader has been started, for the tests: each is a
+    /// new decoder and a new picture, so it must not happen on every draw.
+    private(set) var restarts = 0
     private let context = CIContext(options: [.cacheIntermediates: false,
                                               .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
 
@@ -143,12 +152,39 @@ final class VideoFrames {
 
     func frame(at requested: Double) -> CGImage? {
         let t = min(max(requested, 0), max(duration - 1e-3, 0))
-        if let current, current.time <= t + 1e-6, pending.map({ $0.time > t + 1e-6 }) ?? false {
+        // The first frame there is, when it starts after `t` (a file whose
+        // picture begins late, as some screen recordings do), is the
+        // nearest to show: nothing lies before it. Taken for a frame from
+        // the future, it used to send the reader back to the start on
+        // every draw.
+        var nothingEarlier: Bool { currentIsFirst && settledOnFirst && t >= readFrom - 1e-6 }
+        if let current, current.time <= t + 1e-6 || nothingEarlier, pending.map({ $0.time > t + 1e-6 }) ?? false {
             return picture()
         }
         let position = current?.time ?? readFrom
-        if reader == nil || t + 1e-6 < position || t > position + 2 { restart(at: t) }
-        guard let output else { return picture() }
+        if reader == nil || (t + 1e-6 < position && !nothingEarlier) || t > position + 2 { restart(at: t, back: 0.5) }
+        // Reading starts a little before `t`, for the frame already showing
+        // then. Where frames are far apart (a slideshow, a screen recording
+        // of a still screen) that frame began longer ago, so reading starts
+        // further back, in a few widening steps, until it is found.
+        var back = 0.5
+        while true {
+            advance(to: t)
+            guard let current, current.time > t + 1e-6, currentIsFirst else { break }
+            if readFrom <= 0 || back >= 100 {
+                settledOnFirst = true
+                break
+            }
+            back *= 6
+            restart(at: t, back: back)
+        }
+        return picture()
+    }
+
+    /// Reads on until `current` is the frame showing at `t` and `pending`
+    /// the one after it.
+    private func advance(to t: Double) {
+        guard let output else { return }
         while true {
             let next: (time: Double, buffer: CVPixelBuffer)
             if let waiting = pending {
@@ -161,6 +197,7 @@ final class VideoFrames {
                 break    // the end of the file: the last frame stays
             }
             if next.time <= t + 1e-6 || current == nil {
+                currentIsFirst = current == nil
                 current = next
                 image = nil
                 if next.time > t + 1e-6 { break }
@@ -169,10 +206,9 @@ final class VideoFrames {
                 break
             }
         }
-        return picture()
     }
 
-    private func restart(at t: Double) {
+    private func restart(at t: Double, back: Double) {
         reader?.cancelReading()
         // Let go of the old reader first: were the new one not to start,
         // the cancelled one would stay, never restarting, and the layer
@@ -182,8 +218,11 @@ final class VideoFrames {
         current = nil
         pending = nil
         image = nil
+        currentIsFirst = false
+        settledOnFirst = false
+        restarts += 1
         // A little before, so the frame already showing at `t` is read too.
-        readFrom = max(0, t - 0.5)
+        readFrom = max(0, t - back)
         guard let reader = try? AVAssetReader(asset: asset) else { return }
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,

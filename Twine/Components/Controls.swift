@@ -369,6 +369,8 @@ struct UnitField: View {
     let commit: (Double) -> Void
 
     @State private var text = ""
+    /// Counts commits, so the field can read the value back after each.
+    @State private var commits = 0
     @FocusState private var focused: Bool
     @Environment(\.scrubbing) private var scrubbing
 
@@ -405,6 +407,11 @@ struct UnitField: View {
                 .onChange(of: value) { old, now in
                     if !focused || text == format(old) || text == Self.mixedText { text = shown(now) }
                 }
+                // After a commit, what the project took, which is not always
+                // what was typed: a time lands on a frame, a number is held
+                // to a limit, a change is refused. Read a turn later, when
+                // `value` is the new one.
+                .onChange(of: commits) { _, _ in text = shown(value) }
                 .onChange(of: mixed) { if !focused { text = shown(value) } }
                 .onKeyPress(keys: [.upArrow, .downArrow], phases: [.down, .repeat]) { press in
                     nudge(by: ArrowNudge.amount(press, step: step, suffix: suffix))
@@ -492,6 +499,7 @@ struct UnitField: View {
             // the view updates, and showing it would put the old number back
             // the moment the field lost focus.
             text = format(v)
+            commits += 1
         } else {
             // A number that is no use at all says so.
             if !untouched, Double(typed) != nil, number == nil { NSSound.beep() }
@@ -544,6 +552,7 @@ struct OptionalField: View {
     let commit: (Double?) -> Void
 
     @State private var text = ""
+    @State private var commits = 0
     @FocusState private var focused: Bool
     @Environment(\.scrubbing) private var scrubbing
 
@@ -576,6 +585,8 @@ struct OptionalField: View {
                 .onChange(of: value) { old, now in
                     if !focused || text == (old.map(format) ?? "") { text = now.map(format) ?? "" }
                 }
+                // After a commit, what the project took (see `UnitField`).
+                .onChange(of: commits) { _, _ in text = value.map(format) ?? "" }
                 .onKeyPress(keys: [.upArrow, .downArrow], phases: [.down, .repeat]) { press in
                     nudge(by: ArrowNudge.amount(press, step: step, suffix: suffix))
                     return .handled
@@ -627,7 +638,10 @@ struct OptionalField: View {
                       : UnitField.nearest(to: typedNumber, from: value ?? placeholder, decimals: decimals, accepts: accepts) {
             // Left reading what it was showing, nothing was typed: the
             // number shown may be rounded, and must not replace the value.
-            if value.map({ typed != format($0) && abs($0 - v) > .ulpOfOne }) ?? true { commit(v) }
+            if value.map({ typed != format($0) && abs($0 - v) > .ulpOfOne }) ?? true {
+                commit(v)
+                commits += 1
+            }
             text = format(v)
         } else {
             if Double(typed) != nil { NSSound.beep() }

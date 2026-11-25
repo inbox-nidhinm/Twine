@@ -295,8 +295,27 @@ final class EditorController {
     }
 
     func stop() {
-        editor.isPlaying = false
+        // A playhead still gliding to an action's end is let go, or the
+        // next tick would put it back (Go to Start within a second of
+        // adding an action did nothing).
+        cancelGlide()
+        if editor.isPlaying {
+            editor.isPlaying = false
+            // Paused on a frame, never between two.
+            editor.time = min(max(frameRate.snapped(editor.time), 0), lastFrameTime)
+        }
         followAudio()
+    }
+
+    /// Brings the playhead back inside the scene when the scene is made
+    /// shorter under it (by the ruler, the inspector, an undo or an AI
+    /// app): it used to rest past the end, where the canvas showed a moment
+    /// that is not in the scene and Add Action put a bar beyond it.
+    func keepPlayheadInScene() {
+        if editor.time > lastFrameTime {
+            cancelGlide()
+            editor.time = lastFrameTime
+        }
     }
 
     /// Moves the playhead, landing on a frame.
@@ -1651,7 +1670,11 @@ final class EditorController {
         board.setData(data, forType: Self.pasteboardType)
     }
 
+    /// Cut is Copy and Delete of the same things: after a click in the
+    /// timeline that is the selected actions, and nothing when none is
+    /// (it used to copy the layers and then delete nothing).
     func cutSelection() {
+        if timelineHasFocus { return selectedActions.isEmpty ? NSSound.beep() : cutSelectedActions() }
         copySelection()
         deleteSelection()
     }

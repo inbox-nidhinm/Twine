@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 263
+    static let pushes = 264
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -109,6 +109,16 @@ enum VersionHistory {
             "A file that will not import, an SVG or a Figma copy that cannot be read, and a name already taken by another project or folder each say so in a note, where there was only a beep. SVG imports and Figma pastes show that they are under way.",
             "Notes stay up longer the more they say, and for as long as the pointer rests on them.",
             "With a colour picker, the easing card or any other card open, a click elsewhere now closes the card and does what it was aimed at: picking another swatch, another layer or a number took two clicks, the first only closing the card. A second click on the control that raised a card closes it.",
+            "The playhead stays inside the scene when the scene is made shorter under it, pausing lands on a frame, and Go to Start or End takes effect at once after adding an action (the playhead's glide to the new bar used to put it back).",
+            "A sound's waveform comes back when its layer is deleted and the delete undone.",
+            "After Return, a field reads what the project took, not what was typed: a time lands on its frame, a number held to a limit shows the limit, and a change that was refused shows the old value.",
+            "Turning a layer inside a mirrored group or frame follows the pointer; it turned the other way.",
+            "The eyedropper keeps the fill's opacity, as typing a hex does; it set it to 100%.",
+            "Cut after a click in the timeline cuts the selected actions, and does nothing with none selected (it copied the layers and deleted nothing). Shift-click in the layers panel lets go of the actions of layers that leave the selection. After renaming a layer or the project with Return, the keys go back to the canvas.",
+            "Emoji in text are named among what a Lottie leaves out; they vanished without a word.",
+            "A page curl is drawn again when its layer is resized while paused.",
+            "An export asked for by an AI app shows its done note only when it finished, not when it failed.",
+            "A video whose first frame comes late, or whose frames are far apart, no longer risks being read again from the start on every draw.",
         ], misc: [
             "Settings is in the Twine menu (⌘,). File > Duplicate is named Duplicate Project, and Home is greyed out on the home screen.",
             "A new, empty project opens in Design, where the drawing tools are; a project with layers still opens in Animate.",

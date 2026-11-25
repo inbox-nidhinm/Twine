@@ -129,7 +129,9 @@ struct LayersPanel: View {
     private func click(_ id: UUID, _ modifiers: NSEvent.ModifierFlags) {
         if modifiers.contains(.shift), let from = lastClicked, let a = rows.firstIndex(where: { $0.id == from }),
            let b = rows.firstIndex(where: { $0.id == id }) {
-            editor.selection = Set(rows[min(a, b)...max(a, b)].map(\.id))
+            // Through the controller, which lets go of the actions of
+            // layers that leave the selection.
+            controller.select(rows[min(a, b)...max(a, b)].map(\.id))
         } else if modifiers.contains(.command) {
             controller.select([id], extending: true)
             lastClicked = id
@@ -197,6 +199,7 @@ struct LayersPanel: View {
         let wanted = fileDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         if !wanted.isEmpty, wanted != document.name, !wanted.contains("/") { pendingName = wanted }
         document.rename(to: fileDraft) { _ in pendingName = nil }
+        UnitField.leaveField()
     }
 }
 
@@ -347,6 +350,9 @@ private struct LayerRow: View {
     private func commit() {
         editor.renaming = nil
         if draft != layer.name { controller.perform(.renameLayer(layer.id, draft)) }
+        // The field goes, so the keyboard goes back to the canvas: left
+        // nowhere, Space and the tool keys did nothing until a click.
+        UnitField.leaveField()
     }
 
     /// The layers a switch on this row changes: every selected layer when

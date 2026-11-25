@@ -100,6 +100,10 @@ struct EditorView: View {
         // Every number field in the window, its cards and menus included,
         // undoes a drag as one step.
         .environment(\.scrubbing, controller.scrubbing)
+        // The scene's length changes from many places (the ruler, the
+        // inspector, an undo, an AI app), so the playhead is brought back
+        // inside it from here.
+        .onChange(of: store.project.composition.duration) { _, _ in controller.keepPlayheadInScene() }
         .environment(\.documentColors, DocumentColors { [weak controller] in controller?.project.documentColors() ?? [] })
     }
 

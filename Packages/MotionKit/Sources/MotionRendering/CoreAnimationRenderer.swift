@@ -454,6 +454,7 @@ final class Node {
     /// The page curl last drawn, and the back of the page it was drawn
     /// with, kept while the look and size stay the same.
     private var curl: Curl = .none
+    private var curlSize = Size2(0, 0)
     private var curlBack: (color: RGBA, size: CGSize, outline: CGPath?, image: CIImage)?
     /// Frosted glass: the blurred background, under the fills and clipped
     /// to the shape. Made when a layer first needs one.
@@ -650,9 +651,12 @@ final class Node {
             container.shadowPath = nil
         }
 
-        if layer.blur != blurRadius || layer.curl != curl {
+        // The curl is cut to the layer's size, so a new size draws it again
+        // (resizing a layer while paused mid-curl left the old one).
+        if layer.blur != blurRadius || layer.curl != curl || (layer.curl != .none && layer.size != curlSize) {
             blurRadius = layer.blur
             curl = layer.curl
+            curlSize = layer.size
             var filters: [Any] = layer.blur > 0 ? [Blur.filter(amount: layer.blur)] : []
             if case .curled(let c) = layer.curl {
                 filters += PageCurlFilter.filters(c, size: layer.size.cg, back: back(of: layer))

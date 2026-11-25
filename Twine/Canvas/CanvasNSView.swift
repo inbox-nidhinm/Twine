@@ -1003,7 +1003,11 @@ final class CanvasNSView: NSView {
             let a0 = atan2(rotate.start.y - pivot.y, rotate.start.x - pivot.x)
             let a1 = atan2(point.y - pivot.y, point.x - pivot.x)
             let original = rotate.layer.transform.rotation
-            var angle = original + (a1 - a0) * 180 / .pi
+            // Inside a mirrored group or frame (a flipped Figma import, a
+            // scale below zero) the layer's own turn shows the other way
+            // round on screen, so it follows the pointer in reverse.
+            let mirrored = (parentInverse(of: rotate.layer.id)?.determinant ?? 1) < 0
+            var angle = original + (mirrored ? -1 : 1) * (a1 - a0) * 180 / .pi
             if shift { angle = (angle / 15).rounded() * 15 }
             var layer = rotate.layer
             layer.transform.rotation = angle

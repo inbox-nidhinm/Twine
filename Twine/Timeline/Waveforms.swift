@@ -28,6 +28,10 @@ final class Waveforms {
             let read = await Self.read(url)
             await MainActor.run {
                 self.peaks[mediaID] = read
+                // No longer being read: if these peaks are let go (the
+                // layer deleted) and the layer comes back by an undo, they
+                // are read again. Left marked, the bar stayed bare.
+                self.reading.remove(mediaID)
                 self.onChange()
             }
         }

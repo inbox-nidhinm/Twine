@@ -43,7 +43,7 @@ struct ColorPicker: View {
             HueBar(hue: hsb.h, change: { hsb.h = $0; push() }, began: onBegin, ended: onEnd)
             AlphaBar(alpha: alpha, color: hsb.rgba(alpha: 1), change: { alpha = $0; push() }, began: onBegin, ended: onEnd)
             HStack(spacing: 8) {
-                EyedropperButton(pick: take)
+                EyedropperButton(pick: sample)
                 HexField(color: current, commit: take)
             }
             if !documentColors.isEmpty {
@@ -67,6 +67,12 @@ struct ColorPicker: View {
         onEnd()
         pull(c)
         picked = c
+    }
+
+    /// A colour sampled from the screen, which has no opacity of its own:
+    /// the fill keeps the one it had, as it does when a hex is typed.
+    private func sample(_ c: RGBA) {
+        take(RGBA(c.r, c.g, c.b, alpha))
     }
 
     /// Takes a colour from outside, keeping the hue where it was for greys and

@@ -24,6 +24,7 @@ public enum LottieOmission: String, CaseIterable, Sendable {
     case tiledPictures = "Tiled pictures"
     case pictureStrokes = "Picture strokes"
     case linearBurn = "Linear Burn"
+    case emoji = "Emoji"
 }
 
 /// A picture a Lottie carries, as a PNG or JPEG file's bytes.

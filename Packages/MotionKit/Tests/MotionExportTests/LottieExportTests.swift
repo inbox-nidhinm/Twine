@@ -288,6 +288,17 @@ private func scene() -> (project: Project, square: UUID, group: UUID) {
         #expect(LottieCheck.leftOut(scene().project).isEmpty)
     }
 
+    /// Text goes out as outlines, and an emoji has none, so it is named.
+    @Test func emojiAreNamedAsLeftOut() {
+        func project(_ words: String) -> Project {
+            let text = Layer(name: "Text", content: .text(TextContent(text: words, fontSize: 40)),
+                             size: Size2(200, 48), position: Vec2(100, 100))
+            return Project(composition: Composition(width: 200, height: 200, frameRate: .fps30, duration: 1), layers: [text])
+        }
+        #expect(LottieCheck.leftOut(project("Launch 🎉")) == ["Emoji"])
+        #expect(LottieCheck.leftOut(project("Launch day")).isEmpty)
+    }
+
     @Test func dotLottieHoldsTheAnimation() throws {
         let (project, _, _) = scene()
         let (url, _) = try export(project, as: .dotLottie)
