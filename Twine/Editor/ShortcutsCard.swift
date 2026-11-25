@@ -153,7 +153,7 @@ struct ShortcutsCard: View {
                     s("Forward, backward", "⌘]", "⌘["),
                     s("To front, to back", "⌥⌘]", "⌥⌘["),
                     s("To front, to back, one key", "]", "["),
-                    s("Lock or unlock", "⇧⌘L"),
+                    s("Lock or unlock, hide or show", "⇧⌘L", "⇧⌘H"),
                 ]),
                 Group(title: "Gradients", items: [
                     s("Turn in 15° steps", "⇧", "drag"),
@@ -187,7 +187,7 @@ struct ShortcutsCard: View {
                     s("Rename in the layers panel", "double-click"),
                     s("Add a layer, or the layers between", "⌘ click", "⇧ click"),
                     s("Duplicate project", "⇧⌘S"),
-                    s("Home", "⇧⌘H"),
+                    s("Home", "⌃⌘H"),
                     s("Close the project", "⌘W"),
                 ]),
             ],

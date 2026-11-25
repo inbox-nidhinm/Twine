@@ -69,7 +69,7 @@ struct LayersPanel: View {
             }
         }
         .overlay(alignment: .topTrailing) {
-            IconButton(icon: .home, help: "Home (⇧⌘H)") {
+            IconButton(icon: .home, help: "Home (⌃⌘H)") {
                 HomeWindowController.shared.showWindow(nil)
             }
             .padding(.trailing, Theme.buttonInset)
@@ -503,8 +503,8 @@ extension EditorController {
         entries += [
             .separator,
             .item(layer.isSoloed ? "Unsolo" : "Solo") { self.perform(.setSoloed(ids, !layer.isSoloed)) },
-            .item(layer.isLocked ? "Unlock" : "Lock") { self.perform(.setLocked(ids, !layer.isLocked)) },
-            .item(layer.isVisible ? "Hide" : "Show") { self.perform(.setVisible(ids, !layer.isVisible)) },
+            .item(layer.isLocked ? "Unlock" : "Lock", shortcut: "⇧⌘L") { self.perform(.setLocked(ids, !layer.isLocked)) },
+            .item(layer.isVisible ? "Hide" : "Show", shortcut: "⇧⌘H") { self.perform(.setVisible(ids, !layer.isVisible)) },
             .separator,
             .item("Delete", shortcut: "⌫") { self.deleteSelectedLayers() },
         ]

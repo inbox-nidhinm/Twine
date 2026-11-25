@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 279
+    static let pushes = 280
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -68,7 +68,7 @@ enum VersionHistory {
             "Drag a layer into a frame, or out of one. Let go of a dragged layer over another frame and it goes into it, staying where you dropped it; let go outside its frame and it comes out to the top level. The frame it would land in is outlined as you drag. A layer inside a group stays the group's.",
             "Distances, as in Figma: with something selected, hold Option and point at another layer to see how far apart they are, across the gap between them, or from edge to matching edge where they overlap.",
             "The Text tool drags out a box: drag with it and the text is that wide, wrapping inside it; a click still makes a text that grows as you type.",
-            "Figma's quick keys on the canvas. A number key sets the selection's opacity (4 is 40%, 0 is 100%, and two in quick succession are exact: 4 then 5 is 45%). ] and [ send it to the front and to the back. I picks a colour from anywhere on the screen as its fill, or a text's colour. Shift-X swaps a shape's fill and stroke; Option-/ takes its fills away and Shift-/ its strokes. Shift-1 fits the view and Shift-0 shows it at actual size, beside ⌘0 and ⌥⌘0. Shift-Command-L locks or unlocks the selection. The ones that change a layer work in Design.",
+            "Figma's quick keys on the canvas. A number key sets the selection's opacity (4 is 40%, 0 is 100%, and two in quick succession are exact: 4 then 5 is 45%). ] and [ send it to the front and to the back. I picks a colour from anywhere on the screen as its fill, or a text's colour. Shift-X swaps a shape's fill and stroke; Option-/ takes its fills away and Shift-/ its strokes. Shift-1 fits the view and Shift-0 shows it at actual size, beside ⌘0 and ⌥⌘0. Shift-Command-L locks or unlocks the selection and Shift-Command-H hides or shows it; Home, which had that key, is now Control-Command-H. The ones that change a layer work in Design.",
             "The Edit menu has Lock or Unlock and Hide or Show, and Arrange has Flip Horizontal and Flip Vertical.",
         ], fixes: [
             "Cards open beside the control that raises them again. The colour picker, a fill's or stroke's card, the stroke settings and the easing card had all been landing in the window's top-left corner since cards began letting clicks through to what is behind them.",
