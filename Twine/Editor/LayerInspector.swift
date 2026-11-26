@@ -33,9 +33,6 @@ struct LayerInspector: View {
                     // A template sets its own camera.
                     PanelDivider()
                     TemplateSection(layer: layer, setup: setup, controller: controller)
-                } else if layer.isFrame {
-                    PanelDivider()
-                    SpaceSection(layer: layer, controller: controller)
                 }
                 PanelDivider()
                 appearanceSection
@@ -1212,38 +1209,18 @@ struct InspectorItemTitle: View {
 
 // MARK: - Effects
 
-/// A mask: the layers in front of it in its group or frame show only
-/// where it draws (4 October 2026, as in Figma). Its one control stops it
-/// being a mask; Use as Mask is on the layers' right-click menu.
-/// A frame in 3D: its children placed in one space and seen through one
-/// camera. Off, it is only its header with +; on, its camera and how depth
-/// looks, with − in the header.
-private struct SpaceSection: View {
+/// A frame in 3D, as an item in Effects (26 November 2026, the user's
+/// request; it was a section of its own): its children placed in one space
+/// and seen through one camera. These are its camera and how depth looks,
+/// under the item's name row.
+private struct SpaceRows: View {
     let layer: Layer
+    let space: Space3D
     let controller: EditorController
 
     private enum Camera: Hashable { case perspective, isometric }
 
     var body: some View {
-        let space = layer.space3D
-        VStack(alignment: .leading, spacing: Theme.space8) {
-            HeaderRow(title: "3D") {
-                if space == nil {
-                    IconButton(icon: .plus, help: "Hold the frame's layers in 3D: each sits at its own depth and turns in one space, seen through one camera, the nearest drawn on top") {
-                        controller.edit(layer.id) { $0.space3D = Space3D() }
-                    }
-                } else {
-                    IconButton(icon: .minus, help: "Back to flat: the layers are drawn in their own order again, each tilt seen from its own depth") {
-                        controller.edit(layer.id) { $0.space3D = nil }
-                    }
-                }
-            }
-            if let space { rows(space).gridBody() }
-        }
-        .sectionPadding(empty: space == nil)
-    }
-
-    private func rows(_ space: Space3D) -> some View {
         VStack(alignment: .leading, spacing: Theme.space8) {
             SegmentRow(selection: space.isIsometric ? Camera.isometric : .perspective, options: [.perspective, .isometric],
                        title: { $0 == .perspective ? "Perspective" : "Isometric" }) { camera in
@@ -1308,6 +1285,9 @@ private struct SpaceSection: View {
     }
 }
 
+/// A mask: the layers in front of it in its group or frame show only
+/// where it draws (4 October 2026, as in Figma). Its one control stops it
+/// being a mask; Use as Mask is on the layers' right-click menu.
 private struct MaskSection: View {
     let layer: Layer
     let controller: EditorController
@@ -1359,11 +1339,16 @@ struct EffectsSection: View {
     private var showsSkew: Bool { canWarp && (addedSkew || t.skew != .zero) }
     private var showsTilt: Bool { canWarp && (addedTilt || t.tilt.isTilted) }
     private var showsBend: Bool { canWarp && (addedBend || t.bend != .zero) }
+    /// A frame of its own (not a template, which sets its own camera) can
+    /// hold its layers in 3D.
+    private var canHoldSpace: Bool { others.isEmpty && layer.isFrame && layer.template == nil }
+    private var showsSpace: Bool { canHoldSpace && layer.space3D != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.space8) {
             HeaderRow(title: "Effects") {
                 IconButton(icon: .plus, help: isMixed ? "Replace the different effects with one"
+                                              : canHoldSpace ? "Add a shadow, a blur, glass, 3D, a skew, a tilt or a bend"
                                               : others.isEmpty ? "Add a shadow, a blur, glass, a skew, a tilt or a bend"
                                               : "Add a shadow, a blur or glass") {
                     var entries: [MenuEntry] = [.item("Drop Shadow", icon: .shadow) { add(.dropShadow(DropShadow())) }]
@@ -1381,8 +1366,14 @@ struct EffectsSection: View {
                     if everyone.allSatisfy({ $0.look?.geometry.isClosed == true }) {
                         entries.append(.item("Glass", icon: .glass) { add(.glass(Glass())) })
                     }
-                    if canWarp && !(showsSkew && showsTilt && showsBend) {
+                    let addsSpace = canHoldSpace && !showsSpace
+                    if addsSpace || (canWarp && !(showsSkew && showsTilt && showsBend)) {
                         entries.append(.separator)
+                        if addsSpace {
+                            entries.append(.item("3D", icon: .camera) {
+                                controller.edit(layer.id) { $0.space3D = Space3D() }
+                            })
+                        }
                         if !showsSkew { entries.append(.item("Skew", icon: .skew) { addedSkew = true }) }
                         if !showsTilt { entries.append(.item("Tilt", icon: .tilt) { addedTilt = true }) }
                         if !showsBend { entries.append(.item("Bend", icon: .bend) { addedBend = true }) }
@@ -1399,11 +1390,12 @@ struct EffectsSection: View {
                         .gridBody()
                 }
             }
+            if showsSpace, let space = layer.space3D { spaceRows(space).gridBody() }
             if showsSkew { skewRows.gridBody() }
             if showsTilt { tiltRows.gridBody() }
             if showsBend { bendRows.gridBody() }
         }
-        .sectionPadding(empty: layer.effects.isEmpty && !isMixed && !showsSkew && !showsTilt && !showsBend)
+        .sectionPadding(empty: layer.effects.isEmpty && !isMixed && !showsSpace && !showsSkew && !showsTilt && !showsBend)
     }
 
     private func titleRow(_ icon: Icon, _ title: String, remove: @escaping () -> Void) -> some View {
@@ -1414,6 +1406,16 @@ struct EffectsSection: View {
     private func eyeButton(_ effect: Effect, _ index: Int) -> some View {
         IconButton(icon: effect.isEnabled ? .eye : .eyeSlash, help: effect.isEnabled ? "Hide the effect" : "Show the effect") {
             edit(index) { $0.isEnabled.toggle() }
+        }
+    }
+
+    private func spaceRows(_ space: Space3D) -> some View {
+        VStack(alignment: .leading, spacing: Theme.space8) {
+            titleRow(.camera, "3D") {
+                controller.edit(layer.id) { $0.space3D = nil }
+            }
+            .help("The frame's layers held in one space and seen through one camera, the nearest drawn on top. Remove it and they are drawn in their own order again.")
+            SpaceRows(layer: layer, space: space, controller: controller)
         }
     }
 
