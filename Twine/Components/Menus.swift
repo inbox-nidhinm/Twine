@@ -246,7 +246,7 @@ private struct MenuCard: View {
             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                 switch entry.kind {
                 case .separator:
-                    Rectangle().fill(Theme.border).frame(height: Theme.hairline).padding(.vertical, Theme.space4)
+                    Rectangle().fill(Theme.rule).frame(height: Theme.hairline).padding(.vertical, Theme.space4)
                 case .header(let title):
                     Text(title)
                         .font(ThemeFont.caption)
@@ -268,7 +268,7 @@ private struct MenuCard: View {
         }
         .padding(Theme.menuPad)
         .frame(minWidth: Theme.menuMinWidth, alignment: .leading)
-        .floatingPanel(corner: Theme.radiusMenu)
+        .floatingPanel(corner: Theme.radiusMenu, fill: Theme.dropdown)
     }
 }
 

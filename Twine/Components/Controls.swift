@@ -829,7 +829,7 @@ struct ReadoutRow: View {
 struct PanelDivider: View {
     var body: some View {
         Rectangle()
-            .fill(Theme.border)
+            .fill(Theme.rule)
             .frame(height: Theme.hairline)
     }
 }

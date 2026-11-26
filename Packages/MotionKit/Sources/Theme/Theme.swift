@@ -9,6 +9,13 @@ import AppKit
 /// blue where Flip is green, and the two tokens derived from the accent
 /// (`rowSelected`, `accentHover`) are re-derived to match.
 ///
+/// The greys and the text colours are DialKit's (26 November 2026, v0.2.85):
+/// the user kept its darker colours from the DialKit restyle, which was
+/// otherwise archived (branch `archive/dialkit`). They come from DialKit's
+/// stylesheet (joshpuckett/dialkit, `src/styles/theme.css`); where a token
+/// must be one solid colour it is DialKit's white tint already laid over
+/// its glass (#212121), so it reads the same on a panel.
+///
 /// Views read these and never write a literal. If a view needs a value that is
 /// not here, it belongs here first.
 public enum Theme {
@@ -17,15 +24,22 @@ public enum Theme {
 
     /// #1E1E1E. The canvas, and the track inside sliders and toggles.
     public static let canvas = Color(red: 0x1E / 255, green: 0x1E / 255, blue: 0x1E / 255)
-    /// #2C2C2C. Every floating card.
-    public static let panel = Color(red: 0x2C / 255, green: 0x2C / 255, blue: 0x2C / 255)
-    /// #383838. Fields, trays, and hover over `panel`.
-    public static let panelRaised = Color(red: 0x38 / 255, green: 0x38 / 255, blue: 0x38 / 255)
-    /// #484848. Hover over something already on `panelRaised`: the next rung of
-    /// the same ramp, so a hover on a tray still shows.
-    public static let panelHover = Color(red: 0x48 / 255, green: 0x48 / 255, blue: 0x48 / 255)
-    /// #424242. Rules, and the edge of every card.
-    public static let border = Color(red: 0x42 / 255, green: 0x42 / 255, blue: 0x42 / 255)
+    /// #212121 (DialKit's glass). Every floating card.
+    public static let panel = Color(red: 0x21 / 255, green: 0x21 / 255, blue: 0x21 / 255)
+    /// #2C2C2C (DialKit's surface, white at 5% over the glass). Fields,
+    /// trays, and hover over `panel`.
+    public static let panelRaised = Color(red: 0x2C / 255, green: 0x2C / 255, blue: 0x2C / 255)
+    /// #373737 (DialKit's surface under the pointer, white at 10%). Hover
+    /// over something already on `panelRaised`: the next rung of the same
+    /// ramp, so a hover on a tray still shows.
+    public static let panelHover = Color(red: 0x37 / 255, green: 0x37 / 255, blue: 0x37 / 255)
+    /// White at 10% (DialKit's border). The edge of every card.
+    public static let border = Color.white.opacity(0.10)
+    /// White at 6% (DialKit's subtle surface). The rule between a panel's
+    /// sections, and between a menu's groups.
+    public static let rule = Color.white.opacity(0.06)
+    /// #2A2A2A (DialKit's dropdown). An open menu's card.
+    public static let dropdown = Color(red: 0x2A / 255, green: 0x2A / 255, blue: 0x2A / 255)
     /// A hairline over colour the theme does not control: a swatch, a well, a
     /// thumbnail, the inside of a track. Translucent so it reads on anything.
     public static let edge = Color.white.opacity(0.12)
@@ -47,16 +61,18 @@ public enum Theme {
     /// #33506C. A selected row. Mixed by eye rather than as the accent at some
     /// opacity over `panel`, which comes out greyer than the accent reads.
     public static let rowSelected = Color(red: 0x33 / 255, green: 0x50 / 255, blue: 0x6C / 255)
-    /// #5C5C5C. What is chosen inside the inspector: a segment, a switch that
-    /// is on. Grey rather than the accent, so settings never compete with the
-    /// selection on the canvas for attention.
-    public static let chosen = Color(red: 0x5C / 255, green: 0x5C / 255, blue: 0x5C / 255)
+    /// #434343 (DialKit's active surface over a field). What is chosen
+    /// inside the inspector: a segment, a switch that is on. Grey rather
+    /// than the accent, so settings never compete with the selection on the
+    /// canvas for attention.
+    public static let chosen = Color(red: 0x43 / 255, green: 0x43 / 255, blue: 0x43 / 255)
     /// `chosen` under the pointer: a step lighter, as `accentHover` is.
-    public static let chosenHover = Color(red: 0x68 / 255, green: 0x68 / 255, blue: 0x68 / 255)
+    public static let chosenHover = Color(red: 0x4C / 255, green: 0x4C / 255, blue: 0x4C / 255)
     /// The row that is current without being selected.
     public static let rowCurrent = accent.opacity(0.22)
-    /// A row under the pointer. Translucent so the grain shows through.
-    public static let rowHover = Color.white.opacity(0.057)
+    /// A row under the pointer (DialKit's surface). Translucent so the grain
+    /// shows through.
+    public static let rowHover = Color.white.opacity(0.05)
     /// A template's tile on Home's New from Template screen, and under the pointer.
     public static let templateTile = Color(red: 0x41 / 255, green: 0x41 / 255, blue: 0x41 / 255)
     public static let templateTileHover = Color(red: 0x4A / 255, green: 0x4A / 255, blue: 0x4A / 255)
@@ -68,6 +84,8 @@ public enum Theme {
     public static let previewShape = Color(white: 0.86)
     /// Smart guides and equal-spacing marks while something snaps.
     public static let guide = Color(red: 0xF2 / 255, green: 0x4E / 255, blue: 0x6B / 255)
+    /// A timeline bar that is not selected (DialKit's clip, white at 20%).
+    public static let clip = Color.white.opacity(0.20)
     /// A timeline scene's own colour: its span bar and the line down its
     /// rows (#2E5575, the user's choice), a deep blue apart from the light
     /// blue of a selection. Scenes have no row colour: the bar is enough.
@@ -77,13 +95,16 @@ public enum Theme {
 
     // MARK: Text (text/*)
 
-    public static let textPrimary = Color.white
-    public static let textSecondary = Color(white: 0.70)
-    /// Placeholders, units, readouts, disabled.
-    public static let textTertiary = Color(white: 0.50)
-    /// A field's name and unit inside its box (X, W, px, %): a step brighter
-    /// than `textTertiary`, which on the raised box was hard to read.
-    public static let fieldLabel = Color(white: 0.62)
+    /// White at 95% (DialKit's primary text).
+    public static let textPrimary = Color.white.opacity(0.95)
+    /// White at 70% (DialKit's label text).
+    public static let textSecondary = Color.white.opacity(0.70)
+    /// White at 40% (DialKit's tertiary text). Placeholders, units,
+    /// readouts, disabled.
+    public static let textTertiary = Color.white.opacity(0.40)
+    /// A field's name and unit inside its box (X, W, px, %), as DialKit's
+    /// labels inside a row: white at 70%.
+    public static let fieldLabel = Color.white.opacity(0.70)
     /// Text drawn on a white fill, such as a slider readout once the fill
     /// reaches it.
     public static let textOnFill = Color(white: 0.32)

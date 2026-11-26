@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 280
+    static let pushes = 285
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -72,6 +72,9 @@ enum VersionHistory {
             "The Edit menu has Lock or Unlock and Hide or Show, and Arrange has Flip Horizontal and Flip Vertical.",
         ], fixes: [
             "Cards open beside the control that raises them again. The colour picker, a fill's or stroke's card, the stroke settings and the easing card had all been landing in the window's top-left corner since cards began letting clicks through to what is behind them.",
+        ], misc: [
+            "Darker colours, from DialKit: the panels, fields, hovers, chosen greys, card edges, dividers, menus, unselected timeline bars and text take DialKit's palette, darker and softer than Flip's. Sizes, type and layout are as they were.",
+            "The DialKit restyle (v0.2.81 to v0.2.84: DialKit's 36 pt rows and 13 pt type, slider rows, new panel heads, a restyled timeline) was tried on a branch of its own and archived; only its colours were kept. It is on the archive/dialkit branch and the dialkit-v0.2.84 tag, and Flip's colours as they were on archive/flip-look.",
         ]),
         .init(date: "19 October 2026", title: "Templates and 3D", features: [
             "Frames in 3D. A frame's new 3D section (+ to switch it on) holds its layers in one space, seen through one camera: each layer has a Z in Position (towards you, or away when negative), its Tilt turns it in that space, and whatever is nearest is drawn on top, changing as layers turn and move. Choose Perspective, with how far away the camera is and the vanishing point it looks at, or Isometric, where nothing grows or shrinks with depth; fade and blur layers the further behind the frame they are; and set how strongly a layer shows with its back to you. Clicks pick the layer drawn in front. Layers in a 3D frame show their outline but no handles, as tilted layers do, and a group inside one is a flat card. Projects with 3D frames need this Twine to open.",
