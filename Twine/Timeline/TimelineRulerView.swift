@@ -57,7 +57,7 @@ final class TimelineRulerView: NSView {
             .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular),
             .foregroundColor: NSColor(Theme.textTertiary),
         ]
-        ctx.setFillColor(NSColor(Theme.textTertiary).withAlphaComponent(0.7).cgColor)
+        ctx.setFillColor(NSColor(Theme.textTertiary).fading(0.7).cgColor)
         while viewport.x(for: t) <= bounds.width + 40 {
             let x = viewport.x(for: t)
             let major = abs((t / step).rounded() * step - t) < minor / 10
@@ -218,5 +218,15 @@ final class TimelineRulerView: NSView {
         addCursorRect(CGRect(x: x + 5, y: 0, width: max(bounds.width - x - 5, 0), height: bounds.height), cursor: Cursors.arrow)
         addCursorRect(CGRect(x: x - 5, y: 0, width: 10, height: bounds.height), cursor: Cursors.resizeHorizontal)
         addCursorRect(pillRect.insetBy(dx: -2, dy: -2), cursor: Cursors.hand)
+    }
+}
+
+extension NSColor {
+    /// This colour at `share` of its own strength. Theme colours can be
+    /// see-through already (white at 10%, say), and `withAlphaComponent`
+    /// would replace that strength rather than lessen it: a divider meant
+    /// to be faint came out at 45% white (v0.2.85).
+    func fading(_ share: CGFloat) -> NSColor {
+        withAlphaComponent(alphaComponent * share)
     }
 }

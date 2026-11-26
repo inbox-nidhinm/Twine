@@ -15,7 +15,7 @@ enum VersionHistory {
 
     /// How many pushes to GitHub the app has had, this one included. Raise it by
     /// one with every push: the first was v0.0.01, the 100th is v0.1.00. It matches the repo's commit count once the commit that raises it is made.
-    static let pushes = 285
+    static let pushes = 286
 
     static var release: String { String(format: "v0.%d.%02d", pushes / 100, pushes % 100) }
 
@@ -72,6 +72,7 @@ enum VersionHistory {
             "The Edit menu has Lock or Unlock and Hide or Show, and Arrange has Flip Horizontal and Flip Vertical.",
         ], fixes: [
             "Cards open beside the control that raises them again. The colour picker, a fill's or stroke's card, the stroke settings and the easing card had all been landing in the window's top-left corner since cards began letting clicks through to what is behind them.",
+            "The timeline's lines between rows are faint again, and an action's name beside its layer's is grey again, as are the ruler's dots: with the DialKit colours they had come out far too light, at nearly half white and full white.",
         ], misc: [
             "Darker colours, from DialKit: the panels, fields, hovers, chosen greys, card edges, dividers, menus, unselected timeline bars and text take DialKit's palette, darker and softer than Flip's. Sizes, type and layout are as they were.",
             "The DialKit restyle (v0.2.81 to v0.2.84: DialKit's 36 pt rows and 13 pt type, slider rows, new panel heads, a restyled timeline) was tried on a branch of its own and archived; only its colours were kept. It is on the archive/dialkit branch and the dialkit-v0.2.84 tag, and Flip's colours as they were on archive/flip-look.",

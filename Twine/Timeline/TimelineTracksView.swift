@@ -423,7 +423,7 @@ final class TimelineTracksView: NSView {
             ctx.fill(label)
         }
         // The faint line under every row.
-        ctx.setFillColor(NSColor(Theme.border).withAlphaComponent(0.45).cgColor)
+        ctx.setFillColor(NSColor(Theme.border).fading(0.45).cgColor)
         ctx.fill(CGRect(x: 0, y: row.y + TimelineRow.height - 1, width: bounds.width, height: 1))
         // Down the left of a scene's rows, its line.
         if row.inScene != nil {
@@ -435,7 +435,7 @@ final class TimelineTracksView: NSView {
         // The label: layer, then action.
         let dimmed = row.folded == nil ? !action.isEnabled : row.actions.allSatisfy { !$0.isEnabled }
         let primary = NSColor(selected ? Theme.textPrimary : dimmed ? Theme.textTertiary : Theme.textPrimary)
-        let secondary = NSColor(selected ? Theme.textPrimary : Theme.textTertiary).withAlphaComponent(selected ? 0.75 : 1)
+        let secondary = NSColor(selected ? Theme.textPrimary : Theme.textTertiary).fading(selected ? 0.75 : 1)
         // Under the pointer, and always, crossed out, on an action switched
         // off, as a hidden layer's row shows in the layers panel, so what is
         // off is never missed.
@@ -618,7 +618,7 @@ final class TimelineTracksView: NSView {
             x += 2
         }
         ctx.addPath(path)
-        ctx.setFillColor(NSColor(Theme.textPrimary).withAlphaComponent(selected ? 0.45 : 0.22).cgColor)
+        ctx.setFillColor(NSColor(Theme.textPrimary).fading(selected ? 0.45 : 0.22).cgColor)
         ctx.fillPath()
         ctx.restoreGState()
     }
