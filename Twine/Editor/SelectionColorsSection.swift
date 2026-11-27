@@ -5,17 +5,19 @@ import Theme
 
 /// Figma's Selection colours: every colour and gradient used inside a group,
 /// a frame or several layers, each once, changed everywhere it is used from
-/// here (`SelectionColors`). A colour is a row as a fill's is; a gradient is
-/// a row that opens its stops under it. Shows nothing when there is no
-/// colour inside, divider included.
+/// here (`SelectionColors`). Closed, as it starts for each selection, its
+/// header shows the first few as small swatches and how many more there
+/// are; a click opens the full list (27 November 2026, as in Figma). A
+/// colour is a row as a fill's is; a gradient is a row that opens its stops
+/// under it. Shows nothing when there is no colour inside, divider included.
 struct SelectionColorsSection: View {
     let ids: [UUID]
     let controller: EditorController
 
-    /// How many show before the rest are asked for, as in Figma.
-    private static let shownAtFirst = 8
+    /// How many swatches the closed header shows before its count.
+    private static let peeked = 3
 
-    @State private var showsAll = false
+    @State private var isOpen = false
     /// The gradient whose stops are open, by its first place.
     @State private var open: SelectionColors.Place?
     @State private var pickedStop: Int?
@@ -23,25 +25,56 @@ struct SelectionColorsSection: View {
     var body: some View {
         let entries = SelectionColors.entries(in: controller.project, under: ids)
         if !entries.isEmpty {
-            let shown = showsAll ? entries : Array(entries.prefix(Self.shownAtFirst))
             PanelDivider()
             VStack(alignment: .leading, spacing: Theme.space8) {
-                HeaderRow(title: "Selection colours") {}
-                VStack(alignment: .leading, spacing: Theme.space8) {
-                    ForEach(shown) { entry in
-                        switch entry.look {
-                        case .color(let color): colorRow(color, places: entry.places)
-                        case .gradient(let g, let kind): gradientRows(g, kind: kind, entry: entry)
+                if isOpen {
+                    HeaderRow(title: "Selection colours") {
+                        IconButton(icon: .chevronUp, help: "Hide the colours") { isOpen = false }
+                    }
+                    VStack(alignment: .leading, spacing: Theme.space8) {
+                        ForEach(entries) { entry in
+                            switch entry.look {
+                            case .color(let color): colorRow(color, places: entry.places)
+                            case .gradient(let g, let kind): gradientRows(g, kind: kind, entry: entry)
+                            }
                         }
                     }
-                    if entries.count > shown.count {
-                        PanelButton(title: "See all \(entries.count) colours") { showsAll = true }
+                    .gridBody()
+                } else {
+                    Button { isOpen = true } label: {
+                        HeaderRow(title: "Selection colours") { peek(entries) }
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .help("Show every colour inside, to change it wherever it is used")
                 }
-                .gridBody()
             }
-            .padding(.bottom, Theme.panelPad)
+            .sectionPadding(empty: !isOpen)
+            .onChange(of: ids) { _, _ in
+                isOpen = false
+                open = nil
+                pickedStop = nil
+            }
         }
+    }
+
+    /// The first few colours as small swatches, then how many more.
+    private func peek(_ entries: [SelectionColors.Entry]) -> some View {
+        HStack(spacing: Theme.space4) {
+            ForEach(entries.prefix(Self.peeked)) { entry in
+                switch entry.look {
+                case .color(let color): PaintSwatch(paint: .solid(color), size: Theme.swatchPeek)
+                case .gradient(let g, let kind): PaintSwatch(paint: .gradient(g, kind), size: Theme.swatchPeek)
+                }
+            }
+            if entries.count > Self.peeked {
+                Text("+\(entries.count - Self.peeked)")
+                    .font(ThemeFont.label)
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(.leading, Theme.space2)
+            }
+        }
+        .padding(.trailing, Theme.panelPad - Theme.buttonInset)
     }
 
     // MARK: Colours

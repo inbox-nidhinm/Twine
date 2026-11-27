@@ -276,6 +276,9 @@ public enum Theme {
     /// for ticks and chevrons.
     public static let iconRow: CGFloat = 15
     public static let iconSmall: CGFloat = 13
+    /// The small swatches a closed Selection colours section shows in its
+    /// header, as Figma's do.
+    public static let swatchPeek: CGFloat = 16
 
 
     /// What every panel insets its contents by.
